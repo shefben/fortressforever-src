@@ -7,36 +7,72 @@
 
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
-#ifndef CS_CONTROL_H
-#define CS_CONTROL_H
+#ifndef FF_BOT_MANAGER_H
+#define FF_BOT_MANAGER_H
 
 
 #include "bot_manager.h"
 #include "nav_area.h"
 #include "bot_util.h"
 #include "bot_profile.h"
-#include "cs_shareddefs.h"
-#include "cs_player.h"
+#include "ff_shareddefs.h"
+#include "ff_player.h"
+
+//=============================================================================
+// FF Team Definitions (Assumed values - replace with actual engine/game definitions if available)
+// These are typical values used in Source Engine games.
+// Note: ff_shareddefs.h defines team *colors* but not these specific enum IDs.
+// CTeamManager::GetTeamName(int i) might be another source if available.
+#define FF_TEAM_UNASSIGNED 0  // Typically Unassigned
+#define FF_TEAM_SPECTATOR 1   // Typically Spectator
+#define FF_TEAM_RED 2         // Fortress Forever Red Team (example value)
+#define FF_TEAM_BLUE 3        // Fortress Forever Blue Team (example value)
+// Add FF_TEAM_YELLOW, FF_TEAM_GREEN if they are primary playable teams with distinct IDs
+// FF_TEAM_NEUTRAL could be a special value if needed for objectives, e.g., -1 or another enum.
+// FF_TEAM_COUNT should reflect the number of actual playable teams for array indexing etc.
+// For Red vs Blue, this is often 2 (if indexing starts at 0 for playable teams) or 4 (if including unassigned/spec).
+// For radio messages, it's likely for playable teams.
+#define FF_TEAM_COUNT 2 // Assuming 2 primary playable teams (Red, Blue) for things like radio message arrays.
+                        // Adjust if FF has more (e.g. 4-team maps).
+#define FF_TEAM_AUTOASSIGN -1 // Or another appropriate value for auto-assignment logic
+#define FF_TEAM_NEUTRAL -2    // Example for neutral objectives, if needed
+//=============================================================================
+
 
 extern ConVar friendlyfire;
 
 class CBasePlayerWeapon;
 
-/**
- * Given one team, return the other
- */
+// FF Specific: Define game scenario types
+enum FFGameScenarioType
+{
+	SCENARIO_FF_UNKNOWN,        // Default or unknown
+	SCENARIO_FF_ITEM_SCRIPT,    // Maps with info_ff_script (flags, custom objectives)
+	SCENARIO_FF_MINECART,       // Maps with ff_minecart (payload-like)
+	SCENARIO_FF_MIXED           // Maps with a mix of objectives
+};
+
+
+class CFFBotManager;
+
+// accessor for FF-specific bots
+inline CFFBotManager *TheFFBots( void )
+{
+	return reinterpret_cast< CFFBotManager * >( TheBots );
+}
+
+//--------------------------------------------------------------------------------------------------------------
+// FF: Added OtherTeam - assuming Red vs Blue for now. Adapt if more primary teams.
 inline int OtherTeam( int team )
 {
-	return (team == TEAM_TERRORIST) ? TEAM_CT : TEAM_TERRORIST;
+	if ( team == FF_TEAM_RED )
+		return FF_TEAM_BLUE;
+	if ( team == FF_TEAM_BLUE )
+		return FF_TEAM_RED;
+	return team; // Return original if not Red or Blue (e.g. spectator, unassigned)
 }
+//--------------------------------------------------------------------------------------------------------------
 
-class CCSBotManager;
-
-// accessor for CS-specific bots
-inline CCSBotManager *TheCSBots( void )
-{
-	return reinterpret_cast< CCSBotManager * >( TheBots );
-}
 
 //--------------------------------------------------------------------------------------------------------------
 class BotEventInterface : public IGameEventListener2
@@ -48,7 +84,7 @@ public:
 //--------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Macro to set up an OnEventClass() in TheCSBots.
+ * Macro to set up an OnEventClass() in TheFFBots.
  */
 #define DECLARE_BOTMANAGER_EVENT_LISTENER( BotManagerSingleton, EventClass, EventName ) \
 	public: \
@@ -89,21 +125,21 @@ public:
 
 
 //--------------------------------------------------------------------------------------------------------------
-#define DECLARE_CSBOTMANAGER_EVENT_LISTENER( EventClass, EventName ) DECLARE_BOTMANAGER_EVENT_LISTENER( TheCSBots, EventClass, EventName )
+#define DECLARE_FFBOTMANAGER_EVENT_LISTENER( EventClass, EventName ) DECLARE_BOTMANAGER_EVENT_LISTENER( TheFFBots, EventClass, EventName )
 
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Macro to propogate an event from the bot manager to all bots
  */
-#define CCSBOTMANAGER_ITERATE_BOTS( Callback, arg1 ) \
+#define CFFBOTMANAGER_ITERATE_BOTS( Callback, arg1 ) \
 	{ \
 		for ( int idx = 1; idx <= gpGlobals->maxClients; ++idx ) \
 		{ \
 			CBasePlayer *player = UTIL_PlayerByIndex( idx ); \
 			if (player == NULL) continue; \
 			if (!player->IsBot()) continue; \
-			CCSBot *bot = dynamic_cast< CCSBot * >(player); \
+			CFFBot *bot = dynamic_cast< CFFBot * >(player); \
 			if ( !bot ) continue; \
 			bot->Callback( arg1 ); \
 		} \
@@ -112,12 +148,12 @@ public:
 
 //--------------------------------------------------------------------------------------------------------------
 //
-// The manager for Counter-Strike specific bots
+// The manager for Fortress Forever specific bots
 //
-class CCSBotManager : public CBotManager
+class CFFBotManager : public CBotManager
 {
 public:
-	CCSBotManager();
+	CFFBotManager();
 
 	virtual CBasePlayer *AllocateBotEntity( void );			///< factory method to allocate the appropriate entity for the bot
 
@@ -133,7 +169,7 @@ public:
 	virtual void StartFrame( void );						///< (EXTEND) called each frame
 
 	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const;	///< return priority of player (0 = max pri)
-	virtual bool IsImportantPlayer( CCSPlayer *player ) const;				///< return true if player is important to scenario (VIP, bomb carrier, etc)
+	virtual bool IsImportantPlayer( CFFPlayer *player ) const;				///< return true if player is important to scenario (capture carrier, etc)
 
 	void ExtractScenarioData( void );							///< search the map entities to determine the game scenario and define important zones
 
@@ -151,46 +187,36 @@ public:
 	}
 
 	// the supported game scenarios ------------------------------------------------------------------------------
-	enum GameScenarioType
-	{
-		SCENARIO_DEATHMATCH,
-		SCENARIO_DEFUSE_BOMB,
-		SCENARIO_RESCUE_HOSTAGES,
-		SCENARIO_ESCORT_VIP
-	};
-	GameScenarioType GetScenario( void ) const		{ return m_gameScenario; }
+	FFGameScenarioType GetScenario( void ) const		{ return m_gameScenario; }
 
 	// "zones" ---------------------------------------------------------------------------------------------------
-	// depending on the game mode, these are bomb zones, rescue zones, etc.
+	// For FF, these can represent flags, control points, minecart paths/goals etc.
 
-	enum { MAX_ZONES = 4 };										///< max # of zones in a map
-	enum { MAX_ZONE_NAV_AREAS = 16 };							///< max # of nav areas in a zone
+	enum { MAX_ZONES = 16 };
+	enum { MAX_ZONE_NAV_AREAS = 32 };
 	struct Zone
 	{
-		CBaseEntity *m_entity;									///< the map entity
-		CNavArea *m_area[ MAX_ZONE_NAV_AREAS ];					///< nav areas that overlap this zone
+		EHANDLE m_entity;
+		CNavArea *m_area[ MAX_ZONE_NAV_AREAS ];
 		int m_areaCount;
 		Vector m_center;
-		bool m_isLegacy;										///< if true, use pev->origin and 256 unit radius as zone
-		int m_index;
+		int m_zoneID;
 		bool m_isBlocked;
 		Extent m_extent;
+		int m_team;
 	};
 
 	const Zone *GetZone( int i ) const				{ return &m_zone[i]; }
-	const Zone *GetZone( const Vector &pos ) const;				///< return the zone that contains the given position
-	const Zone *GetClosestZone( const Vector &pos ) const;		///< return the closest zone to the given position
-	const Zone *GetClosestZone( const CBaseEntity *entity ) const;	///< return the closest zone to the given entity
+	const Zone *GetZone( const Vector &pos ) const;
+	const Zone *GetClosestZone( const Vector &pos ) const;
+	const Zone *GetClosestZone( const CBaseEntity *entity ) const;
 	int GetZoneCount( void ) const					{ return m_zoneCount; }
 	void CheckForBlockedZones( void );
 
 
-	const Vector *GetRandomPositionInZone( const Zone *zone ) const;	///< return a random position inside the given zone
-	CNavArea *GetRandomAreaInZone( const Zone *zone ) const;			///< return a random area inside the given zone
+	const Vector *GetRandomPositionInZone( const Zone *zone ) const;
+	CNavArea *GetRandomAreaInZone( const Zone *zone ) const;
 
-	/**
-	 * Return the zone closest to the given position, using the given cost heuristic
-	 */
 	template< typename CostFunctor >
 	const Zone *GetClosestZone( CNavArea *startArea, CostFunctor costFunc, float *travelDistance = NULL ) const
 	{
@@ -208,7 +234,6 @@ public:
 			if ( m_zone[i].m_isBlocked )
 				continue;
 
-			// just use the first overlapping nav area as a reasonable approximation
 			float dist = NavAreaTravelDistance( startArea, m_zone[i].m_area[0], costFunc );
 
 			if (dist >= 0.0f && dist < closeDist)
@@ -224,7 +249,6 @@ public:
 		return closeZone;
 	}
 
-	/// pick a zone at random and return it
 	const Zone *GetRandomZone( void ) const
 	{
 		if (m_zoneCount == 0)
@@ -247,154 +271,141 @@ public:
 	}
 
 
-	/// returns a random spawn point for the given team (no arg means use both team spawnpoints)
-	CBaseEntity *GetRandomSpawn( int team = TEAM_MAXCOUNT ) const;
+	CBaseEntity *GetRandomSpawn( int team = FF_TEAM_AUTOASSIGN ) const;
 
 
-	bool IsBombPlanted( void ) const			{ return m_isBombPlanted; }			///< returns true if bomb has been planted
-	float GetBombPlantTimestamp( void ) const	{ return m_bombPlantTimestamp; }	///< return time bomb was planted
-	bool IsTimeToPlantBomb( void ) const;											///< return true if it's ok to try to plant bomb
-	CCSPlayer *GetBombDefuser( void ) const		{ return m_bombDefuser; }			///< return the player currently defusing the bomb, or NULL
-	float GetBombTimeLeft( void ) const;											///< get the time remaining before the planted bomb explodes
-	CBaseEntity *GetLooseBomb( void )			{ return m_looseBomb; }				///< return the bomb if it is loose on the ground
-	CNavArea *GetLooseBombArea( void ) const	{ return m_looseBombArea; }			///< return area that bomb is in/near
-	void SetLooseBomb( CBaseEntity *bomb );
-
-
-	float GetRadioMessageTimestamp( RadioType event, int teamID ) const;			///< return the last time the given radio message was sent for given team
-	float GetRadioMessageInterval( RadioType event, int teamID ) const;				///< return the interval since the last time this message was sent
+	float GetRadioMessageTimestamp( RadioType event, int teamID ) const;
+	float GetRadioMessageInterval( RadioType event, int teamID ) const;
 	void SetRadioMessageTimestamp( RadioType event, int teamID );
 	void ResetRadioMessageTimestamps( void );
 
-	float GetLastSeenEnemyTimestamp( void ) const	{ return m_lastSeenEnemyTimestamp; }	///< return the last time anyone has seen an enemy
+	float GetLastSeenEnemyTimestamp( void ) const	{ return m_lastSeenEnemyTimestamp; }
 	void SetLastSeenEnemyTimestamp( void ) 			{ m_lastSeenEnemyTimestamp = gpGlobals->curtime; }
 
 	float GetRoundStartTime( void ) const			{ return m_roundStartTimestamp; }
-	float GetElapsedRoundTime( void ) const			{ return gpGlobals->curtime - m_roundStartTimestamp; }	///< return the elapsed time since the current round began
+	float GetElapsedRoundTime( void ) const			{ return gpGlobals->curtime - m_roundStartTimestamp; }
 
-	bool AllowRogues( void ) const					{ return cv_bot_allow_rogues.GetBool(); }
-	bool AllowPistols( void ) const					{ return cv_bot_allow_pistols.GetBool(); }
-	bool AllowShotguns( void ) const				{ return cv_bot_allow_shotguns.GetBool(); }
-	bool AllowSubMachineGuns( void ) const			{ return cv_bot_allow_sub_machine_guns.GetBool(); }
-	bool AllowRifles( void ) const					{ return cv_bot_allow_rifles.GetBool(); }
-	bool AllowMachineGuns( void ) const				{ return cv_bot_allow_machine_guns.GetBool(); }
-	bool AllowGrenades( void ) const				{ return cv_bot_allow_grenades.GetBool(); }
-	bool AllowSnipers( void ) const					{ return cv_bot_allow_snipers.GetBool(); }
-#ifdef CS_SHIELD_ENABLED
-	bool AllowTacticalShield( void ) const			{ return cv_bot_allow_shield.GetBool(); }
-#else
-	bool AllowTacticalShield( void ) const			{ return false; }
-#endif // CS_SHIELD_ENABLED
+	// FF_TODO_WEAPONS: Consider adding AllowPistols, AllowShotguns etc. if FF bots need ConVar checks for weapon categories
+	// bool AllowPistols( void ) const				{ return cv_bot_allow_pistols.GetBool(); }
+	// bool AllowShotguns( void ) const				{ return cv_bot_allow_shotguns.GetBool(); }
+	// etc.
 
 	bool AllowFriendlyFireDamage( void ) const		{ return friendlyfire.GetBool(); }
 
-	bool IsWeaponUseable( const CWeaponCSBase *weapon ) const;	///< return true if the bot can use this weapon
+	bool IsWeaponUseable( const CBasePlayerWeapon *weapon ) const;	// In CS, this checks weapon allowance ConVars. Adapt for FF if needed.
 
-	bool IsDefenseRushing( void ) const				{ return m_isDefenseRushing; }		///< returns true if defense team has "decided" to rush this round
-	bool IsOnDefense( const CCSPlayer *player ) const;		///< return true if this player is on "defense"
-	bool IsOnOffense( const CCSPlayer *player ) const;		///< return true if this player is on "offense"
-
-	bool IsRoundOver( void ) const					{ return m_isRoundOver; }		///< return true if the round has ended
+	bool IsRoundOver( void ) const					{ return m_isRoundOver; }
 
 	#define FROM_CONSOLE true
-	bool BotAddCommand( int team, bool isFromConsole = false, const char *profileName = NULL, CSWeaponType weaponType = WEAPONTYPE_UNKNOWN, BotDifficultyType difficulty = NUM_DIFFICULTY_LEVELS );	///< process the "bot_add" console command
+	// FF_TODO_WEAPONS: weaponType parameter might be better as FFWeaponID or similar if specific weapon spawning is desired for bots.
+	bool BotAddCommand( int team, bool isFromConsole = false, const char *profileName = NULL, int weaponType = 0, BotDifficultyType difficulty = NUM_DIFFICULTY_LEVELS );
 
 private:
 	enum SkillType { LOW, AVERAGE, HIGH, RANDOM };
 
 	void MaintainBotQuota( void );
 
-	static bool m_isMapDataLoaded;							///< true if we've attempted to load map data
-	bool m_serverActive;									///< true between ServerActivate() and ServerDeactivate()
+	static bool m_isMapDataLoaded;
+	bool m_serverActive;
 
-	GameScenarioType m_gameScenario;						///< what kind of game are we playing
+	FFGameScenarioType m_gameScenario;
 
-	Zone m_zone[ MAX_ZONES ];							
+	Zone m_zone[ MAX_ZONES ];
 	int m_zoneCount;
 
-	bool m_isBombPlanted;									///< true if bomb has been planted
-	float m_bombPlantTimestamp;								///< time bomb was planted
-	float m_earliestBombPlantTimestamp;						///< don't allow planting until after this time has elapsed
-	CCSPlayer *m_bombDefuser;								///< the player currently defusing a bomb
-	EHANDLE m_looseBomb;									///< will be non-NULL if bomb is loose on the ground
-	CNavArea *m_looseBombArea;								///< area that bomb is is/near
+	// CS-specific members removed:
+	// bool m_isBombPlanted;
+	// float m_bombPlantTimestamp;
+	// float m_earliestBombPlantTimestamp;
+	// CFFPlayer *m_bombDefuser; // Was CCSPlayer
+	// EHANDLE m_looseBomb;
+	// CNavArea *m_looseBombArea;
+	// bool m_isDefenseRushing;
 
-	bool m_isRoundOver;										///< true if the round has ended
+	bool m_isRoundOver;
 
-	CountdownTimer m_checkTransientAreasTimer;				///< when elapsed, all transient nav areas should be checked for blockage
+	CountdownTimer m_checkTransientAreasTimer;
 
-	float m_radioMsgTimestamp[ RADIO_END - RADIO_START_1 ][ 2 ];
+	float m_radioMsgTimestamp[ RADIO_END - RADIO_START_1 ][ FF_TEAM_COUNT ];
 
 	float m_lastSeenEnemyTimestamp;
-	float m_roundStartTimestamp;							///< the time when the current round began
-
-	bool m_isDefenseRushing;								///< whether defensive team is rushing this round or not
+	float m_roundStartTimestamp;
 
 	// Event Handlers --------------------------------------------------------------------------------------------
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
+	// Generic events likely still relevant for FF
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DoorMoving,			door_moving )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFire,			weapon_fire )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFireOnEmpty,		weapon_fire_on_empty )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponReload,			weapon_reload )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombPickedUp,			bomb_pickup )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombPlanted,			bomb_planted )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombBeep,				bomb_beep )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefuseBegin,		bomb_begindefuse )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefused,			bomb_defused )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefuseAbort,		bomb_abortdefuse )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombExploded,			bomb_exploded )
+	// Round events - ff_restartround might be more specific
+	// FF_TODO_EVENTS: Verify if round_start, round_end, round_freeze_end are directly used or if ff_restartround covers all needs.
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundStart,			round_start )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundFreezeEnd,		round_freeze_end ) // If FF has freeze period, keep this
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundStart,			round_start )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundFreezeEnd,		round_freeze_end )
+	// FF Specific event listeners
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FFRestartRound,		ff_restartround ) // Specific FF event for round restarts
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerChangeClass,		player_changeclass )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerChangeTeam,		player_changeteam ) // Added: useful for bot team balancing/management
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DisguiseLost,			disguise_lost ) // Spy related
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( CloakLost,			    cloak_lost )    // Spy related
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( DoorMoving,			door_moving )
+	// Buildable events (These seem comprehensive for FF)
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildDispenser,		build_dispenser )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildSentryGun,		build_sentrygun )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildDetpack,		    build_detpack )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildManCannon,		build_mancannon )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserKilled,		dispenser_killed )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserDismantled,	dispenser_dismantled )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserDetonated,	dispenser_detonated )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserSabotaged,	dispenser_sabotaged ) // Engineer building sabotaged by Spy
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HostageFollows,		hostage_follows )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HostageRescuedAll,		hostage_rescued_all )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunKilled,		sentrygun_killed )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunDismantled,	sentrygun_dismantled ) // Corrected from sentry_dismantled
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunDetonated,	sentrygun_detonated )  // Corrected from sentry_detonated
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunUpgraded,		sentrygun_upgraded )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunSabotaged,	sentrygun_sabotaged )  // Engineer building sabotaged by Spy
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponFire,			weapon_fire )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponFireOnEmpty,		weapon_fire_on_empty )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponReload,			weapon_reload )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponZoom,			weapon_zoom )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DetpackDetonated,	    detpack_detonated )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ManCannonDetonated,	mancannon_detonated )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
+	// FF_TODO_EVENTS: Consider other game events like flag_captured, flag_dropped, point_captured, etc.
+	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( FlagCaptured,          item_captured ) // Example, verify actual event name
+	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( CapturePointCaptured,  point_captured ) // Example, verify actual event name
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( FlashbangDetonate,		flashbang_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( SmokeGrenadeDetonate,	smokegrenade_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
-
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
-
-	CUtlVector< BotEventInterface * > m_commonEventListeners;	// These event listeners fire often, and can be disabled for performance gains when no bots are present.
+	CUtlVector< BotEventInterface * > m_commonEventListeners;
 	bool m_eventListenersEnabled;
 	void EnableEventListeners( bool enable );
 };
 
-inline CBasePlayer *CCSBotManager::AllocateBotEntity( void )
+inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )
 {
-	return static_cast<CBasePlayer *>( CreateEntityByName( "cs_bot" ) );
+	return static_cast<CBasePlayer *>( CreateEntityByName( "ff_bot" ) );
 }
 
-inline bool CCSBotManager::IsTimeToPlantBomb( void ) const
-{
-	return (gpGlobals->curtime >= m_earliestBombPlantTimestamp);
-}
 
-inline const CCSBotManager::Zone *CCSBotManager::GetClosestZone( const CBaseEntity *entity ) const
+inline const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const CBaseEntity *entity ) const
 {
 	if (entity == NULL)
 		return NULL;
 
 	Vector centroid = entity->GetAbsOrigin();
-	centroid.z += HalfHumanHeight;
+	// centroid.z += HalfHumanHeight; // This might need adjustment based on typical FF player bbox
 	return GetClosestZone( centroid );
 }
 
-#endif
+#endif // FF_BOT_MANAGER_H

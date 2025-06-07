@@ -9,7 +9,7 @@
 // Author: Matthew D. Campbell (matt@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h" // FF_CHANGE: Changed from cs_bot.h
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"

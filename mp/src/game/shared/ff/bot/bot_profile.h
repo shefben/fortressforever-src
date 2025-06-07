@@ -14,7 +14,9 @@
 
 #include "bot_constants.h"
 #include "bot_util.h"
-#include "cs_weapon_parse.h"
+#include "../../server/ff/ff_shareddefs.h" // For FF_TEAM_*
+#include "../../server/ff/bot/ff_bot_manager.h" // For FF_TEAM_* constants
+#include "../weapons/ff_weapon_base.h" // For FFWeaponID
 
 enum
 {
@@ -44,9 +46,10 @@ public:
 		m_voicePitch = 100;
 		m_reactionTime = 0.3f;
 		m_attackDelay = 0.0f;
-		m_teams = TEAM_UNASSIGNED;
+		m_teams = FF_TEAM_UNASSIGNED;
 		m_voiceBank = 0;
-		m_prefersSilencer = false;
+		m_prefersSilencer = false; // FF_TODO: Review if this concept applies to FF
+		for(int i=0; i<MAX_WEAPON_PREFS; ++i) m_weaponPreference[i] = FF_WEAPON_NONE;
 	}
 
 	~BotProfile( void )
@@ -55,58 +58,58 @@ public:
 			delete [] m_name;
 	}
 
-	const char *GetName( void ) const					{ return m_name; }		///< return bot's name
+	const char *GetName( void ) const					{ return m_name; }
 	float GetAggression( void ) const					{ return m_aggression; }
 	float GetSkill( void ) const						{ return m_skill; }
 	float GetTeamwork( void ) const						{ return m_teamwork; }
 
-	CSWeaponID GetWeaponPreference( int i ) const		{ return m_weaponPreference[ i ]; }
-	const char *GetWeaponPreferenceAsString( int i ) const;
+	FFWeaponID GetWeaponPreference( int i ) const		{ return m_weaponPreference[ i ]; }
+	const char *GetWeaponPreferenceAsString( int i ) const; // Implementation will be FF_TODO in .cpp
 	int GetWeaponPreferenceCount( void ) const			{ return m_weaponPreferenceCount; }
-	bool HasPrimaryPreference( void ) const;			///< return true if this profile has a primary weapon preference
-	bool HasPistolPreference( void ) const;				///< return true if this profile has a pistol weapon preference
+	bool HasPrimaryPreference( void ) const;			// Implementation will be FF_TODO in .cpp
+	bool HasPistolPreference( void ) const;				// Implementation will be FF_TODO in .cpp
 
 	int GetCost( void ) const							{ return m_cost; }
-	int GetSkin( void ) const							{ return m_skin; }
-	bool IsDifficulty( BotDifficultyType diff ) const;	///< return true if this profile can be used for the given difficulty level
+	int GetSkin( void ) const							{ return m_skin; } // Assumed to be class slot ID for FF
+	bool IsDifficulty( BotDifficultyType diff ) const;
 	int GetVoicePitch( void ) const						{ return m_voicePitch; }
 	float GetReactionTime( void ) const					{ return m_reactionTime; }
 	float GetAttackDelay( void ) const					{ return m_attackDelay; }
 	int GetVoiceBank() const							{ return m_voiceBank; }
 
-	bool IsValidForTeam( int team ) const;
+	bool IsValidForTeam( int team ) const; // team will be FF_TEAM_*
 
-	bool PrefersSilencer() const						{ return m_prefersSilencer; }
+	bool PrefersSilencer() const						{ return m_prefersSilencer; } // FF_TODO: Review for FF
 
 	bool InheritsFrom( const char *name ) const;
 
 private:	
-	friend class BotProfileManager;						///< for loading profiles
+	friend class BotProfileManager;
 
-	void Inherit( const BotProfile *parent, const BotProfile *baseline );	///< copy values from parent if they differ from baseline
+	void Inherit( const BotProfile *parent, const BotProfile *baseline );
 
-	char *m_name;										///< the bot's name
-	float m_aggression;									///< percentage: 0 = coward, 1 = berserker
-	float m_skill;										///< percentage: 0 = terrible, 1 = expert
-	float m_teamwork;									///< percentage: 0 = rogue, 1 = complete obeyance to team, lots of comm
+	char *m_name;
+	float m_aggression;
+	float m_skill;
+	float m_teamwork;
 
 	enum { MAX_WEAPON_PREFS = 16 };
-	CSWeaponID m_weaponPreference[ MAX_WEAPON_PREFS ];	///< which weapons this bot likes to use, in order of priority
+	FFWeaponID m_weaponPreference[ MAX_WEAPON_PREFS ]; // Changed to FFWeaponID
 	int m_weaponPreferenceCount;
 
-	int m_cost;											///< reputation point cost for career mode
-	int m_skin;											///< "skin" index
-	unsigned char m_difficultyFlags;					///< bits set correspond to difficulty levels this is valid for
-	int m_voicePitch;									///< the pitch shift for bot chatter (100 = normal)
-	float m_reactionTime;								//< our reaction time in seconds
-	float m_attackDelay;								///< time in seconds from when we notice an enemy to when we open fire
-	int m_teams;										///< teams for which this profile is valid
+	int m_cost;
+	int m_skin;
+	unsigned char m_difficultyFlags;
+	int m_voicePitch;
+	float m_reactionTime;
+	float m_attackDelay;
+	int m_teams;
 
-	bool m_prefersSilencer;								///< does the bot prefer to use silencers?
+	bool m_prefersSilencer;
 
-	int m_voiceBank;									///< Index of the BotChatter.db voice bank this profile uses (0 is the default)
+	int m_voiceBank;
 
-	CUtlVector< const BotProfile * > m_templates;		///< List of templates we inherit from
+	CUtlVector< const BotProfile * > m_templates;
 };
 typedef CUtlLinkedList<BotProfile *> BotProfileList;
 
@@ -116,19 +119,11 @@ inline bool BotProfile::IsDifficulty( BotDifficultyType diff ) const
 	return (m_difficultyFlags & (1 << diff)) ? true : false;
 }
 
-/**
- * Copy in data from parent if it differs from the baseline
- */
 inline void BotProfile::Inherit( const BotProfile *parent, const BotProfile *baseline )
 {
-	if (parent->m_aggression != baseline->m_aggression)
-		m_aggression = parent->m_aggression;
-
-	if (parent->m_skill != baseline->m_skill)
-		m_skill = parent->m_skill;
-
-	if (parent->m_teamwork != baseline->m_teamwork)
-		m_teamwork = parent->m_teamwork;
+	if (parent->m_aggression != baseline->m_aggression) m_aggression = parent->m_aggression;
+	if (parent->m_skill != baseline->m_skill) m_skill = parent->m_skill;
+	if (parent->m_teamwork != baseline->m_teamwork) m_teamwork = parent->m_teamwork;
 
 	if (parent->m_weaponPreferenceCount != baseline->m_weaponPreferenceCount)
 	{
@@ -136,41 +131,19 @@ inline void BotProfile::Inherit( const BotProfile *parent, const BotProfile *bas
 		for( int i=0; i<parent->m_weaponPreferenceCount; ++i )
 			m_weaponPreference[i] = parent->m_weaponPreference[i];
 	}
-
-	if (parent->m_cost != baseline->m_cost)
-		m_cost = parent->m_cost;
-
-	if (parent->m_skin != baseline->m_skin)
-		m_skin = parent->m_skin;
-
-	if (parent->m_difficultyFlags != baseline->m_difficultyFlags)
-		m_difficultyFlags = parent->m_difficultyFlags;
-
-	if (parent->m_voicePitch != baseline->m_voicePitch)
-		m_voicePitch = parent->m_voicePitch;
-
-	if (parent->m_reactionTime != baseline->m_reactionTime)
-		m_reactionTime = parent->m_reactionTime;
-
-	if (parent->m_attackDelay != baseline->m_attackDelay)
-		m_attackDelay = parent->m_attackDelay;
-
-	if (parent->m_teams != baseline->m_teams)
-		m_teams = parent->m_teams;
-
-	if (parent->m_voiceBank != baseline->m_voiceBank)
-		m_voiceBank = parent->m_voiceBank;
-
+	if (parent->m_cost != baseline->m_cost) m_cost = parent->m_cost;
+	if (parent->m_skin != baseline->m_skin) m_skin = parent->m_skin;
+	if (parent->m_difficultyFlags != baseline->m_difficultyFlags) m_difficultyFlags = parent->m_difficultyFlags;
+	if (parent->m_voicePitch != baseline->m_voicePitch) m_voicePitch = parent->m_voicePitch;
+	if (parent->m_reactionTime != baseline->m_reactionTime) m_reactionTime = parent->m_reactionTime;
+	if (parent->m_attackDelay != baseline->m_attackDelay) m_attackDelay = parent->m_attackDelay;
+	if (parent->m_teams != baseline->m_teams) m_teams = parent->m_teams;
+	if (parent->m_voiceBank != baseline->m_voiceBank) m_voiceBank = parent->m_voiceBank;
+	if (parent->m_prefersSilencer != baseline->m_prefersSilencer) m_prefersSilencer = parent->m_prefersSilencer;
 	m_templates.AddToTail( parent );
 }
 
-
-
-
 //--------------------------------------------------------------------------------------------------------------
-/**
- * The BotProfileManager defines the interface to accessing BotProfiles
- */
 class BotProfileManager
 {
 public:
@@ -180,72 +153,32 @@ public:
 	void Init( const char *filename, unsigned int *checksum = NULL );
 	void Reset( void );
 
-	/// given a name, return a profile
-	const BotProfile *GetProfile( const char *name, int team ) const
-	{
-		FOR_EACH_LL( m_profileList, it )
-		{
-			BotProfile *profile = m_profileList[ it ];
-	
-			if ( !stricmp( name, profile->GetName() ) && profile->IsValidForTeam( team ) )
-				return profile;
-		}
+	const BotProfile *GetProfile( const char *name, int team ) const;
+	const BotProfile *GetProfileMatchingTemplate( const char *profileName, int team, BotDifficultyType difficulty ) const;
+	const BotProfileList *GetProfileList( void ) const		{ return &m_profileList; }
+	const BotProfile *GetRandomProfile( BotDifficultyType difficulty, int team, FFWeaponID weaponType ) const; // weaponType changed to FFWeaponID
 
-		return NULL;
-	}
-
-	/// given a template name and difficulty, return a profile
-	const BotProfile *GetProfileMatchingTemplate( const char *profileName, int team, BotDifficultyType difficulty ) const
-	{
-		FOR_EACH_LL( m_profileList, it )
-		{
-			BotProfile *profile = m_profileList[ it ];
-
-			if ( !profile->InheritsFrom( profileName ) )
-				continue;
-
-			if ( !profile->IsValidForTeam( team ) )
-				continue;
-
-			if ( !profile->IsDifficulty( difficulty ) )
-				continue;
-
-			if ( UTIL_IsNameTaken( profile->GetName() ) )
-				continue;
-
-			return profile;
-		}
-
-		return NULL;
-	}
-
-	const BotProfileList *GetProfileList( void ) const		{ return &m_profileList; }		///< return list of all profiles
-
-	const BotProfile *GetRandomProfile( BotDifficultyType difficulty, int team, CSWeaponType weaponType ) const;			///< return random unused profile that matches the given difficulty level
-
-	const char * GetCustomSkin( int index );				///< Returns custom skin name at a particular index
-	const char * GetCustomSkinModelname( int index );		///< Returns custom skin modelname at a particular index
-	const char * GetCustomSkinFname( int index );			///< Returns custom skin filename at a particular index
-	int GetCustomSkinIndex( const char *name, const char *filename = NULL );	///< Looks up a custom skin index by name
+	const char * GetCustomSkin( int index );
+	const char * GetCustomSkinModelname( int index );
+	const char * GetCustomSkinFname( int index );
+	int GetCustomSkinIndex( const char *name, const char *filename = NULL );
 
 	typedef CUtlVector<char *> VoiceBankList;
 	const VoiceBankList *GetVoiceBanks( void ) const		{ return &m_voiceBanks; }
-	int FindVoiceBankIndex( const char *filename );		///< return index of the (custom) bot phrase db, inserting it if needed
+	int FindVoiceBankIndex( const char *filename );
 
 protected:
-	BotProfileList m_profileList;							///< the list of all bot profiles
-	BotProfileList m_templateList;							///< the list of all bot templates
+	BotProfileList m_profileList;
+	BotProfileList m_templateList;
 
 	VoiceBankList m_voiceBanks;
 
-	char *m_skins[ NumCustomSkins ];						///< Custom skin names
-	char *m_skinModelnames[ NumCustomSkins ];				///< Custom skin modelnames
-	char *m_skinFilenames[ NumCustomSkins ];				///< Custom skin filenames
-	int m_nextSkin;											///< Next custom skin to allocate
+	char *m_skins[ NumCustomSkins ];
+	char *m_skinModelnames[ NumCustomSkins ];
+	char *m_skinFilenames[ NumCustomSkins ];
+	int m_nextSkin;
 };
 
-/// the global singleton for accessing BotProfiles
 extern BotProfileManager *TheBotProfiles;
-
 
 #endif // _BOT_PROFILE_H_
