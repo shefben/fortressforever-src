@@ -1181,6 +1181,19 @@ private:
 	CountdownTimer m_wiggleTimer;
 	CountdownTimer m_stuckJumpTimer;
 
+	//- Lua Objective Data Accessors --------------------------------------------------------------------------------
+public:
+	int GetLuaObjectivePointCount() const;
+	const CFFBotManager::LuaObjectivePoint* GetLuaObjectivePoint(int index) const;
+	const CUtlVector<CFFBotManager::LuaObjectivePoint>& GetAllLuaObjectivePoints() const;
+	const CFFBotManager::LuaObjectivePoint* GetClosestLuaObjectivePoint(const Vector &pos, int teamAffiliation = FF_TEAM_NEUTRAL, float maxDist = -1.0f) const;
+
+	int GetLuaPathPointCount() const;
+	const CFFBotManager::LuaPathPoint* GetLuaPathPoint(int index) const;
+	const CUtlVector<CFFBotManager::LuaPathPoint>& GetAllLuaPathPoints() const;
+	const CFFBotManager::LuaPathPoint* GetClosestLuaPathPoint(const Vector &pos, float maxDist = -1.0f) const; // Path points usually aren't team affiliated
+
+private:
 	enum { MAX_VEL_SAMPLES = 10 };	
 	float m_avgVel[ MAX_VEL_SAMPLES ];
 	int m_avgVelIndex;

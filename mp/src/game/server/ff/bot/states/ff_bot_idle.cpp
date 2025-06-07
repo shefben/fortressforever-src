@@ -202,6 +202,43 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// If all else fails and bot is just idle without a path, make it hunt.
 	if(!me->HasPath())
 	{
+		// FF_LUA_INTEGRATION_TODO: Prioritize Lua objectives before generic hunting
+		if (me->GetLuaObjectivePointCount() > 0)
+		{
+			// Example: Try to find a neutral or own-team objective first.
+			// More complex logic would involve checking objective type, status, bot's current task, etc.
+			int desiredTeamAffiliation = me->GetTeamNumber();
+			if (desiredTeamAffiliation < FF_TEAM_RED) // If bot is unassigned or spectator, look for neutral
+			    desiredTeamAffiliation = FF_TEAM_NEUTRAL;
+
+			const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), desiredTeamAffiliation);
+			if (!obj && desiredTeamAffiliation != FF_TEAM_NEUTRAL) // If no team objective, try neutral
+			{
+				obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), FF_TEAM_NEUTRAL);
+			}
+            // FF_TODO: Could also check for objectives specifically for the "other" team if the bot's role is to attack.
+
+			if (obj)
+			{
+				// Use Msg for general server console, PrintIfWatched for bot-specific debug target
+				Msg("[FF_BOT_IDLE] Bot %s found Lua objective: %s at (%.f, %.f, %.f), Team: %d\n",
+					me->GetPlayerName(), obj->name, obj->position.x, obj->position.y, obj->position.z, obj->teamAffiliation);
+				me->PrintIfWatched("Found Lua objective: %s at (%.f, %.f, %.f), Team: %d\n",
+					obj->name, obj->position.x, obj->position.y, obj->position.z, obj->teamAffiliation);
+
+				// FF_TODO_OBJECTIVES: This is where a bot would decide to move to an objective,
+				// potentially transitioning to a new state like "CaptureObjectiveState" or "MoveToObjectiveState".
+				// For now, just demonstrating data access. If we MoveTo, it might spam.
+				// Example:
+				// me->SetTask(CFFBot::CAPTURE_OBJECTIVE_LUA, (CBaseEntity*)NULL); // Need a new task type
+				// me->MoveTo(obj->position, SAFEST_ROUTE);
+				// return; // Exit IdleState once an objective is chosen
+			}
+			else
+			{
+				me->PrintIfWatched("No suitable Lua objectives found nearby or for my team.\n");
+			}
+		}
 		me->Hunt();
 	}
 }

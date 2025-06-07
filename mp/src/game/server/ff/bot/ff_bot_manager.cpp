@@ -148,15 +148,78 @@ bool CFFBotManager::IsOnOffense( const CFFPlayer *player ) const { return !IsOnD
 
 void CFFBotManager::ServerActivate( void )
 {
-	m_isMapDataLoaded = false; TheBotPhrases->Reset(); TheBotPhrases->Initialize( "BotChatter.db", 0 );
-	TheBotProfiles->Reset(); TheBotProfiles->FindVoiceBankIndex( "BotChatter.db" );
-	const char *filename = "BotPackList.db"; FileHandle_t file = filesystem->Open( filename, "r" );
-	if ( !file ) TheBotProfiles->Init( "BotProfile.db" );
-	else { /* ... (BotProfile loading as before) ... */ }
+	m_isMapDataLoaded = false;
+	TheBotPhrases->Reset();
+	TheBotPhrases->Initialize( "BotChatter.db", 0 );
+
+	TheBotProfiles->Reset();
+	TheBotProfiles->FindVoiceBankIndex( "BotChatter.db" );
+	const char *filename = "BotPackList.db";
+	FileHandle_t file = filesystem->Open( filename, "r" );
+	if ( !file )
+	{
+		TheBotProfiles->Init( "BotProfile.db" );
+	}
+	else
+	{
+		// FF_TODO_PORT: This BotProfile loading from BotPackList.db needs to be verified if it's still used.
+		// The original CS code had a more complex block here for parsing BotPackList.db
+		// For now, assuming the simple Init("BotProfile.db") if BotPackList.db is not found is okay,
+		// or that the existing BotProfile loading in the file is sufficient.
+		// If BotPackList.db is used, the parsing logic from cs_bot_manager.cpp should be ported here.
+		// Simplified for now:
+		char *dataPointer = new char[filesystem->Size(filename) + 1];
+		filesystem->Read(dataPointer, filesystem->Size(filename), file);
+		dataPointer[filesystem->Size(filename)] = 0;
+		filesystem->Close(file);
+		const char *dataFile = SharedParse(dataPointer);
+		const char *token;
+		while (dataFile)
+		{
+			token = SharedGetToken();
+			if (token && *token)
+			{
+				char *clone = CloneString(token);
+				TheBotProfiles->Init(clone);
+				delete[] clone;
+			}
+			dataFile = SharedParse(dataFile);
+		}
+		delete[] dataPointer;
+	}
 	const BotProfileManager::VoiceBankList *voiceBanks = TheBotProfiles->GetVoiceBanks();
-	for ( int i=1; i<voiceBanks->Count(); ++i ) TheBotPhrases->Initialize( (*voiceBanks)[i], i );
-	TheNavMesh->SetPlayerSpawnName( "info_player_red" ); TheNavMesh->SetPlayerSpawnName( "info_player_blue" );
-	ExtractScenarioData(); RestartRound(); TheBotPhrases->OnMapChange(); m_serverActive = true;
+	for ( int i=1; i<voiceBanks->Count(); ++i )
+	{
+		TheBotPhrases->Initialize( (*voiceBanks)[i], i );
+	}
+
+	TheNavMesh->SetPlayerSpawnName( "info_player_red" );
+	TheNavMesh->SetPlayerSpawnName( "info_player_blue" );
+
+	// FF_LUA_INTEGRATION:
+	// Lua scripts (base.lua, mapname.lua, globalscripts/custom.lua) are loaded and executed
+	// by FFScriptManager::LevelInit(), which is called by game rules (eg CGameRules::State_Enter(GR_STATE_PREGAME)).
+	// CFFBotManager does not need to manually load these scripts here.
+	// Instead, it would query data/call functions defined in Lua if needed.
+	Msg("[FF_BOT] CFFBotManager::ServerActivate - Lua scripts presumed loaded by FFScriptManager.\n");
+	if (_scriptman.GetLuaState() == NULL)
+	{
+		Warning("[FF_BOT] Lua state is NULL in CFFBotManager::ServerActivate. Lua scripts might not have loaded correctly.\n");
+	}
+	else
+	{
+		Msg("[FF_BOT] Lua state is available. Bots can potentially interact with Lua.\n");
+		// FF_LUA_INTEGRATION_TODO: Add calls here to Lua functions to get objective data
+		// and populate m_luaObjectivePoints, m_luaPathPoints, etc.
+		// Example:
+		// luabridge::LuaRef luaObjectives = luabridge::getGlobal( _scriptman.GetLuaState(), "FF_GetMapObjectivePoints" );
+		// if ( luaObjectives.isFunction() ) { try { luabridge::LuaResult result = luaObjectives(); /* process result */ } catch(...) {} }
+	}
+
+	ExtractScenarioData(); // This might need to be called AFTER Lua populates objectives if they are Lua-driven
+	RestartRound();
+	TheBotPhrases->OnMapChange();
+	m_serverActive = true;
 }
 
 void CFFBotManager::ServerDeactivate( void ) { m_serverActive = false; }
@@ -630,3 +693,42 @@ CON_COMMAND_F( nav_check_connectivity, "Checks to be sure every (or just the mar
 
 // Class CCollectOverlappingAreas remains the same as it's generic.
 // Note: ShortestPathCost is defined in ff_bot.h and uses CFFBot.
+
+// FF_LUA_INTEGRATION: Accessors for Lua-defined objective data
+const CUtlVector<CFFBotManager::LuaObjectivePoint>& CFFBotManager::GetAllLuaObjectivePoints() const
+{
+	return m_luaObjectivePoints;
+}
+
+int CFFBotManager::GetLuaObjectivePointCount() const
+{
+	return m_luaObjectivePoints.Count();
+}
+
+const CFFBotManager::LuaObjectivePoint* CFFBotManager::GetLuaObjectivePoint(int index) const
+{
+	if (index < 0 || index >= m_luaObjectivePoints.Count())
+	{
+		return NULL;
+	}
+	return &m_luaObjectivePoints[index];
+}
+
+const CUtlVector<CFFBotManager::LuaPathPoint>& CFFBotManager::GetAllLuaPathPoints() const
+{
+	return m_luaPathPoints;
+}
+
+int CFFBotManager::GetLuaPathPointCount() const
+{
+	return m_luaPathPoints.Count();
+}
+
+const CFFBotManager::LuaPathPoint* CFFBotManager::GetLuaPathPoint(int index) const
+{
+	if (index < 0 || index >= m_luaPathPoints.Count())
+	{
+		return NULL;
+	}
+	return &m_luaPathPoints[index];
+}

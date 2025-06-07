@@ -391,7 +391,7 @@ void CFFBot::EquipBestWeapon( bool mustEquip )
 				return;
 		}
 	}
-	
+
 	// FF_TODO_WEAPONS: Implement FF specific weapon selection logic.
 	// This is a very naive placeholder.
 	// It should iterate through available FFWeaponIDs, check if the bot has them,
@@ -741,4 +741,130 @@ float CFFBot::GetCombatRange( void ) const
 	}
 
 	return range;
+}
+
+//--------------------------------------------------------------------------------------------------------------
+// Lua Objective Data Accessors
+//--------------------------------------------------------------------------------------------------------------
+
+int CFFBot::GetLuaObjectivePointCount() const
+{
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetLuaObjectivePointCount();
+	}
+	return 0;
+}
+
+const CFFBotManager::LuaObjectivePoint* CFFBot::GetLuaObjectivePoint(int index) const
+{
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetLuaObjectivePoint(index);
+	}
+	return NULL;
+}
+
+const CUtlVector<CFFBotManager::LuaObjectivePoint>& CFFBot::GetAllLuaObjectivePoints() const
+{
+	// This is a bit awkward if TheFFBots() is NULL, as we must return a reference.
+	// However, TheFFBots() should generally be valid if bots are active.
+	// If it can be NULL and this is called, it would likely crash elsewhere anyway.
+	// Consider adding an empty static CUtlVector to return in error cases if this becomes an issue.
+	static CUtlVector<CFFBotManager::LuaObjectivePoint> s_emptyObjectivePoints;
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetAllLuaObjectivePoints();
+	}
+	return s_emptyObjectivePoints;
+}
+
+const CFFBotManager::LuaObjectivePoint* CFFBot::GetClosestLuaObjectivePoint(const Vector &pos, int teamAffiliation, float maxDist) const
+{
+	if (!TheFFBots())
+	{
+		return NULL;
+	}
+
+	const CUtlVector<CFFBotManager::LuaObjectivePoint>& objectives = TheFFBots()->GetAllLuaObjectivePoints();
+	const CFFBotManager::LuaObjectivePoint* closestPoint = NULL;
+	float closestDistSq = (maxDist > 0) ? (maxDist * maxDist) : FLT_MAX;
+
+	for (int i = 0; i < objectives.Count(); ++i)
+	{
+		const CFFBotManager::LuaObjectivePoint& point = objectives[i];
+
+		// Check team affiliation
+		if (teamAffiliation != FF_TEAM_NEUTRAL && // FF_TEAM_NEUTRAL means any team is fine for the objective itself
+            point.teamAffiliation != FF_TEAM_NEUTRAL && // Objective is team-specific
+            point.teamAffiliation != teamAffiliation)   // Objective team doesn't match requested team
+		{
+			// Special case: if bot is on a team, and objective is for OTHER team, it might still be relevant (e.g. to attack/defend)
+            // This simple getter doesn't make that decision; it just filters by exact affiliation or neutral.
+            // More complex logic would be in bot's tactical decision making.
+            // For now, if a specific team is requested for the objective, it must match or be neutral.
+            if (teamAffiliation != point.teamAffiliation)
+                continue;
+		}
+
+		float distSq = pos.DistToSqr(point.position);
+		if (distSq < closestDistSq)
+		{
+			closestDistSq = distSq;
+			closestPoint = &point;
+		}
+	}
+	return closestPoint;
+}
+
+int CFFBot::GetLuaPathPointCount() const
+{
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetLuaPathPointCount();
+	}
+	return 0;
+}
+
+const CFFBotManager::LuaPathPoint* CFFBot::GetLuaPathPoint(int index) const
+{
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetLuaPathPoint(index);
+	}
+	return NULL;
+}
+
+const CUtlVector<CFFBotManager::LuaPathPoint>& CFFBot::GetAllLuaPathPoints() const
+{
+	static CUtlVector<CFFBotManager::LuaPathPoint> s_emptyPathPoints;
+	if (TheFFBots())
+	{
+		return TheFFBots()->GetAllLuaPathPoints();
+	}
+	return s_emptyPathPoints;
+}
+
+const CFFBotManager::LuaPathPoint* CFFBot::GetClosestLuaPathPoint(const Vector &pos, float maxDist) const
+{
+	if (!TheFFBots())
+	{
+		return NULL;
+	}
+
+	const CUtlVector<CFFBotManager::LuaPathPoint>& pathPoints = TheFFBots()->GetAllLuaPathPoints();
+	const CFFBotManager::LuaPathPoint* closestPoint = NULL;
+	float closestDistSq = (maxDist > 0) ? (maxDist * maxDist) : FLT_MAX;
+
+	for (int i = 0; i < pathPoints.Count(); ++i)
+	{
+		const CFFBotManager::LuaPathPoint& point = pathPoints[i];
+		float distSq = pos.DistToSqr(point.position);
+		if (distSq < closestDistSq)
+		{
+			closestDistSq = distSq;
+			closestPoint = &point;
+		}
+	}
+	return closestPoint;
 }

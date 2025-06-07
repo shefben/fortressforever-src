@@ -390,6 +390,44 @@ private:
 	CUtlVector< BotEventInterface * > m_commonEventListeners;
 	bool m_eventListenersEnabled;
 	void EnableEventListeners( bool enable );
+
+	// FF_LUA_INTEGRATION: Placeholder structures for Lua-defined objective data
+	struct LuaObjectivePoint
+	{
+		char name[MAX_PATH];
+		Vector position;
+		int teamAffiliation;      // e.g., FF_TEAM_RED, FF_TEAM_BLUE, FF_TEAM_NEUTRAL, or specific team if it's a capture point for one team.
+		int type;                 // FF_LUA_TODO: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture, 4=PayloadCheckpoint, 5=PayloadGoal
+		float radius;             // Radius for proximity checks.
+		bool isActive;            // Is the objective currently active/relevant?
+		int currentOwnerTeam;     // For capturable points, which team currently owns it.
+		// Add other relevant properties as identified from Lua scripts.
+		LuaObjectivePoint() : position(vec3_origin), teamAffiliation(FF_TEAM_NEUTRAL), type(0), radius(100.0f), isActive(true), currentOwnerTeam(FF_TEAM_NEUTRAL) { name[0] = '\0'; }
+	};
+	CUtlVector<LuaObjectivePoint> m_luaObjectivePoints;
+
+	struct LuaPathPoint // For things like minecart paths defined in Lua
+	{
+		char name[MAX_PATH];
+		Vector position;
+		int order;                // Sequence order for the path.
+		float waitTime;           // How long to potentially wait at this node.
+		int pathID;               // If multiple paths exist.
+		// Add other properties like "isCartStop", "triggersEvent", etc.
+		LuaPathPoint() : position(vec3_origin), order(0), waitTime(0.0f), pathID(0) { name[0] = '\0'; }
+	};
+	CUtlVector<LuaPathPoint> m_luaPathPoints;
+	// Add more structures as needed for different types of Lua-driven game elements relevant to bots
+
+public:
+	// FF_LUA_INTEGRATION: Accessors for Lua-defined objective data
+	const CUtlVector<LuaObjectivePoint>& GetAllLuaObjectivePoints() const;
+	int GetLuaObjectivePointCount() const;
+	const LuaObjectivePoint* GetLuaObjectivePoint(int index) const;
+
+	const CUtlVector<LuaPathPoint>& GetAllLuaPathPoints() const;
+	int GetLuaPathPointCount() const;
+	const LuaPathPoint* GetLuaPathPoint(int index) const;
 };
 
 inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )
