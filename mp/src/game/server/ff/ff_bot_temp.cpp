@@ -61,17 +61,17 @@
 #include "in_buttons.h"
 #include "movehelper_server.h"
 #include "gameinterface.h"
-#include "ff_utils.h"
-#include "ff_team.h"
-#include "te_effect_dispatch.h"
-#include "bitbuf.h"
-#include "filesystem.h"
+// #include "ff_utils.h"
+// #include "ff_team.h"
+// #include "te_effect_dispatch.h"
+// #include "bitbuf.h"
+// #include "filesystem.h"
 
 // TODO: REMOVE ME REMOVE ME
 //#include "ff_detpack.h"
 
-#include "ff_buildableobject.h"
-#include "ff_buildable_sentrygun.h"
+// #include "ff_buildableobject.h"
+// #include "ff_buildable_sentrygun.h"
 
 CON_COMMAND_F(ffdev_tranqme, "tranqs you", FCVAR_CHEAT)
 {
@@ -88,483 +88,483 @@ CON_COMMAND_F(ffdev_tranqme, "tranqs you", FCVAR_CHEAT)
 }
 
 class CFFBot;
-void Bot_Think( CFFBot *pBot );
-bool Bot_GhostThinkRecord( CFFBot *pBot );
-bool Bot_GhostThinkPlayback( CFFBot *pBot );
+// void Bot_Think( CFFBot *pBot );
+// bool Bot_GhostThinkRecord( CFFBot *pBot );
+// bool Bot_GhostThinkPlayback( CFFBot *pBot );
 
-ConVar bot_forcefireweapon( "bot_forcefireweapon", "", 0, "Force bots with the specified weapon to fire." );
-ConVar bot_forceattack2( "bot_forceattack2", "0", 0, "When firing, use attack2." );
-ConVar bot_forceattackon( "bot_forceattackon", "0", 0, "When firing, don't tap fire, hold it down." );
-ConVar bot_flipout( "bot_flipout", "0", 0, "When on, all bots fire their guns." );
-ConVar bot_changeclass( "bot_changeclass", "0", 0, "Force all bots to change to the specified class." );
-static ConVar bot_mimic( "bot_mimic", "0", 0, "Bot uses usercmd of player by index." );
-static ConVar bot_mimic_yaw_offset( "bot_mimic_yaw_offset", "0", 0, "Offsets the bot yaw." );
-
-ConVar bot_sendcmd( "bot_sendcmd", "", 0, "Forces bots to send the specified command." );
-
-ConVar bot_crouch( "bot_crouch", "0", 0, "Bot crouches" );
-
-//////////////////////////////////////////////////////////////////////////
-
-ConVar bot_ghostrecord( "bot_ghostrecord", "-1", 0, "Record a clients usercommands to file." );
-ConVar bot_ghostplayback( "bot_ghostplayback", "-1", 0, "Playback a clients usercommands from file." );
-
-//////////////////////////////////////////////////////////////////////////
+// ConVar bot_forcefireweapon( "bot_forcefireweapon", "", 0, "Force bots with the specified weapon to fire." );
+// ConVar bot_forceattack2( "bot_forceattack2", "0", 0, "When firing, use attack2." );
+// ConVar bot_forceattackon( "bot_forceattackon", "0", 0, "When firing, don't tap fire, hold it down." );
+// ConVar bot_flipout( "bot_flipout", "0", 0, "When on, all bots fire their guns." );
+// ConVar bot_changeclass( "bot_changeclass", "0", 0, "Force all bots to change to the specified class." );
+// static ConVar bot_mimic( "bot_mimic", "0", 0, "Bot uses usercmd of player by index." );
+// static ConVar bot_mimic_yaw_offset( "bot_mimic_yaw_offset", "0", 0, "Offsets the bot yaw." );
+//
+// ConVar bot_sendcmd( "bot_sendcmd", "", 0, "Forces bots to send the specified command." );
+//
+// ConVar bot_crouch( "bot_crouch", "0", 0, "Bot crouches" );
+//
+// //////////////////////////////////////////////////////////////////////////
+//
+// ConVar bot_ghostrecord( "bot_ghostrecord", "-1", 0, "Record a clients usercommands to file." );
+// ConVar bot_ghostplayback( "bot_ghostplayback", "-1", 0, "Playback a clients usercommands from file." );
+//
+// //////////////////////////////////////////////////////////////////////////
 
 static int g_CurBotNumber = 1;
 
-CON_COMMAND( bot_immuneme, "immune me" )
-{
-	CFFPlayer *pHuman = ToFFPlayer( UTIL_GetCommandClient() );
-	if( pHuman )
-	{
-		pHuman->Cure( NULL );
-	}
-}
-
-CON_COMMAND(bot_cloak, "cloak!")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_SpyCloak();
-		}
-	}
-}
-
-CON_COMMAND( bot_slot, "change to slot x" )
-{
-	int iSlot = 1;
-
-	const char* pszString = args[1];
-	if( !pszString )
-		return;
-
-	switch( pszString[0] )
-	{
-		case '1': iSlot = 1; break;
-		case '2': iSlot = 2; break;
-		case '3': iSlot = 3; break;
-		case '4': iSlot = 4; break;
-		case '5': iSlot = 5; break;
-		default: Warning( "[bot_slot] Default to slot 1\n" ); break;
-	}
-
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Weapon_Switch( pPlayer->Weapon_GetSlot( iSlot ) );
-		}
-	}
-}
-
-CON_COMMAND(bot_scloak, "scloak!")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_SpySilentCloak();
-		}
-	}
-}
-
-CON_COMMAND( bot_dropitems, "drop items" )
-{
-	for( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
-		{
-			pPlayer->Command_DropItems();
-		}
-	}
-}
-
-CON_COMMAND( bot_savesentry, "makes a bot save his sentry" )
-{
-	for( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-		if( pPlayer && pPlayer->GetSentryGun() )
-		{
-			CFFSentryGun *pSentryGun = pPlayer->GetSentryGun();
-			pSentryGun->Upgrade();
-			pSentryGun->Repair(200);
-			pSentryGun->AddAmmo(200, 200);
-		}
-	}
-}
-
-CON_COMMAND(bot_buildsentry, "build an sg")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_BuildSentryGun();
-		}
-	}
-
-}
-
-CON_COMMAND(bot_builddispenser, "build a dispenser")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_BuildDispenser();
-		}
-	}
-
-}
-
-CON_COMMAND(bot_buildsg, "build an sg")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_BuildSentryGun();
-		}
-	}
-
-}
-
-CON_COMMAND(bot_disguise, "trigger a disguise")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Bot_Disguise(TEAM_RED, CLASS_SOLDIER);
-		}
-	}
-}
-
-CON_COMMAND(bot_disguisez, "trigger a disguise")
-{
-	if ((!args[1] || !args[1][0]) || (!args[2] || !args[2][0]))
-		return;
-
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			int iTeam = TEAM_UNASSIGNED;
-			int iClass = CLASS_NONE;
-
-			if (!Q_stricmp( args[1], "blue"))
-				iTeam = TEAM_BLUE;
-			else if( !Q_stricmp( args[1], "red" ) )
-				iTeam = TEAM_RED;
-			else if( !Q_stricmp( args[1], "yellow" ) )
-				iTeam = TEAM_YELLOW;
-			else if( !Q_stricmp( args[1], "green" ) )
-				iTeam = TEAM_GREEN;
-
-			if( !Q_stricmp( args[2], "scout" ) )
-				iClass = CLASS_SCOUT;
-			else if( !Q_stricmp( args[2], "sniper" ) )
-				iClass = CLASS_SNIPER;
-			else if( !Q_stricmp( args[2], "soldier" ) )
-				iClass = CLASS_SOLDIER;
-			else if( !Q_stricmp( args[2], "demoman" ) )
-				iClass = CLASS_DEMOMAN;
-			else if( !Q_stricmp( args[2], "medic" ) )
-				iClass = CLASS_MEDIC;
-			else if( !Q_stricmp( args[2], "hwguy" ) )
-				iClass = CLASS_HWGUY;
-			else if( !Q_stricmp( args[2], "pyro" ) )
-				iClass = CLASS_PYRO;
-			else if( !Q_stricmp( args[2], "spy" ) )
-				iClass = CLASS_SPY;
-			else if( !Q_stricmp( args[2], "engineer" ) )
-				iClass = CLASS_ENGINEER;
-
-			if( iTeam != TEAM_UNASSIGNED && iClass != CLASS_NONE )
-			{
-				Warning( "[Bot %s] Disguising as: %s %s\n", pPlayer->GetPlayerName(), args[1], args[2] );
-				pPlayer->Bot_Disguise( iTeam, iClass );
-			}			
-		}
-	}
-}
-
-CON_COMMAND( bot_dmggun, "Makes a bot attack your sg" )
-{
-	for( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-
-		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
-		{
-			CFFPlayer *pOwner = ToFFPlayer( UTIL_GetCommandClient() );
-			if( pOwner )
-			{
-				if( pOwner->GetSentryGun() )
-				{
-					Warning( "[Bot %s] Sending damage to %s's sentrygun!\n", pPlayer->GetPlayerName(), pOwner->GetPlayerName() );
-					( pOwner->GetSentryGun() )->TakeDamage( CTakeDamageInfo( pPlayer, pPlayer, 999999.0f, DMG_DIRECT ) );
-				}
-			}
-		}
-	}
-}
-
-CON_COMMAND( bot_showhealth, "Makes a bot show his health" )
-{
-	for( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-
-		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
-		{
-			Warning( "[Bot %s] Health: %i (%i%%), Armor: %i (%i%%), Alive: %s: Lifestate: %i\n", pPlayer->GetPlayerName(), pPlayer->GetHealth(), pPlayer->GetHealthPercentage(), pPlayer->GetArmor(), pPlayer->GetArmorPercentage(), pPlayer->IsAlive() ? "Yes" : "No", (int) pPlayer->m_lifeState );
-		}
-	}
-}
-
-CON_COMMAND(bot_flashlight, "turn on flashlights")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->FlashlightTurnOn();
-		}
-	}
-}
-
-CON_COMMAND(bot_saveme, "have a bot do saveme")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_SaveMe();
-		}
-	}
-}
-
-CON_COMMAND(bot_engyme, "have a bot do engyme")
-{
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->Command_EngyMe();
-		}
-	}
-}
-
-CON_COMMAND( bot_status, "Make bot show health / armor" )
-{
-	for( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-		if( pPlayer && ( ( pPlayer->GetFlags() & FL_FAKECLIENT) || pPlayer->IsBot() ) )
-		{
-			Warning( "[Bot %s] Health: %i (%i%%) Armor: %i (%i%%)\n", pPlayer->GetPlayerName(), pPlayer->GetHealth(), pPlayer->GetHealthPercentage(), pPlayer->GetArmor(), pPlayer->GetArmorPercentage() );
-		}
-	}
-}
-
-CON_COMMAND(ffdev_gibs, "gibs")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-
-	CEffectData effect;
-	effect.m_nEntIndex = you->entindex();
-
-	DispatchEffect("Gib", effect);
-}
-
-CON_COMMAND(ffdev_legshotme, "legshots you")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-	you->AddSpeedEffect(SE_LEGSHOT, 999, 0.5f, SEM_ACCUMULATIVE|SEM_HEALABLE, FF_STATUSICON_LEGINJURY, 15.0f);
-}
-
-//CON_COMMAND(ffdev_tranqme, "tranqs you")
-//{
-//	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-//	you->AddSpeedEffect(SE_TRANQ, 6.0, 0.3f, SEM_BOOLEAN|SEM_HEALABLE, FF_STATUSICON_TRANQUILIZED, 6.0f);
-//	
-//	CSingleUserRecipientFilter user(you);
-//	user.MakeReliable();
+// CON_COMMAND( bot_immuneme, "immune me" )
+// {
+// 	CFFPlayer *pHuman = ToFFPlayer( UTIL_GetCommandClient() );
+// 	if( pHuman )
+// 	{
+// 		pHuman->Cure( NULL );
+// 	}
+// }
 //
-//	UserMessageBegin(user, "FFViewEffect");
-//	WRITE_BYTE(FF_VIEWEFFECT_TRANQUILIZED);
-//	WRITE_FLOAT(6.0f);
-//	MessageEnd();
-//}
+// CON_COMMAND(bot_cloak, "cloak!")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_SpyCloak();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_slot, "change to slot x" )
+// {
+// 	int iSlot = 1;
+//
+// 	const char* pszString = args[1];
+// 	if( !pszString )
+// 		return;
+//
+// 	switch( pszString[0] )
+// 	{
+// 		case '1': iSlot = 1; break;
+// 		case '2': iSlot = 2; break;
+// 		case '3': iSlot = 3; break;
+// 		case '4': iSlot = 4; break;
+// 		case '5': iSlot = 5; break;
+// 		default: Warning( "[bot_slot] Default to slot 1\n" ); break;
+// 	}
+//
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Weapon_Switch( pPlayer->Weapon_GetSlot( iSlot ) );
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_scloak, "scloak!")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_SpySilentCloak();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_dropitems, "drop items" )
+// {
+// 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+// 		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
+// 		{
+// 			pPlayer->Command_DropItems();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_savesentry, "makes a bot save his sentry" )
+// {
+// 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+// 		if( pPlayer && pPlayer->GetSentryGun() )
+// 		{
+// 			CFFSentryGun *pSentryGun = pPlayer->GetSentryGun();
+// 			pSentryGun->Upgrade();
+// 			pSentryGun->Repair(200);
+// 			pSentryGun->AddAmmo(200, 200);
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_buildsentry, "build an sg")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_BuildSentryGun();
+// 		}
+// 	}
+//
+// }
+//
+// CON_COMMAND(bot_builddispenser, "build a dispenser")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_BuildDispenser();
+// 		}
+// 	}
+//
+// }
+//
+// CON_COMMAND(bot_buildsg, "build an sg")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_BuildSentryGun();
+// 		}
+// 	}
+//
+// }
+//
+// CON_COMMAND(bot_disguise, "trigger a disguise")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Bot_Disguise(TEAM_RED, CLASS_SOLDIER);
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_disguisez, "trigger a disguise")
+// {
+// 	if ((!args[1] || !args[1][0]) || (!args[2] || !args[2][0]))
+// 		return;
+//
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			int iTeam = TEAM_UNASSIGNED;
+// 			int iClass = CLASS_NONE;
+//
+// 			if (!Q_stricmp( args[1], "blue"))
+// 				iTeam = TEAM_BLUE;
+// 			else if( !Q_stricmp( args[1], "red" ) )
+// 				iTeam = TEAM_RED;
+// 			else if( !Q_stricmp( args[1], "yellow" ) )
+// 				iTeam = TEAM_YELLOW;
+// 			else if( !Q_stricmp( args[1], "green" ) )
+// 				iTeam = TEAM_GREEN;
+//
+// 			if( !Q_stricmp( args[2], "scout" ) )
+// 				iClass = CLASS_SCOUT;
+// 			else if( !Q_stricmp( args[2], "sniper" ) )
+// 				iClass = CLASS_SNIPER;
+// 			else if( !Q_stricmp( args[2], "soldier" ) )
+// 				iClass = CLASS_SOLDIER;
+// 			else if( !Q_stricmp( args[2], "demoman" ) )
+// 				iClass = CLASS_DEMOMAN;
+// 			else if( !Q_stricmp( args[2], "medic" ) )
+// 				iClass = CLASS_MEDIC;
+// 			else if( !Q_stricmp( args[2], "hwguy" ) )
+// 				iClass = CLASS_HWGUY;
+// 			else if( !Q_stricmp( args[2], "pyro" ) )
+// 				iClass = CLASS_PYRO;
+// 			else if( !Q_stricmp( args[2], "spy" ) )
+// 				iClass = CLASS_SPY;
+// 			else if( !Q_stricmp( args[2], "engineer" ) )
+// 				iClass = CLASS_ENGINEER;
+//
+// 			if( iTeam != TEAM_UNASSIGNED && iClass != CLASS_NONE )
+// 			{
+// 				Warning( "[Bot %s] Disguising as: %s %s\n", pPlayer->GetPlayerName(), args[1], args[2] );
+// 				pPlayer->Bot_Disguise( iTeam, iClass );
+// 			}
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_dmggun, "Makes a bot attack your sg" )
+// {
+// 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+//
+// 		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
+// 		{
+// 			CFFPlayer *pOwner = ToFFPlayer( UTIL_GetCommandClient() );
+// 			if( pOwner )
+// 			{
+// 				if( pOwner->GetSentryGun() )
+// 				{
+// 					Warning( "[Bot %s] Sending damage to %s's sentrygun!\n", pPlayer->GetPlayerName(), pOwner->GetPlayerName() );
+// 					( pOwner->GetSentryGun() )->TakeDamage( CTakeDamageInfo( pPlayer, pPlayer, 999999.0f, DMG_DIRECT ) );
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_showhealth, "Makes a bot show his health" )
+// {
+// 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+//
+// 		if( pPlayer && ( pPlayer->GetFlags() & FL_FAKECLIENT ) )
+// 		{
+// 			Warning( "[Bot %s] Health: %i (%i%%), Armor: %i (%i%%), Alive: %s: Lifestate: %i\n", pPlayer->GetPlayerName(), pPlayer->GetHealth(), pPlayer->GetHealthPercentage(), pPlayer->GetArmor(), pPlayer->GetArmorPercentage(), pPlayer->IsAlive() ? "Yes" : "No", (int) pPlayer->m_lifeState );
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_flashlight, "turn on flashlights")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->FlashlightTurnOn();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_saveme, "have a bot do saveme")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_SaveMe();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(bot_engyme, "have a bot do engyme")
+// {
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
+// 		{
+// 			pPlayer->Command_EngyMe();
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND( bot_status, "Make bot show health / armor" )
+// {
+// 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+// 		if( pPlayer && ( ( pPlayer->GetFlags() & FL_FAKECLIENT) || pPlayer->IsBot() ) )
+// 		{
+// 			Warning( "[Bot %s] Health: %i (%i%%) Armor: %i (%i%%)\n", pPlayer->GetPlayerName(), pPlayer->GetHealth(), pPlayer->GetHealthPercentage(), pPlayer->GetArmor(), pPlayer->GetArmorPercentage() );
+// 		}
+// 	}
+// }
+//
+// CON_COMMAND(ffdev_gibs, "gibs")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+//
+// 	CEffectData effect;
+// 	effect.m_nEntIndex = you->entindex();
+//
+// 	DispatchEffect("Gib", effect);
+// }
+//
+// CON_COMMAND(ffdev_legshotme, "legshots you")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+// 	you->AddSpeedEffect(SE_LEGSHOT, 999, 0.5f, SEM_ACCUMULATIVE|SEM_HEALABLE, FF_STATUSICON_LEGINJURY, 15.0f);
+// }
+//
+// //CON_COMMAND(ffdev_tranqme, "tranqs you")
+// //{
+// //	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+// //	you->AddSpeedEffect(SE_TRANQ, 6.0, 0.3f, SEM_BOOLEAN|SEM_HEALABLE, FF_STATUSICON_TRANQUILIZED, 6.0f);
+// //
+// //	CSingleUserRecipientFilter user(you);
+// //	user.MakeReliable();
+// //
+// //	UserMessageBegin(user, "FFViewEffect");
+// //	WRITE_BYTE(FF_VIEWEFFECT_TRANQUILIZED);
+// //	WRITE_FLOAT(6.0f);
+// //	MessageEnd();
+// //}
+//
+// CON_COMMAND(ffdev_gasvieweffectme, "gas view effects you")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+//
+// 	CSingleUserRecipientFilter user(you);
+// 	user.MakeReliable();
+//
+// 	UserMessageBegin(user, "FFViewEffect");
+// 	WRITE_BYTE(FF_VIEWEFFECT_GASSED);
+// 	WRITE_FLOAT(6.0f);
+// 	MessageEnd();
+// }
+//
+// CON_COMMAND(ffdev_score, "you score")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+// 	you->AddPointsToTeam(10, true);
+// }
+//
+// CON_COMMAND(ffdev_conc, "some weird negative conc")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+// 	you->m_flConcTime = -1;
+// }
+//
+// CON_COMMAND(ffdev_iclass, "instant switch")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+//
+// 	if (!args[1] || !args[1][0])
+// 		return;
+//
+// 	int iClass = atoi(args[1]);
+//
+// 	you->InstaSwitch(iClass);
+// }
+//
+// CON_COMMAND(bot_infectme, "infects you")
+// {
+// 	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+//
+// 	if (!you)
+// 		return;
+//
+// 	for (int i = 1; i <= gpGlobals->maxClients; i++)
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+//
+// 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT) && pPlayer->GetClassSlot() == CLASS_MEDIC)
+// 		{
+// 			you->Infect(pPlayer);
+// 		}
+// 	}
+// }
 
-CON_COMMAND(ffdev_gasvieweffectme, "gas view effects you")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
+// // This is our bot class.
+// class CFFBot : public CFFPlayer
+// {
+// public:
+// 	bool			m_bBackwards;
+//
+// 	float			m_flNextTurnTime;
+// 	bool			m_bLastTurnToRight;
+//
+// 	float			m_flNextStrafeTime;
+// 	float			m_flSideMove;
+//
+// 	QAngle			m_ForwardAngle;
+// 	QAngle			m_LastAngles;
+//
+// };
 
-	CSingleUserRecipientFilter user(you);
-	user.MakeReliable();
+// LINK_ENTITY_TO_CLASS( ff_bot, CFFBot );
 
-	UserMessageBegin(user, "FFViewEffect");
-	WRITE_BYTE(FF_VIEWEFFECT_GASSED);
-	WRITE_FLOAT(6.0f);
-	MessageEnd();
-}
-
-CON_COMMAND(ffdev_score, "you score")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-	you->AddPointsToTeam(10, true);
-}
-
-CON_COMMAND(ffdev_conc, "some weird negative conc")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-	you->m_flConcTime = -1;
-}
-
-CON_COMMAND(ffdev_iclass, "instant switch")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-
-	if (!args[1] || !args[1][0])
-		return;
-
-	int iClass = atoi(args[1]);
-
-	you->InstaSwitch(iClass);
-}
-
-CON_COMMAND(bot_infectme, "infects you")
-{
-	CFFPlayer *you = ToFFPlayer(UTIL_GetCommandClient());
-
-	if (!you)
-		return;
-
-	for (int i = 1; i <= gpGlobals->maxClients; i++)
-	{
-		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
-
-		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT) && pPlayer->GetClassSlot() == CLASS_MEDIC)
-		{
-			you->Infect(pPlayer);
-		}
-	}
-}
-
-// This is our bot class.
-class CFFBot : public CFFPlayer
-{
-public:
-	bool			m_bBackwards;
-
-	float			m_flNextTurnTime;
-	bool			m_bLastTurnToRight;
-
-	float			m_flNextStrafeTime;
-	float			m_flSideMove;
-
-	QAngle			m_ForwardAngle;
-	QAngle			m_LastAngles;
-	
-};
-
-LINK_ENTITY_TO_CLASS( ff_bot, CFFBot );
-
-class CBotManager
-{
-public:
-	static CBasePlayer* ClientPutInServerOverride_Bot( edict_t *pEdict, const char *playername )
-	{
-		// This tells it which edict to use rather than creating a new one.
-		CBasePlayer::s_PlayerEdict = pEdict;
-
-		CFFBot *pPlayer = static_cast<CFFBot *>( CreateEntityByName( "ff_bot" ) );
-		if ( pPlayer )
-		{
-			pPlayer->SetPlayerName( playername );
-		}
-
-		return pPlayer;
-	}
-};
+// class CBotManager
+// {
+// public:
+// 	static CBasePlayer* ClientPutInServerOverride_Bot( edict_t *pEdict, const char *playername )
+// 	{
+// 		// This tells it which edict to use rather than creating a new one.
+// 		CBasePlayer::s_PlayerEdict = pEdict;
+//
+// 		CFFBot *pPlayer = static_cast<CFFBot *>( CreateEntityByName( "ff_bot" ) );
+// 		if ( pPlayer )
+// 		{
+// 			pPlayer->SetPlayerName( playername );
+// 		}
+//
+// 		return pPlayer;
+// 	}
+// };
 
 
 //-----------------------------------------------------------------------------
 // Purpose: Create a new Bot and put it in the game.
 // Output : Pointer to the new Bot, or NULL if there's no free clients.
 //-----------------------------------------------------------------------------
-CBasePlayer *BotPutInServer( bool bFrozen, int iTeam, int iClass, const char *pszCustomName )
-{
-	char botname[ 64 ];
-	if ( pszCustomName && pszCustomName[0] )
-	{
-		V_strcpy_safe( botname, pszCustomName );
-	}
-	else
-	{
-		Q_snprintf(botname, sizeof(botname), "Bot%02i", g_CurBotNumber);
-	}
-	
-	// This trick lets us create a CFFBot for this client instead of the CFFPlayer
-	// that we would normally get when ClientPutInServer is called.
-	ClientPutInServerOverride( &CBotManager::ClientPutInServerOverride_Bot );
-	edict_t *pEdict = engine->CreateFakeClient( botname );
-	ClientPutInServerOverride( NULL );
-
-	if (!pEdict)
-	{
-		Msg( "Failed to create Bot.\n");
-		return NULL;
-	}
-
-	// Allocate a player entity for the bot, and call spawn
-	CFFBot *pPlayer = ((CFFBot*)CBaseEntity::Instance( pEdict ));
-
-	pPlayer->ClearFlags();
-	pPlayer->AddFlag( FL_CLIENT | FL_FAKECLIENT );
-
-	if ( bFrozen )
-		pPlayer->AddEFlags( EFL_BOT_FROZEN );
-
-	//pPlayer->ChangeTeam( TEAM_UNASSIGNED );
-	pPlayer->ChangeTeam( iTeam );
-	pPlayer->ChangeClass( bot_changeclass.GetInt() ? Class_IntToString(bot_changeclass.GetInt()) : Class_IntToString(iClass) );
-	pPlayer->RemoveAllItems( true );
-	pPlayer->Spawn();
-
-	g_CurBotNumber++;
-
-	return pPlayer;
-}
+// CBasePlayer *BotPutInServer( bool bFrozen, int iTeam, int iClass, const char *pszCustomName )
+// {
+// 	char botname[ 64 ];
+// 	if ( pszCustomName && pszCustomName[0] )
+// 	{
+// 		V_strcpy_safe( botname, pszCustomName );
+// 	}
+// 	else
+// 	{
+// 		Q_snprintf(botname, sizeof(botname), "Bot%02i", g_CurBotNumber);
+// 	}
+//
+// 	// This trick lets us create a CFFBot for this client instead of the CFFPlayer
+// 	// that we would normally get when ClientPutInServer is called.
+// 	ClientPutInServerOverride( &CBotManager::ClientPutInServerOverride_Bot );
+// 	edict_t *pEdict = engine->CreateFakeClient( botname );
+// 	ClientPutInServerOverride( NULL );
+//
+// 	if (!pEdict)
+// 	{
+// 		Msg( "Failed to create Bot.\n");
+// 		return NULL;
+// 	}
+//
+// 	// Allocate a player entity for the bot, and call spawn
+// 	CFFBot *pPlayer = ((CFFBot*)CBaseEntity::Instance( pEdict ));
+//
+// 	pPlayer->ClearFlags();
+// 	pPlayer->AddFlag( FL_CLIENT | FL_FAKECLIENT );
+//
+// 	if ( bFrozen )
+// 		pPlayer->AddEFlags( EFL_BOT_FROZEN );
+//
+// 	//pPlayer->ChangeTeam( TEAM_UNASSIGNED );
+// 	pPlayer->ChangeTeam( iTeam );
+// 	pPlayer->ChangeClass( bot_changeclass.GetInt() ? Class_IntToString(bot_changeclass.GetInt()) : Class_IntToString(iClass) );
+// 	pPlayer->RemoveAllItems( true );
+// 	pPlayer->Spawn();
+//
+// 	g_CurBotNumber++;
+//
+// 	return pPlayer;
+// }
 
 // Handler for the "bot" command.
 void BotAdd_f( const CCommand &args )
@@ -625,20 +625,20 @@ ConCommand cc_Bot( "bot_add", BotAdd_f, "Add a bot.", FCVAR_CHEAT );
 //-----------------------------------------------------------------------------
 // Purpose: Run through all the Bots in the game and let them think.
 //-----------------------------------------------------------------------------
-void Bot_RunAll( void )
-{
-	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
-	{
-		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
-
-		if ( pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT) )
-		{
-			CFFBot *pBot = dynamic_cast< CFFBot* >( pPlayer );
-			if ( pBot )
-				Bot_Think( pBot );
-		}
-	}
-}
+// void Bot_RunAll( void )
+// {
+// 	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+// 	{
+// 		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+//
+// 		if ( pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT) )
+// 		{
+// 			CFFBot *pBot = dynamic_cast< CFFBot* >( pPlayer );
+// 			if ( pBot )
+// 				Bot_Think( pBot );
+// 		}
+// 	}
+// }
 
 bool Bot_RunMimicCommand( CUserCmd& cmd )
 {
@@ -970,155 +970,155 @@ char g_UserCmdBuffer[iBufferSize + sizeof(CUserCmd)];
 bf_write g_WriteBuffer("GhostWriter", g_UserCmdBuffer, sizeof(g_UserCmdBuffer));
 bf_read g_ReadBuffer("GhostReader", g_UserCmdBuffer, sizeof(g_UserCmdBuffer));
 
-bool Bot_GhostThinkRecord( CFFBot *pBot )
-{
-	if(bot_ghostplayback.GetInt() > 0)
-		return false;
-
-	if ( bot_ghostrecord.GetInt() <= 0 || bot_ghostrecord.GetInt() > gpGlobals->maxClients )
-	{
-		if(g_GhostFile)
-		{
-			filesystem->Write(g_WriteBuffer.GetBasePointer(), g_WriteBuffer.GetNumBytesWritten(), g_GhostFile);
-			g_WriteBuffer.Reset();
-
-			filesystem->Close(g_GhostFile);
-			g_GhostFile = 0;
-		}
-		return false;
-	}
-
-	CBasePlayer *pPlayer = UTIL_PlayerByIndex( bot_ghostrecord.GetInt()  );
-	if ( !pPlayer || !pPlayer->GetLastUserCommand() )
-		return false;
-
-	if(!g_GhostFile)
-	{
-		g_GhostFile = filesystem->Open("ghost.rec", "wb");
-		g_WriteBuffer.WriteBitVec3Coord(pPlayer->GetAbsOrigin());
-	}
-
-	CUserCmd nullcmd;
-	CUserCmd cmd = *pPlayer->GetLastUserCommand();
-	
-	// Write to file.
-	WriteUsercmd( &g_WriteBuffer, &cmd, &nullcmd );
-
-	if(g_WriteBuffer.GetNumBytesWritten() > iBufferSize)
-	{
-		filesystem->Write(g_WriteBuffer.GetBasePointer(), iBufferSize, g_GhostFile);
-		g_WriteBuffer.SeekToBit(0);
-	}
-	return true;
-}
-
-bool Bot_GhostThinkPlayback( CFFBot *pBot )
-{
-	if(bot_ghostrecord.GetInt() > 0)
-		return false;
-
-	if ( bot_ghostplayback.GetInt() <= 0 || bot_ghostplayback.GetInt() > gpGlobals->maxClients )
-	{
-		if(g_GhostFile)
-		{
-			filesystem->Close(g_GhostFile);
-			g_GhostFile = 0;
-		}
-		return false;
-	}
-
-	if(!g_GhostFile)
-	{
-		g_GhostFile = filesystem->Open("ghost.rec", "rb");
-		g_ReadBuffer.Reset();
-		g_ReadBuffer.SetAssertOnOverflow(false);
-		int iRead = filesystem->Read(g_UserCmdBuffer, iBufferSize, g_GhostFile);
-		DevMsg("Read %d bytes from ghost.rec", iRead);
-
-		Vector vec;
-		g_ReadBuffer.ReadBitVec3Coord(vec);
-		pBot->SetAbsOrigin(vec);
-	}
-
-	// Write to file.
-	CUserCmd nullcmd;
-	CUserCmd cmd;
-	ReadUsercmd( &g_ReadBuffer, &cmd, &nullcmd );
-
-	if(g_ReadBuffer.GetNumBytesRead() > iBufferSize)
-	{
-		g_ReadBuffer.Seek(0);
-		filesystem->Read(g_UserCmdBuffer, iBufferSize, g_GhostFile);
-	}
-
-	float frametime = gpGlobals->frametime;
-	RunPlayerMove( pBot, cmd, frametime );
-	return true;
-}
-
-//-----------------------------------------------------------------------------
-// Run this Bot's AI for one frame.
-//-----------------------------------------------------------------------------
-void Bot_Think( CFFBot *pBot )
-{
-	// Make sure we stay being a bot
-	pBot->AddFlag( FL_FAKECLIENT );
-
-
-	CUserCmd cmd;
-	Q_memset( &cmd, 0, sizeof( cmd ) );
-	
-	// change the bot's class if need be
-	if (bot_changeclass.GetInt() != 0 && bot_changeclass.GetInt() != pBot->GetClassSlot())
-	{
-		pBot->ChangeClass(Class_IntToString(bot_changeclass.GetInt()));
-	}
-
-	Bot_GhostThinkRecord(pBot);
-
-	if(Bot_GhostThinkPlayback(pBot))
-		return;
-
-	// Finally, override all this stuff if the bot is being forced to mimic a player.
-	if ( !Bot_RunMimicCommand( cmd ) )
-	{
-		cmd.sidemove = pBot->m_flSideMove;
-
-		if ( pBot->IsAlive() && (pBot->GetSolid() == SOLID_BBOX) )
-		{
-			Bot_SetForwardMovement( pBot, cmd );
-
-			// Only turn if I haven't been hurt
-			if ( !pBot->IsEFlagSet(EFL_BOT_FROZEN) && pBot->m_iHealth == pBot->GetMaxHealth() )
-			{
-				Bot_UpdateDirection( pBot );
-				Bot_UpdateStrafing( pBot, cmd );
-			}
-
-			// Handle console settings.
-			Bot_ForceFireWeapon( pBot, cmd );
-			Bot_HandleSendCmd( pBot );
-		}
-		else
-		{
-			Bot_HandleRespawn( pBot, cmd );
-		}
-
-		Bot_FlipOut( pBot, cmd );
-
-		// Fix up the m_fEffects flags
-		pBot->PostClientMessagesSent();
-
-		
-		
-		cmd.viewangles = pBot->GetLocalAngles();
-		cmd.upmove = 0;
-		cmd.impulse = 0;
-	}
-
-//	float frametime = gpGlobals->frametime;
-//	RunPlayerMove( pBot, cmd, frametime );
-}
+// bool Bot_GhostThinkRecord( CFFBot *pBot )
+// {
+// 	if(bot_ghostplayback.GetInt() > 0)
+// 		return false;
+//
+// 	if ( bot_ghostrecord.GetInt() <= 0 || bot_ghostrecord.GetInt() > gpGlobals->maxClients )
+// 	{
+// 		if(g_GhostFile)
+// 		{
+// 			filesystem->Write(g_WriteBuffer.GetBasePointer(), g_WriteBuffer.GetNumBytesWritten(), g_GhostFile);
+// 			g_WriteBuffer.Reset();
+//
+// 			filesystem->Close(g_GhostFile);
+// 			g_GhostFile = 0;
+// 		}
+// 		return false;
+// 	}
+//
+// 	CBasePlayer *pPlayer = UTIL_PlayerByIndex( bot_ghostrecord.GetInt()  );
+// 	if ( !pPlayer || !pPlayer->GetLastUserCommand() )
+// 		return false;
+//
+// 	if(!g_GhostFile)
+// 	{
+// 		g_GhostFile = filesystem->Open("ghost.rec", "wb");
+// 		g_WriteBuffer.WriteBitVec3Coord(pPlayer->GetAbsOrigin());
+// 	}
+//
+// 	CUserCmd nullcmd;
+// 	CUserCmd cmd = *pPlayer->GetLastUserCommand();
+//
+// 	// Write to file.
+// 	WriteUsercmd( &g_WriteBuffer, &cmd, &nullcmd );
+//
+// 	if(g_WriteBuffer.GetNumBytesWritten() > iBufferSize)
+// 	{
+// 		filesystem->Write(g_WriteBuffer.GetBasePointer(), iBufferSize, g_GhostFile);
+// 		g_WriteBuffer.SeekToBit(0);
+// 	}
+// 	return true;
+// }
+//
+// bool Bot_GhostThinkPlayback( CFFBot *pBot )
+// {
+// 	if(bot_ghostrecord.GetInt() > 0)
+// 		return false;
+//
+// 	if ( bot_ghostplayback.GetInt() <= 0 || bot_ghostplayback.GetInt() > gpGlobals->maxClients )
+// 	{
+// 		if(g_GhostFile)
+// 		{
+// 			filesystem->Close(g_GhostFile);
+// 			g_GhostFile = 0;
+// 		}
+// 		return false;
+// 	}
+//
+// 	if(!g_GhostFile)
+// 	{
+// 		g_GhostFile = filesystem->Open("ghost.rec", "rb");
+// 		g_ReadBuffer.Reset();
+// 		g_ReadBuffer.SetAssertOnOverflow(false);
+// 		int iRead = filesystem->Read(g_UserCmdBuffer, iBufferSize, g_GhostFile);
+// 		DevMsg("Read %d bytes from ghost.rec", iRead);
+//
+// 		Vector vec;
+// 		g_ReadBuffer.ReadBitVec3Coord(vec);
+// 		pBot->SetAbsOrigin(vec);
+// 	}
+//
+// 	// Write to file.
+// 	CUserCmd nullcmd;
+// 	CUserCmd cmd;
+// 	ReadUsercmd( &g_ReadBuffer, &cmd, &nullcmd );
+//
+// 	if(g_ReadBuffer.GetNumBytesRead() > iBufferSize)
+// 	{
+// 		g_ReadBuffer.Seek(0);
+// 		filesystem->Read(g_UserCmdBuffer, iBufferSize, g_GhostFile);
+// 	}
+//
+// 	float frametime = gpGlobals->frametime;
+// 	RunPlayerMove( pBot, cmd, frametime );
+// 	return true;
+// }
+//
+// //-----------------------------------------------------------------------------
+// // Run this Bot's AI for one frame.
+// //-----------------------------------------------------------------------------
+// void Bot_Think( CFFBot *pBot )
+// {
+// 	// Make sure we stay being a bot
+// 	pBot->AddFlag( FL_FAKECLIENT );
+//
+//
+// 	CUserCmd cmd;
+// 	Q_memset( &cmd, 0, sizeof( cmd ) );
+//
+// 	// change the bot's class if need be
+// 	if (bot_changeclass.GetInt() != 0 && bot_changeclass.GetInt() != pBot->GetClassSlot())
+// 	{
+// 		pBot->ChangeClass(Class_IntToString(bot_changeclass.GetInt()));
+// 	}
+//
+// 	Bot_GhostThinkRecord(pBot);
+//
+// 	if(Bot_GhostThinkPlayback(pBot))
+// 		return;
+//
+// 	// Finally, override all this stuff if the bot is being forced to mimic a player.
+// 	if ( !Bot_RunMimicCommand( cmd ) )
+// 	{
+// 		cmd.sidemove = pBot->m_flSideMove;
+//
+// 		if ( pBot->IsAlive() && (pBot->GetSolid() == SOLID_BBOX) )
+// 		{
+// 			Bot_SetForwardMovement( pBot, cmd );
+//
+// 			// Only turn if I haven't been hurt
+// 			if ( !pBot->IsEFlagSet(EFL_BOT_FROZEN) && pBot->m_iHealth == pBot->GetMaxHealth() )
+// 			{
+// 				Bot_UpdateDirection( pBot );
+// 				Bot_UpdateStrafing( pBot, cmd );
+// 			}
+//
+// 			// Handle console settings.
+// 			Bot_ForceFireWeapon( pBot, cmd );
+// 			Bot_HandleSendCmd( pBot );
+// 		}
+// 		else
+// 		{
+// 			Bot_HandleRespawn( pBot, cmd );
+// 		}
+//
+// 		Bot_FlipOut( pBot, cmd );
+//
+// 		// Fix up the m_fEffects flags
+// 		pBot->PostClientMessagesSent();
+//
+//
+//
+// 		cmd.viewangles = pBot->GetLocalAngles();
+// 		cmd.upmove = 0;
+// 		cmd.impulse = 0;
+// 	}
+//
+// //	float frametime = gpGlobals->frametime;
+// //	RunPlayerMove( pBot, cmd, frametime );
+// }
 
 CON_COMMAND_F( bot_teleport, "Teleport the specified bot to the specified position & angles.\n\tFormat: bot_teleport <bot name> <X> <Y> <Z> <Pitch> <Yaw> <Roll>", FCVAR_CHEAT )
 {

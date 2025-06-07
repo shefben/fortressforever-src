@@ -119,7 +119,15 @@ extern ConVar tf_mm_servermode;
 
 #ifdef CSTRIKE_DLL // BOTPORT: TODO: move these ifdefs out
 #include "bot/bot.h"
+// Forward declarations for CS Bot Manager
+void InstallCSBotControl();
+void RemoveCSBotControl();
 #endif
+
+// Forward declarations for future FF Bot Manager
+// class CFFBotManager; // This might be needed later when CFFBotManager is defined
+void InstallFFBotControl();
+void RemoveFFBotControl();
 
 #ifdef PORTAL
 #include "prop_portal_shared.h"
@@ -721,8 +729,10 @@ bool CServerGameDLL::DLLInit( CreateInterfaceFn appSystemFactory,
 	// load Mod specific game events ( MUST be before InitAllSystems() so it can pickup the mod specific events)
 	gameeventmanager->LoadEventsFromFile("resource/ModEvents.res");
 
-#ifdef CSTRIKE_DLL // BOTPORT: TODO: move these ifdefs out
-	InstallBotControl();
+#ifdef CSTRIKE_DLL
+	InstallCSBotControl();
+#elif defined(FF_DLL)
+	InstallFFBotControl();
 #endif
 
 	if ( !IGameSystem::InitAllSystems() )
@@ -756,7 +766,9 @@ bool CServerGameDLL::DLLInit( CreateInterfaceFn appSystemFactory,
 	TheNavMesh = NavMeshFactory();
 #endif
 
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::OnDLLInit();
+#endif
 
 	// init the gamestatsupload connection
 	gamestatsuploader->InitConnection();
@@ -773,7 +785,9 @@ void CServerGameDLL::PostInit()
 void CServerGameDLL::DLLShutdown( void )
 {
 
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::OnDLLShutdown();
+#endif
 
 	// Due to dependencies, these are not autogamesystems
 	ModelSoundsCacheShutdown();
@@ -796,8 +810,10 @@ void CServerGameDLL::DLLShutdown( void )
 
 	IGameSystem::ShutdownAllSystems();
 
-#ifdef CSTRIKE_DLL // BOTPORT: TODO: move these ifdefs out
-	RemoveBotControl();
+#ifdef CSTRIKE_DLL
+	RemoveCSBotControl();
+#elif defined(FF_DLL)
+	RemoveFFBotControl();
 #endif
 
 #ifndef _XBOX
@@ -990,7 +1006,9 @@ bool CServerGameDLL::LevelInit( const char *pMapName, char const *pMapEntities, 
 	_timerman.Init();
 	_scriptman.LevelInit(pMapName);
 
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::LevelInit();
+#endif
 
 	if ( IsX360() && !background && (gpGlobals->maxClients == 1) && (g_nCurrentChapterIndex >= 0) )
 	{
@@ -1181,7 +1199,9 @@ void CServerGameDLL::ServerActivate( edict_t *pEdictList, int edictCount, int cl
 #endif
 
 	// Omni-bot: Initialize the bot interface
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::InitBotInterface();
+#endif
 
 #ifdef CSTRIKE_DLL // BOTPORT: TODO: move these ifdefs out
 	TheBots->ServerActivate();
@@ -1278,7 +1298,9 @@ void CServerGameDLL::GameFrame( bool simulating )
 #endif
 
 	// Omni-bot: Update the bot interface
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::UpdateBotInterface();
+#endif
 
 #ifdef NEXT_BOT
 	TheNextBots().Update();
@@ -1421,7 +1443,9 @@ void CServerGameDLL::LevelShutdown( void )
 {
 
 	// Omni-bot: Shut down the bot interface
+#if !defined(FF_DLL)
 	Omnibot::omnibot_interface::ShutdownBotInterface();
+#endif
 
 #ifndef NO_STEAM
 	IGameSystem::LevelShutdownPreClearSteamAPIContextAllSystems();
@@ -3567,3 +3591,25 @@ CSteamID GetSteamIDForPlayerIndex( int iPlayerIndex )
 }
 
 #endif
+
+
+// Stub definitions for FF Bot Control
+// extern CBotManager *TheBots; // Ensure TheBots is accessible
+// class CFFBotManager;
+
+void InstallFFBotControl() {
+    // Placeholder for CFFBotManager instantiation
+    // Example:
+    // extern CBotManager *TheBots;
+    // if ( TheBots != NULL ) { delete TheBots; TheBots = NULL; }
+    // TheBots = new CFFBotManager(); // This line will be enabled when CFFBotManager is implemented.
+    Msg("InstallFFBotControl() called (STUB)\n");
+}
+
+void RemoveFFBotControl() {
+    // Placeholder for CFFBotManager cleanup
+    // Example:
+    // extern CBotManager *TheBots;
+    // if ( TheBots != NULL /* && dynamic_cast<CFFBotManager*>(TheBots) */ ) { delete TheBots; TheBots = NULL; }
+    Msg("RemoveFFBotControl() called (STUB)\n");
+}
