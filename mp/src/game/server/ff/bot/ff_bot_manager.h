@@ -386,6 +386,12 @@ private:
 	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( FlagCaptured,          item_captured ) // Example, verify actual event name
 	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( CapturePointCaptured,  point_captured ) // Example, verify actual event name
 
+	// FF_TODO_SAPPERS: If a 'buildable_sapped' or 'obj_sapped' game event exists, create a listener for it.
+	// The handler should identify the sapped buildable and the Engineer owner(s).
+	// Affected Engineer bots should be immediately notified and potentially forced
+	// into RepairBuildableState (or a dedicated AntiSapperState) for that buildable.
+	// Example: DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildableSapped, buildable_sapped )
+
 
 	CUtlVector< BotEventInterface * > m_commonEventListeners;
 	bool m_eventListenersEnabled;

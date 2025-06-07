@@ -29,6 +29,15 @@ void IdleState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	me->DestroyPath();
 	me->SetBotEnemy( NULL );
+	m_huntArea = NULL; // Initialize hunt area
+	m_medicScanTimer.Start(RandomFloat(0.5f, 1.5f)); // Initialize medic scan timer
+	m_engineerSentryScanTimer.Start(RandomFloat(2.0f, 3.5f)); // Renamed from m_engineerScanTimer
+	m_engineerDispenserScanTimer.Start(RandomFloat(3.0f, 5.0f)); // Initialize dispenser scan timer
+	m_engineerRepairScanTimer.Start(RandomFloat(1.5f, 2.5f)); // Initialize repair scan timer
+	m_engineerResourceScanTimer.Start(RandomFloat(4.0f, 6.0f)); // Initialize resource scan timer
+	m_engineerGuardScanTimer.Start(RandomFloat(5.0f, 7.0f)); // Initialize guard scan timer
+	m_spyInfiltrateScanTimer.Start(RandomFloat(3.0f, 6.0f)); // Initialize spy scan timer
+
 
 	// FF_TODO: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly for FF item/weapon logic
 	// if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
@@ -44,6 +53,98 @@ void IdleState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
  */
 void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
+	// Medic Behavior: Periodically scan for teammates to heal
+	if (me->IsMedic() && m_medicScanTimer.IsElapsed())
+	{
+		CFFPlayer* patient = me->FindNearbyInjuredTeammate();
+		if (patient)
+		{
+			me->StartHealing(patient);
+			return; // Transitioned to HealTeammateState
+		}
+		m_medicScanTimer.Start(RandomFloat(1.0f, 2.0f)); // Reschedule scan
+	}
+
+	// Engineer Behavior: Periodically consider building a sentry
+	if (me->IsEngineer() && !me->HasSentry() && m_engineerSentryScanTimer.IsElapsed()) // Renamed timer
+	{
+		// FF_TODO_ENGINEER: Add more sophisticated logic for when/where to build sentries.
+		// For now, if near a friendly Lua objective that the bot's team owns, try to build there.
+		const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), me->GetTeamNumber());
+		if (obj && obj->currentOwnerTeam == me->GetTeamNumber() && (me->GetAbsOrigin() - obj->position).IsLengthLessThan(750.0f))
+		{
+			Vector buildPos = obj->position + Vector(RandomFloat(-100, 100), RandomFloat(-100,100), 0);
+			me->PrintIfWatched("Engineer: Decided to build sentry near friendly objective '%s'.\n", obj->name);
+			me->TryToBuildSentry(&buildPos);
+			return;
+		}
+		m_engineerSentryScanTimer.Start(RandomFloat(5.0f, 10.0f));
+	}
+
+	// Engineer Behavior: Periodically consider building a dispenser
+	if (me->IsEngineer() && !me->HasDispenser() && m_engineerDispenserScanTimer.IsElapsed())
+	{
+		// FF_TODO_ENGINEER: Add more sophisticated logic for when/where to build dispensers.
+		// Example: Build near a cluster of teammates or a chokepoint/defensive position.
+		// For now, if near a (possibly different) friendly Lua objective.
+		const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), me->GetTeamNumber());
+		if (obj && obj->currentOwnerTeam == me->GetTeamNumber() && (me->GetAbsOrigin() - obj->position).IsLengthLessThan(600.0f))
+		{
+			Vector buildPos = obj->position + Vector(RandomFloat(-50, 50), RandomFloat(-50,50), 20); // Slightly different offset
+			me->PrintIfWatched("Engineer: Decided to build dispenser near friendly objective '%s'.\n", obj->name);
+			me->TryToBuildDispenser(&buildPos);
+			return;
+		}
+		// Could also add logic to build if teammates nearby are low on health/ammo.
+		m_engineerDispenserScanTimer.Start(RandomFloat(10.0f, 15.0f)); // Dispensers might be built less frequently
+		if (me->GetState() != this) return; // Return if state changed
+	}
+
+	// Engineer Behavior: Periodically scan for damaged buildables to repair
+	if (me->IsEngineer() && m_engineerRepairScanTimer.IsElapsed())
+	{
+		me->TryToRepairBuildable();
+		m_engineerRepairScanTimer.Start(RandomFloat(2.0f, 4.0f));
+		if (me->GetState() != this) return;
+	}
+
+	// Engineer Behavior: If low on resources, try to find some
+	if (me->IsEngineer() && me->GetAmmoCount(AMMO_CELLS) < CFFBot::ENGINEER_LOW_CELL_THRESHOLD && m_engineerResourceScanTimer.IsElapsed())
+	{
+		me->TryToFindResources();
+		m_engineerResourceScanTimer.Start(RandomFloat(5.0f, 8.0f));
+		if (me->GetState() != this) return;
+	}
+
+	// Engineer Behavior: Periodically consider guarding their sentry
+	if (me->IsEngineer() && me->HasSentry() && m_engineerGuardScanTimer.IsElapsed())
+	{
+		// Check if sentry is alive and built before trying to guard
+		CFFSentryGun *sentry = me->GetSentryGun();
+		if (sentry && sentry->IsAlive() && sentry->IsBuilt()) // isBuilt() is important
+		{
+			// Don't switch if already doing a higher priority Engineer task or already guarding
+			if (me->GetState() != &me->m_buildSentryState &&
+				me->GetState() != &me->m_buildDispenserState &&
+				me->GetState() != &me->m_repairBuildableState && // Or allow interrupting repair for guard if sentry is fine
+				me->GetState() != &me->m_guardSentryState)
+			{
+				me->TryToGuardSentry();
+				if (me->GetState() != this) return;
+			}
+		}
+		m_engineerGuardScanTimer.Start(RandomFloat(10.0f, 15.0f)); // Reschedule guard scan
+	}
+
+	// Spy Behavior: Periodically try to infiltrate
+	if (me->IsSpy() && m_spyInfiltrateScanTimer.IsElapsed())
+	{
+		me->TryToInfiltrate();
+		m_spyInfiltrateScanTimer.Start(RandomFloat(10.0f, 20.0f)); // Reschedule infiltrate scan
+		if (me->GetState() != this) return;
+	}
+
+
 	if (me->GetLastKnownArea() == NULL && me->StayOnNavMesh() == false)
 		return;
 
@@ -230,9 +331,8 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 				// potentially transitioning to a new state like "CaptureObjectiveState" or "MoveToObjectiveState".
 				// For now, just demonstrating data access. If we MoveTo, it might spam.
 				// Example:
-				// me->SetTask(CFFBot::CAPTURE_OBJECTIVE_LUA, (CBaseEntity*)NULL); // Need a new task type
-				// me->MoveTo(obj->position, SAFEST_ROUTE);
-				// return; // Exit IdleState once an objective is chosen
+				me->CaptureObjective(obj); // FF_LUA_OBJECTIVES: Transition to CaptureObjectiveState
+				return; // Exit IdleState once an objective is chosen
 			}
 			else
 			{

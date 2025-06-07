@@ -27,6 +27,13 @@
 class CBaseDoor;
 class CBasePropDoor;
 class CFFBot; // Changed from CCSBot
+class HealTeammateState; // Forward declaration
+class BuildSentryState; // Forward declaration
+class BuildDispenserState; // Forward declaration
+class RepairBuildableState; // Forward declaration
+class FindResourcesState; // Forward declaration
+class GuardSentryState; // Forward declaration
+class InfiltrateState; // Forward declaration
 class CPushAwayEnumerator;
 
 //--------------------------------------------------------------------------------------------------------------
@@ -71,6 +78,16 @@ public:
 	virtual void OnEnter( CFFBot *bot ); // Changed CCSBot to CFFBot
 	virtual void OnUpdate( CFFBot *bot ); // Changed CCSBot to CFFBot
 	virtual const char *GetName( void ) const		{ return "Idle"; }
+
+private:
+	CountdownTimer m_medicScanTimer; // For medics to periodically scan for heal targets
+	CountdownTimer m_engineerSentryScanTimer; // For engineers to periodically consider building sentries
+	CountdownTimer m_engineerDispenserScanTimer; // For engineers to periodically consider building dispensers
+	CountdownTimer m_engineerRepairScanTimer; // For engineers to periodically scan for damaged buildables
+	CountdownTimer m_engineerResourceScanTimer; // For engineers to periodically scan for resources
+	CountdownTimer m_engineerGuardScanTimer; // For engineers to periodically consider guarding their sentry
+	CountdownTimer m_spyInfiltrateScanTimer; // For spies to periodically consider infiltrating
+	CNavArea *m_huntArea;           // Target area for hunting behavior (was used in ff_bot_idle.cpp but not declared here)
 };
 
 
@@ -514,10 +531,13 @@ public:
 		MOVE_TO_LAST_KNOWN_ENEMY_POSITION,
 		MOVE_TO_SNIPER_SPOT,
 		SNIPING,
+		CAPTURE_LUA_OBJECTIVE, // For Lua-defined objectives
+		DEFEND_LUA_OBJECTIVE,  // For Lua-defined objectives
 
 		NUM_TASKS // This needs to be last
 	};
 	void SetTask( TaskType task, CBaseEntity *entity = NULL );	///< set our current "task"
+	void SetTask( TaskType task, const CFFBotManager::LuaObjectivePoint *objectiveTarget ); ///< Overload for Lua objectives
 	TaskType GetTask( void ) const;
 	CBaseEntity *GetTaskEntity( void );
 	const char *GetTaskName( void ) const;						///< return string describing current task
@@ -893,12 +913,52 @@ private:
 	FollowState				m_followState;
 	UseEntityState			m_useEntityState;
 	OpenDoorState			m_openDoorState;
+	class CaptureObjectiveState m_captureObjectiveState; // FF_LUA_OBJECTIVES: Added state instance
+	HealTeammateState		m_healTeammateState;     // Medic healing state
+	BuildSentryState		m_buildSentryState;      // Engineer building state
+	BuildDispenserState		m_buildDispenserState;   // Engineer building dispenser state
+	RepairBuildableState	m_repairBuildableState;  // Engineer repairing state
+	FindResourcesState		m_findResourcesState;    // Engineer finding resources state
+	GuardSentryState		m_guardSentryState;      // Engineer guarding sentry state
+	InfiltrateState			m_infiltrateState;       // Spy infiltration state
 
 	void SetState( BotState *state );
 	BotState *m_state;
 	float m_stateTimestamp;
 	bool m_isAttacking;
 	bool m_isOpeningDoor;
+
+public: // FF_LUA_OBJECTIVES: Made public to be callable from IdleState etc.
+	void CaptureObjective(const CFFBotManager::LuaObjectivePoint* objective);
+
+	// Medic behavior
+	bool IsMedic(void) const;
+	CFFPlayer* FindNearbyInjuredTeammate(float maxRange = 1000.0f, float healthRatioThreshold = 0.98f);
+	void StartHealing(CFFPlayer* target);
+
+	// Engineer behavior
+	bool IsEngineer(void) const;
+	bool HasSentry(void) const; // Checks if engineer already has a sentry deployed
+	void TryToBuildSentry(const Vector *location = NULL);
+	bool HasDispenser(void) const; // Checks if engineer already has a dispenser deployed
+	void TryToBuildDispenser(const Vector *location = NULL);
+	CBaseEntity* FindNearbyDamagedFriendlyBuildable(float maxRange = 800.0f);
+	void TryToRepairBuildable(CBaseEntity* targetBuildable = NULL);
+	CBaseEntity* FindResourceSource(float maxRange = 2000.0f);
+	void TryToFindResources();
+	void TryToGuardSentry();
+
+	// Spy behavior
+	bool IsSpy() const;
+	CBaseEntity* FindSpyTarget(float maxRange = 3000.0f); // Can target buildings or players
+	void TryToInfiltrate();
+	bool IsBehind(const CBaseEntity* target) const; // Conceptual check if bot is behind target
+
+	static const int ENGINEER_LOW_CELL_THRESHOLD = 50;
+	static const int ENGINEER_MAX_CELLS = 200; // Max desired cells for an Engineer bot
+
+
+private:
 
 	TaskType m_task;
 	EHANDLE m_taskEntity;

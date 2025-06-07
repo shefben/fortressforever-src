@@ -20,6 +20,8 @@
 #include "tier0/icommandline.h"
 #include "gameeventdefs.h"
 #include "ff_item_flag.h"
+#include "filesystem.h" // Required for KeyValues file operations
+#include "ff_weapon_base.h" // Required for FFWeaponID and CFFWeaponBase
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -141,7 +143,147 @@ void CFFBotManager::StartFrame( void )
 	}
 }
 
-bool CFFBotManager::IsWeaponUseable( const CBasePlayerWeapon *weapon ) const { return true; /* FF_TODO: Implement FF specific cvars */ }
+// ConVar extern declarations, now defined in ff_bot_cvars.cpp
+extern ConVar bot_difficulty;
+extern ConVar bot_quota;
+extern ConVar bot_quota_mode;
+extern ConVar bot_join_team;
+extern ConVar bot_join_after_player;
+extern ConVar bot_auto_vacate;
+extern ConVar bot_chatter;
+extern ConVar bot_prefix;
+extern ConVar bot_defer_to_human;
+
+extern ConVar ff_bot_allow_pistols;
+extern ConVar ff_bot_allow_shotguns;
+extern ConVar ff_bot_allow_sub_machine_guns;
+extern ConVar ff_bot_allow_rifles;
+extern ConVar ff_bot_allow_machine_guns;
+extern ConVar ff_bot_allow_grenades;
+extern ConVar ff_bot_allow_rocket_launchers;
+extern ConVar ff_bot_allow_flamethrowers;
+extern ConVar ff_bot_allow_pipe_launchers;
+extern ConVar ff_bot_allow_miniguns;
+extern ConVar ff_bot_allow_sniper_rifles;
+extern ConVar ff_bot_allow_mediguns;
+extern ConVar ff_bot_allow_tranqguns;
+// Note: bot_debug and bot_debug_target are also in ff_bot_cvars.cpp but not directly used in this file's logic yet.
+
+
+bool CFFBotManager::IsWeaponUseable( const CBasePlayerWeapon *weapon ) const
+{
+	if (weapon == NULL)
+		return false; // Cannot use a null weapon
+
+	const CFFWeaponBase *ffWeapon = dynamic_cast<const CFFWeaponBase *>(weapon);
+	if (ffWeapon == NULL)
+	{
+		// If it's not an CFFWeaponBase, we can't get FFWeaponID.
+		// For safety, assume usable, or log a warning.
+		// Alternatively, could be strict and return false.
+		// CSBotManager returns true for C4 (non-CSWeapon).
+		// Let's be permissive for now for uncastable weapons.
+		return true;
+	}
+
+	FFWeaponID weaponID = ffWeapon->GetWeaponID();
+
+	// Melee weapons are generally always allowed, unless specific "X_only" mode is on,
+	// which is handled by other cvars being 0.
+	// There isn't a single "ff_bot_allow_melee" cvar, so they bypass these checks.
+	switch (weaponID)
+	{
+		case FF_WEAPON_CROWBAR:
+		case FF_WEAPON_KNIFE:
+		case FF_WEAPON_MEDKIT: // Medkit is more utility but often melee slot
+		case FF_WEAPON_SPANNER:
+		case FF_WEAPON_UMBRELLA:
+			return true;
+		// Deployables are not "combat" weapons in the same sense for this check
+		case FF_WEAPON_DEPLOYDISPENSER:
+		case FF_WEAPON_DEPLOYSENTRYGUN:
+		case FF_WEAPON_DEPLOYDETPACK:
+		case FF_WEAPON_DEPLOYMANCANNON:
+			return true; // Or false, depending on interpretation. Bots don't "fight" with these.
+		default:
+			break;
+	}
+
+	// Check against specific categories
+	// FF_TODO_WEAPONS: Refine these mappings as needed. Some FF weapons might need new categories or special handling.
+	switch (weaponID)
+	{
+		// Pistols
+		case FF_WEAPON_JUMPGUN: // Scout's primary, acts like a pistol
+			return ff_bot_allow_pistols.GetBool();
+
+		// Shotguns
+		case FF_WEAPON_SHOTGUN:
+		case FF_WEAPON_SUPERSHOTGUN:
+			return ff_bot_allow_shotguns.GetBool();
+
+		// SMGs / Nailguns
+		case FF_WEAPON_NAILGUN:
+		case FF_WEAPON_SUPERNAILGUN:
+		case FF_WEAPON_TOMMYGUN: // Civilian primary
+			return ff_bot_allow_sub_machine_guns.GetBool(); // Or ff_bot_allow_rifles if SMG isn't a good fit
+
+		// Rifles (General Purpose)
+		case FF_WEAPON_AUTORIFLE: // Sniper secondary
+		case FF_WEAPON_RAILGUN:   // Engineer primary
+			return ff_bot_allow_rifles.GetBool();
+
+		// Sniper Rifles
+		case FF_WEAPON_SNIPERRIFLE:
+			return ff_bot_allow_sniper_rifles.GetBool();
+
+		// Rocket Launchers / Explosives
+		case FF_WEAPON_RPG:
+		case FF_WEAPON_IC: // Incendiary Cannon, explosive/fire AOE
+			return ff_bot_allow_rocket_launchers.GetBool();
+
+		// Flamethrowers
+		case FF_WEAPON_FLAMETHROWER:
+			return ff_bot_allow_flamethrowers.GetBool();
+
+		// Pipe Launchers (Demoman)
+		case FF_WEAPON_GRENADELAUNCHER: // Often primary for Demo, distinct from hand grenades
+		case FF_WEAPON_PIPELAUNCHER:
+			return ff_bot_allow_pipe_launchers.GetBool();
+
+		// Miniguns (HWGuy)
+		case FF_WEAPON_ASSAULTCANNON:
+			return ff_bot_allow_miniguns.GetBool();
+
+		// Utility / Special
+		case FF_WEAPON_TRANQUILISER: // Spy primary
+			return ff_bot_allow_tranqguns.GetBool();
+
+		// Grenades (Hand grenades - if they are represented as CFFWeaponBase instances and bots can "wield" them)
+		// This check might be more relevant in CanEquip/SwitchTo logic rather than general "use".
+		// For now, if a bot is somehow wielding a grenade type directly, check ff_bot_allow_grenades.
+		// However, actual grenade throwing is usually a separate action.
+		// FF_TODO_WEAPONS: Verify if hand grenades are CFFWeaponBase and appear here.
+		// Assuming GetWeaponID() can return grenade types if they are wielded:
+		// case FF_WEAPON_GRENADE_NORMAL: (Example, if such an ID exists for wielded grenades)
+		// case FF_WEAPON_GRENADE_CONC:
+		// case FF_WEAPON_GRENADE_EMP:
+		// case FF_WEAPON_GRENADE_NAIL:
+		//	 return ff_bot_allow_grenades.GetBool();
+
+		// FF_WEAPON_NONE, FF_WEAPON_CUBEMAP, FF_WEAPON_MAX should not be actively used.
+		case FF_WEAPON_NONE:
+		case FF_WEAPON_CUBEMAP: // Should not be a usable weapon for a bot
+		case FF_WEAPON_MAX:
+			return false;
+
+		default:
+			// If a weapon ID is not explicitly handled, assume it's usable to be less restrictive.
+			// Or, log a warning about an unhandled weapon type.
+			// Warning("CFFBotManager::IsWeaponUseable: Unhandled weapon ID %d\n", weaponID);
+			return true;
+	}
+}
 
 bool CFFBotManager::IsOnDefense( const CFFPlayer *player ) const { return false; /* FF_TODO: Implement FF game mode logic */ }
 bool CFFBotManager::IsOnOffense( const CFFPlayer *player ) const { return !IsOnDefense( player ); /* FF_TODO: Implement FF game mode logic */ }
@@ -292,112 +434,100 @@ CON_COMMAND_F( bot_goto_mark, "Sends a bot to the selected nav area.", FCVAR_GAM
 	CFFBot *bot = dynamic_cast<CFFBot *>( player ); if ( bot ) bot->MoveTo( area->GetCenter(), FASTEST_ROUTE ); break; } }
 }
 
-// FF_TODO_CVARS: Declare these ConVars, likely in ff_bot_cvars.cpp
-extern ConVar ff_bot_allow_pistols;
-extern ConVar ff_bot_allow_shotguns;
-extern ConVar ff_bot_allow_sub_machine_guns;
-extern ConVar ff_bot_allow_rifles;
-extern ConVar ff_bot_allow_machine_guns;
-extern ConVar ff_bot_allow_grenades; // FF might have different grenade types (emp, conc, nail, etc.)
-extern ConVar ff_bot_allow_rocket_launchers; // Example for soldier
-extern ConVar ff_bot_allow_flamethrowers;    // Example for pyro
-extern ConVar ff_bot_allow_pipe_launchers;   // Example for demo
-extern ConVar ff_bot_allow_miniguns;         // Example for hwguy
-extern ConVar ff_bot_allow_sniper_rifles;    // Example for sniper
-extern ConVar ff_bot_allow_mediguns;         // Example for medic - utility, not direct damage
-extern ConVar ff_bot_allow_tranqguns;        // Example for spy - utility
-// Add other FF specific weapon category ConVars as needed
+// The extern ConVar declarations that were here have been removed,
+// as they are now defined in ff_bot_cvars.cpp.
+// The ConCommand functions below will link to those definitions.
 
 CON_COMMAND_F( bot_knives_only, "Restricts the bots to only using melee weapons", FCVAR_GAMEDLL ) // FF uses various melee
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() ) return;
 	// Assuming melee is always allowed or not controlled by a specific "allow_melee" cvar for bots
-	if (&ff_bot_allow_pistols) ff_bot_allow_pistols.SetValue( 0 );
-	if (&ff_bot_allow_shotguns) ff_bot_allow_shotguns.SetValue( 0 );
-	if (&ff_bot_allow_sub_machine_guns) ff_bot_allow_sub_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_rifles) ff_bot_allow_rifles.SetValue( 0 );
-	if (&ff_bot_allow_machine_guns) ff_bot_allow_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_grenades) ff_bot_allow_grenades.SetValue( 0 );
-	if (&ff_bot_allow_sniper_rifles) ff_bot_allow_sniper_rifles.SetValue( 0 );
-	if (&ff_bot_allow_rocket_launchers) ff_bot_allow_rocket_launchers.SetValue( 0 );
-	if (&ff_bot_allow_flamethrowers) ff_bot_allow_flamethrowers.SetValue( 0 );
-	if (&ff_bot_allow_pipe_launchers) ff_bot_allow_pipe_launchers.SetValue( 0 );
-	if (&ff_bot_allow_miniguns) ff_bot_allow_miniguns.SetValue( 0 );
-	if (&ff_bot_allow_mediguns) ff_bot_allow_mediguns.SetValue( 0 ); // Utility
-	if (&ff_bot_allow_tranqguns) ff_bot_allow_tranqguns.SetValue( 0 ); // Utility
+	ff_bot_allow_pistols.SetValue( 0 );
+	ff_bot_allow_shotguns.SetValue( 0 );
+	ff_bot_allow_sub_machine_guns.SetValue( 0 );
+	ff_bot_allow_rifles.SetValue( 0 );
+	ff_bot_allow_machine_guns.SetValue( 0 );
+	ff_bot_allow_grenades.SetValue( 0 );
+	ff_bot_allow_sniper_rifles.SetValue( 0 );
+	ff_bot_allow_rocket_launchers.SetValue( 0 );
+	ff_bot_allow_flamethrowers.SetValue( 0 );
+	ff_bot_allow_pipe_launchers.SetValue( 0 );
+	ff_bot_allow_miniguns.SetValue( 0 );
+	ff_bot_allow_mediguns.SetValue( 0 );
+	ff_bot_allow_tranqguns.SetValue( 0 );
 }
 
 CON_COMMAND_F( bot_pistols_only, "Restricts the bots to only using pistols (Scout, Spy, Engineer)", FCVAR_GAMEDLL )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() ) return;
-	if (&ff_bot_allow_pistols) ff_bot_allow_pistols.SetValue( 1 );
-	if (&ff_bot_allow_shotguns) ff_bot_allow_shotguns.SetValue( 0 );
-	if (&ff_bot_allow_sub_machine_guns) ff_bot_allow_sub_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_rifles) ff_bot_allow_rifles.SetValue( 0 );
-	if (&ff_bot_allow_machine_guns) ff_bot_allow_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_grenades) ff_bot_allow_grenades.SetValue( 0 );
-	if (&ff_bot_allow_sniper_rifles) ff_bot_allow_sniper_rifles.SetValue( 0 );
-	if (&ff_bot_allow_rocket_launchers) ff_bot_allow_rocket_launchers.SetValue( 0 );
-	if (&ff_bot_allow_flamethrowers) ff_bot_allow_flamethrowers.SetValue( 0 );
-	if (&ff_bot_allow_pipe_launchers) ff_bot_allow_pipe_launchers.SetValue( 0 );
-	if (&ff_bot_allow_miniguns) ff_bot_allow_miniguns.SetValue( 0 );
-	if (&ff_bot_allow_mediguns) ff_bot_allow_mediguns.SetValue( 0 );
-	if (&ff_bot_allow_tranqguns) ff_bot_allow_tranqguns.SetValue( 0 );
+	ff_bot_allow_pistols.SetValue( 1 );
+	ff_bot_allow_shotguns.SetValue( 0 );
+	ff_bot_allow_sub_machine_guns.SetValue( 0 );
+	ff_bot_allow_rifles.SetValue( 0 );
+	ff_bot_allow_machine_guns.SetValue( 0 );
+	ff_bot_allow_grenades.SetValue( 0 );
+	ff_bot_allow_sniper_rifles.SetValue( 0 );
+	ff_bot_allow_rocket_launchers.SetValue( 0 );
+	ff_bot_allow_flamethrowers.SetValue( 0 );
+	ff_bot_allow_pipe_launchers.SetValue( 0 );
+	ff_bot_allow_miniguns.SetValue( 0 );
+	ff_bot_allow_mediguns.SetValue( 0 );
+	ff_bot_allow_tranqguns.SetValue( 0 );
 }
 
 CON_COMMAND_F( bot_rockets_only, "Restricts the bots to only using rocket launchers (Soldier)", FCVAR_GAMEDLL )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() ) return;
-	if (&ff_bot_allow_pistols) ff_bot_allow_pistols.SetValue( 0 );
-	if (&ff_bot_allow_shotguns) ff_bot_allow_shotguns.SetValue( 1 ); // Soldiers often have shotguns too
-	if (&ff_bot_allow_sub_machine_guns) ff_bot_allow_sub_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_rifles) ff_bot_allow_rifles.SetValue( 0 );
-	if (&ff_bot_allow_machine_guns) ff_bot_allow_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_grenades) ff_bot_allow_grenades.SetValue( 0 ); // Grenades are separate
-	if (&ff_bot_allow_sniper_rifles) ff_bot_allow_sniper_rifles.SetValue( 0 );
-	if (&ff_bot_allow_rocket_launchers) ff_bot_allow_rocket_launchers.SetValue( 1 );
-	if (&ff_bot_allow_flamethrowers) ff_bot_allow_flamethrowers.SetValue( 0 );
-	if (&ff_bot_allow_pipe_launchers) ff_bot_allow_pipe_launchers.SetValue( 0 );
-	if (&ff_bot_allow_miniguns) ff_bot_allow_miniguns.SetValue( 0 );
-	if (&ff_bot_allow_mediguns) ff_bot_allow_mediguns.SetValue( 0 );
-	if (&ff_bot_allow_tranqguns) ff_bot_allow_tranqguns.SetValue( 0 );
+	ff_bot_allow_pistols.SetValue( 0 );
+	ff_bot_allow_shotguns.SetValue( 1 ); // Soldiers often have shotguns too
+	ff_bot_allow_sub_machine_guns.SetValue( 0 );
+	ff_bot_allow_rifles.SetValue( 0 );
+	ff_bot_allow_machine_guns.SetValue( 0 );
+	ff_bot_allow_grenades.SetValue( 0 ); // Grenades are separate
+	ff_bot_allow_sniper_rifles.SetValue( 0 );
+	ff_bot_allow_rocket_launchers.SetValue( 1 );
+	ff_bot_allow_flamethrowers.SetValue( 0 );
+	ff_bot_allow_pipe_launchers.SetValue( 0 );
+	ff_bot_allow_miniguns.SetValue( 0 );
+	ff_bot_allow_mediguns.SetValue( 0 );
+	ff_bot_allow_tranqguns.SetValue( 0 );
 }
 
 
 CON_COMMAND_F( bot_snipers_only, "Restricts the bots to only using sniper rifles (Sniper)", FCVAR_GAMEDLL )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() ) return;
-	if (&ff_bot_allow_pistols) ff_bot_allow_pistols.SetValue( 0 ); // Snipers might have SMG/pistol
-	if (&ff_bot_allow_shotguns) ff_bot_allow_shotguns.SetValue( 0 );
-	if (&ff_bot_allow_sub_machine_guns) ff_bot_allow_sub_machine_guns.SetValue( 1 ); // Sniper often has SMG
-	if (&ff_bot_allow_rifles) ff_bot_allow_rifles.SetValue( 0 );
-	if (&ff_bot_allow_machine_guns) ff_bot_allow_machine_guns.SetValue( 0 );
-	if (&ff_bot_allow_grenades) ff_bot_allow_grenades.SetValue( 0 );
-	if (&ff_bot_allow_sniper_rifles) ff_bot_allow_sniper_rifles.SetValue( 1 );
-	if (&ff_bot_allow_rocket_launchers) ff_bot_allow_rocket_launchers.SetValue( 0 );
-	if (&ff_bot_allow_flamethrowers) ff_bot_allow_flamethrowers.SetValue( 0 );
-	if (&ff_bot_allow_pipe_launchers) ff_bot_allow_pipe_launchers.SetValue( 0 );
-	if (&ff_bot_allow_miniguns) ff_bot_allow_miniguns.SetValue( 0 );
-	if (&ff_bot_allow_mediguns) ff_bot_allow_mediguns.SetValue( 0 );
-	if (&ff_bot_allow_tranqguns) ff_bot_allow_tranqguns.SetValue( 0 );
+	ff_bot_allow_pistols.SetValue( 0 );
+	ff_bot_allow_shotguns.SetValue( 0 );
+	ff_bot_allow_sub_machine_guns.SetValue( 1 ); // Sniper often has SMG
+	ff_bot_allow_rifles.SetValue( 0 );
+	ff_bot_allow_machine_guns.SetValue( 0 );
+	ff_bot_allow_grenades.SetValue( 0 );
+	ff_bot_allow_sniper_rifles.SetValue( 1 );
+	ff_bot_allow_rocket_launchers.SetValue( 0 );
+	ff_bot_allow_flamethrowers.SetValue( 0 );
+	ff_bot_allow_pipe_launchers.SetValue( 0 );
+	ff_bot_allow_miniguns.SetValue( 0 );
+	ff_bot_allow_mediguns.SetValue( 0 );
+	ff_bot_allow_tranqguns.SetValue( 0 );
 }
 
 CON_COMMAND_F( bot_all_weapons, "Allows the bots to use all their normal weapons", FCVAR_GAMEDLL )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() ) return;
-	if (&ff_bot_allow_pistols) ff_bot_allow_pistols.SetValue( 1 );
-	if (&ff_bot_allow_shotguns) ff_bot_allow_shotguns.SetValue( 1 );
-	if (&ff_bot_allow_sub_machine_guns) ff_bot_allow_sub_machine_guns.SetValue( 1 );
-	if (&ff_bot_allow_rifles) ff_bot_allow_rifles.SetValue( 1 ); // Generic rifle category if FF has any
-	if (&ff_bot_allow_machine_guns) ff_bot_allow_machine_guns.SetValue( 1 ); // Generic MG category if FF has any
-	if (&ff_bot_allow_grenades) ff_bot_allow_grenades.SetValue( 1 );
-	if (&ff_bot_allow_sniper_rifles) ff_bot_allow_sniper_rifles.SetValue( 1 );
-	if (&ff_bot_allow_rocket_launchers) ff_bot_allow_rocket_launchers.SetValue( 1 );
-	if (&ff_bot_allow_flamethrowers) ff_bot_allow_flamethrowers.SetValue( 1 );
-	if (&ff_bot_allow_pipe_launchers) ff_bot_allow_pipe_launchers.SetValue( 1 );
-	if (&ff_bot_allow_miniguns) ff_bot_allow_miniguns.SetValue( 1 );
-	if (&ff_bot_allow_mediguns) ff_bot_allow_mediguns.SetValue( 1 );
-	if (&ff_bot_allow_tranqguns) ff_bot_allow_tranqguns.SetValue( 1 );
+	ff_bot_allow_pistols.SetValue( 1 );
+	ff_bot_allow_shotguns.SetValue( 1 );
+	ff_bot_allow_sub_machine_guns.SetValue( 1 );
+	ff_bot_allow_rifles.SetValue( 1 );
+	ff_bot_allow_machine_guns.SetValue( 1 );
+	ff_bot_allow_grenades.SetValue( 1 );
+	ff_bot_allow_sniper_rifles.SetValue( 1 );
+	ff_bot_allow_rocket_launchers.SetValue( 1 );
+	ff_bot_allow_flamethrowers.SetValue( 1 );
+	ff_bot_allow_pipe_launchers.SetValue( 1 );
+	ff_bot_allow_miniguns.SetValue( 1 );
+	ff_bot_allow_mediguns.SetValue( 1 );
+	ff_bot_allow_tranqguns.SetValue( 1 );
 }
 
 
@@ -551,17 +681,73 @@ const Vector *CFFBotManager::GetRandomPositionInZone( const Zone *zone ) const {
 	return &pos;
 }
 CNavArea *CFFBotManager::GetRandomAreaInZone( const Zone *zone ) const { /* ... (as before) ... */
-	int areaCount = zone->m_areaCount; if( areaCount == 0 ) { assert( false && "CFFBotManager::GetRandomAreaInZone: No areas for this zone" ); return NULL; }
+	int areaCount = zone->m_areaCount; if( areaCount == 0 ) { Assert( false && "CFFBotManager::GetRandomAreaInZone: No areas for this zone" ); return NULL; }
 	int totalWeight = 0; for( int areaIndex = 0; areaIndex < areaCount; areaIndex++ ) { CNavArea *currentArea = zone->m_area[areaIndex];
 		if( currentArea->GetAttributes() & NAV_MESH_JUMP ) totalWeight += 0; else if( currentArea->GetAttributes() & NAV_MESH_AVOID ) totalWeight += 1; else totalWeight += 20; }
-	if( totalWeight == 0 ) { assert( false && "CFFBotManager::GetRandomAreaInZone: No real areas for this zone" ); return NULL; }
+	if( totalWeight == 0 ) { Assert( false && "CFFBotManager::GetRandomAreaInZone: No real areas for this zone" ); return NULL; }
 	int randomPick = RandomInt( 1, totalWeight ); for( int areaIndex = 0; areaIndex < areaCount; areaIndex++ ) {
 		CNavArea *currentArea = zone->m_area[areaIndex]; if( currentArea->GetAttributes() & NAV_MESH_JUMP ) randomPick -= 0;
 		else if( currentArea->GetAttributes() & NAV_MESH_AVOID ) randomPick -= 1; else randomPick -= 20;
 		if( randomPick <= 0 ) return currentArea; } return zone->m_area[0];
 }
 
-void CFFBotManager::OnServerShutdown( IGameEvent *event ) { /* ... (as before, FF_TODO for cvars) ... */ }
+void CFFBotManager::OnServerShutdown( IGameEvent *event )
+{
+	if ( !engine->IsDedicatedServer() )
+	{
+		// Save bot-specific ConVars for Fortress Forever
+		static const char *ffBotVars[] =
+		{
+			"bot_difficulty",
+			"bot_quota",
+			"bot_quota_mode",
+			"bot_chatter",
+			"bot_prefix",
+			"bot_join_team",
+			"bot_defer_to_human",
+			"bot_join_after_player",
+			"bot_auto_vacate",
+			// FF Specific Weapon Allows
+			"ff_bot_allow_pistols",
+			"ff_bot_allow_shotguns",
+			"ff_bot_allow_sub_machine_guns",
+			"ff_bot_allow_rifles",
+			"ff_bot_allow_machine_guns",
+			"ff_bot_allow_grenades",
+			"ff_bot_allow_rocket_launchers",
+			"ff_bot_allow_flamethrowers",
+			"ff_bot_allow_pipe_launchers",
+			"ff_bot_allow_miniguns",
+			"ff_bot_allow_sniper_rifles",
+			"ff_bot_allow_mediguns",
+			"ff_bot_allow_tranqguns",
+			// Add any other relevant bot ConVars here
+		};
+
+		KeyValues *data = new KeyValues( "FFBotConfig" ); // Use a distinct name like "FFBotConfig"
+
+		// load the config data
+		if (data)
+		{
+			// Try to load existing, otherwise it's a new KeyValues object
+			data->LoadFromFile( filesystem, "FFBotConfig.vdf", "GAME" );
+			for ( int i=0; i<sizeof(ffBotVars)/sizeof(ffBotVars[0]); ++i )
+			{
+				const char *varName = ffBotVars[i];
+				if ( varName )
+				{
+					ConVar *var = cvar->FindVar( varName );
+					if ( var )
+					{
+						data->SetString( varName, var->GetString() );
+					}
+				}
+			}
+			data->SaveToFile( filesystem, "FFBotConfig.vdf", "GAME" );
+			data->deleteThis();
+		}
+	}
+}
 void CFFBotManager::OnPlayerFootstep( IGameEvent *event ) { CFFBOTMANAGER_ITERATE_BOTS( OnPlayerFootstep, event ); }
 void CFFBotManager::OnPlayerRadio( IGameEvent *event ) { CFFBOTMANAGER_ITERATE_BOTS( OnPlayerRadio, event ); }
 void CFFBotManager::OnPlayerDeath( IGameEvent *event ) { CFFBOTMANAGER_ITERATE_BOTS( OnPlayerDeath, event ); }
