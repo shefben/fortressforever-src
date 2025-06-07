@@ -1,7 +1,7 @@
 // NextBotPath.h
 // Encapsulate and manipulate a path through the world
 // Author: Michael Booth, February 2006
-// Copyright (c) 2006 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #ifndef _NEXT_BOT_PATH_H_
 #define _NEXT_BOT_PATH_H_
@@ -192,8 +192,12 @@ public:
 		CNavArea *closestArea = NULL;
 		bool pathResult = NavAreaBuildPath( startArea, subjectArea, &subjectPos, costFunc, &closestArea, maxPathLength, bot->GetEntity()->GetTeamNumber() );
 
+		// Failed?
+		if ( closestArea == NULL )
+			return false;
+
 		//
-		// Build actual path by following parent links back from subject area
+		// Build actual path by following parent links back from goal area
 		//
 
 		// get count
@@ -208,18 +212,10 @@ public:
 				// startArea can be re-evaluated during the pathfind and given a parent...
 				break;
 			}
+			if ( count >= MAX_PATH_SEGMENTS-1 ) // save room for endpoint
+				break;
 		}
-
-		// save room for endpoint
-		if ( count > MAX_PATH_SEGMENTS-1 )
-		{
-			count = MAX_PATH_SEGMENTS-1;
-		}
-		else if ( count == 0 )
-		{
-			return false;
-		}
-
+		
 		if ( count == 1 )
 		{
 			BuildTrivialPath( bot, subjectPos );
@@ -317,6 +313,10 @@ public:
 		CNavArea *closestArea = NULL;
 		bool pathResult = NavAreaBuildPath( startArea, goalArea, &goal, costFunc, &closestArea, maxPathLength, bot->GetEntity()->GetTeamNumber() );
 
+		// Failed?
+		if ( closestArea == NULL )
+			return false;
+
 		//
 		// Build actual path by following parent links back from goal area
 		//
@@ -333,18 +333,10 @@ public:
 				// startArea can be re-evaluated during the pathfind and given a parent...
 				break;
 			}
+			if ( count >= MAX_PATH_SEGMENTS-1 ) // save room for endpoint
+				break;
 		}
-
-		// save room for endpoint
-		if ( count > MAX_PATH_SEGMENTS-1 )
-		{
-			count = MAX_PATH_SEGMENTS-1;
-		}
-		else if ( count == 0 )
-		{
-			return false;
-		}
-
+		
 		if ( count == 1 )
 		{
 			BuildTrivialPath( bot, goal );

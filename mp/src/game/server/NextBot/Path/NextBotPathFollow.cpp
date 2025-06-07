@@ -1,7 +1,7 @@
 // NextBotPathFollow.cpp
 // Path following
 // Author: Michael Booth, April 2005
-// Copyright (c) 2005 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 
@@ -46,6 +46,9 @@ PathFollower::PathFollower( void )
 	m_hindrance = NULL;
 
 	m_minLookAheadRange = -1.0f;
+
+	// was 10.0f for L4D - need a better solution here (MSB 5/15/09)
+	m_goalTolerance = 25.0f;
 }
 
 
@@ -236,7 +239,7 @@ bool PathFollower::IsAtGoal( INextBot *bot ) const
 				// can't use this for positions below us because we need to be able
 				// to climb over random objects along our path that we can't actually
 				// move *through*
-				if ( toGoal.z < mover->GetStepHeight() || ( mover->IsPotentiallyTraversable( mover->GetFeet(), next->pos ) && !mover->HasPotentialGap( mover->GetFeet(), next->pos ) ) )
+				if ( toGoal.z < mover->GetStepHeight() && ( mover->IsPotentiallyTraversable( mover->GetFeet(), next->pos ) && !mover->HasPotentialGap( mover->GetFeet(), next->pos ) ) )
 				{
 					// passed goal
 					return true;
@@ -246,8 +249,7 @@ bool PathFollower::IsAtGoal( INextBot *bot ) const
 
 		// proximity check
 		// Z delta can be anything, since we may be climbing over a tall fence, a physics prop, etc.
-		const float rangeTolerance = 25.0f; // was 10.0f for L4D - need a better solution here (MSB 5/15/09)
-		if ( toGoal.AsVector2D().IsLengthLessThan( rangeTolerance ) )
+		if ( toGoal.AsVector2D().IsLengthLessThan( m_goalTolerance ) )
 		{
 			// reached goal
 			return true;
@@ -462,16 +464,17 @@ bool PathFollower::CheckProgress( INextBot *bot )
 	ILocomotion *mover = bot->GetLocomotionInterface();
 
 	// skip nearby goal points that are redundant to smooth path following motion
+	const Path::Segment *pSkipToGoal = NULL;
 	if ( m_minLookAheadRange > 0.0f )
 	{
+		pSkipToGoal = m_goal;
 		const Vector &myFeet = mover->GetFeet();
-
-		while( m_goal && m_goal->type == ON_GROUND && mover->IsOnGround() )
+		while( pSkipToGoal && pSkipToGoal->type == ON_GROUND && mover->IsOnGround() )
 		{
-			if ( ( m_goal->pos - myFeet ).IsLengthLessThan( m_minLookAheadRange ) )
+			if ( ( pSkipToGoal->pos - myFeet ).IsLengthLessThan( m_minLookAheadRange ) )
 			{
 				// goal is too close - step to next segment
-				const Path::Segment *nextSegment = NextSegment( m_goal );
+				const Path::Segment *nextSegment = NextSegment( pSkipToGoal );
 
 				if ( !nextSegment || nextSegment->type != ON_GROUND )
 				{
@@ -479,18 +482,24 @@ bool PathFollower::CheckProgress( INextBot *bot )
 					break;
 				}
 
-/*
+				if ( nextSegment->pos.z > myFeet.z + mover->GetStepHeight() )
+				{
+					// going uphill or up stairs tends to cause problems if we skip ahead, so don't
+					break;
+				}
+
+#ifdef DOTA_DLL
 				if ( DotProduct( mover->GetMotionVector(), nextSegment->forward ) <= 0.1f )
 				{
 					// don't skip sharp turns
 					break;
 				}
-*/
+#endif
 
 				// can we reach the next path segment directly
 				if ( mover->IsPotentiallyTraversable( myFeet, nextSegment->pos ) && !mover->HasPotentialGap( myFeet, nextSegment->pos ) )
 				{
-					m_goal = nextSegment;
+					pSkipToGoal = nextSegment;
 				}
 				else
 				{
@@ -504,13 +513,18 @@ bool PathFollower::CheckProgress( INextBot *bot )
 				break;
 			}
 		}
-	}
 
+		// didn't find any goal to skip to
+		if ( pSkipToGoal == m_goal )
+		{
+			pSkipToGoal = NULL;
+		}
+	}
 
 	if ( IsAtGoal( bot ) )
 	{
 		// iterate to next segment of the path
-		const Path::Segment *nextSegment = NextSegment( m_goal );
+		const Path::Segment *nextSegment = pSkipToGoal ? pSkipToGoal : NextSegment( m_goal );
 
 		if ( nextSegment == NULL )
 		{
@@ -538,6 +552,12 @@ bool PathFollower::CheckProgress( INextBot *bot )
 		{
 			// keep moving
 			m_goal = nextSegment;
+
+			if ( bot->IsDebugging( NEXTBOT_PATH ) && !mover->IsPotentiallyTraversable( mover->GetFeet(), nextSegment->pos ) )
+			{
+				Warning( "PathFollower: path to my goal is blocked by something\n" );
+				NDebugOverlay::Sphere( m_goal->pos, 5.f, 255, 0, 0, true, 3.f );
+			}
 		}
 	}
 
@@ -696,6 +716,10 @@ void PathFollower::Update( INextBot *bot )
 				{
 					DevMsg( "PathFollower: OnMoveToFailure( FAIL_FELL_OFF )\n" );
 				}
+
+				// reset stuck status since we're (likely) repathing anyways. otherwise, we could be stuck in a loop here and not move
+				mover->ClearStuckStatus( "Fell off path" );
+
 				return;
 			}
 		}
@@ -717,7 +741,7 @@ void PathFollower::Update( INextBot *bot )
 	{
 		const float nearLedgeRange = 50.0f;
 		if ( rangeToGoal > nearLedgeRange || ( m_goal && m_goal->type != CLIMB_UP ) )
-		{	
+		{
 			goalPos = Avoid( bot, goalPos, forward, left );
 		}
 	}
@@ -865,20 +889,11 @@ Vector PathFollower::Avoid( INextBot *bot, const Vector &goalPos, const Vector &
 	m_avoidTimer.Start( avoidInterval );
 
 	ILocomotion *mover = bot->GetLocomotionInterface();
-	IBody *body = bot->GetBodyInterface();
 
-	unsigned int mask = body->GetSolidMask();
-
-	Vector adjustedGoal = goalPos;
-	
 	if ( mover->IsClimbingOrJumping() || !mover->IsOnGround() )
 	{
-		return adjustedGoal;
+		return goalPos;
 	}
-
-	// we want to avoid other players, etc	
-	trace_t result;
-	NextBotTraceFilterOnlyActors filter( bot->GetEntity(), COLLISION_GROUP_NONE );
 
 	//
 	// Check for potential blockers along our path and wait if we're blocked
@@ -897,14 +912,23 @@ Vector PathFollower::Avoid( INextBot *bot, const Vector &goalPos, const Vector &
 	CNavArea *area = bot->GetEntity()->GetLastKnownArea();
 	if ( area && ( area->GetAttributes() & NAV_MESH_PRECISE ) )
 	{
-		return adjustedGoal;
+		return goalPos;
 	}
 
 	m_didAvoidCheck = true;
 
-	const float offset = ( body->GetHullWidth()/4.0f ) + 2.0f;
-	const float range = mover->IsRunning() ? 50.0f : 30.0f;
+	// we want to avoid other players, etc	
+	trace_t result;
+	NextBotTraceFilterOnlyActors filter( bot->GetEntity(), COLLISION_GROUP_NONE );
+
+	IBody *body = bot->GetBodyInterface();
+	unsigned int mask = body->GetSolidMask();
+
 	const float size = body->GetHullWidth()/4.0f;
+	const float offset = size + 2.0f;
+
+	float range = mover->IsRunning() ? 50.0f : 30.0f;
+	range *= bot->GetEntity()->GetModelScale();
 
 	m_hullMin = Vector( -size, -size, mover->GetStepHeight()+0.1f );
 	
@@ -989,6 +1013,7 @@ Vector PathFollower::Avoid( INextBot *bot, const Vector &goalPos, const Vector &
 // 		}
 	}
 
+	Vector adjustedGoal = goalPos;
 
 	// avoid doors directly in our way
 	if ( door && !m_isLeftClear && !m_isRightClear )

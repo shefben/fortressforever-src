@@ -1,7 +1,7 @@
 // NextBotAttentionInterface.h
 // Manage what this bot pays attention to
 // Author: Michael Booth, April 2007
-// Copyright (c) 2007 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #ifndef _NEXT_BOT_ATTENTION_INTERFACE_H_
 #define _NEXT_BOT_ATTENTION_INTERFACE_H_

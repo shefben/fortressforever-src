@@ -1,7 +1,7 @@
 // NextBotPlayerBody.cpp
 // Implementation of Body interface for CBasePlayer-derived classes
 // Author: Michael Booth, October 2006
-// Copyright (c) 2006 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 
@@ -13,10 +13,12 @@
 #include "tier0/memdbgon.h"
 
 
-ConVar NextBotSaccadeTime( "nb_saccade_time", "0.1", FCVAR_CHEAT );
-ConVar NextBotSaccadeSpeed( "nb_saccade_speed", "1000", FCVAR_CHEAT );
-ConVar NextBotHeadAimSteadyMaxRate( "nb_head_aim_steady_max_rate", "100", FCVAR_CHEAT );
-ConVar NextBotHeadAimSettleDuration( "nb_head_aim_settle_duration", "0.3", FCVAR_CHEAT );
+ConVar nb_saccade_time( "nb_saccade_time", "0.1", FCVAR_CHEAT );
+ConVar nb_saccade_speed( "nb_saccade_speed", "1000", FCVAR_CHEAT );
+ConVar nb_head_aim_steady_max_rate( "nb_head_aim_steady_max_rate", "100", FCVAR_CHEAT );
+ConVar nb_head_aim_settle_duration( "nb_head_aim_settle_duration", "0.3", FCVAR_CHEAT );
+ConVar nb_head_aim_resettle_angle( "nb_head_aim_resettle_angle", "100", FCVAR_CHEAT, "After rotating through this angle, the bot pauses to 'recenter' its virtual mouse on its virtual mousepad" );
+ConVar nb_head_aim_resettle_time( "nb_head_aim_resettle_time", "0.3", FCVAR_CHEAT, "How long the bot pauses to 'recenter' its virtual mouse on its virtual mousepad" );
 
 
 //-----------------------------------------------------------------------------------------------
@@ -89,6 +91,8 @@ void PlayerBody::Reset( void )
 	m_lookAtPos = vec3_origin;
 	m_lookAtSubject = NULL;
 	m_lookAtReplyWhenAimed = NULL;
+	m_lookAtVelocity = vec3_origin;
+	m_lookAtExpireTimer.Invalidate();
 
 	m_lookAtPriority = BORING;
 	m_lookAtExpireTimer.Invalidate();
@@ -96,12 +100,12 @@ void PlayerBody::Reset( void )
 	m_isSightedIn = false;
 	m_hasBeenSightedIn = false;
 	m_headSteadyTimer.Invalidate();
-	m_yawRate = 0.0f;
-	m_pitchRate = 0.0f;
 	m_priorAngles = vec3_angle;
+	m_anchorRepositionTimer.Invalidate();
+	m_anchorForward = vec3_origin;
 }
 
-static ConVar bot_mimic( "bot_mimic", "0", 0, "Bot uses usercmd of player by index." );
+ConVar bot_mimic( "bot_mimic", "0", 0, "Bot uses usercmd of player by index." );
 
 //-----------------------------------------------------------------------------------------------
 /**
@@ -126,12 +130,11 @@ void PlayerBody::Upkeep( void )
 	// get current view angles
 	QAngle currentAngles = player->EyeAngles() + player->GetPunchAngle();
 
-
 	// track when our head is "steady"
 	bool isSteady = true;
 
 	float actualPitchRate = AngleDiff( currentAngles.x, m_priorAngles.x );
-	if ( abs( actualPitchRate ) > NextBotHeadAimSteadyMaxRate.GetFloat() * deltaT )
+	if ( abs( actualPitchRate ) > nb_head_aim_steady_max_rate.GetFloat() * deltaT )
 	{
 		isSteady = false;
 	}
@@ -139,7 +142,7 @@ void PlayerBody::Upkeep( void )
 	{
 		float actualYawRate = AngleDiff( currentAngles.y, m_priorAngles.y );
 
-		if ( abs( actualYawRate ) > NextBotHeadAimSteadyMaxRate.GetFloat() * deltaT )
+		if ( abs( actualYawRate ) > nb_head_aim_steady_max_rate.GetFloat() * deltaT )
 		{
 			isSteady = false;
 		}
@@ -163,7 +166,7 @@ void PlayerBody::Upkeep( void )
 		{
 			const float maxTime = 3.0f;
 			float t = GetHeadSteadyDuration() / maxTime;
-			t = clamp( t, 0, 1.0f );
+			t = clamp( t, 0.f, 1.0f );
 			NDebugOverlay::Circle( player->EyePosition(), t * 10.0f, 0, 255, 0, 255, true, 2.0f * deltaT );
 		}
 	}
@@ -177,22 +180,65 @@ void PlayerBody::Upkeep( void )
 		return;
 	}
 
+	// simulate limited range of mouse movements
+	// compute the angle change from "center"
+	const Vector &forward = GetViewVector();
+	float deltaAngle = RAD2DEG( acos( DotProduct( forward, m_anchorForward ) ) );
+	if ( deltaAngle > nb_head_aim_resettle_angle.GetFloat() )
+	{
+		// time to recenter our 'virtual mouse'
+		m_anchorRepositionTimer.Start( RandomFloat( 0.9f, 1.1f ) * nb_head_aim_resettle_time.GetFloat() );
+		m_anchorForward = forward;
+		return;
+	}
+
+	// if we're currently recentering our "virtual mouse", wait
+	if ( m_anchorRepositionTimer.HasStarted() && !m_anchorRepositionTimer.IsElapsed() )
+	{
+		return;
+	}
+	m_anchorRepositionTimer.Invalidate();
+
 
 	// if we have a subject, update lookat point
 	CBaseEntity *subject = m_lookAtSubject;
 	if ( subject )
 	{
-		if ( subject->MyCombatCharacterPointer() ) 
+		if ( m_lookAtTrackingTimer.IsElapsed() )
 		{
-			m_lookAtPos = GetBot()->GetIntentionInterface()->SelectTargetPoint( GetBot(), subject->MyCombatCharacterPointer() );
-		}
-		else
-		{
-			m_lookAtPos = subject->WorldSpaceCenter();
+			// update subject tracking by periodically estimating linear aim velocity, allowing for "slop" between updates
+			Vector desiredLookAtPos;
+
+			if ( subject->MyCombatCharacterPointer() ) 
+			{
+				desiredLookAtPos = GetBot()->GetIntentionInterface()->SelectTargetPoint( GetBot(), subject->MyCombatCharacterPointer() );
+			}
+			else
+			{
+				desiredLookAtPos = subject->WorldSpaceCenter();
+			}
+
+			desiredLookAtPos += GetHeadAimSubjectLeadTime() * subject->GetAbsVelocity();
+
+			Vector errorVector = desiredLookAtPos - m_lookAtPos;
+			float error = errorVector.NormalizeInPlace();
+
+			float trackingInterval = GetHeadAimTrackingInterval();
+			if ( trackingInterval < deltaT )
+			{
+				trackingInterval = deltaT;
+			}
+
+			float errorVel = error / trackingInterval;
+
+			m_lookAtVelocity = ( errorVel * errorVector ) + subject->GetAbsVelocity();
+
+			m_lookAtTrackingTimer.Start( RandomFloat( 0.8f, 1.2f ) * trackingInterval );
 		}
 
-		m_lookAtPos += GetHeadAimSubjectLeadTime() * subject->GetAbsVelocity();
+		m_lookAtPos += deltaT * m_lookAtVelocity;
 	}
+
 
 	// aim view towards last look at point
 	Vector to = m_lookAtPos - GetEyePosition();
@@ -203,15 +249,14 @@ void PlayerBody::Upkeep( void )
 
 	QAngle angles;
 
-	const Vector &forward = GetViewVector();
-
 	if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 	{
 		NDebugOverlay::Line( GetEyePosition(), GetEyePosition() + 100.0f * forward, 255, 255, 0, false, 2.0f * deltaT );
 
 		float thickness = isSteady ? 2.0f : 3.0f;
+		int r = m_isSightedIn ? 255 : 0;
 		int g = subject ? 255 : 0;
-		NDebugOverlay::HorzArrow( GetEyePosition(), m_lookAtPos, thickness, 0, g, 255, 255, false, 2.0f * deltaT );
+		NDebugOverlay::HorzArrow( GetEyePosition(), m_lookAtPos, thickness, r, g, 255, 255, false, 2.0f * deltaT );
 	}
 
 	
@@ -221,7 +266,18 @@ void PlayerBody::Upkeep( void )
 	{
 		// on target
 		m_isSightedIn = true;
-		m_hasBeenSightedIn = true;
+
+		if ( !m_hasBeenSightedIn )
+		{
+			m_hasBeenSightedIn = true;
+
+			if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
+			{
+				ConColorMsg( Color( 255, 100, 0, 255 ), "%3.2f: %s Look At SIGHTED IN\n",
+								gpGlobals->curtime,
+								m_player->GetPlayerName() );
+			}
+		}
 
 		if ( m_lookAtReplyWhenAimed )
 		{
@@ -256,7 +312,7 @@ void PlayerBody::Upkeep( void )
 	}
 
 	angles.y = ApproachAngle( desiredAngles.y, currentAngles.y, approachRate * deltaT );
-	angles.x = ApproachAngle( desiredAngles.x, currentAngles.x, approachRate * deltaT );
+	angles.x = ApproachAngle( desiredAngles.x, currentAngles.x, 0.5f * approachRate * deltaT );
 	angles.z = 0.0f;
 
 	// back out "punch angle"
@@ -318,7 +374,7 @@ void PlayerBody::AimHeadTowards( const Vector &lookAtPos, LookAtPriorityType pri
 	// don't spaz our aim around
 	if ( m_lookAtPriority == priority )
 	{
-		if ( !IsHeadSteady() || GetHeadSteadyDuration() < NextBotHeadAimSettleDuration.GetFloat() )
+		if ( !IsHeadSteady() || GetHeadSteadyDuration() < nb_head_aim_settle_duration.GetFloat() )
 		{
 			// we're still finishing a look-at at the same priority
 			if ( replyWhenAimed ) 
@@ -328,9 +384,11 @@ void PlayerBody::AimHeadTowards( const Vector &lookAtPos, LookAtPriorityType pri
 
 			if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 			{
-				ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At rejected - previous aim not settled\n",
+				ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At '%s' rejected - previous aim not %s\n",
 								gpGlobals->curtime,
-								m_player->GetPlayerName() );
+								m_player->GetPlayerName(),
+								reason,
+								IsHeadSteady() ? "settled long enough" : "head-steady" );
 			}
 			return;
 		}
@@ -347,9 +405,10 @@ void PlayerBody::AimHeadTowards( const Vector &lookAtPos, LookAtPriorityType pri
 
 		if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 		{
-			ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At rejected - higher priority aim in progress\n",
+			ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At '%s' rejected - higher priority aim in progress\n",
 							gpGlobals->curtime,
-							m_player->GetPlayerName() );
+							m_player->GetPlayerName(),
+							reason );
 		}
 		return;
 	}
@@ -378,14 +437,17 @@ void PlayerBody::AimHeadTowards( const Vector &lookAtPos, LookAtPriorityType pri
 
 	m_lookAtPriority = priority;
 	m_lookAtDurationTimer.Start();
-	m_isSightedIn = false;
+
+	// do NOT clear this here, or continuous calls to AimHeadTowards will keep IsHeadAimingOnTarget returning false all of the time
+	// m_isSightedIn = false;
+
 	m_hasBeenSightedIn = false;
 
 	if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 	{
 		NDebugOverlay::Cross3D( lookAtPos, 2.0f, 255, 255, 100, true, 2.0f * duration );
 		
-		char *priName = "";
+		const char *priName = "";
 		switch( priority )
 		{
 			case BORING:		priName = "BORING"; break;
@@ -424,7 +486,7 @@ void PlayerBody::AimHeadTowards( CBaseEntity *subject, LookAtPriorityType priori
 	// don't spaz our aim around
 	if ( m_lookAtPriority == priority )
 	{
-		if ( !IsHeadSteady() || GetHeadSteadyDuration() < NextBotHeadAimSettleDuration.GetFloat() )
+		if ( !IsHeadSteady() || GetHeadSteadyDuration() < nb_head_aim_settle_duration.GetFloat() )
 		{
 			// we're still finishing a look-at at the same priority
 			if ( replyWhenAimed ) 
@@ -434,9 +496,11 @@ void PlayerBody::AimHeadTowards( CBaseEntity *subject, LookAtPriorityType priori
 
 			if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 			{
-				ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At rejected - previous aim not settled\n",
+				ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At '%s' rejected - previous aim not %s\n",
 								gpGlobals->curtime,
-								m_player->GetPlayerName() );
+								m_player->GetPlayerName(),
+								reason,
+								IsHeadSteady() ? "head-steady" : "settled long enough" );
 			}
 			return;
 		}
@@ -453,9 +517,10 @@ void PlayerBody::AimHeadTowards( CBaseEntity *subject, LookAtPriorityType priori
 
 		if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 		{
-			ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At rejected - higher priority aim in progress\n",
+			ConColorMsg( Color( 255, 0, 0, 255 ), "%3.2f: %s Look At '%s' rejected - higher priority aim in progress\n",
 							gpGlobals->curtime,
-							m_player->GetPlayerName() );
+							m_player->GetPlayerName(),
+							reason );
 		}
 		return;
 	}
@@ -504,14 +569,17 @@ void PlayerBody::AimHeadTowards( CBaseEntity *subject, LookAtPriorityType priori
 
 	m_lookAtPriority = priority;
 	m_lookAtDurationTimer.Start();
-	m_isSightedIn = false;
+
+	// do NOT clear this here, or continuous calls to AimHeadTowards will keep IsHeadAimingOnTarget returning false all of the time
+	// m_isSightedIn = false;
+
 	m_hasBeenSightedIn = false;
 
 	if ( GetBot()->IsDebugging( NEXTBOT_LOOK_AT ) )
 	{
 		NDebugOverlay::Cross3D( m_lookAtPos, 2.0f, 100, 100, 100, true, duration );
 		
-		char *priName = "";
+		const char *priName = "";
 		switch( priority )
 		{
 			case BORING:		priName = "BORING"; break;
@@ -553,9 +621,17 @@ float PlayerBody::GetHeadSteadyDuration( void ) const
 
 
 //-----------------------------------------------------------------------------------------------
+// Clear out currently pending replyWhenAimed callback
+void PlayerBody::ClearPendingAimReply( void )
+{
+	m_lookAtReplyWhenAimed = NULL;
+}
+
+
+//-----------------------------------------------------------------------------------------------
 float PlayerBody::GetMaxHeadAngularVelocity( void ) const
 {
-	return NextBotSaccadeSpeed.GetFloat();
+	return nb_saccade_speed.GetFloat();
 }
 
 
@@ -713,7 +789,7 @@ bool PlayerBody::IsArousal( ArousalType arousal ) const
  */
 float PlayerBody::GetHullWidth( void ) const
 {
-	return VEC_HULL_MAX.x - VEC_HULL_MIN.x;
+	return VEC_HULL_MAX_SCALED( m_player ).x - VEC_HULL_MIN_SCALED( m_player ).x;
 }
 
 
@@ -738,7 +814,7 @@ float PlayerBody::GetHullHeight( void ) const
  */
 float PlayerBody::GetStandHullHeight( void ) const
 {
-	return VEC_HULL_MAX.z - VEC_HULL_MIN.z;
+	return VEC_HULL_MAX_SCALED( m_player ).z - VEC_HULL_MIN_SCALED( m_player ).z;
 }
 
 
@@ -748,7 +824,7 @@ float PlayerBody::GetStandHullHeight( void ) const
  */
 float PlayerBody::GetCrouchHullHeight( void ) const
 {
-	return VEC_DUCK_HULL_MAX.z - VEC_DUCK_HULL_MIN.z;
+	return VEC_DUCK_HULL_MAX_SCALED( m_player ).z - VEC_DUCK_HULL_MIN_SCALED( m_player ).z;
 }
 
 
@@ -760,11 +836,11 @@ const Vector &PlayerBody::GetHullMins( void ) const
 {
 	if ( m_posture == CROUCH )
 	{
-		m_hullMins = VEC_DUCK_HULL_MIN;
+		m_hullMins = VEC_DUCK_HULL_MIN_SCALED( m_player );
 	}
 	else
 	{
-		m_hullMins = VEC_HULL_MIN;
+		m_hullMins = VEC_HULL_MIN_SCALED( m_player );
 	}
 	
 	return m_hullMins;
@@ -779,11 +855,11 @@ const Vector &PlayerBody::GetHullMaxs( void ) const
 {
 	if ( m_posture == CROUCH )
 	{
-		m_hullMaxs = VEC_DUCK_HULL_MAX;
+		m_hullMaxs = VEC_DUCK_HULL_MAX_SCALED( m_player );
 	}
 	else
 	{
-		m_hullMaxs = VEC_HULL_MAX;
+		m_hullMaxs = VEC_HULL_MAX_SCALED( m_player );
 	}
 
 	return m_hullMaxs;	

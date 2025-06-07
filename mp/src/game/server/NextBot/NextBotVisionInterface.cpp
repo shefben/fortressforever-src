@@ -1,7 +1,7 @@
 // NextBotVisionInterface.cpp
 // Implementation of common vision system
 // Author: Michael Booth, May 2006
-// Copyright (c) 2006 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 
@@ -28,7 +28,7 @@ ConVar nb_debug_known_entities( "nb_debug_known_entities", "0", FCVAR_CHEAT, "Sh
 
 
 //------------------------------------------------------------------------------------------
-IVision::IVision( INextBot *bot ) : INextBotComponent( bot ) 
+IVision::IVision( INextBot *bot ) : INextBotComponent( bot )
 { 
 	Reset();
 }
@@ -44,6 +44,7 @@ void IVision::Reset( void )
 
 	m_knownEntityVector.RemoveAll();
 	m_lastVisionUpdateTimestamp = 0.0f;
+	m_primaryThreat = NULL;
 
 	m_FOV = GetDefaultFieldOfView();
 	m_cosHalfFOV = cos( 0.5f * m_FOV * M_PI / 180.0f );
@@ -77,7 +78,7 @@ const CKnownEntity *IVision::GetPrimaryKnownThreat( bool onlyVisibleThreats ) co
 		// check in case status changes between updates
 		if ( IsAwareOf( firstThreat ) && !firstThreat.IsObsolete() && !IsIgnored( firstThreat.GetEntity() ) && GetBot()->IsEnemy( firstThreat.GetEntity() ) )
 		{
-			if ( !onlyVisibleThreats || firstThreat.IsVisible() )
+			if ( !onlyVisibleThreats || firstThreat.IsVisibleRecently() )
 			{
 				threat = &firstThreat;
 				break;
@@ -86,7 +87,10 @@ const CKnownEntity *IVision::GetPrimaryKnownThreat( bool onlyVisibleThreats ) co
 	}
 
 	if ( threat == NULL )
+	{
+		m_primaryThreat = NULL;
 		return NULL;
+	}
 
 	for( ++i; i<m_knownEntityVector.Count(); ++i )
 	{
@@ -95,13 +99,16 @@ const CKnownEntity *IVision::GetPrimaryKnownThreat( bool onlyVisibleThreats ) co
 		// check in case status changes between updates
 		if ( IsAwareOf( newThreat ) && !newThreat.IsObsolete() && !IsIgnored( newThreat.GetEntity() ) && GetBot()->IsEnemy( newThreat.GetEntity() ) )
 		{
-			if ( !onlyVisibleThreats || newThreat.IsVisible() )
+			if ( !onlyVisibleThreats || newThreat.IsVisibleRecently() )
 			{
 				threat = GetBot()->GetIntentionInterface()->SelectMoreDangerousThreat( GetBot(), GetBot()->GetEntity(), threat, &newThreat );
 			}
 		}
 	}
-	
+
+	// cache off threat
+	m_primaryThreat = threat ? threat->GetEntity() : NULL;
+
 	return threat;
 }
 
@@ -189,7 +196,7 @@ const CKnownEntity *IVision::GetKnown( const CBaseEntity *entity ) const
 	{
 		const CKnownEntity &known = m_knownEntityVector[i];
 
-		if ( known.GetEntity() && known.GetEntity()->entindex() == entity->entindex() )
+		if ( known.GetEntity() && known.GetEntity()->entindex() == entity->entindex() && !known.IsObsolete() )
 		{
 			return &known;
 		}
@@ -207,6 +214,12 @@ const CKnownEntity *IVision::GetKnown( const CBaseEntity *entity ) const
  */
 void IVision::AddKnownEntity( CBaseEntity *entity )
 {
+	if ( entity == NULL || entity->IsWorld() )
+	{
+		// the world is not an entity we can deal with
+		return;
+	}
+
 	CKnownEntity known( entity );
 
 	// only add it if we don't already know of it
@@ -216,6 +229,33 @@ void IVision::AddKnownEntity( CBaseEntity *entity )
 	}
 }
 
+
+//------------------------------------------------------------------------------------------
+// Remove the given entity from our awareness (whether we know if it or not)
+// Useful if we've moved to where we last saw the entity, but it's not there any longer.
+void IVision::ForgetEntity( CBaseEntity *forgetMe )
+{
+	if ( !forgetMe )
+		return;
+
+	FOR_EACH_VEC( m_knownEntityVector, it )
+	{
+		const CKnownEntity &known = m_knownEntityVector[ it ];
+
+		if ( known.GetEntity() && known.GetEntity()->entindex() == forgetMe->entindex() )
+		{
+			m_knownEntityVector.FastRemove( it );
+			return;
+		}
+	}
+}
+
+
+//------------------------------------------------------------------------------------------
+void IVision::ForgetAllKnownEntities( void )
+{
+	m_knownEntityVector.RemoveAll();
+}
 
 
 //------------------------------------------------------------------------------------------
@@ -234,7 +274,7 @@ int IVision::GetKnownCount( int team, bool onlyVisible, float rangeLimit ) const
 		{
 			if ( team == TEAM_ANY || known.GetEntity()->GetTeamNumber() == team )
 			{
-				if ( !onlyVisible || known.IsVisible() )
+				if ( !onlyVisible || known.IsVisibleRecently() )
 				{
 					if ( rangeLimit < 0.0f || GetBot()->IsRangeLessThan( known.GetLastKnownPosition(), rangeLimit ) )
 					{
@@ -387,7 +427,7 @@ void IVision::UpdateKnownEntities( void )
 			}
 			else // known entity is not currently visible
 			{
-				if ( known.IsVisible() )
+				if ( known.IsVisibleInFOVNow() )
 				{
 					// previously known and visible entity is now no longer visible
 					known.UpdateVisibilityStatus( false );
@@ -452,23 +492,40 @@ void IVision::UpdateKnownEntities( void )
 
 			if ( subject && GetBot()->IsSelf( subject ) )
 			{
-				for( int i=0; i < m_knownEntityVector.Count(); ++i )
+				CUtlVector< CKnownEntity > knownVector;
+				CollectKnownEntities( &knownVector );
+
+				for( int i=0; i < knownVector.Count(); ++i )
 				{
-					CKnownEntity &known = m_knownEntityVector[i];
+					CKnownEntity &known = knownVector[i];
 
 					if ( GetBot()->IsFriend( known.GetEntity() ) )
 					{
-						if ( known.IsVisible() )
-							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 5.0f, 0, 255, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						if ( IsAwareOf( known ) )
+						{
+							if ( known.IsVisibleInFOVNow() )
+								NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 5.0f, 0, 255, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+							else
+								NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 2.0f, 0, 100, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						}
 						else
-							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 2.0f, 0, 100, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						{
+							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 1.0f, 0, 100, 0, 128, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						}
 					}
 					else
 					{
-						if ( known.IsVisible() )
-							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 5.0f, 255, 0, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						if ( IsAwareOf( known ) )
+						{
+							if ( known.IsVisibleInFOVNow() )
+								NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 5.0f, 255, 0, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+							else
+								NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 2.0f, 100, 0, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						}
 						else
-							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 2.0f, 100, 0, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						{
+							NDebugOverlay::HorzArrow( GetBot()->GetEntity()->GetAbsOrigin(), known.GetLastKnownPosition(), 1.0f, 100, 0, 0, 128, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
+						}
 					}
 				}
 			}
@@ -485,6 +542,7 @@ void IVision::Update( void )
 {
 	VPROF_BUDGET( "IVision::Update", "NextBotExpensive" );
 
+/* This adds significantly to bot's reaction times
 	// throttle update rate
 	if ( !m_scanTimer.IsElapsed() )
 	{
@@ -492,7 +550,7 @@ void IVision::Update( void )
 	}
 
 	m_scanTimer.Start( 0.5f * GetMinRecognizeTime() );
-
+*/
 
 	if ( nb_blind.GetBool() )
 	{
@@ -527,14 +585,29 @@ bool IVision::IsAbleToSee( CBaseEntity *subject, FieldOfViewCheckType checkFOV, 
 	{
 		return false;
 	}
-	
-	if ( !IsNoticed( subject ) )
+
+	CBaseCombatCharacter *combat = subject->MyCombatCharacterPointer();
+	if ( combat )
+	{
+		CNavArea *subjectArea = combat->GetLastKnownArea();
+		CNavArea *myArea = GetBot()->GetEntity()->GetLastKnownArea();
+		if ( myArea && subjectArea )
+		{
+			if ( !myArea->IsPotentiallyVisible( subjectArea ) )
+			{
+				// subject is not potentially visible, skip the expensive raycast
+				return false;
+			}
+		}
+	}
+
+	// do actual line-of-sight trace
+	if ( !IsLineOfSightClearToEntity( subject ) )
 	{
 		return false;
 	}
 
-	// do actual line-of-sight trace
-	return IsLineOfSightClearToEntity( subject );
+	return IsVisibleEntityNoticed( subject );
 }
 
 

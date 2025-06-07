@@ -1,7 +1,7 @@
 // NextBotCombatCharacter.cpp
 // Next generation bot system
 // Author: Michael Booth, April 2005
-// Copyright (c) 2005 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 
@@ -16,6 +16,7 @@
 #include "TerrorGamerules.h"
 #endif
 
+#include "vprof.h"
 #include "datacache/imdlcache.h"
 #include "EntityFlame.h"
 
@@ -88,7 +89,7 @@ bool NextBotDestroyer::operator() ( INextBot *bot  )
 		if ( bot->GetEntity()->IsPlayer() )
 		{
 			CBasePlayer *player = dynamic_cast< CBasePlayer * >( bot->GetEntity() );
-			engine->ServerCommand( UTIL_VarArgs( "kick \"%s\"\n", player->GetPlayerName() ) );
+			engine->ServerCommand( UTIL_VarArgs( "kickid %d\n", player->GetUserID() ) );
 		}
 		else
 		{
@@ -144,12 +145,12 @@ public:
 		CBasePlayer *player = UTIL_GetListenServerHost();
 		if ( player )
 		{
-		Vector forward;
-		player->EyeVectors( &forward );
+			Vector forward;
+			player->EyeVectors( &forward );
 
-		trace_t result;
+			trace_t result;
 			unsigned int mask = MASK_BLOCKLOS_AND_NPCS|CONTENTS_IGNORE_NODRAW_OPAQUE | CONTENTS_GRATE | CONTENTS_WINDOW;
-		UTIL_TraceLine( player->EyePosition(), player->EyePosition() + 999999.9f * forward, mask, player, COLLISION_GROUP_NONE, &result );
+			UTIL_TraceLine( player->EyePosition(), player->EyePosition() + 999999.9f * forward, mask, player, COLLISION_GROUP_NONE, &result );
 			if ( result.DidHit() )
 			{
 				NDebugOverlay::Cross3D( result.endpos, 5, 0, 255, 0, true, 10.0f );
@@ -157,10 +158,10 @@ public:
 				m_goal = result.endpos;
 			}
 			else
-		{
-			m_isGoalValid = false;
+			{
+				m_isGoalValid = false;
+			}
 		}
-	}
 	}
 
 	bool operator() ( INextBot *bot )
@@ -192,7 +193,7 @@ CON_COMMAND_F( nb_move_to_cursor, "Tell all NextBots to move to the cursor posit
 bool IgnoreActorsTraceFilterFunction( IHandleEntity *pServerEntity, int contentsMask )
 {
 	CBaseEntity *entity = EntityFromEntityHandle( pServerEntity );
-	return ( entity->MyNextBotPointer() == NULL && !entity->IsPlayer() );
+	return ( entity->MyCombatCharacterPointer() == NULL );	// includes all bots, npcs, players, and TF2 buildings
 }
 
 
@@ -202,7 +203,7 @@ bool VisionTraceFilterFunction( IHandleEntity *pServerEntity, int contentsMask )
 {
 	// Honor BlockLOS also to allow seeing through partially-broken doors
 	CBaseEntity *entity = EntityFromEntityHandle( pServerEntity );
-	return ( entity->MyNextBotPointer() == NULL && !entity->IsPlayer() && entity->BlocksLOS() );
+	return ( entity->MyCombatCharacterPointer() == NULL && entity->BlocksLOS() );
 }
 
 
@@ -341,10 +342,10 @@ void NextBotCombatCharacter::Ignite( float flFlameLifetime, CBaseEntity *pAttack
 		return;
 
 	// BaseClass::Ignite stuff, plus SetAttacker on the flame, so our attacker gets credit
-	CEntityFlame *pFlame = CEntityFlame::Create( this, flFlameLifetime );
+	CEntityFlame *pFlame = CEntityFlame::Create( this );
 	if ( pFlame )
 	{
-		pFlame->SetAttacker( pAttacker );
+		pFlame->SetLifetime( flFlameLifetime );
 		AddFlag( FL_ONFIRE );
 
 		SetEffectEntity( pFlame );

@@ -1,3 +1,4 @@
+//========= Copyright Valve Corporation, All rights reserved. ============//
 // NextBotGroundLocomotion.cpp
 // Basic ground-based movement for NextBotCombatCharacters
 // Author: Michael Booth, February 2009
@@ -471,7 +472,7 @@ public:
 			if ( entity && m_me->IsSelf( entity ) )
 				return false;
 
-			return true;
+			return m_me->GetLocomotionInterface()->ShouldCollideWith( entity );
 		}
 
 		return false;
@@ -490,7 +491,7 @@ bool NextBotGroundLocomotion::DetectCollision( trace_t *pTrace, int &recursionLi
 	IBody *body = GetBot()->GetBodyInterface();
 
 	CBaseEntity *ignore = m_ignorePhysicsPropTimer.IsElapsed() ? NULL : m_ignorePhysicsProp;
-	GroundLocomotionCollisionTraceFilter filter( GetBot(), ignore, COLLISION_GROUP_NONE );
+	GroundLocomotionCollisionTraceFilter filter( GetBot(), ignore, body->GetCollisionGroup() );
 
 	TraceHull( from, to, vecMins, vecMaxs, body->GetSolidMask(), &filter, pTrace );
 
@@ -896,7 +897,7 @@ void NextBotGroundLocomotion::UpdatePosition( const Vector &newPos )
 {
 	VPROF_BUDGET( "NextBotGroundLocomotion::UpdatePosition", "NextBot" );
 
-	if ( NextBotStop.GetBool() || (m_nextBot->GetFlags() & FL_FROZEN) != 0 )
+	if ( NextBotStop.GetBool() || (m_nextBot->GetFlags() & FL_FROZEN) != 0 || newPos == m_nextBot->GetPosition() )
 	{
 		return;
 	}
@@ -910,7 +911,10 @@ void NextBotGroundLocomotion::UpdatePosition( const Vector &newPos )
 	Vector safePos = ResolveCollision( m_nextBot->GetPosition(), adjustedNewPos, recursionLimit );
 
 	// set the bot's position
-	m_nextBot->SetPosition( safePos );
+	if ( GetBot()->GetIntentionInterface()->IsPositionAllowed( GetBot(), safePos ) != ANSWER_NO )
+	{
+		m_nextBot->SetPosition( safePos );
+	}
 }
 
 
@@ -947,7 +951,7 @@ void NextBotGroundLocomotion::UpdateGroundConstraint( void )
 	const float stickToGroundTolerance = GetStepHeight() + 0.01f;
 
 	trace_t ground;
-	NextBotTraceFilterIgnoreActors filter( m_nextBot, COLLISION_GROUP_NONE );
+	NextBotTraceFilterIgnoreActors filter( m_nextBot, body->GetCollisionGroup() );
 
 	TraceHull( m_nextBot->GetPosition() + Vector( 0, 0, GetStepHeight() + 0.001f ),
 					m_nextBot->GetPosition() + Vector( 0, 0, -stickToGroundTolerance ), 
@@ -1428,7 +1432,7 @@ void NextBotGroundLocomotion::FaceTowards( const Vector &target )
 	}
 	else
 	{
-		angles.y = desiredYaw;
+		angles.y += angleDiff;
 	}
 	
 	m_nextBot->SetLocalAngles( angles );

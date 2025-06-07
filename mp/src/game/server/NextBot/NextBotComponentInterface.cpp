@@ -1,7 +1,7 @@
 // NextBotComponentInterface.cpp
 // Implentation of system methods for NextBot component interface
 // Author: Michael Booth, May 2006
-// Copyright (c) 2006 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 

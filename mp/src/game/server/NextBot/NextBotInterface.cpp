@@ -1,7 +1,7 @@
 // NextBotInterface.cpp
 // Implentation of system methods for NextBot interface
 // Author: Michael Booth, May 2006
-// Copyright (c) 2006 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #include "cbase.h"
 
@@ -48,14 +48,15 @@ INextBot::~INextBot()
 	// tell the manager we're gone
 	TheNextBots().UnRegister( this );
 
+	// delete Intention first, since destruction of Actions may access other components
+	if ( m_baseIntention )
+		delete m_baseIntention;
+
 	if ( m_baseLocomotion )
 		delete m_baseLocomotion;
 
 	if ( m_baseBody )
 		delete m_baseBody;
-
-	if ( m_baseIntention )
-		delete m_baseIntention;
 
 	if ( m_baseVision )
 		delete m_baseVision;
@@ -113,6 +114,7 @@ void INextBot::EndUpdate( void )
 void INextBot::Update( void )
 {
 	VPROF_BUDGET( "INextBot::Update", "NextBot" );
+
 	m_debugDisplayLine = 0;
 
 	if ( IsDebugging( NEXTBOT_DEBUG_ALL ) )
@@ -137,6 +139,8 @@ void INextBot::Update( void )
 //----------------------------------------------------------------------------------------------------------------
 void INextBot::Upkeep( void )
 {
+	VPROF_BUDGET( "INextBot::Upkeep", "NextBot" );
+
 	// do upkeep for all components
 	for( INextBotComponent *comp = m_componentList; comp; comp = comp->m_nextComponent )
 	{
@@ -247,7 +251,7 @@ bool INextBot::IsRangeGreaterThan( CBaseEntity *subject, float range ) const
 	Vector botPos;
 	CBaseEntity *bot = const_cast< INextBot * >( this )->GetEntity();
 	if ( !bot || !subject )
-		return 0.0f;
+		return true;
 
 	bot->CollisionProp()->CalcNearestPoint( subject->WorldSpaceCenter(), &botPos );
 	float computedRange = subject->CollisionProp()->CalcDistanceFromPoint( botPos );

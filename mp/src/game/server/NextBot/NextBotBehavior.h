@@ -1,7 +1,7 @@
 // NextBotBehaviorEngine.h
 // Behavioral system constructed from Actions
 // Author: Michael Booth, April 2006
-// Copyright (c) 2007 Turtle Rock Studios, Inc. - All Rights Reserved
+//========= Copyright Valve Corporation, All rights reserved. ============//
 
 #ifndef _BEHAVIOR_ENGINE_H_
 #define _BEHAVIOR_ENGINE_H_
@@ -10,6 +10,8 @@
 #include "NextBotEventResponderInterface.h"
 #include "NextBotContextualQueryInterface.h"
 #include "NextBotDebug.h"
+#include "tier0/vprof.h"
+
 
 //#define DEBUG_BEHAVIOR_MEMORY
 extern ConVar NextBotDebugHistory;
@@ -168,13 +170,21 @@ class Behavior : public INextBotEventResponder, public IContextualQuery
 public:
 	DECLARE_CLASS( Behavior, INextBotEventResponder );
 
-	Behavior( Action< Actor > *initialAction, const char *name = "" ) : m_name( name )
+	Behavior( Action< Actor > *initialAction, const char *name = "" ) : m_name( "%s", name )
 	{
 		m_action = initialAction;
+		m_me = NULL;
 	}
 
 	virtual ~Behavior() 
 	{
+		if ( m_me && m_action )
+		{
+			// allow all currently active Actions to end
+			m_action->InvokeOnEnd( m_me, this, NULL );
+			m_me = NULL;
+		}
+
 		// dig down to the bottom of the action stack and delete 
 		// that, so we don't leak action memory since action 
 		// destructors intentionally don't delete actions
@@ -187,6 +197,9 @@ public:
 		{
 			delete bottomAction;
 		}
+
+		// delete any dead Actions
+		m_deadActionVector.PurgeAndDeleteElements();
 	}
 
 	/**
@@ -196,6 +209,13 @@ public:
 	 */
 	void Reset( Action< Actor > *action )
 	{
+		if ( m_me && m_action )
+		{
+			// allow all currently active Actions to end
+			m_action->InvokeOnEnd( m_me, this, NULL );
+			m_me = NULL;
+		}
+
 		// find "bottom" action (see comment in destructor)
 		Action< Actor > *bottomAction;
 		for( bottomAction = m_action; bottomAction && bottomAction->m_buriedUnderMe; bottomAction = bottomAction->m_buriedUnderMe )
@@ -205,6 +225,9 @@ public:
 		{
 			delete bottomAction;
 		}
+
+		// delete any dead Actions
+		m_deadActionVector.PurgeAndDeleteElements();
 
 		m_action = action;
 	}
@@ -227,6 +250,8 @@ public:
 			return;
 		}
 
+		m_me = me;
+
 		m_action = m_action->ApplyResult( me, this, m_action->InvokeUpdate( me, this, interval ) );
 
 		if ( m_action && me->IsDebugging( NEXTBOT_BEHAVIOR ) )
@@ -234,6 +259,9 @@ public:
 			CFmtStr msg;
 			me->DisplayDebugText( msg.sprintf( "%s: %s", GetName(), m_action->DebugString() ) );
 		}
+
+		// delete any dead Actions
+		m_deadActionVector.PurgeAndDeleteElements();
 	}
 
 	/**
@@ -255,6 +283,19 @@ public:
 			CFmtStr msg;
 			me->DisplayDebugText( msg.sprintf( "%s: %s", GetName(), m_action->DebugString() ) );
 		}
+	}
+
+	/**
+	 * Use this method to destroy Actions used by this Behavior.
+	 * We cannot delete Actions in-line since Action updates can potentially
+	 * invoke event responders which will then use potentially deleted
+	 * Action pointers, causing memory corruption.
+	 * Instead, we will collect the dead Actions and delete them at the
+	 * end of Update().
+	 */
+	void DestroyAction( Action< Actor > *dead )
+	{
+		m_deadActionVector.AddToTail( dead );
 	}
 
 	const char *GetName( void ) const
@@ -354,6 +395,36 @@ public:
 				while( action && result == ANSWER_UNDEFINED )
 				{
 					result = action->ShouldRetreat( me );
+					action = action->GetActionBuriedUnderMe();
+				}
+
+				action = containingAction;
+			}
+		}
+
+		return result;
+	}
+
+	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const	// should we attack "them"?
+	{
+		QueryResultType result = ANSWER_UNDEFINED;
+
+		if ( m_action )
+		{
+			// find innermost child action
+			Action< Actor > *action;
+			for( action = m_action; action->m_child; action = action->m_child )
+				;
+
+			// work our way through our containers
+			while( action && result == ANSWER_UNDEFINED )
+			{
+				Action< Actor > *containingAction = action->m_parent;
+
+				// work our way up the stack
+				while( action && result == ANSWER_UNDEFINED )
+				{
+					result = action->ShouldAttack( me, them );
 					action = action->GetActionBuriedUnderMe();
 				}
 
@@ -499,6 +570,10 @@ private:
 
 	#define MAX_NAME_LENGTH 32
 	CFmtStrN< MAX_NAME_LENGTH > m_name;
+
+	Actor *m_me;
+
+	CUtlVector< Action< Actor > * > m_deadActionVector;		// completed Actions pending deletion
 };
 
 
@@ -593,6 +668,7 @@ public:
 	virtual EventDesiredResult< Actor > OnModelChanged( Actor *me )												{ return TryContinue(); }
 	virtual EventDesiredResult< Actor > OnPickUp( Actor *me, CBaseEntity *item, CBaseCombatCharacter *giver )	{ return TryContinue(); }
 	virtual EventDesiredResult< Actor > OnDrop( Actor *me, CBaseEntity *item )									{ return TryContinue(); }
+	virtual EventDesiredResult< Actor > OnActorEmoted( Actor *me, CBaseCombatCharacter *emoter, int emote )			{ return TryContinue(); }
 
 	virtual EventDesiredResult< Actor > OnCommandAttack( Actor *me, CBaseEntity *victim )						{ return TryContinue(); }
 	virtual EventDesiredResult< Actor > OnCommandApproach( Actor *me, const Vector &pos, float range )			{ return TryContinue(); }
@@ -843,6 +919,7 @@ private:
 	virtual void OnModelChanged( void )									{ PROCESS_EVENT( OnModelChanged ); }
 	virtual void OnPickUp( CBaseEntity *item, CBaseCombatCharacter *giver )	{ PROCESS_EVENT_WITH_2_ARGS( OnPickUp, item, giver ); }
 	virtual void OnDrop( CBaseEntity *item )							{ PROCESS_EVENT_WITH_1_ARG( OnDrop, item ); }
+	virtual void OnActorEmoted( CBaseCombatCharacter *emoter, int emote )	{ PROCESS_EVENT_WITH_2_ARGS( OnActorEmoted, emoter, emote ); }
 
 	virtual void OnCommandAttack( CBaseEntity *victim )					{ PROCESS_EVENT_WITH_1_ARG( OnCommandAttack, victim ); }
 	virtual void OnCommandApproach( const Vector &pos, float range )	{ PROCESS_EVENT_WITH_2_ARGS( OnCommandApproach, pos, range ); }
@@ -980,33 +1057,9 @@ private:
 			return;
 		}
 
-		if ( result.m_priority > m_eventResult.m_priority )
+		if ( result.m_priority >= m_eventResult.m_priority )
 		{
-			// new result is more important - destroy the replaced action
-			if ( result.m_priority != RESULT_NONE && m_eventResult.m_action )
-			{
-				delete m_eventResult.m_action;
-			}
-			
-			m_eventResult = result;
-		}
-		else if ( result.m_priority == m_eventResult.m_priority && m_eventResult.m_type == SUSTAIN )
-		{
-			// same priority as existing SUSTAIN, override
-
-			// destroy the replaced action
-			if ( m_eventResult.m_action )
-			{
-				delete m_eventResult.m_action;
-			}
-
-			m_eventResult = result;
-		}
-		else
-		{
-			// new result is equal or lower priority than previously stored result - discard it
-			
-			if ( result.m_priority == RESULT_CRITICAL )
+			if ( m_eventResult.m_priority == RESULT_CRITICAL )
 			{				
 				if ( developer.GetBool() )
 				{
@@ -1014,6 +1067,20 @@ private:
 				}
 			}
 
+			// new result as important or more so - destroy the replaced action
+			if ( m_eventResult.m_action )
+			{
+				delete m_eventResult.m_action;
+			}
+			
+			// We keep the most recently processed event because this allows code to check history/state to
+			// do custom event collision handling. If we keep the first event at this priority and discard
+			// subsequent events (original behavior) there is no way to predict future collision resolutions (MSB).
+			m_eventResult = result;
+		}
+		else
+		{
+			// new result is lower priority than previously stored result - discard it
 			if ( result.m_action )
 			{
 				// destroy the unused action
@@ -1296,7 +1363,12 @@ ActionResult< Actor > Action< Actor >::InvokeUpdate( Actor *me, Behavior< Actor 
 	}
 
 	// update ourselves
-	ActionResult< Actor > result = Update( me, interval );
+	ActionResult< Actor > result;
+	{
+		VPROF_BUDGET( GetName(), "NextBot" );
+
+		result = Update( me, interval );
+	}
 
 	return result;
 }
@@ -1384,7 +1456,7 @@ Action< Actor > * Action< Actor >::InvokeOnSuspend( Actor *me, Behavior< Actor >
 
 		Action< Actor > * buried = GetActionBuriedUnderMe();
 
-		delete this;
+		behavior->DestroyAction( this );
 
 		// new Action on top of the stack
 		return buried;
@@ -1501,7 +1573,7 @@ Action< Actor > *Action< Actor >::ApplyResult( Actor *me, Behavior< Actor > *beh
 			// discard ended action
 			if ( this != newAction )
 			{
-				delete this;
+				behavior->DestroyAction( this );
 			}
 
 			// debug display
@@ -1600,7 +1672,7 @@ Action< Actor > *Action< Actor >::ApplyResult( Actor *me, Behavior< Actor > *beh
 			if ( resumedAction == NULL )
 			{
 				// all Actions complete
-				delete this;
+				behavior->DestroyAction( this );
 				return NULL;
 			}
 
@@ -1614,7 +1686,7 @@ Action< Actor > *Action< Actor >::ApplyResult( Actor *me, Behavior< Actor > *beh
 			}
 
 			// discard ended action
-			delete this;
+			behavior->DestroyAction( this );
 
 			// apply result of OnResume()
 			return resumedAction->ApplyResult( me, behavior, resumeResult );
@@ -1724,8 +1796,7 @@ const char *Action< Actor >::GetFullName( void ) const
 	}
 	
 	// assemble name
-	int i;
-	for( i = stackIndex-1; i; --i )
+	for( int i = stackIndex-1; i > 0; --i )
 	{
 		Q_strcat( str, nameStack[ i ], fudge );
 		Q_strcat( str, "/", fudge );
@@ -1734,7 +1805,7 @@ const char *Action< Actor >::GetFullName( void ) const
 	Q_strcat( str, nameStack[ 0 ], fudge );
 	
 	/*
-	for( i = 0; i < stackIndex-1; ++i )
+	for( int i = 0; i < stackIndex-1; ++i )
 	{
 		Q_strcat( str, " )", fudge );		
 	}
@@ -1789,7 +1860,8 @@ void Action< Actor >::PrintStateToConsole( void ) const
 				++buriedLevel;
 			}
 			
-			ConColorMsg( color, buffer );
+			//ConColorMsg( color, "%s", buffer );
+			DevMsg( "%s", buffer );
 			
 			colorIndex = ( colorIndex + 1 ) % colorCount;
 			
@@ -1811,7 +1883,8 @@ void Action< Actor >::PrintStateToConsole( void ) const
 				--buriedLevel;
 			}
 			
-			ConColorMsg( color, buffer );
+			//ConColorMsg( color, "%s", buffer );
+			DevMsg( "%s", buffer );
 
 			--colorIndex;
 			if ( colorIndex < 0 )
@@ -1832,7 +1905,8 @@ void Action< Actor >::PrintStateToConsole( void ) const
 			*outMsg = '\000';
 
 			// output active substring at full brightness
-			ConColorMsg( colorTable[ colorIndex ], buffer );
+			//ConColorMsg( colorTable[ colorIndex ], "%s", buffer );
+			DevMsg( "%s", buffer );
 
 			outMsg = buffer;
 			
@@ -1843,8 +1917,11 @@ void Action< Actor >::PrintStateToConsole( void ) const
 	}
 
 	*outMsg = '\000';
-	ConColorMsg( colorTable[ colorIndex ], buffer );
-	ConColorMsg( colorTable[ colorIndex ], "\n\n" );
+	//ConColorMsg( colorTable[ colorIndex ], "%s", buffer );
+	DevMsg( "%s", buffer );
+
+	//ConColorMsg( colorTable[ colorIndex ], "\n\n" );
+	DevMsg( "\n\n" );
 }
 
 
