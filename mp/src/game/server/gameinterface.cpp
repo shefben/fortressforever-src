@@ -1181,14 +1181,14 @@ void CServerGameDLL::ServerActivate( edict_t *pEdictList, int edictCount, int cl
 #endif
 
 	// Omni-bot: Initialize the bot interface
-	Omnibot::omnibot_interface::InitBotInterface();
+//	Omnibot::omnibot_interface::InitBotInterface();
 
 #ifdef CSTRIKE_DLL // BOTPORT: TODO: move these ifdefs out
 	TheBots->ServerActivate();
 #endif
 
 #ifdef NEXT_BOT
-	TheNextBots().OnMapLoaded();
+	// TheNextBots().OnMapLoaded(); // Disabled NextBot
 #endif
 }
 
@@ -1278,10 +1278,10 @@ void CServerGameDLL::GameFrame( bool simulating )
 #endif
 
 	// Omni-bot: Update the bot interface
-	Omnibot::omnibot_interface::UpdateBotInterface();
+//	Omnibot::omnibot_interface::UpdateBotInterface();
 
 #ifdef NEXT_BOT
-	TheNextBots().Update();
+	// TheNextBots().Update(); // Disabled NextBot
 #endif
 
 	gamestatsuploader->UpdateConnection();
@@ -1421,7 +1421,7 @@ void CServerGameDLL::LevelShutdown( void )
 {
 
 	// Omni-bot: Shut down the bot interface
-	Omnibot::omnibot_interface::ShutdownBotInterface();
+//	Omnibot::omnibot_interface::ShutdownBotInterface();
 
 #ifndef NO_STEAM
 	IGameSystem::LevelShutdownPreClearSteamAPIContextAllSystems();
