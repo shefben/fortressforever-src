@@ -26,6 +26,7 @@
 #include "shareddefs.h"      // For ENT_FLAG_FIRST_USER
 #include "states/ff_bot_carry_flag.h" // For m_carryFlagState member instance
 #include "states/ff_bot_defend_objective.h" // For m_defendObjectiveState member instance
+#include "states/ff_bot_reload_state.h" // For m_reloadState member instance
 
 // FF_TODO_GAME_MECHANIC: Verify these actual flag values from TF_Config.h or FF's equivalent.
 // These are conceptual offsets from ENT_FLAG_FIRST_USER, assuming order from TF2's eTF_EntityFlags.
@@ -60,7 +61,8 @@ const int FF_CLASS_CIVILIAN = 10; // Max player class ID
 
 // Building types (derived by Omnibot, typically TF_CLASS_MAX_PLAYERS + offset)
 // FF_CRITICAL_OMNIBOT: Verify these values match how FFInterface::GetEntityClass derives them.
-const int FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET = 10; // Max player ID used for Omnibot's CLASSEX offset scheme.
+// These are conceptual and primarily for bot's internal understanding if direct game enums aren't used/available.
+const int FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET = 10; // Max player ID (e.g. Civilian=10)
 const int FF_CLASSEX_SENTRY_LVL1   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 1;  // 11
 const int FF_CLASSEX_SENTRY_LVL2   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 2;  // 12
 const int FF_CLASSEX_SENTRY_LVL3   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 3;  // 13
@@ -68,22 +70,24 @@ const int FF_CLASSEX_DISPENSER     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET 
 const int FF_CLASSEX_TELE_ENTR     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 5;  // 15
 const int FF_CLASSEX_TELE_EXIT     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 6;  // 16
 
-// Projectile types - Values from TF_Config.h's eTF_EntityClass enum.
-// These are the values CFFBot::GetEntityOmniBotClass should return for these projectiles.
-// FF_CRITICAL_TODO_PYRO_PROJ: Values VERIFIED against TF_Config.h. Next: ensure FFInterface::GetEntityClass in omnibot_interface.cpp
-// correctly maps game's Classify() output for these projectiles to these TF_CLASSEX_ values.
-const int FF_CLASSEX_ROCKET        = 30; // TF_CLASS_MAX (11) + 19. Covers CLASS_ROCKET and CLASS_IC_ROCKET.
-const int FF_CLASSEX_GLGRENADE     = 29; // TF_CLASS_MAX (11) + 18. For CLASS_GLGRENADE (Grenade Launcher).
-const int FF_CLASSEX_PIPE          = 28; // TF_CLASS_MAX (11) + 17. For CLASS_PIPEBOMB (Demoman pipes).
-const int FF_CLASSEX_GRENADE       = 20; // TF_CLASS_MAX (11) + 9. For CLASS_GRENADE (Hand Grenade).
+// Projectile types - Values are intended to match literal values from TF_Config.h's eTF_EntityClass enum.
+// FF_CRITICAL_TODO_OMNIBOT: These values MUST match what FFInterface::GetEntityClass (Omnibot) returns for these entities.
+// The Classify() method on game projectiles should map to these.
+const int FF_CLASSEX_GRENADE          = 20; // Hand Grenade (MIRV parent, Normal Grenade)
+const int FF_CLASSEX_EMP_GRENADE      = 21; // EMP Grenade (Potentially reflectable?)
+const int FF_CLASSEX_NAIL_GRENADE     = 22; // Nail Grenade explosion (Individual nails might be different)
+const int FF_CLASSEX_MIRV_GRENADE     = 23; // MIRV Grenade (Parent)
+const int FF_CLASSEX_MIRVLET_GRENADE  = 24; // MIRVlet Grenade (Child)
+const int FF_CLASSEX_NAPALM_GRENADE   = 25; // Napalm Grenade
+const int FF_CLASSEX_GAS_GRENADE      = 26; // Gas Grenade
+const int FF_CLASSEX_CONC_GRENADE     = 27; // Concussion Grenade
+const int FF_CLASSEX_PIPE             = 28; // Demoman Pipebombs (direct fire)
+const int FF_CLASSEX_GLGRENADE        = 29; // Grenade Launcher Grenades (arcing)
+const int FF_CLASSEX_ROCKET           = 30; // Rocket Launcher Rocket / Incendiary Cannon Rocket
 
-// FF_TODO_PYRO_PROJ: Other potential reflectable projectiles from TF_Config.h's TF_CLASSEX_ list and their Classify() mappings:
-// const int FF_CLASSEX_NAIL_GRENADE = 22; // For Nail Grenade explosion. Individual nails are likely not CLASS_NAIL_GRENADE.
-// const int FF_CLASSEX_EMP_GRENADE = 21; // (Usually not reflectable by Pyro airblast)
-// const int FF_CLASSEX_CONC_GRENADE = 27; // (Usually not reflectable)
-// const int FF_CLASSEX_NAPALM_GRENADE = 25; // (Usually not reflectable)
-// Individual Nails: CFFProjectileNail does not override Classify(). If CFFProjectileBase::Classify() is generic, direct nail reflection might be hard.
-
+// FF_TODO_PYRO_PROJ: Identify if other projectile types (e.g., individual nails from Nailgun, Syringes)
+// are reflectable and if they have corresponding TF_CLASSEX_ values or game Classify() values.
+// Add them here if needed for CFFBot::GetEntityOmniBotClass and CFFBot::ScanForNearbyProjectiles.
 
 // A general unknown or default class for GetEntityOmniBotClass if no specific mapping found.
 const int FF_CLASSEX_UNKNOWN       = 0; // Or some other non-conflicting value
@@ -101,6 +105,7 @@ class GuardSentryState; // Forward declaration
 class InfiltrateState; // Forward declaration
 class CarryFlagState; // Forward declaration for carrying flag state
 class DefendObjectiveState; // Forward declaration for defending objective state
+class ReloadState; // Forward declaration for reloading state
 class CPushAwayEnumerator;
 
 //--------------------------------------------------------------------------------------------------------------
@@ -615,6 +620,7 @@ public:
 		SNIPING,
 		CAPTURE_LUA_OBJECTIVE, // FF_TODO_LUA: For Lua-defined objectives
 		DEFEND_LUA_OBJECTIVE,  // FF_TODO_LUA: For Lua-defined objectives
+		RELOADING,             // Bot is reloading
 
 		NUM_TASKS // This needs to be last
 	};
@@ -1012,6 +1018,7 @@ private:
 	FollowTeammateState		m_followTeammateState;   // State for following a teammate
 	CarryFlagState m_carryFlagState; // Instance of the new state
 	DefendObjectiveState m_defendObjectiveState; // Instance of the defend objective state
+	ReloadState m_reloadState; // Instance of the reload state
 
 
 	// Engineer buildable selection
@@ -1036,6 +1043,7 @@ public: // FF_TODO_LUA: Made public to be callable from IdleState etc.
 	void CaptureObjective(const CFFBotManager::LuaObjectivePoint* objective);
 	void CarryFlagToCapturePoint(const CFFBotManager::LuaObjectivePoint* capturePoint);
 	void DefendObjective(const CFFBotManager::LuaObjectivePoint* pObjective);
+	void TryToReload(void);
 
 
 	// Medic behavior
@@ -1524,6 +1532,8 @@ private: // Demoman private members
 	// Flag carrying members
 	CHandle<CFFInfoScript> m_carriedFlag; // Handle to the CFFInfoScript entity if carrying a flag
 	int m_carriedFlagType;                // Conceptual: 0=none, 1=enemy_flag, 2=own_flag (if needed for recovery)
+
+	CountdownTimer m_opportunisticReloadTimer; // For periodic reload checks in BotThink
 
 public: // Make sure this is before private if that's the convention
 };

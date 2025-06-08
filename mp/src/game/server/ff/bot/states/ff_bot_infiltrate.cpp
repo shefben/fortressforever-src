@@ -233,18 +233,46 @@ void InfiltrateState::OnUpdate( CFFBot *me )
 				if ( (pBuildable->GetAbsOrigin() - me->GetAbsOrigin()).IsLengthLessThan(INTERACTION_RANGE * 0.9f) )
 				{
 					me->SetLookAt("Sapping Target", m_targetEnemyBuilding->WorldSpaceCenter(), PRIORITY_HIGH);
-					me->StartSabotaging(m_targetEnemyBuilding.Get());
-					me->PrintIfWatched("Spy: Called StartSabotaging on %s\n", m_targetEnemyBuilding->GetClassname());
 
-					// SAP_DURATION will now be the time the bot stays "engaged" in the sap attempt.
-					// CFFPlayer::SpyStartSabotaging sets m_flSpySabotageFinish = gpGlobals->curtime + 3.0f;
-					// SAP_DURATION in this state is 3.1f, so this timer aligns well.
-					m_actionTimer.Start(SAP_DURATION);
+					// FF_TODO_BUILDING: Verify these classnames are correct for FF.
+					const char* buildingClassname = m_targetEnemyBuilding->GetClassname();
+					bool commandSent = false;
+					if (FStrEq(buildingClassname, "obj_sentrygun"))
+					{
+						me->HandleCommand("sentrysabotage");
+						me->PrintIfWatched("Spy: Issued 'sentrysabotage' for %s\n", buildingClassname);
+						commandSent = true;
+					}
+					else if (FStrEq(buildingClassname, "obj_dispenser"))
+					{
+						me->HandleCommand("dispensersabotage");
+						me->PrintIfWatched("Spy: Issued 'dispensersabotage' for %s\n", buildingClassname);
+						commandSent = true;
+					}
+					// FF_TODO_SPY: Add cases for other sappable buildings like teleporters if applicable.
+					// else if (FStrEq(buildingClassname, "obj_teleporter_entrance")) { me->HandleCommand("teleportersabotage_entrance"); commandSent = true; }
+					// else if (FStrEq(buildingClassname, "obj_teleporter_exit")) { me->HandleCommand("teleportersabotage_exit"); commandSent = true; }
+					else
+					{
+						me->PrintIfWatched("Spy: Don't know how to sap building class '%s'.\n", buildingClassname);
+					}
 
-					// FF_TODO_SPY: How does the bot know SpyStartSabotaging succeeded and m_hSabotaging is set on CFFPlayer?
-					// We'll add a check at the start of OnUpdate for this.
-					// FF_TODO_SPY: Does the bot need to hold aim or stay near while CFFPlayer::m_hSabotaging is active? Assume yes for SAP_DURATION.
-					// This is handled by the new 'isSapping' block at the start of OnUpdate.
+					if (commandSent)
+					{
+						// SAP_DURATION now represents time to wait for game event/state change before re-evaluating.
+						// The actual CFFPlayer::m_hSabotaging and m_flSpySabotageFinish are NOT directly set by bot anymore.
+						// Bot relies on game events or GetActualBuildableFlags to see TF_ENT_FLAG_SABOTAGED.
+						m_actionTimer.Start(SAP_DURATION);
+						// FF_CRITICAL_TODO_SPY: Bot needs game event (e.g., TF_MSG_SABOTAGED_SENTRY) or to see
+						// TF_ENT_FLAG_SABOTAGED on building (via GetActualBuildableFlags) to confirm sabotage success.
+						// The 'isSapping' logic at the start of OnUpdate might need adjustment based on how game confirms sap.
+						// For now, it checks CFFPlayer::m_hSabotaging which is set by game's Sabotage() method.
+					}
+					else
+					{
+						// Couldn't send a command, so re-evaluate immediately or after short delay.
+						m_actionTimer.Start(0.5f);
+					}
 					return;
 				}
 				else

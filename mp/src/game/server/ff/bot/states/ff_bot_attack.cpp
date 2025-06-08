@@ -550,6 +550,18 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	}
 
 	if (gpGlobals->curtime > m_reacquireTimestamp) me->FireWeaponAtEnemy();
+
+	// Check for reload after firing
+	CFFWeaponBase *pWeapon = me->GetActiveFFWeapon();
+	if (pWeapon && pWeapon->Clip1() == 0 && me->GetAmmoCount(pWeapon->GetPrimaryAmmoType()) > 0 && pWeapon->CanReload())
+	{
+		// Only try to reload if we have reserve ammo and the weapon can be reloaded.
+		// NeedsReload() implicitly checks reserve, but an explicit check here is also fine.
+		me->PrintIfWatched("AttackState: Weapon %s empty after firing, attempting reload.\n", pWeapon->GetClassname());
+		me->TryToReload(); // This will change state to ReloadState if successful
+		return; // Exit AttackState as we are now reloading
+	}
+
 	Dodge( me );
 }
 

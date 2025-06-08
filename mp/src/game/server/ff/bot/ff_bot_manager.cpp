@@ -1292,7 +1292,93 @@ const CFFBotManager::LuaPathPoint* CFFBotManager::GetLuaPathPoint(int index) con
 // Forward declarations for any functions that might have been removed by the large replace block above
 // and are still needed by other parts of the file that were not part of this specific diff.
 // This is a safeguard. Actual review of the full file post-merge would confirm.
-void CFFBotManager::ServerActivate( void ) { BaseClass::ServerActivate(); m_serverActive = true; ResetRadioMessageTimestamps(); ExtractScenarioData(); }
+void CFFBotManager::ServerActivate( void )
+{
+	BaseClass::ServerActivate(); // Call base class version first
+
+	m_isMapDataLoaded = false; // Reset map data loaded flag
+
+	// Initialize bot phrases
+	// TheBotPhrases is created in constructor. Initialize it here.
+	// FF_TODO_FILES: Ensure "BotChatterFF.db" or equivalent exists and is correctly formatted.
+	if (TheBotPhrases)
+	{
+		TheBotPhrases->Reset();
+		TheBotPhrases->Initialize( "BotChatterFF.db", 0 ); // Assuming a FF specific chatter file
+	}
+
+	// Initialize bot profiles
+	// TheBotProfiles is created in constructor. Initialize it here.
+	// FF_TODO_FILES: Ensure "BotProfileFF.db" and "BotPackListFF.db" or equivalents exist.
+	if (TheBotProfiles)
+	{
+		TheBotProfiles->Reset();
+		// TheBotProfiles->FindVoiceBankIndex( "BotChatterFF.db" ); // Ensure default voice bank is first if using multiple chatter files
+
+		// Read in the list of bot profile DBs from a FF specific pack list
+		const char *profilePackListFile = "BotPackListFF.db";
+		FileHandle_t file = filesystem->Open( profilePackListFile, "r" );
+
+		if ( !file )
+		{
+			// Fallback to a default profile DB if pack list not found
+			TheBotProfiles->Init( "BotProfileFF.db" );
+		}
+		else
+		{
+			int dataLength = filesystem->Size( profilePackListFile );
+			char *dataPointer = new char[ dataLength ];
+
+			filesystem->Read( dataPointer, dataLength, file );
+			filesystem->Close( file );
+
+			const char *dataFile = SharedParse( dataPointer );
+			const char *token;
+
+			while ( dataFile )
+			{
+				token = SharedGetToken();
+				if (token && *token) // Ensure token is not null or empty
+				{
+					char *clone = CloneString( token );
+					TheBotProfiles->Init( clone ); // Initialize each profile DB listed
+					delete[] clone;
+				}
+				dataFile = SharedParse( dataFile );
+			}
+			delete [] dataPointer;
+		}
+
+		// FF_TODO_BOT_PROFILE: If FF uses custom voice speakables like CS, parse them here.
+		// const BotProfileManager::VoiceBankList *voiceBanks = TheBotProfiles->GetVoiceBanks();
+		// for ( int i=1; i<voiceBanks->Count(); ++i )
+		// {
+		// 	TheBotPhrases->Initialize( (*voiceBanks)[i], i );
+		// }
+	}
+
+	// Tell the Navigation Mesh system what FF spawn points are named
+	// FF_TODO_NAV: Verify these are the primary spawn point classnames for FF.
+	// TheNavMesh->SetPlayerSpawnName( "info_player_red" ); // Example for red team
+	// TheNavMesh->AddPlayerSpawnName( "info_player_blue" ); // Example for blue team
+    // Or, if there's a generic one used by GetRandomSpawn:
+    // TheNavMesh->SetPlayerSpawnName( "info_player_start_ff" ); // Hypothetical generic FF spawn
+
+	ExtractScenarioData(); // Already present, good. This populates Lua objectives etc.
+
+	// RestartRound(); // CS calls this, but in TF2-likes, gamerules usually handle the first round start.
+	// Let's rely on game rules to call RestartRound.
+	// If initial setup specific to bots is needed before first round, it should be in RestartRound().
+
+	if (TheBotPhrases)
+	{
+		TheBotPhrases->OnMapChange(); // Notify phrases about map change
+	}
+
+	ResetRadioMessageTimestamps(); // Already present.
+	m_serverActive = true;
+	m_isMapDataLoaded = true; // Set this after all map-specific data is processed
+}
 void CFFBotManager::ServerDeactivate( void ) { BaseClass::ServerDeactivate(); m_serverActive = false; }
 void CFFBotManager::ClientDisconnect( CBaseEntity *entity ) { BaseClass::ClientDisconnect(entity); }
 bool CFFBotManager::ClientCommand( CBasePlayer *player, const CCommand &args ) { return BaseClass::ClientCommand(player, args); }
@@ -1306,8 +1392,377 @@ const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const Vector &pos ) co
 // void CFFBotManager::CheckForBlockedZones( void ) { } // Already defined
 const Vector *CFFBotManager::GetRandomPositionInZone( const Zone *zone ) const { return NULL; }
 CNavArea *CFFBotManager::GetRandomAreaInZone( const Zone *zone ) const { return NULL; }
-bool CFFBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, int weaponType, BotDifficultyType difficulty ) { return false; } // Placeholder, actual implementation exists
-void CFFBotManager::MaintainBotQuota( void ) { } // Placeholder, actual implementation exists
+// Process the "bot_add" console command
+bool CFFBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, int weaponType, BotDifficultyType difficulty )
+{
+	if ( !TheNavMesh->IsLoaded() )
+	{
+		if ( !TheNavMesh->IsGenerating() )
+		{
+			if ( !m_isMapDataLoaded )
+			{
+				TheNavMesh->BeginGeneration();
+				m_isMapDataLoaded = true; // TODO: Ensure this flag is used consistently for map data vs. nav mesh
+			}
+			// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: Nav mesh not loaded and not generating. Aborting bot add.\n" );
+			return false;
+		}
+	}
+
+	// Dont allow bots to join if the Navigation Mesh is being generated
+	if (TheNavMesh->IsGenerating())
+	{
+		// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: Nav mesh is generating. Aborting bot add.\n" );
+		return false;
+	}
+
+	const BotProfile *profile = NULL;
+
+	if ( !isFromConsole )
+	{
+		profileName = NULL; // Ignore profile name if not from console (i.e. quota system)
+		difficulty = GetDifficultyLevel(); // Use cvar difficulty
+	}
+	else
+	{
+		// If difficulty not specified by console, use cvar difficulty
+		if ( difficulty == NUM_DIFFICULTY_LEVELS )
+		{
+			difficulty = GetDifficultyLevel();
+		}
+
+		// If team not specified by console, check ff_bot_join_team cvar
+		if (team == FF_TEAM_AUTOASSIGN || team == FF_TEAM_UNASSIGNED ) // Using FF_TEAM_AUTOASSIGN as general "pick one"
+		{
+			const char *joinTeamStr = ff_bot_join_team.GetString();
+			if ( !stricmp( joinTeamStr, "RED" ) ) // FF_TODO_CVAR: Use actual team name strings if different
+				team = FF_TEAM_RED;
+			else if ( !stricmp( joinTeamStr, "BLUE" ) )
+				team = FF_TEAM_BLUE;
+			// FF_TODO_TEAMS: Add YELLOW, GREEN if they are valid bot teams
+			// else if ( !stricmp( joinTeamStr, "YELLOW" ) ) team = FF_TEAM_YELLOW;
+			// else if ( !stricmp( joinTeamStr, "GREEN" ) ) team = FF_TEAM_GREEN;
+			else
+			{
+				if (FFGameRules())
+					team = FFGameRules()->SelectDefaultTeam(); // Let gamerules decide
+				else
+					team = FF_TEAM_RED; // Fallback if no gamerules
+			}
+		}
+	}
+
+	if ( profileName && *profileName )
+	{
+		// In FF, bot names might not need to be unique from human players in the same way as CS career mode.
+		// bool ignoreHumans = FFGameRules() && FFGameRules()->IsCareer(); // FF doesn't have career mode.
+		// For now, assume profileName is a profile filename or a specific bot name from a profile.
+		// Bot names are usually derived from profile, so UTIL_IsNameTaken might be complex.
+		// Let profile selection handle it.
+
+		// Try to add a bot by name (exact match from a profile file)
+		profile = TheBotProfiles->GetProfile( profileName, team ); // team can be FF_TEAM_AUTOASSIGN here
+		if ( !profile )
+		{
+			// Try to add a bot by template (partial match or inherited profile)
+			// TheBotProfiles->GetProfileMatchingTemplate might need to be adapted for FF if not already.
+			// For now, using GetRandomProfileFiltered to achieve similar effect if name is a template.
+			profile = TheBotProfiles->GetRandomProfileFiltered( difficulty, team, profileName, weaponType );
+
+			if ( !profile )
+			{
+				if ( isFromConsole )
+				{
+					Msg( "Error - no profile for '%s' exists or matches criteria.\n", profileName );
+				}
+				// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: No profile for '%s'.\n", profileName );
+				return true; // Return true because the command was processed, even if it failed.
+			}
+		}
+	}
+	else
+	{
+		// If team not specified (e.g. by quota system), check ff_bot_join_team cvar
+		if (team == FF_TEAM_AUTOASSIGN || team == FF_TEAM_UNASSIGNED)
+		{
+			const char *joinTeamStr = ff_bot_join_team.GetString();
+			if ( !stricmp( joinTeamStr, "RED" ) ) team = FF_TEAM_RED;
+			else if ( !stricmp( joinTeamStr, "BLUE" ) ) team = FF_TEAM_BLUE;
+			// FF_TODO_TEAMS: Add YELLOW, GREEN
+			else
+			{
+				if (FFGameRules())
+					team = FFGameRules()->SelectDefaultTeam();
+				else
+					team = FF_TEAM_RED; // Fallback
+			}
+		}
+
+		profile = TheBotProfiles->GetRandomProfileFiltered( difficulty, team, NULL, weaponType );
+		if (profile == NULL)
+		{
+			if ( isFromConsole )
+			{
+				Msg( "All bot profiles at this difficulty level and team are in use or no matching profile found.\n" );
+			}
+			// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: No random profile available for difficulty %d, team %d.\n", difficulty, team);
+			return true; // Command processed.
+		}
+	}
+
+	// Ensure a valid playable team is selected
+	if (team != FF_TEAM_RED && team != FF_TEAM_BLUE ) // FF_TODO_TEAMS: Add YELLOW, GREEN
+	{
+		if ( isFromConsole )
+		{
+			Msg( "Could not add bot to the game: Invalid team specified (%d).\n", team );
+		}
+		// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: Invalid team %d.\n", team );
+		return false; // Return false as it's a setup error.
+	}
+
+	if (FFGameRules()) // Always check FFGameRules() before calling
+	{
+		if ( FFGameRules()->TeamFull( team ) )
+		{
+			if ( isFromConsole )
+			{
+				Msg( "Could not add bot to the game: Team %d is full.\n", team );
+			}
+			// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: Team %d full.\n", team );
+			return false;
+		}
+
+		// FF_TODO_GAMERULES: Check if FFGameRules()->TeamStacked is relevant for FF.
+		// if ( FFGameRules()->TeamStacked( team, FF_TEAM_UNASSIGNED ) ) // FF_TEAM_UNASSIGNED or FF_TEAM_AUTOASSIGN?
+		// {
+		// 	if ( isFromConsole )
+		// 	{
+		// 		Msg( "Could not add bot to the game: Team is stacked (to disable this check, set mp_autoteambalance to zero, increase mp_limitteams, and restart the round).\n" );
+		// 	}
+		// 	return false;
+		// }
+	}
+
+
+	// Create the actual bot
+	// CFFBot *bot = CreateBot<CFFBot>( profile, team ); // This is from CBotManager template
+	edict_t *pEdict = engine->CreateFakeClient( profile->GetName() );
+	if ( !pEdict )
+	{
+		Msg( "Failed to create fake client for bot %s.\n", profile->GetName() );
+		if ( profile ) TheBotProfiles->DecrementUseCount( profile ); // Decrement if creation failed
+		return false;
+	}
+
+	// AllocateAndBindBotEntity is expected to be called by ClientPutInServerOverride_Bot
+	// but we need to set up the profile and team beforehand for the bot.
+	// Store profile and intended team for the bot to pick up in its Spawn.
+	// This requires a mechanism to pass this data to the bot entity before Spawn.
+	// For now, assume CreateFakeClient + ClientPutInServer + Bot::Spawn sequence.
+	// We need a way to associate `profile` and `team` with `pEdict` for the bot's Spawn method.
+	// This is a deviation from CS where CreateBot handles it more directly.
+	// A temporary global or a map could be used: g_PendingBotProfile[entindex(pEdict)] = profile;
+
+	// The CS CreateBot<T> template does:
+	// 1. Allocates entity (pEdict = engine->CreateFakeClient)
+	// 2. Calls TheBots->AllocateAndBindBotEntity(pEdict) -> which calls ClientPutInServerOverride_Bot
+	//    Inside ClientPutInServerOverride_Bot:
+	//    - CBasePlayer *pPlayer = TheBots->AllocateBotEntity(); // Factory: new T (bot entity)
+	//    - pPlayer->SetEdict(pEdict);
+	//    - pPlayer->SetPlayerName(profile->GetName());
+	// 3. Sets team: bot->ChangeTeam(team)
+	// 4. Calls DispatchSpawn(bot->edict())
+	// 5. Sets profile: bot->SetProfile(profile)
+
+	// Let's try to follow this more closely.
+	// ClientPutInServerOverride_Bot will be called when the entity is truly put in server.
+	// We need to ensure the bot entity, once created via AllocateBotEntity, gets its profile and team.
+	// This suggests CFFBot::Spawn() needs to acquire its profile.
+	// Or, BotAddCommand should get the CFFBot* pointer after it's created.
+
+	// This is tricky because AllocateAndBindBotEntity is in the base CBotManager and we don't get the CFFBot* back here directly.
+	// Let's assume CFFBot::Spawn or some init function will handle profile and team assignment based on some criteria
+	// or that we can retrieve the bot pointer shortly after.
+
+	// For now, just creating the fake client. The bot entity itself will be created by the engine calling ClientPutInServer.
+	// The profile and team need to be communicated to the bot instance.
+	// One way: Store them in a temporary map keyed by edict or userid.
+	// CFFBot::BotSpawn() can then retrieve it.
+	// This is a common pattern if the entity creation is separated from parameter setup.
+	// Let's assume such a mechanism exists or will be added to CFFBot.
+	// For example: PreSpawnBotSettings(entindex(pEdict), profile, team);
+
+	// If the bot is added via console, increment quota
+	if (isFromConsole)
+	{
+		bot_quota.SetValue( bot_quota.GetInt() + 1 );
+	}
+
+	// FF_LOG_BOT_ACTION( NULL, "BotAddCommand: Successfully initiated bot add for profile '%s', team %d.\n", profile->GetName(), team );
+	return true; // Successfully initiated adding a bot.
+}
+// Keep a minimum quota of bots in the game
+void CFFBotManager::MaintainBotQuota( void )
+{
+	if ( !AreBotsAllowed() )
+		return;
+
+	if (TheNavMesh->IsGenerating()) // Don't add/remove if nav mesh is busy
+		return;
+
+	// Don't add/remove bots if game has ended for some reason
+    if (FFGameRules() && FFGameRules()->IsGameOver())
+		return;
+
+	int totalHumansInGame = UTIL_HumansInGame( false ); // false = count all humans, including spectators for some checks
+	int humanPlayersInGame = UTIL_HumansInGame( true ); // true = ignore spectators, only count active players
+
+	// Don't add bots until local player has been registered (if listenserver), to make sure he's player ID #1 etc.
+	if (!engine->IsDedicatedServer() && totalHumansInGame == 0)
+		return;
+
+	if ( !FFGameRules() || !TheFFBots() ) // Use TheFFBots() for safety
+	{
+		return;
+	}
+
+	int desiredBotCount = bot_quota.GetInt();
+	int botsInGame = UTIL_FFBotsInGame(); // Assumed to be implemented
+
+	// Check if the round has been ongoing for a while, affecting new spawns
+	// FF_TODO_GAMERULES: Adjust time if FF has different spawn rules post-round start.
+	// bool isRoundInProgress = FFGameRules()->m_bFirstConnected && // Assuming m_bFirstConnected or similar exists
+	// 						 !TheFFBots()->IsRoundOver() &&
+	// 						 ( FFGameRules()->GetRoundElapsedTime() >= 20.0f ); // 20 seconds is a common threshold
+
+	// FF_TODO_CVAR: FF might have a different cvar for quota_mode. Using CS's "fill" and "match" for now.
+	// const char *quotaMode = cv_bot_quota_mode.GetString(); // Assuming cv_bot_quota_mode exists
+	const char *quotaMode = "normal"; // Placeholder if FF doesn't have fill/match modes, default to 'normal' (direct quota)
+
+	if ( FStrEq( quotaMode, "fill" ) )
+	{
+		// 'fill' mode: bots + humans = bot_quota
+		// if ( !isRoundInProgress ) // Don't adjust if round is too far along
+		// {
+			desiredBotCount = MAX( 0, desiredBotCount - humanPlayersInGame );
+		// }
+		// else
+		// {
+		// 	desiredBotCount = botsInGame; // Keep current number if round in progress
+		// }
+	}
+	else if ( FStrEq( quotaMode, "match" ) )
+	{
+		// 'match' mode: bots = bot_quota * humans
+		// if ( !isRoundInProgress )
+		// {
+			desiredBotCount = (int)MAX( 0, bot_quota.GetFloat() * humanPlayersInGame );
+		// }
+		// else
+		// {
+		// 	desiredBotCount = botsInGame;
+		// }
+	}
+	// Else, "normal" mode means desiredBotCount is just bot_quota.GetInt().
+
+	// Wait for a player to join, if cvar is set
+	if (bot_join_after_player.GetBool())
+	{
+		if (humanPlayersInGame == 0)
+			desiredBotCount = 0;
+	}
+
+	// Delay bot joining after map load
+	if ( bot_join_delay.GetFloat() > 0 && FFGameRules()->GetMapElapsedTime() < bot_join_delay.GetFloat() )
+	{
+		desiredBotCount = 0;
+	}
+
+	// FF_TODO_CVAR: Check for FF equivalent of bot_auto_vacate for slot reservation.
+	// if (cv_bot_auto_vacate.GetBool())
+	// 	desiredBotCount = MIN( desiredBotCount, gpGlobals->maxClients - (humanPlayersInGame + 1) );
+	// else
+		desiredBotCount = MIN( desiredBotCount, gpGlobals->maxClients - humanPlayersInGame );
+
+
+	// Team balancing logic (simplified from CS for now, can be expanded)
+	// FF_TODO_BALANCE: This is a very basic balancing. FF might need more sophisticated logic,
+	// especially if it supports more than 2 teams or has specific balancing rules.
+	// if ( botsInGame > 0 && desiredBotCount == botsInGame && FFGameRules()->m_bFirstConnected )
+	// {
+	// 	if ( FFGameRules()->GetRoundElapsedTime() < 20.0f ) // Only balance early in round
+	// 	{
+	// 		if ( mp_autoteambalance.GetBool() ) // Assuming mp_autoteambalance cvar
+	// 		{
+	// 			int numRed, numBlue; // FF_TODO_TEAMS: Extend for Yellow, Green
+	// 			FFGameRules()->GetTeamCounts( numRed, numBlue ); // Assumes FFGameRules has this
+	//
+	// 			// Only balance if bots can join any team (ff_bot_join_team is not "RED" or "BLUE")
+	// 			const char* joinTeamPref = ff_bot_join_team.GetString();
+	// 			if ( stricmp(joinTeamPref, "RED") != 0 && stricmp(joinTeamPref, "BLUE") != 0 )
+	// 			{
+	// 				if ( numRed > numBlue + 1 )
+	// 				{
+	// 					if ( UTIL_FFKickBotFromTeam( FF_TEAM_RED ) ) return; // Kicked, so restart maintain quota next frame
+	// 				}
+	// 				else if ( numBlue > numRed + 1 )
+	// 				{
+	// 					if ( UTIL_FFKickBotFromTeam( FF_TEAM_BLUE ) ) return;
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	// Add bots if necessary
+	if (desiredBotCount > botsInGame)
+	{
+		// Check if any team can accept a new bot (not full)
+		// FF_TODO_TEAMS: Iterate through all playable FF teams if more than RED/BLUE.
+		if ( (FFGameRules() && (!FFGameRules()->TeamFull( FF_TEAM_RED ) || !FFGameRules()->TeamFull( FF_TEAM_BLUE ))) || !FFGameRules() )
+		{
+			// Call BotAddCommand with FF_TEAM_AUTOASSIGN to let it pick based on ff_bot_join_team & game rules
+			this->BotAddCommand( FF_TEAM_AUTOASSIGN );
+		}
+	}
+	else if (desiredBotCount < botsInGame)
+	{
+		// Kick a bot to maintain quota
+
+		// First, try to remove any unassigned bots (if such a state exists and is kickable)
+		// if (UTIL_FFKickBotFromTeam( FF_TEAM_UNASSIGNED )) // FF_TEAM_UNASSIGNED might not be practical for kicking
+		// 	return;
+
+		int kickTeam = FF_TEAM_AUTOASSIGN;
+		if (FFGameRules())
+		{
+			// Simple balancing: kick from the team with more players.
+			// FF_TODO_BALANCE: More sophisticated: consider scores, number of humans vs bots on teams etc.
+			int numRed, numBlue; // FF_TODO_TEAMS: Extend for Yellow, Green
+			FFGameRules()->GetTeamCounts( numRed, numBlue );
+
+			if (numRed > numBlue) kickTeam = FF_TEAM_RED;
+			else if (numBlue > numRed) kickTeam = FF_TEAM_BLUE;
+			else // Teams are equal, or no game rules, pick a team at random (preferring Red slightly)
+			{
+				kickTeam = (RandomInt( 0, 1 ) == 0) ? FF_TEAM_RED : FF_TEAM_BLUE;
+			}
+		} else {
+			// No game rules, just pick randomly
+			kickTeam = (RandomInt( 0, 1 ) == 0) ? FF_TEAM_RED : FF_TEAM_BLUE;
+		}
+
+
+		if (UTIL_FFKickBotFromTeam( kickTeam )) // Assumes UTIL_FFKickBotFromTeam is implemented
+			return; // Kicked one, will re-evaluate next frame.
+
+		// If failed to kick from chosen team (e.g. no bots on that team), try the other.
+		// FF_TODO_TEAMS: This needs to be smarter for >2 teams.
+		if (kickTeam == FF_TEAM_RED) UTIL_FFKickBotFromTeam( FF_TEAM_BLUE );
+		else UTIL_FFKickBotFromTeam( FF_TEAM_RED );
+	}
+}
 // void CFFBotManager::OnPlayerDeath( IGameEvent *event ) { CFFBot *bot; FF_FOR_EACH_BOT( bot, i ) { bot->OnPlayerDeath( event ); } } // Already defined
 // ... and so on for all other event handlers and member functions previously defined in this file ...
 // This is just a structural placeholder to ensure the diff applies; the actual functions are assumed to be present.

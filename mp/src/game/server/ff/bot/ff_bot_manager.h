@@ -279,18 +279,25 @@ private:
 	float m_roundStartTimestamp;
 	bool m_isDefenseRushing;								///< whether defensive team is rushing this round or not (conceptual, adapt to FF logic)
 
-	// FF_TODO_LUA: Placeholder structures for Lua-defined objective data
+	// FF_LUA_TODO: The structures below (LuaObjectivePoint, LuaPathPoint) define how bots understand objectives
+	// and paths exposed from Lua scripts (e.g., via info_ff_script entities).
+	// Their fields are based on current assumptions of what Lua will provide and what bots need.
+	// These may need expansion as Lua scripting capabilities and bot AI requirements evolve.
+
 	struct LuaObjectivePoint
 	{
-		char name[MAX_PATH];      // Descriptive name (e.g., entity targetname)
-		char m_id[MAX_PATH];      // Unique ID string for matching with luaevent, typically from info_ff_script's "Lua Objective ID"
-		Vector position;
-		LuaObjectiveState m_state; // Current state of the objective, updated by luaevent
-		int teamAffiliation;      // e.g., FF_TEAM_RED, FF_TEAM_BLUE, FF_TEAM_NEUTRAL. Initial/design-time affiliation.
-		int type;                 // FF_TODO_LUA: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture etc.
-		float radius;             // Radius for proximity checks.
-		int currentOwnerTeam;     // For capturable points, which team currently owns it. Updated by game logic/events.
-		CHandle<CBaseEntity> m_entity; // Handle to the actual info_ff_script entity
+		char name[MAX_PATH];      // Descriptive name (e.g., entity targetname from info_ff_script)
+		char m_id[MAX_PATH];      // Unique ID string for matching with luaevent (e.g., "Lua Objective ID" from info_ff_script)
+		Vector position;          // World position of the objective
+		LuaObjectiveState m_state; // Current state (LUA_OBJECTIVE_ACTIVE, LUA_OBJECTIVE_CARRIED, etc.), updated by luaevent
+		int teamAffiliation;      // Initial/designed team affiliation (e.g., FF_TEAM_RED, FF_TEAM_NEUTRAL)
+		// FF_LUA_TODO: 'type' currently uses integers (e.g., 0=Generic, 1=ControlPoint/CaptureGoal, 2=Item_Flag).
+		// This is a bot-internal mapping, potentially from info_ff_script's "Bot Goal Type".
+		// Consider defining a bot-side enum for these types for clarity if they stabilize.
+		int type;
+		float radius;             // Effective radius for proximity or area checks.
+		int currentOwnerTeam;     // Current team controlling this objective (e.g. for a control point, or carrier of a flag). Updated by game events.
+		CHandle<CBaseEntity> m_entity; // Handle to the associated game entity (e.g., the info_ff_script or the flag item itself)
 
 		LuaObjectivePoint() :
 			position(vec3_origin),

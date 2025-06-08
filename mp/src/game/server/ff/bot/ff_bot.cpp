@@ -115,6 +115,8 @@ CFFBot::CFFBot()
 	// Flag carrying
 	m_carriedFlag = NULL;
 	m_carriedFlagType = 0; // 0 = none, 1 = enemy flag, 2 = own flag
+
+	m_opportunisticReloadTimer.Invalidate();
 }
 
 CFFBot::~CFFBot()
@@ -315,12 +317,15 @@ int CFFBot::GetEntityOmniBotClass(CBaseEntity* pEntity)
 			// if it encounters an entity that the game classifies as CLASS_GRENADE.
 			// A more robust GetEntityOmniBotClass would try to distinguish here.
 			// Example (conceptual, needs actual game logic):
-			// if ( dynamic_cast<CFFProjectileGrenade*>(pEntity) ) return FF_CLASSEX_GLGRENADE; // Grenade Launcher
+			// if ( dynamic_cast<CFFProjectileGrenade*>(pEntity) ) return FF_CLASSEX_GLGRENADE; // Grenade Launcher (arcing)
 			// if ( dynamic_cast<CFFProjectileHEGrenade*>(pEntity) ) return FF_CLASSEX_GRENADE; // Hand Grenade
-			return FF_CLASSEX_GLGRENADE; // Default for CLASS_GRENADE, assuming GL pipes are primary concern.
+			// FF_CRITICAL_TODO_PYRO_PROJ: Verify CFFProjectileGrenade (GL) Classify() result.
+			// If it's just CLASS_GRENADE, airblast might target HE grenades when trying to reflect GL pipes.
+			// For now, assume game's CLASS_GRENADE refers to the hand grenade type.
+			return FF_CLASSEX_GRENADE; // Should be 20 (Hand Grenade)
 
 		// FF_TODO_PYRO_PROJ: Add other reflectable projectiles like nails if CLASS_NAIL exists and maps to a TF_CLASSEX_
-		// case CLASS_NAIL: return FF_CLASSEX_NAIL; // FF_CLASSEX_NAIL would need to be defined. TF_Config.h has TF_CLASSEX_NAIL_GRENADE (22).
+		// case CLASS_NAIL: return FF_CLASSEX_NAIL_GRENADE; // (Value 22) - Need to confirm Classify() for individual nails.
 
 		// Buildings: Map game's Classify() result to Omnibot-derived FF_CLASSEX_ values (e.g., Sentry Lvl1/2/3)
 		case CLASS_SENTRYGUN:
@@ -1276,6 +1281,46 @@ void CFFBot::DefendObjective(const CFFBotManager::LuaObjectivePoint* pObjective)
 	PrintIfWatched("Bot %s: Transitioning to DefendObjectiveState for objective '%s'.\n", GetPlayerName(), pObjective->name);
 	m_defendObjectiveState.SetObjectiveToDefend(pObjective);
 	SetState(&m_defendObjectiveState);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryToReload(void)
+{
+	CFFWeaponBase* pWeapon = GetActiveFFWeapon();
+
+	// Check if we have an active weapon, if it needs reloading, if it can be reloaded,
+	// and if we are not already in the ReloadState.
+	if (pWeapon &&
+		(pWeapon->Clip1() < pWeapon->GetMaxClip1() && GetAmmoCount(pWeapon->GetPrimaryAmmoType()) > 0) && // NeedsReload()
+		pWeapon->CanReload() &&                                                                           // CanReload()
+		GetCurrentState() != &m_reloadState)
+	{
+		// Do not interrupt an attack to reload unless out of ammo or very low.
+		// AttackState itself will call TryToReload if Clip1() == 0.
+		// This check is more for opportunistic reloads from IdleState or other non-combat states.
+		if (IsAttacking() && pWeapon->Clip1() > 0) // If attacking and still have ammo, don't reload yet
+		{
+			// Potentially add a threshold, e.g., if clip is very low but not empty
+			// PrintIfWatched("Bot %s: Wants to reload %s, but currently attacking with ammo in clip.\n", GetPlayerName(), pWeapon->GetClassname());
+			return;
+		}
+
+		PrintIfWatched("Bot %s: Trying to reload %s.\n", GetPlayerName(), pWeapon->GetClassname());
+		SetState(&m_reloadState);
+	}
+	else if (GetCurrentState() == &m_reloadState)
+	{
+		// Already reloading
+	}
+	else if (pWeapon && !(pWeapon->Clip1() < pWeapon->GetMaxClip1() && GetAmmoCount(pWeapon->GetPrimaryAmmoType()) > 0) )
+	{
+		// Doesn't need reload (clip full or no reserve ammo)
+		// PrintIfWatched("Bot %s: No need to reload %s (Clip: %d/%d, Reserve: %d).\n", GetPlayerName(), pWeapon->GetClassname(), pWeapon->Clip1(), pWeapon->GetMaxClip1(), GetAmmoCount(pWeapon->GetPrimaryAmmoType()));
+	}
+	else if (pWeapon && !pWeapon->CanReload())
+	{
+		PrintIfWatched("Bot %s: Cannot reload %s (weapon doesn't support it).\n", GetPlayerName(), pWeapon->GetClassname());
+	}
 }
 // End of ff_bot.cpp (ensure all previous content is above this line)
 [end of mp/src/game/server/ff/bot/ff_bot.cpp]

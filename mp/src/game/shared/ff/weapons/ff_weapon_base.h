@@ -264,9 +264,33 @@ public:
 	virtual float		GetRecoilMultiplier( void ) { return 1.0f; }
 	bool				m_bMuzzleFlash;
 
+	// Conceptual methods for Bot Reload Logic
+	// These are not meant to drive actual game reload mechanics but are used by bots to query weapon state.
+	// Actual reload mechanics are handled by the weapon's ItemPostFrame and game events.
+	/**
+	 * @brief Conceptually, does the weapon need reloading (e.g., not full clip and has reserve ammo).
+	 * Bot uses this to decide if a reload attempt is reasonable.
+	 */
+	virtual bool NeedsReload() const
+	{
+		if ( UsesClipsForAmmo1() && m_iClip1 < GetMaxClip1() && GetReserveAmmoCount(GetPrimaryAmmoType()) > 0 ) return true;
+		// FF_TODO_WEAPON_STATS: Add secondary ammo check if applicable for some weapons
+		return false;
+	}
+	/**
+	 * @brief Conceptually, can the weapon be reloaded at all. Most can.
+	 * Bot uses this as a basic check.
+	 */
+	virtual bool CanReload() const { return UsesClipsForAmmo1() && GetMaxClip1() > 0; } // Most weapons can, if they use a clip
+	/**
+	 * @brief Conceptually, how long does this weapon take to reload.
+	 * Bot uses this to estimate time for ReloadState. Default to a generic time if not specified.
+	 */
+	virtual float GetReloadTime() const { return 2.0f; } // Example: 2.0 seconds, override in derived classes
+
 	// Let grenade launchers and pipe launchers report variable changes accurately
 	void				SetClip1(int iAmount) { m_iClip1 = iAmount; }
-	int					GetClip1() { return m_iClip1; }
+	// int					GetClip1() { return m_iClip1; } // Already exists in CBaseCombatWeapon
 
 private:
 
