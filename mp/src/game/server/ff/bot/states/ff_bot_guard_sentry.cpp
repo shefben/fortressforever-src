@@ -27,6 +27,7 @@ GuardSentryState::GuardSentryState(void)
 	m_guardSpot = vec3_origin;
 	m_repathTimer.Invalidate();
 	m_isAtGuardSpot = false;
+	m_tendSentryTimer.Invalidate();
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -40,48 +41,91 @@ void GuardSentryState::OnEnter( CFFBot *me )
 {
 	me->PrintIfWatched( "GuardSentryState: Entering state.\n" );
 	m_isAtGuardSpot = false;
-	m_sentryToGuard = me->GetSentryGun(); // Assumes CFFBot::GetSentryGun() returns their CFFSentryGun*
+	m_sentryToGuard = me->GetSentryGun();
 
 	if (!m_sentryToGuard.Get() || !m_sentryToGuard->IsAlive())
 	{
 		me->PrintIfWatched( "GuardSentryState: No valid sentry to guard. Idling.\n" );
-		me->Idle(); // Should probably try to build one
+		me->Idle();
 		return;
 	}
 
-	// Determine a guard spot. Placeholder: a spot near the sentry.
-	// TODO: More sophisticated logic to find a covered spot with LoS to sentry/approaches.
-	Vector forward, right;
-	AngleVectors(m_sentryToGuard->GetAbsAngles(), &forward, &right, NULL);
-	m_guardSpot = m_sentryToGuard->GetAbsOrigin() - forward * GUARD_SPOT_OFFSET_DIST + right * (GUARD_SPOT_OFFSET_DIST / 2.0f) ;
+	// Enhanced Guard Spot Selection
+	Vector sentryOrigin = m_sentryToGuard->GetAbsOrigin();
+	QAngle sentryAngles = m_sentryToGuard->GetAbsAngles();
+	Vector sentryForward, sentryRight, sentryUp;
+	AngleVectors(sentryAngles, &sentryForward, &sentryRight, &sentryUp);
 
-	// Attempt to find a valid nav area near the calculated spot
-	CNavArea *sentryArea = TheNavMesh->GetNearestNavArea(m_sentryToGuard->GetAbsOrigin());
-	if (sentryArea)
+	// FF_TODO_AI_BEHAVIOR: A more advanced check would be to find a spot that has LOS to common enemy approaches
+	// but keeps the Engineer somewhat safe, perhaps checking for nearby cover nodes or using visibility analysis.
+	const float candidateDist = GUARD_SPOT_OFFSET_DIST; // 150.0f
+	Vector candidateSpots[] = {
+		sentryOrigin - sentryForward * candidateDist + sentryRight * (candidateDist * 0.75f), // Behind and to the right
+		sentryOrigin - sentryForward * candidateDist - sentryRight * (candidateDist * 0.75f), // Behind and to the left
+		sentryOrigin + sentryRight * candidateDist,                                          // To the right
+		sentryOrigin - sentryRight * candidateDist,                                          // To the left
+		sentryOrigin + sentryForward * (candidateDist * 0.5f) - sentryRight * candidateDist, // Slightly in front, to the left (less ideal)
+		sentryOrigin + sentryForward * (candidateDist * 0.5f) + sentryRight * candidateDist, // Slightly in front, to the right (less ideal)
+		sentryOrigin - sentryForward * (candidateDist * 0.5f)                                // Directly behind (closer)
+	};
+
+	CNavArea *bestNavArea = NULL;
+	Vector chosenGuardSpot = sentryOrigin; // Default to sentry origin if no good spot found
+
+	for (const auto& spotAttempt : candidateSpots)
 	{
-		m_guardSpot = sentryArea->GetClosestPointOnArea(m_guardSpot); // Snap to navmesh
+		CNavArea *navArea = TheNavMesh->GetNearestNavArea(spotAttempt, true, 200.0f, true, true);
+		if (navArea && me->IsReachable(navArea)) // IsReachable is a conceptual check, might need actual path test
+		{
+			// Basic check: is it not too close to the sentry itself (unless it's the only option)
+			if ((navArea->GetCenter() - sentryOrigin).IsLengthGreaterThan(GUARD_SPOT_OFFSET_DIST * 0.5f))
+			{
+				// Further checks could involve LOS to sentry, cover, etc.
+				// For now, first valid reachable spot is chosen.
+				bestNavArea = navArea;
+				chosenGuardSpot = navArea->GetCenter();
+				me->PrintIfWatched("GuardSentryState: Found candidate guard spot at (%.1f, %.1f, %.1f)\n", chosenGuardSpot.x, chosenGuardSpot.y, chosenGuardSpot.z);
+				break;
+			}
+		}
 	}
-	// Else, m_guardSpot might be off-mesh, pathing will likely fail.
 
-	me->PrintIfWatched( "GuardSentryState: Guarding sentry %s at (%.1f, %.1f, %.1f). Moving to guard spot (%.1f, %.1f, %.1f).\n",
-		m_sentryToGuard->GetClassname(),
-		m_sentryToGuard->GetAbsOrigin().x, m_sentryToGuard->GetAbsOrigin().y, m_sentryToGuard->GetAbsOrigin().z,
-		m_guardSpot.x, m_guardSpot.y, m_guardSpot.z );
+	if (!bestNavArea) // If no candidate spots worked, try very close to the sentry.
+	{
+		me->PrintIfWatched("GuardSentryState: No ideal candidate guard spots found. Trying very close to sentry.\n");
+		Vector closeSpot = sentryOrigin - sentryForward * 75.0f; // Closer behind
+		bestNavArea = TheNavMesh->GetNearestNavArea(closeSpot, true, 100.0f, true, true);
+		if (bestNavArea && me->IsReachable(bestNavArea))
+		{
+			chosenGuardSpot = bestNavArea->GetCenter();
+		}
+		else // Fallback to sentry's own area if even that fails
+		{
+			bestNavArea = TheNavMesh->GetNearestNavArea(sentryOrigin, true, 50.0f, true, true);
+			if (bestNavArea && me->IsReachable(bestNavArea)) chosenGuardSpot = bestNavArea->GetCenter();
+			// If still no good spot, chosenGuardSpot remains sentryOrigin, pathing might fail but it's a last resort.
+		}
+	}
+
+	m_guardSpot = chosenGuardSpot;
+
+	me->PrintIfWatched( "GuardSentryState: Guarding sentry %s. Final guard spot (%.1f, %.1f, %.1f).\n",
+		m_sentryToGuard->GetClassname(), m_guardSpot.x, m_guardSpot.y, m_guardSpot.z );
 
 	if (!me->MoveTo(m_guardSpot, SAFEST_ROUTE))
 	{
-		me->PrintIfWatched( "GuardSentryState: Unable to path to guard spot. Staying near sentry.\n" );
-		// Fallback: If path to ideal guard spot fails, just move to the sentry's origin.
-		m_guardSpot = m_sentryToGuard->GetAbsOrigin(); // Update guard spot to sentry itself
+		me->PrintIfWatched( "GuardSentryState: Unable to path to final guard spot. Staying very close to sentry.\n" );
+		m_guardSpot = sentryOrigin; // Fallback to sentry's exact origin
 		if (!me->MoveTo(m_guardSpot, SAFEST_ROUTE))
 		{
 		    me->PrintIfWatched( "GuardSentryState: Still unable to path even to sentry origin. Idling.\n" );
-		    me->Idle(); // Give up for now
+		    me->Idle();
 		    return;
 		}
 	}
 	m_repathTimer.Start(BUILD_REPATH_TIME);
 	m_scanForThreatsTimer.Start(GUARD_SCAN_INTERVAL);
+	m_tendSentryTimer.Start(RandomFloat(5.0f, 10.0f)); // Initialize tend timer
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -92,11 +136,11 @@ void GuardSentryState::OnUpdate( CFFBot *me )
 	if (!sentry || !sentry->IsAlive())
 	{
 		me->PrintIfWatched("GuardSentryState: Sentry destroyed or invalid. Idling (will try to rebuild).\n");
-		me->Idle(); // Idle state will trigger TryToBuildSentry if appropriate
+		me->Idle();
 		return;
 	}
 
-	// Handle enemy threats first - this is the primary purpose of guarding
+	// Priority 1: Handle enemy threats
 	if (me->GetBotEnemy() != NULL && me->IsEnemyVisible())
 	{
 		me->PrintIfWatched("GuardSentryState: Enemy detected! Engaging.\n");
@@ -104,9 +148,30 @@ void GuardSentryState::OnUpdate( CFFBot *me )
 		return;
 	}
 
+	// Priority 2: Check Sentry Status (Damage, Sappers) - if not currently tending
+	if (!m_tendSentryTimer.HasStarted() || m_tendSentryTimer.IsGreaterThan(1.0f)) // Don't interrupt very recent tending action
+	{
+		if (sentry->IsSapped() || sentry->GetHealth() < sentry->GetMaxHealth())
+		{
+			me->PrintIfWatched("GuardSentryState: Sentry %s needs repair (Sapped: %s, Health: %d/%d). Switching to RepairBuildableState.\n",
+				sentry->GetClassname(), sentry->IsSapped() ? "YES" : "NO", sentry->GetHealth(), sentry->GetMaxHealth());
+			me->TryToRepairBuildable(sentry);
+			return;
+		}
+	}
+
+	// Priority 3: Check Resources
+	if (me->GetAmmoCount(AMMO_CELLS) < CFFBot::ENGINEER_LOW_CELL_THRESHOLD) // FF_TODO_CLASS_ENGINEER: AMMO_CELLS needs to be the correct enum for metal/resources
+	{
+		me->PrintIfWatched("GuardSentryState: Low on cells/metal. Switching to FindResourcesState.\n");
+		me->TryToFindResources();
+		return;
+	}
+
+	// Pathing to guard spot
 	if (!m_isAtGuardSpot)
 	{
-		if ((me->GetAbsOrigin() - m_guardSpot).IsLengthLessThan(BUILD_PLACEMENT_RADIUS * 0.5f)) // Tighter radius for being "at" spot
+		if ((me->GetAbsOrigin() - m_guardSpot).IsLengthLessThan(50.0f)) // Reduced radius for being "at" spot
 		{
 			m_isAtGuardSpot = true;
 			me->Stop();
@@ -129,45 +194,76 @@ void GuardSentryState::OnUpdate( CFFBot *me )
 		}
 	}
 
-	// At guard spot, perform periodic checks
-	if (m_isAtGuardSpot && m_scanForThreatsTimer.IsElapsed())
-	{
-		// 1. Scan for nearby enemies (even if not direct LoS to bot, but maybe to sentry)
-		// This is implicitly handled by CFFBot::Update() which sets m_enemy if one is found.
-		// If an enemy is found by bot's main update, the check at the start of this OnUpdate will trigger AttackState.
-
-		// 2. Check Sentry Status (Damage, Sappers)
-		if (sentry->IsSapped() || sentry->GetHealth() < sentry->GetMaxHealth())
-		{
-			me->PrintIfWatched("GuardSentryState: Sentry %s needs repair (Sapped: %s, Health: %d/%d). Switching to RepairBuildableState.\n",
-				sentry->GetClassname(), sentry->IsSapped() ? "YES" : "NO", sentry->GetHealth(), sentry->GetMaxHealth());
-			me->TryToRepairBuildable(sentry); // This will change state
-			return;
-		}
-
-		// 3. Check Resources
-		if (me->GetAmmoCount(AMMO_CELLS) < CFFBot::ENGINEER_LOW_CELL_THRESHOLD)
-		{
-			me->PrintIfWatched("GuardSentryState: Low on cells. Switching to FindResourcesState.\n");
-			me->TryToFindResources(); // This will change state
-			return;
-		}
-
-		m_scanForThreatsTimer.Start(GUARD_SCAN_INTERVAL);
-	}
-
-	// Look around, prioritize directions of likely enemy approach relative to sentry
+	// At guard spot, perform periodic actions
 	if (m_isAtGuardSpot)
 	{
-		// FF_TODO_ENGINEER: Implement more intelligent "look around" logic for guarding.
-		// For now, just look towards the sentry occasionally, or generally look around.
-		if (me->HasNotSeenEnemyForLongTime())
+		// "Tending" to Sentry
+		if (m_tendSentryTimer.IsElapsed())
 		{
-			me->SetLookAt("Guarding Sentry Area", sentry->WorldSpaceCenter() + Vector(0,0,30), PRIORITY_LOW, 2.0f, true);
+			me->PrintIfWatched("Engineer: Tending to sentry %s", sentry->GetDebugName());
+
+			CFFWeaponBase *spanner = me->GetWeaponByID(FF_WEAPON_SPANNER); // FF_TODO_WEAPON_STATS: Verify Spanner ID
+			if (spanner && me->GetActiveFFWeapon() != spanner)
+			{
+				me->EquipWeapon(spanner);
+			}
+
+			// Briefly move to sentry, hit it, then can decide to move back to guard spot or stay
+			// For simplicity, just simulate the hit. More complex logic could path to sentry then back.
+			if ((me->GetAbsOrigin() - sentry->GetAbsOrigin()).IsLengthGreaterThan(80.0f)) // If not right next to it
+			{
+				// Optional: me->MoveTo(sentry->GetAbsOrigin(), FASTEST_ROUTE); // and handle pathing
+				// For now, assume spanner has some range or bot is close enough from guard spot for a symbolic hit.
+			}
+
+			me->SetLookAt("Tending Sentry", sentry->WorldSpaceCenter(), PRIORITY_HIGH, 0.5f);
+			me->PressButton(IN_ATTACK);
+			// FF_TODO_GAME_MECHANIC: Does hitting a healthy, non-sapped sentry provide ammo or any benefit in FF?
+			// If it's a continuous action, bot might need to hold IN_ATTACK or do it in RepairState.
+			// For GuardState, a symbolic single hit to "check/boost" is fine.
+			// Schedule a release if IN_ATTACK is not automatically released
+			me->ReleaseButton(IN_ATTACK); // Assuming a quick tap
+
+			m_tendSentryTimer.Start(RandomFloat(7.0f, 12.0f)); // Reset tend timer
+			m_scanForThreatsTimer.Start(GUARD_SCAN_INTERVAL); // Reset scan timer too after tending
+			return; // Tending action taken for this update cycle
 		}
-		else
+
+		// Sentry Firing Reaction (Conceptual)
+		// FF_TODO_ENGINEER: How to detect if m_sentryToGuard is actively firing?
+		// Needs a CFFSentryGun::IsFiring() method or game event.
+		bool isSentryConceptuallyFiring = false; // Placeholder
+		if (isSentryConceptuallyFiring)
 		{
-			me->UpdateLookAround(); // Default look around behavior
+			Vector vSentryFacing;
+			AngleVectors(sentry->GetAbsAngles(), &vSentryFacing);
+			me->SetLookAt("Sentry Target Direction", sentry->GetAbsOrigin() + vSentryFacing * 750.0f, PRIORITY_MEDIUM_HIGH, 1.0f);
+			// Consider becoming more alert or moving to a position to support the sentry.
+		}
+		else if (m_scanForThreatsTimer.IsElapsed()) // General scan if sentry not firing and not tending
+		{
+			// Look around, prioritize directions of likely enemy approach relative to sentry
+			// FF_TODO_ENGINEER: Implement more intelligent "look around" logic for guarding.
+			if (me->HasNotSeenEnemyForLongTime())
+			{
+				// Occasionally look at the sentry then sweep common approach paths
+				if (RandomFloat(0,1) < 0.3f)
+				{
+					me->SetLookAt("Checking Sentry", sentry->WorldSpaceCenter() + Vector(0,0,30), PRIORITY_LOW, 1.5f, true);
+				}
+				else
+				{
+					// Conceptual: Look towards a known enemy approach vector if available from map data or learned behavior
+					Vector approachDir = Vector(RandomFloat(-1,1), RandomFloat(-1,1), 0); // Placeholder
+					approachDir.NormalizeInPlace();
+					me->SetLookAt("Sweeping Approaches", me->EyePosition() + approachDir * 500.0f, PRIORITY_LOW, 2.0f);
+				}
+			}
+			else
+			{
+				me->UpdateLookAround(); // Default look around behavior if saw enemy recently
+			}
+			m_scanForThreatsTimer.Start(GUARD_SCAN_INTERVAL);
 		}
 	}
 }
@@ -181,6 +277,7 @@ void GuardSentryState::OnExit( CFFBot *me )
 	m_isAtGuardSpot = false;
 	m_repathTimer.Invalidate();
 	m_scanForThreatsTimer.Invalidate();
+	m_tendSentryTimer.Invalidate();
 }
 
 [end of mp/src/game/server/ff/bot/states/ff_bot_guard_sentry.cpp]

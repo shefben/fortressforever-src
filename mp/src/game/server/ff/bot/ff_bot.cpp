@@ -23,8 +23,13 @@
 #include "states/ff_bot_find_resources.h" // Engineer finding resources state
 #include "states/ff_bot_guard_sentry.h"   // Engineer guarding sentry state
 #include "states/ff_bot_infiltrate.h"     // Spy infiltration state
+#include "states/ff_bot_follow_teammate.h" // Bot Following Teammate state
 #include "ff_buildableobject.h" // For CFFBuildableObject, CFFSentryGun, CFFDispenser
 #include "items.h" // For CItem, assuming ammo packs might be derived from it
+// FF_TODO_AI_BEHAVIOR: Include headers for CaptureObjectiveState and GuardSentryState if GetTargetObjective/GetSentryBeingGuarded is used.
+// #include "states/ff_bot_capture_objective.h"
+// #include "states/ff_bot_guard_sentry.h"
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -73,8 +78,12 @@ CFFBot::CFFBot()
 	// Engineer buildable state
 	m_sentryGun = NULL;
 	m_dispenser = NULL;
+	m_teleEntrance = NULL;
+	m_teleExit = NULL;
 	m_sentryLevel = 0;
 	m_dispenserLevel = 0;
+	m_teleEntranceLevel = 0;
+	m_teleExitLevel = 0;
 	m_sappedBuildingHandle = NULL;
 	m_hasSappedBuilding = false;
 
@@ -93,12 +102,275 @@ CFFBot::CFFBot()
 	// Engineer building state
 	m_sentryIsBuilding = false;
 	m_dispenserIsBuilding = false;
+
+	// Enemy prioritization
+	m_prioritizedEnemy = NULL;
+	m_enemyPriorityTimer.Invalidate();
+
+	// Demoman specific
+	m_deployedStickiesCount = 0;
+	m_stickyArmTime.Invalidate();
+	m_stickyDetonateCooldown.Invalidate();
+
+	// Flag carrying
+	m_carriedFlag = NULL;
+	m_carriedFlagType = 0; // 0 = none, 1 = enemy flag, 2 = own flag
 }
 
 CFFBot::~CFFBot()
 {
 }
 
+//--------------------------------------------------------------------------------------------------------------
+// Medic Notifications
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::NotifyCalledForMedic(CFFPlayer* pCaller)
+{
+	if (!IsMedic()) return;
+
+	if (pCaller && pCaller != this && pCaller->IsAlive() && InSameTeam(pCaller) && pCaller->GetHealth() < pCaller->GetMaxHealth())
+	{
+		PrintIfWatched("Medic %s: Teammate %s is calling for medic and needs health (%.0f/%.0f)!\n",
+			GetPlayerName(), pCaller->GetPlayerName(), pCaller->GetHealth(), pCaller->GetMaxHealth());
+
+		// FF_TODO_AI_BEHAVIOR: Could add pCaller to a list of pending heal requests if already busy.
+		// For now, consider switching if new caller is better candidate.
+
+		CFFPlayer* currentHealTarget = NULL;
+		if (m_healTeammateState.IsInState()) // Assumes HealTeammateState has IsInState()
+		{
+			// Conceptual: HealTeammateState needs a GetHealTarget() method
+			// currentHealTarget = static_cast<CFFPlayer*>(m_healTeammateState.GetHealTarget());
+			// For now, if in state, assume it has a target and we might not easily get it here
+			// without modifying HealTeammateState more. Let's assume StartHealing handles it.
+		}
+
+
+		if (currentHealTarget != pCaller) // Avoid interrupting if already healing this caller
+		{
+			float distToCaller = GetRangeTo(pCaller);
+			float distToCurrent = FLT_MAX;
+			if (currentHealTarget) distToCurrent = GetRangeTo(currentHealTarget);
+
+			// Simple priority: If not healing anyone, or new caller is much closer,
+			// or new caller is significantly more hurt than current target (if current target is mostly healthy).
+			bool takeNewTarget = false;
+			if (!currentHealTarget)
+			{
+				takeNewTarget = true;
+			}
+			else
+			{
+				if (distToCaller < (distToCurrent * 0.75f)) takeNewTarget = true;
+				else if (pCaller->GetHealth() < pCaller->GetMaxHealth() * 0.5f &&
+				         currentHealTarget->GetHealth() > currentHealTarget->GetMaxHealth() * 0.75f)
+				{
+					takeNewTarget = true;
+				}
+			}
+
+			if (takeNewTarget)
+			{
+				PrintIfWatched("Medic %s: Prioritizing call for medic from %s.\n", GetPlayerName(), pCaller->GetPlayerName());
+				StartHealing(pCaller); // This method sets state to HealTeammateState
+			}
+			else
+			{
+				PrintIfWatched("Medic %s: Call for medic from %s noted, but current heal target priority is higher or similar.\n", GetPlayerName(), pCaller->GetPlayerName());
+			}
+		}
+	}
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::NotifyGaveMedicHealth(CFFPlayer* pTarget, int healthGiven)
+{
+	if (!IsMedic()) return;
+
+	if (pTarget && pTarget != this && healthGiven > 0)
+	{
+		PrintIfWatched("Medic %s: Successfully gave %d health to %s.\n", GetPlayerName(), healthGiven, pTarget->GetPlayerName());
+		// FF_TODO_CLASS_MEDIC: This notification is primarily for external systems or logging.
+		// HealTeammateState itself checks target's health to decide when to stop or switch.
+		// Could potentially use this to slightly extend a timer in HealTeammateState to provide overheal,
+		// or for a medic bot to feel "more useful" if that impacts its behavior/morale.
+	}
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+bool CFFBot::NeedsAmmo(int weaponSlot) const
+{
+	// FF_TODO_WEAPON_STATS: This is a basic implementation. More sophisticated checks could be:
+	// - Specific ammo thresholds per weapon type.
+	// - Considering total carried ammo vs. clip size (e.g., needs ammo if less than 2 full clips total).
+	// - For Engineer, checking metal supply for build/repair could also be part of a broader "needs resources".
+
+	if (weaponSlot == -1) // Check active weapon, or primary/secondary if active is melee
+	{
+		CFFWeaponBase *pCurrentWeapon = GetActiveFFWeapon();
+		if (pCurrentWeapon)
+		{
+			if (pCurrentWeapon->IsMeleeWeapon())
+			{
+				// If current is melee, check primary, then secondary
+				CFFWeaponBase *pPrimary = static_cast<CFFWeaponBase*>(Weapon_GetSlot(FF_PRIMARY_WEAPON_SLOT));
+				if (pPrimary && !pPrimary->IsMeleeWeapon() && pPrimary->HasPrimaryAmmo())
+				{
+					if (pPrimary->Clip1() <= 0 && GetAmmoCount(pPrimary->GetPrimaryAmmoType()) <= 0) return true; // Completely out
+					if (pPrimary->GetMaxClip1() > 0 && (float)pPrimary->Clip1() / pPrimary->GetMaxClip1() < 0.25f && GetAmmoCount(pPrimary->GetPrimaryAmmoType()) < pPrimary->GetMaxClip1()) return true; // Low clip and not much reserve
+				}
+				CFFWeaponBase *pSecondary = static_cast<CFFWeaponBase*>(Weapon_GetSlot(FF_SECONDARY_WEAPON_SLOT));
+				if (pSecondary && !pSecondary->IsMeleeWeapon() && pSecondary->HasPrimaryAmmo()) // Most secondaries use primary ammo type
+				{
+					if (pSecondary->Clip1() <= 0 && GetAmmoCount(pSecondary->GetPrimaryAmmoType()) <= 0) return true;
+					if (pSecondary->GetMaxClip1() > 0 && (float)pSecondary->Clip1() / pSecondary->GetMaxClip1() < 0.25f && GetAmmoCount(pSecondary->GetPrimaryAmmoType()) < pSecondary->GetMaxClip1()) return true;
+				}
+				return false; // Melee active, primary/secondary seem okay or don't exist/use ammo
+			}
+			else if (pCurrentWeapon->HasPrimaryAmmo()) // Non-melee weapon
+			{
+				if (pCurrentWeapon->Clip1() <= 0 && GetAmmoCount(pCurrentWeapon->GetPrimaryAmmoType()) <= 0) return true;
+				if (pCurrentWeapon->GetMaxClip1() > 0 && (float)pCurrentWeapon->Clip1() / pCurrentWeapon->GetMaxClip1() < 0.25f && GetAmmoCount(pCurrentWeapon->GetPrimaryAmmoType()) < pCurrentWeapon->GetMaxClip1()) return true;
+			}
+			// FF_TODO_WEAPON_STATS: Add check for weapons using secondary ammo type if any exist (pCurrentWeapon->HasSecondaryAmmo())
+		}
+		return false; // No weapon or weapon doesn't use primary ammo
+	}
+	else // Check specific slot
+	{
+		CFFWeaponBase *pWeapon = static_cast<CFFWeaponBase*>(Weapon_GetSlot(weaponSlot));
+		if (pWeapon && !pWeapon->IsMeleeWeapon() && pWeapon->HasPrimaryAmmo())
+		{
+			if (pWeapon->Clip1() <= 0 && GetAmmoCount(pWeapon->GetPrimaryAmmoType()) <= 0) return true;
+			if (pWeapon->GetMaxClip1() > 0 && (float)pWeapon->Clip1() / pWeapon->GetMaxClip1() < 0.25f && GetAmmoCount(pWeapon->GetPrimaryAmmoType()) < pWeapon->GetMaxClip1()) return true;
+		}
+		// FF_TODO_WEAPON_STATS: Add check for weapons using secondary ammo type
+		return false;
+	}
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::HandleCommand(const char* command)
+{
+	if (!command || command[0] == '\0')
+		return;
+
+	char cmd[256];
+	Q_snprintf(cmd, sizeof(cmd), "%s\n", command);
+
+	// FF_TODO_GAME_MECHANIC: Determine if ServerCommand or ClientCommand is appropriate.
+	// For build commands (e.g., "buildsentrygun"), ServerCommand was used from CFFBot::SelectSpecificBuildable.
+	// Assuming sabotage commands are also server-level commands that a bot can issue for itself.
+	// If these are client-only commands (like `voicemenu`), then ClientCommand(edict(), cmd) might be needed.
+	// For now, using ServerCommand based on existing pattern for build commands.
+	engine->ServerCommand(cmd);
+	// PrintIfWatched("Bot %s: Issued server command: %s", GetPlayerName(), command); // Optional: for debugging
+}
+
+//--------------------------------------------------------------------------------------------------------------
+int CFFBot::GetEntityOmniBotClass(CBaseEntity* pEntity)
+{
+	if (!pEntity)
+		return FF_CLASSEX_UNKNOWN;
+
+	// This function aims to replicate the classification logic from FFInterface::GetEntityClass (omnibot_interface.cpp)
+	// It should return the same integer values that FFInterface::GetEntityClass would.
+	// FF_CRITICAL_TODO_OMNIBOT: The actual omnibot_interface.cpp (or equivalent for FF) is missing,
+	// so these mappings are based on TF_Config.h and assumptions about FF projectile Classify() results.
+
+	// Handle Players
+	if (pEntity->IsPlayer())
+	{
+		CFFPlayer* pPlayer = static_cast<CFFPlayer*>(pEntity);
+		// FFInterface::GetEntityClass uses: obUtilGetBotClassFromGameClass(pFFPlayer->GetClassSlot())
+		// Assuming GetClassSlot() returns 1 for Scout, ..., 10 for Civilian/Spy, matching our FF_CLASS_ enums.
+		int gameClassSlot = pPlayer->GetClassSlot();
+		if (gameClassSlot >= FF_CLASS_SCOUT && gameClassSlot <= FF_CLASS_CIVILIAN) // FF_CLASS_CIVILIAN is 10
+		{
+			return gameClassSlot;
+		}
+		// FF_TODO_OMNIBOT: If GetClassSlot() doesn't map directly, use pEntity->Classify() and map explicitly
+		// case CLASS_PLAYER_SCOUT: return FF_CLASS_SCOUT; etc.
+		return FF_CLASSEX_UNKNOWN;
+	}
+
+	// Handle other entity types based on their game Classify() result
+	switch (pEntity->Classify())
+	{
+		// Projectiles: Map game's Classify() result to direct TF_CLASSEX_ values from TF_Config.h
+		// Note: CLASS_IC_ROCKET (Incendiary Cannon) is assumed to also return CLASS_ROCKET from its Classify()
+		// or FFInterface::GetEntityClass maps it to TF_CLASSEX_ROCKET.
+		case CLASS_ROCKET:		// Standard SDK value for rockets. Covers normal and IC rockets.
+			return FF_CLASSEX_ROCKET; // 30
+		case CLASS_PIPEBOMB:	// Standard SDK value for demoman pipes (non-sticky).
+			return FF_CLASSEX_PIPE;   // 28
+		case CLASS_GRENADE:		// Standard SDK value for generic grenades.
+			// FF_CRITICAL_TODO_PYRO_PROJ: This mapping is ambiguous without omnibot_interface.cpp.
+			// CFFProjectileGrenade (Grenade Launcher) is likely CLASS_GRENADE.
+			// A separate CFFProjectileHEGrenade (Hand Grenade) would also be CLASS_GRENADE.
+			// Omnibot's FFInterface::GetEntityClass would differentiate them (e.g. by model or owner type).
+			// For now, mapping CLASS_GRENADE to FF_CLASSEX_GLGRENADE (29) for launched pipes.
+			// ScanForNearbyProjectiles will need to be robust enough to also consider FF_CLASSEX_GRENADE (20)
+			// if it encounters an entity that the game classifies as CLASS_GRENADE.
+			// A more robust GetEntityOmniBotClass would try to distinguish here.
+			// Example (conceptual, needs actual game logic):
+			// if ( dynamic_cast<CFFProjectileGrenade*>(pEntity) ) return FF_CLASSEX_GLGRENADE; // Grenade Launcher
+			// if ( dynamic_cast<CFFProjectileHEGrenade*>(pEntity) ) return FF_CLASSEX_GRENADE; // Hand Grenade
+			return FF_CLASSEX_GLGRENADE; // Default for CLASS_GRENADE, assuming GL pipes are primary concern.
+
+		// FF_TODO_PYRO_PROJ: Add other reflectable projectiles like nails if CLASS_NAIL exists and maps to a TF_CLASSEX_
+		// case CLASS_NAIL: return FF_CLASSEX_NAIL; // FF_CLASSEX_NAIL would need to be defined. TF_Config.h has TF_CLASSEX_NAIL_GRENADE (22).
+
+		// Buildings: Map game's Classify() result to Omnibot-derived FF_CLASSEX_ values (e.g., Sentry Lvl1/2/3)
+		case CLASS_SENTRYGUN:
+		{
+			CFFSentryGun *sentry = dynamic_cast<CFFSentryGun*>(pEntity);
+			if (sentry)
+			{
+				// This matches typical Omnibot logic for deriving level-specific classes
+				switch (sentry->GetUpgradeLevel())
+				{
+					case 1: return FF_CLASSEX_SENTRY_LVL1; // 11
+					case 2: return FF_CLASSEX_SENTRY_LVL2; // 12
+					case 3: return FF_CLASSEX_SENTRY_LVL3; // 13
+				}
+			}
+			return FF_CLASSEX_SENTRY_LVL1; // Default to Lvl1 if level unknown or not a CFFSentryGun
+		}
+		case CLASS_DISPENSER:
+			return FF_CLASSEX_DISPENSER; // 14
+
+		// FF_CRITICAL_TODO_ENGINEER: Verify actual Classify() results for FF teleporter objects
+		// and their mapping in the (missing) FFInterface::GetEntityClass.
+		// Assuming CLASS_TELEPORTER_ENTRANCE and CLASS_TELEPORTER_EXIT exist as distinct Classify() results.
+		// If not, FFInterface::GetEntityClass would need to use FClassnameIs or other properties
+		// on a generic CLASS_BUILDING or CLASS_TELEPORTER.
+		case CLASS_TELEPORTER_ENTRANCE: // Placeholder SDK enum value
+			return FF_CLASSEX_TELE_ENTR; // 15
+		case CLASS_TELEPORTER_EXIT:     // Placeholder SDK enum value
+			return FF_CLASSEX_TELE_EXIT; // 16
+		/* // Example alternative if specific Classify() values don't exist:
+		case CLASS_BUILDING_GENERIC: // Or whatever a generic buildable might classify as
+			if (FClassnameIs(pEntity, "obj_teleporter_entrance")) return FF_CLASSEX_TELE_ENTR;
+			if (FClassnameIs(pEntity, "obj_teleporter_exit")) return FF_CLASSEX_TELE_EXIT;
+			break;
+		*/
+
+		// Other TF_CLASSEX_ types from TF_Config.h that might be identified by Classify()
+		// These are less critical for Pyro airblast but good for completeness if this function is used broadly.
+		// case CLASS_DETPACK: return TF_CLASSEX_DETPACK; // TF_CLASSEX_DETPACK is 19 in TF_Config.h
+		// case CLASS_TURRET_BASE: return TF_CLASSEX_TURRET; // TF_CLASSEX_TURRET is 31 in TF_Config.h
+
+		default:
+			// FFInterface::GetEntityClass might have FClassnameIs checks here for entities
+			// not well covered by Classify(), or to refine types.
+			// For projectile detection, the main projectile Classify() cases are key.
+			break;
+	}
+
+	return FF_CLASSEX_UNKNOWN;
+}
 
 //--------------------------------------------------------------------------------------------------------------
 // FF_TODO_CLASS_ENGINEER: Player Engineers likely use a key (e.g., bound to slot4, lastinv,
@@ -116,6 +388,7 @@ void CFFBot::CycleSelectedBuildable()
 	switch (current) {
 		case BUILDABLE_SENTRY: m_selectedBuildableType = BUILDABLE_DISPENSER; break;
 		case BUILDABLE_DISPENSER: m_selectedBuildableType = BUILDABLE_SENTRY; break;
+		// FF_TODO_CLASS_ENGINEER: Add cycling through teleporter entrance/exit if desired
 		default: m_selectedBuildableType = BUILDABLE_SENTRY; break;
 	}
 	PrintIfWatched("%s internally cycled preferred buildable to: %s\n", GetPlayerName(), GetSelectedBuildableName());
@@ -133,6 +406,8 @@ void CFFBot::SelectSpecificBuildable(BuildableType type)
 	switch (type) {
 		case BUILDABLE_SENTRY: command = "buildsentrygun"; break;
 		case BUILDABLE_DISPENSER: command = "builddispenser"; break;
+		case BUILDABLE_TELE_ENTRANCE: command = "buildteleporterentrance"; break;
+		case BUILDABLE_TELE_EXIT: command = "buildteleporterexit"; break;
 		default: Warning("CFFBot::SelectSpecificBuildable: Unknown buildable type %d for %s.\n", type, GetPlayerName()); return;
 	}
 	if (command) {
@@ -148,6 +423,8 @@ const char* CFFBot::GetSelectedBuildableName() const
 	switch(m_selectedBuildableType) {
 		case BUILDABLE_SENTRY: return "Sentry Gun";
 		case BUILDABLE_DISPENSER: return "Dispenser";
+		case BUILDABLE_TELE_ENTRANCE: return "Teleporter Entrance";
+		case BUILDABLE_TELE_EXIT: return "Teleporter Exit";
 		case BUILDABLE_NONE: default: return "None";
 	}
 }
@@ -158,6 +435,7 @@ const char* CFFBot::GetSelectedBuildableName() const
 void CFFBot::NotifyBuildingSapped(CBaseEntity *sappedBuilding, bool isSapped)
 {
 	// Only track our own buildings being sapped by this specific notification
+	// FF_TODO_CLASS_ENGINEER: Extend to handle teleporters if they can be sapped.
 	if (sappedBuilding == m_sentryGun.Get() || sappedBuilding == m_dispenser.Get())
 	{
 		m_sappedBuildingHandle = (isSapped ? sappedBuilding : NULL);
@@ -175,61 +453,71 @@ void CFFBot::NotifyBuildingSapped(CBaseEntity *sappedBuilding, bool isSapped)
 	}
 }
 
-void CFFBot::NotifyBuildingUpgraded(CBaseEntity *building, int newLevel)
+void CFFBot::NotifyBuildingUpgraded(CBaseEntity *building, int newLevelFromEvent)
 {
-	// This notification comes from a game event, which should provide the new level.
-	// FF_CRITICAL_TODO_BUILDING: Ensure game event for upgrades *provides the new level*.
-	// If newLevel is 0 or not sensible, it indicates an issue with event data.
-	if (newLevel <= 0)
+	// FF_CRITICAL_TODO_BUILDING: Ensure game event for upgrades *provides the new level* via 'newLevelFromEvent'.
+	int finalLevel = newLevelFromEvent;
+
+	if (finalLevel <= 0) // If event didn't provide a valid level
 	{
-		// Try to get it from the entity directly if possible (assuming derived classes have GetUpgradeLevel)
 		CFFSentryGun *sentry = dynamic_cast<CFFSentryGun*>(building);
-		if (sentry) newLevel = sentry->GetUpgradeLevel();
+		if (sentry) finalLevel = sentry->GetUpgradeLevel();
 		else
 		{
 			CFFDispenser *dispenser = dynamic_cast<CFFDispenser*>(building);
-			if (dispenser) newLevel = dispenser->GetUpgradeLevel();
+			if (dispenser) finalLevel = dispenser->GetUpgradeLevel();
 			else
 			{
-				// FF_TODO_CLASS_ENGINEER: Add Teleporter logic here too.
-				PrintIfWatched("Bot %s: NotifyBuildingUpgraded called for unknown building type or event did not provide level.\n", GetPlayerName());
-				// Fallback: increment if we know the building, otherwise guess level 1 if we don't.
-				// This is unreliable.
-				if (building == m_sentryGun.Get()) newLevel = m_sentryLevel + 1;
-				else if (building == m_dispenser.Get()) newLevel = m_dispenserLevel + 1;
-				else newLevel = 1; // Pure guess
+				// FF_TODO_CLASS_ENGINEER: Add teleporter level check if they can be upgraded (FF teleporters usually are not).
+				PrintIfWatched("Bot %s: NotifyBuildingUpgraded for unknown building type or event/entity did not provide level.\n", GetPlayerName());
+				// Guess based on current known level if it's our building
+				if (building == m_sentryGun.Get()) finalLevel = m_sentryLevel + 1;
+				else if (building == m_dispenser.Get()) finalLevel = m_dispenserLevel + 1;
+				else finalLevel = 1; // Pure guess for unknown buildings
+				if (finalLevel > 3) finalLevel = 3; // Cap guess at level 3 for Sentry/Dispenser
 			}
 		}
 	}
 
-	SetBuildingLevel(building, newLevel);
-	PrintIfWatched("Bot %s: Building %s reported upgraded to level %d.\n", GetPlayerName(), building->GetClassname(), newLevel);
+	SetBuildingLevel(building, finalLevel);
+	PrintIfWatched("Bot %s: Building %s reported upgraded to level %d.\n", GetPlayerName(), building->GetClassname(), finalLevel);
 }
 
 void CFFBot::NotifyBuildingDestroyed(CBaseEntity *building)
 {
 	bool wasSappedAndDestroyed = (m_sappedBuildingHandle.Get() == building);
 
-	SetBuildingLevel(building, 0); // Sets level to 0 and specific m_...IsBuilding to false
+	SetBuildingLevel(building, 0); // Sets level to 0
 
 	if (building == m_sentryGun.Get())
 	{
 		PrintIfWatched("Bot %s: Sentry gun destroyed.\n", GetPlayerName());
-		m_sentryGun = NULL; // Clear the handle
+		m_sentryGun = NULL;
 	}
 	else if (building == m_dispenser.Get())
 	{
 		PrintIfWatched("Bot %s: Dispenser destroyed.\n", GetPlayerName());
-		m_dispenser = NULL; // Clear the handle
+		m_dispenser = NULL;
 	}
-	// FF_TODO_CLASS_ENGINEER: Add teleporter logic
+	else if (building == m_teleEntrance.Get())
+	{
+		PrintIfWatched("Bot %s: Teleporter Entrance destroyed.\n", GetPlayerName());
+		m_teleEntrance = NULL;
+		m_teleEntranceLevel = 0;
+	}
+	else if (building == m_teleExit.Get())
+	{
+		PrintIfWatched("Bot %s: Teleporter Exit destroyed.\n", GetPlayerName());
+		m_teleExit = NULL;
+		m_teleExitLevel = 0;
+	}
 
 	if (wasSappedAndDestroyed) {
 		m_sappedBuildingHandle = NULL;
 		// Check if any *other* buildings are still sapped before clearing m_hasSappedBuilding
 		if (m_sentryGun.Get() && static_cast<CFFBuildableObject*>(m_sentryGun.Get())->IsSapped()) { /* still has sapped sentry */ }
 		else if (m_dispenser.Get() && static_cast<CFFBuildableObject*>(m_dispenser.Get())->IsSapped()) { /* still has sapped dispenser */ }
-		// FF_TODO_CLASS_ENGINEER: Add teleporter check
+		// FF_TODO_CLASS_ENGINEER: Add teleporter sapped check if applicable
 		else { m_hasSappedBuilding = false; }
 	}
 
@@ -244,19 +532,25 @@ void CFFBot::NotifyBuildingDestroyed(CBaseEntity *building)
 void CFFBot::NotifyBuildingPlacementStarted(BuildableType type)
 {
 	// Called by the bot itself when it decides to place a blueprint.
-	// This helps the BuildSentry/Dispenser states know the bot has initiated the action.
-	// The actual CFFBuildableObject entity might not exist yet or be findable immediately.
 	switch(type)
 	{
 		case BUILDABLE_SENTRY:
-			// m_sentryIsBuilding = true; // Removed, direct check on entity will be used in states
 			m_sentryLevel = 0; // Blueprint stage
 			PrintIfWatched("Bot %s: Initiated sentry blueprint placement.\n", GetPlayerName());
 			break;
 		case BUILDABLE_DISPENSER:
-			// m_dispenserIsBuilding = true; // Removed
 			m_dispenserLevel = 0; // Blueprint stage
 			PrintIfWatched("Bot %s: Initiated dispenser blueprint placement.\n", GetPlayerName());
+			break;
+		case BUILDABLE_TELE_ENTRANCE:
+			m_teleEntranceLevel = 0; // Blueprint stage
+			m_teleEntrance = NULL;   // Clear handle in case it was previously set by another bot's destroyed tele
+			PrintIfWatched("Bot %s: Initiated teleporter entrance blueprint placement.\n", GetPlayerName());
+			break;
+		case BUILDABLE_TELE_EXIT:
+			m_teleExitLevel = 0; // Blueprint stage
+			m_teleExit = NULL;     // Clear handle
+			PrintIfWatched("Bot %s: Initiated teleporter exit blueprint placement.\n", GetPlayerName());
 			break;
 		default:
 			PrintIfWatched("Bot %s: NotifyBuildingPlacementStarted called for unknown type %d.\n", GetPlayerName(), type);
@@ -267,27 +561,32 @@ void CFFBot::NotifyBuildingPlacementStarted(BuildableType type)
 
 void CFFBot::NotifyBuildingBuilt(CBaseEntity* newBuilding, BuildableType type)
 {
-	// This is called by CFFBotManager when a 'buildable_built' game event is received,
-	// meaning the buildable has finished its initial construction (GoLive() was called).
 	if (!newBuilding)
 	{
 		PrintIfWatched("Bot %s: NotifyBuildingBuilt called with NULL newBuilding for type %d.\n", GetPlayerName(), type);
 		return;
 	}
 
-	SetBuildingLevel(newBuilding, 1); // Sets level to 1 and specific m_...IsBuilding to false
+	SetBuildingLevel(newBuilding, 1); // Sets level to 1
 
 	switch(type)
 	{
 		case BUILDABLE_SENTRY:
-			m_sentryGun = newBuilding; // Assign the handle now that it's confirmed built
+			m_sentryGun = newBuilding;
 			PrintIfWatched("Bot %s: Confirmed Sentry built: %s, Level: %d\n", GetPlayerName(), newBuilding->GetClassname(), m_sentryLevel);
 			break;
 		case BUILDABLE_DISPENSER:
-			m_dispenser = newBuilding; // Assign the handle
+			m_dispenser = newBuilding;
 			PrintIfWatched("Bot %s: Confirmed Dispenser built: %s, Level: %d\n", GetPlayerName(), newBuilding->GetClassname(), m_dispenserLevel);
 			break;
-		// FF_TODO_CLASS_ENGINEER: Add teleporter logic
+		case BUILDABLE_TELE_ENTRANCE:
+			m_teleEntrance = newBuilding;
+			PrintIfWatched("Bot %s: Confirmed Teleporter Entrance built: %s, Level: %d\n", GetPlayerName(), newBuilding->GetClassname(), m_teleEntranceLevel);
+			break;
+		case BUILDABLE_TELE_EXIT:
+			m_teleExit = newBuilding;
+			PrintIfWatched("Bot %s: Confirmed Teleporter Exit built: %s, Level: %d\n", GetPlayerName(), newBuilding->GetClassname(), m_teleExitLevel);
+			break;
 		default:
 			PrintIfWatched("Bot %s: Notified unknown buildable type (%d) built: %s.\n", GetPlayerName(), type, newBuilding->GetClassname());
 			break;
@@ -298,46 +597,381 @@ void CFFBot::SetBuildingLevel(CBaseEntity* pBuilding, int level)
 {
 	if (!pBuilding) return;
 
-	// Determine type by checking against known handles if possible, or use classname as fallback
 	if (pBuilding == m_sentryGun.Get())
 	{
 		m_sentryLevel = level;
-		// m_sentryIsBuilding = (level == 0); // Level 0 might mean blueprint/constructing
 	}
 	else if (pBuilding == m_dispenser.Get())
 	{
 		m_dispenserLevel = level;
-		// m_dispenserIsBuilding = (level == 0);
 	}
-	// FF_TODO_CLASS_ENGINEER: Add Teleporter logic here
+	else if (pBuilding == m_teleEntrance.Get())
+	{
+		m_teleEntranceLevel = level; // Teleporters are typically 0 or 1
+	}
+	else if (pBuilding == m_teleExit.Get())
+	{
+		m_teleExitLevel = level; // Teleporters are typically 0 or 1
+	}
 	// Fallback to classname if not one of our current known buildings (e.g. other player's building)
 	// This part is mostly for information if needed, bot primarily cares about its own building levels for upgrade logic.
-	else if (FClassnameIs(pBuilding, "obj_sentrygun")) // FF_TODO_GAME_MECHANIC: Verify classname
+	else if (FClassnameIs(pBuilding, "obj_sentrygun"))
 	{
-		// If it's a sentry but not OUR sentry handle, we don't update m_sentryLevel.
-		// This function is primarily for the bot's *own* buildings.
+		// Potentially update knowledge of other players' sentries if needed by AI, but not m_sentryLevel.
 	}
-	else if (FClassnameIs(pBuilding, "obj_dispenser")) // FF_TODO_GAME_MECHANIC: Verify classname
+	else if (FClassnameIs(pBuilding, "obj_dispenser"))
 	{
-		// Same as above for dispensers.
+		// Same for dispensers.
 	}
+	// FF_TODO_CLASS_ENGINEER: Add FClassnameIs checks for teleporters if needed for general knowledge.
 }
 
 bool CFFBot::IsOwnBuildingInProgress(BuildableType type) const
 {
-	// This method is being removed as states will query entity directly.
-	// Kept for reference during transition, will be deleted.
-	// switch(type)
-	// {
-	// 	case BUILDABLE_SENTRY: return m_sentryIsBuilding;
-	// 	case BUILDABLE_DISPENSER: return m_dispenserIsBuilding;
-	// 	default: return false;
-	// }
+	// FF_TODO_CLASS_ENGINEER: Remove this function after states are updated.
 	return false;
 }
 
+//--------------------------------------------------------------------------------------------------------------
+// New Notification stubs
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::NotifyPipeDetonated(IGameEvent *event)
+{
+	// FF_TODO_CLASS_DEMOMAN: Implement logic for Demoman to react to their own pipe detonations.
+	// Check if 'userid' of the event is this bot.
+	// If so, and if tracking deployed direct-fire pipes, update count or state.
+	// For stickies, CFFPlayer::DetonateStickies() handles game logic; this event might inform bot that some/all stickies are gone.
+	int ownerId = event->GetInt("userid", 0);
+	if (ownerId == GetUserID() && IsDemoman())
+	{
+		// This event is generic for any pipe. If it's a sticky, m_deployedStickiesCount is reset by TryDetonateStickies.
+		// If it's a direct-fire grenade, bot doesn't track those individually post-fire typically.
+		// For now, just log if it's our pipe.
+		// const char* pipeType = event->GetString("type", "unknown"); // Assuming event has a "type" (e.g. "pipebomb", "sticky")
+		// PrintIfWatched("Demoman %s: My pipe detonated (type: %s).\n", GetPlayerName(), pipeType);
+	}
+}
 
-// ... (rest of ff_bot.cpp, including GetBotFollowCount, Walk, Jump, OnTakeDamage, Event_Killed, Touch, IsBusy, etc. ... )
+void CFFBot::NotifyPlayerHealed(CFFPlayer* pMedic)
+{
+	if (!pMedic) return;
+	PrintIfWatched("Bot %s: I'm being healed by Medic %s!\n", GetPlayerName(), pMedic->GetPlayerName());
+	// FF_TODO_AI_BEHAVIOR: Could thank medic, or adjust behavior (e.g. feel safer to advance).
+}
+
+void CFFBot::NotifyMedicGaveHeal(CFFPlayer* pPatient)
+{
+	if (!IsMedic() || !pPatient) return;
+	PrintIfWatched("Medic %s: Successfully healed %s.\n", GetPlayerName(), pPatient->GetPlayerName());
+	// HealTeammateState handles logic of when to stop healing. This is an FYI.
+	// Could be used for scoring/prioritizing patients if multiple are calling.
+}
+
+void CFFBot::NotifyGotDispenserAmmo(CBaseEntity* pDispenser)
+{
+	if (!pDispenser) return;
+	PrintIfWatched("Bot %s: Got ammo from Dispenser %s.\n", GetPlayerName(), pDispenser->GetDebugName());
+	// FF_TODO_AI_BEHAVIOR: Update ammo status knowledge, potentially leave retreat sooner.
+}
+
+void CFFBot::NotifyCloaked()
+{
+	if (!IsSpy()) return;
+	PrintIfWatched("Spy %s: Successfully cloaked.\n", GetPlayerName());
+	// Internal state m_isCloaked in Spy states should reflect this.
+	// This confirms the action succeeded.
+}
+
+void CFFBot::NotifyUncloaked()
+{
+	if (!IsSpy()) return;
+	PrintIfWatched("Spy %s: Successfully uncloaked.\n", GetPlayerName());
+}
+
+
+// Demoman specific implementations
+//--------------------------------------------------------------------------------------------------------------
+bool CFFBot::IsDemoman() const
+{
+	// FF_TODO_GAME_MECHANIC: Ensure "demoman" is the exact internal class name string.
+	return FStrEq(GetPlayerClass()->GetName(), "demoman");
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryLayStickyTrap(const Vector& location)
+{
+	if (!IsDemoman()) return;
+	if (m_deployedStickiesCount >= MAX_BOT_STICKIES)
+	{
+		PrintIfWatched("Demoman %s: At max bot stickies (%d), cannot lay more.\n", GetPlayerName(), m_deployedStickiesCount);
+		return;
+	}
+
+	// FF_TODO_CLASS_DEMOMAN: Check if actual game pipebomb count for player is at max (eg CFFPlayer::GetNumPipebombs())
+	// if ( static_cast<CFFPlayer*>(this)->GetNumPipebombs() >= MAX_DEMO_PIPES ) return;
+
+
+	// FF_TODO_WEAPON_STATS: Verify FF_WEAPON_PIPELAUNCHER is correct and has IN_ATTACK2 for stickies.
+	CFFWeaponBase *pStickyLauncher = GetWeaponByID(FF_WEAPON_PIPELAUNCHER);
+	if (!pStickyLauncher || !CanDeployWeapon(pStickyLauncher) || pStickyLauncher->Clip1() <= 0) // Assuming stickies use Clip1 for ammo like pipes
+	{
+		PrintIfWatched("Demoman %s: Cannot lay sticky (no launcher, no ammo, or can't deploy).\n", GetPlayerName());
+		// FF_TODO_AI_BEHAVIOR: Maybe switch to it or reload if possible. For now, just fail.
+		return;
+	}
+
+	if (GetActiveFFWeapon() != pStickyLauncher)
+	{
+		EquipWeapon(pStickyLauncher);
+		// Need to wait for equip animation if any. For simplicity, assume immediate or next frame.
+		PrintIfWatched("Demoman %s: Equipping sticky launcher to lay trap.\n", GetPlayerName());
+		// Could defer action to next frame: m_actionTimer.Start(0.1f); return;
+	}
+
+	// Aiming: Bot should already be positioned by LayStickyTrapState to have LOS.
+	// Fine-tune aim to the specific location.
+	SetLookAt("Laying Sticky", location, PRIORITY_HIGH, 0.5f); // Look for 0.5s
+
+	// FF_TODO_CLASS_DEMOMAN: Verify IN_ATTACK2 is correct for laying stickies.
+	PressButton(IN_ATTACK2);
+	ReleaseButton(IN_ATTACK2);
+	// Actual CFFPlayer::FirePipeBomb(true) for stickies might set m_flNextSecondaryAttack. Bot needs to respect this.
+	// For now, simple press/release.
+
+	m_deployedStickiesCount++;
+	m_stickyArmTime.Start(1.0f); // Stickies need ~1 second to arm
+	// m_flNextSecondaryAttack = gpGlobals->curtime + GetPlayerClassData()->m_flStickyChargeTime; // If bot needs to respect weapon refire time
+
+	PrintIfWatched("Demoman %s: Laid a sticky towards (%.1f, %.1f, %.1f). Deployed: %d\n", GetPlayerName(), location.x, location.y, location.z, m_deployedStickiesCount);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryDetonateStickies(CFFPlayer* pTarget)
+{
+	if (!IsDemoman()) return;
+	if (m_deployedStickiesCount == 0)
+	{
+		// PrintIfWatched("Demoman %s: No stickies to detonate.\n", GetPlayerName());
+		return;
+	}
+	if (!m_stickyArmTime.IsElapsed())
+	{
+		PrintIfWatched("Demoman %s: Stickies not armed yet (%.1f remaining).\n", GetPlayerName(), m_stickyArmTime.GetRemainingTime());
+		return;
+	}
+	if (!m_stickyDetonateCooldown.IsElapsed())
+	{
+		// PrintIfWatched("Demoman %s: Detonation cooldown active (%.1f remaining).\n", GetPlayerName(), m_stickyDetonateCooldown.GetRemainingTime());
+		return;
+	}
+
+	// FF_TODO_WEAPON_STATS: Verify FF_WEAPON_PIPELAUNCHER is correct and IN_ATTACK2 detonates.
+	// Some games have a separate detonator weapon or require switching to the launcher first.
+	CFFWeaponBase *pStickyLauncher = GetWeaponByID(FF_WEAPON_PIPELAUNCHER);
+	if (!pStickyLauncher)
+	{
+		PrintIfWatched("Demoman %s: Cannot detonate (no launcher).\n", GetPlayerName());
+		return;
+	}
+
+	if (GetActiveFFWeapon() != pStickyLauncher)
+	{
+		EquipWeapon(pStickyLauncher);
+		// Could defer action to next frame for equip time.
+		PrintIfWatched("Demoman %s: Equipping sticky launcher to detonate.\n", GetPlayerName());
+	}
+
+	// FF_TODO_CLASS_DEMOMAN: Aiming before detonation? Usually not required by game mechanic itself, but bot might look towards target.
+	if (pTarget)
+	{
+		SetLookAt("Detonating near Target", pTarget->EyePosition(), PRIORITY_MEDIUM, 0.5f);
+		PrintIfWatched("Demoman %s: Detonating stickies near target %s.\n", GetPlayerName(), pTarget->GetPlayerName());
+	}
+	else
+	{
+		PrintIfWatched("Demoman %s: Detonating stickies (no specific target).\n", GetPlayerName());
+	}
+
+	PressButton(IN_ATTACK2);
+	ReleaseButton(IN_ATTACK2);
+	// Actual CFFPlayer::DetonateStickies() is called.
+	// This function in CFFPlayer sets m_flNextSecondaryAttack. Bot should respect this.
+
+	m_deployedStickiesCount = 0; // Assume all deployed stickies are detonated.
+	m_stickyDetonateCooldown.Start(1.0f); // Cooldown before next detonation attempt
+	// m_flNextSecondaryAttack = gpGlobals->curtime + GetPlayerClassData()->m_flDetonateDelay; // If bot needs to respect weapon refire time
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::StartLayingStickyTrap(const Vector& pos)
+{
+	if (!IsDemoman()) return;
+
+	PrintIfWatched("Demoman %s: Requested to lay sticky trap near (%.1f, %.1f, %.1f).\n", GetPlayerName(), pos.x, pos.y, pos.z);
+	m_layStickyTrapState.SetTrapLocation(pos);
+	SetState(&m_layStickyTrapState);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+// Event-based notification methods CFFBotManager will call on specific bots
+//--------------------------------------------------------------------------------------------------------------
+
+// Note: CFFBot::OnPipeDetonated (the direct game event handler) was already modified.
+// This NotifyPipeDetonated is if the manager specifically tells this bot about a pipe.
+// For this subtask, we'll assume CFFBot::OnDetpackDetonated is the primary path via manager.
+// void CFFBot::NotifyPipeDetonated(IGameEvent *event)
+// {
+// 	int ownerId = event->GetInt("userid");
+// 	if (IsDemoman() && ownerId == GetUserID())
+// 	{
+// 		PrintIfWatched( "Demoman %s: My pipe/sticky detonated (event based).\n", GetPlayerName() );
+//      // This might be redundant if TryDetonateStickies already set count to 0,
+//      // or useful if an enemy detonated one of our stickies.
+// 		if (m_deployedStickiesCount > 0) m_deployedStickiesCount = 0; // Safest to assume all gone
+// 	}
+// }
+
+void CFFBot::NotifyPlayerHealed(CFFPlayer* pMedic)
+{
+	if (!pMedic) return;
+	PrintIfWatched("Bot %s: I'm being healed by Medic %s!\n", GetPlayerName(), pMedic->GetPlayerName());
+	// FF_TODO_AI_BEHAVIOR: Could thank medic, or adjust behavior (e.g. feel safer to advance).
+	// Potentially increase morale slightly or adjust threat assessment if being actively supported.
+}
+
+void CFFBot::NotifyMedicGaveHeal(CFFPlayer* pPatient)
+{
+	if (!IsMedic() || !pPatient) return;
+	PrintIfWatched("Medic %s: Successfully gave health to %s.\n", GetPlayerName(), pPatient->GetPlayerName());
+	// HealTeammateState handles logic of when to stop healing. This is an FYI.
+	// Could be used for scoring/prioritizing patients if multiple are calling.
+	// Could also start a short timer to "stick" with the patient if they are still in combat / vulnerable.
+}
+
+void CFFBot::NotifyGotDispenserAmmo(CBaseEntity* pDispenser)
+{
+	if (!pDispenser) return;
+	PrintIfWatched("Bot %s: Got ammo/resources from Dispenser %s.\n", GetPlayerName(), pDispenser->GetDebugName());
+	// FF_TODO_AI_BEHAVIOR: Bot should update its internal ammo/resource knowledge.
+	// If it was in RetreatState heading for this dispenser, this might trigger exiting retreat sooner.
+	// If it was in FindResourcesState, this might satisfy its need.
+}
+
+void CFFBot::NotifyCloaked()
+{
+	if (!IsSpy()) return;
+	PrintIfWatched("Spy %s: Successfully cloaked (notified by manager).\n", GetPlayerName());
+	// This can be used to confirm to the bot that its cloak attempt (e.g. HandleCommand("cloak")) succeeded.
+	// Spy-specific states (like InfiltrateState) can check CFFPlayer::IsCloaked(),
+	// but this notification provides an explicit trigger.
+}
+
+void CFFBot::NotifyUncloaked()
+{
+	if (!IsSpy()) return;
+	PrintIfWatched("Spy %s: Successfully uncloaked (notified by manager).\n", GetPlayerName());
+	// Similar to NotifyCloaked, confirms uncloak action.
+}
+
+// Note: NotifyCalledForMedic and NotifyGaveMedicHealth are already implemented from previous steps.
+
+// Engineer Teleporter specific methods
+//--------------------------------------------------------------------------------------------------------------
+int CFFBot::GetTeleporterEntranceLevel() const
+{
+	return (m_teleEntrance.Get() ? m_teleEntranceLevel : 0);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+int CFFBot::GetTeleporterExitLevel() const
+{
+	return (m_teleExit.Get() ? m_teleExitLevel : 0);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryToBuildTeleporterEntrance(const Vector* location)
+{
+	if (!IsEngineer()) return;
+	if (GetTeleporterEntranceLevel() > 0)
+	{
+		// PrintIfWatched("Bot %s: Already has a Teleporter Entrance.\n", GetPlayerName());
+		return;
+	}
+	// FF_TODO_CLASS_ENGINEER: Check resources (metal)
+	// if (GetMetal() < GetPlayerClassData()->m_iTeleporterCost) { PrintIfWatched("Bot %s: Not enough metal for Teleporter Entrance.\n", GetPlayerName()); return; }
+
+	PrintIfWatched("Bot %s: Attempting to build Teleporter Entrance.\n", GetPlayerName());
+	// m_buildTeleEntranceState.SetBuildLocation(location); // If state needs specific location
+	SetState(&m_buildTeleEntranceState);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryToBuildTeleporterExit(const Vector* location)
+{
+	if (!IsEngineer()) return;
+	if (GetTeleporterExitLevel() > 0)
+	{
+		// PrintIfWatched("Bot %s: Already has a Teleporter Exit.\n", GetPlayerName());
+		return;
+	}
+	if (GetTeleporterEntranceLevel() == 0) // Usually need an entrance first
+	{
+		PrintIfWatched("Bot %s: Cannot build Teleporter Exit, Entrance not found.\n", GetPlayerName());
+		// FF_TODO_AI_BEHAVIOR: Could try to build entrance first if appropriate.
+		return;
+	}
+	// FF_TODO_CLASS_ENGINEER: Check resources (metal)
+	// if (GetMetal() < GetPlayerClassData()->m_iTeleporterCost) { PrintIfWatched("Bot %s: Not enough metal for Teleporter Exit.\n", GetPlayerName()); return; }
+
+	PrintIfWatched("Bot %s: Attempting to build Teleporter Exit.\n", GetPlayerName());
+	// m_buildTeleExitState.SetBuildLocation(location); // If state needs specific location
+	SetState(&m_buildTeleExitState);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+// Prioritization helper method implementations
+//--------------------------------------------------------------------------------------------------------------
+CFFPlayer* CFFBot::GetMedicWhoIsHealingMe() const
+{
+	// FF_TODO_AI_BEHAVIOR: Implement logic to find a Medic CFFPlayer entity that has this bot as its heal target.
+	// This might involve iterating players, checking if they are Medic, and inspecting their CFFPlayer::m_hHealTarget.
+	// For now, this is a stub.
+	for (int i = 1; i <= gpGlobals->maxClients; ++i)
+	{
+		CFFPlayer* pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+		if (pPlayer && pPlayer->IsAlive() && pPlayer->IsMedic() && InSameTeam(pPlayer))
+		{
+			// Conceptual: if (pPlayer->GetHealTarget() == this) return pPlayer;
+		}
+	}
+	return NULL;
+}
+
+//--------------------------------------------------------------------------------------------------------------
+CBaseEntity* CFFBot::GetMostImportantNearbyFriendlyBuilding() const
+{
+	// FF_TODO_AI_BEHAVIOR: Implement more sophisticated logic to find the most important friendly building.
+	// This could consider building health, level, proximity to combat, type (Sentry > Dispenser > Teleporter), etc.
+	// For now, simple check for own built sentry or dispenser.
+	if (m_sentryGun.Get() && m_sentryGun->IsAlive() && static_cast<CFFBuildableObject*>(m_sentryGun.Get())->IsBuilt())
+	{
+		if ((GetAbsOrigin() - m_sentryGun->GetAbsOrigin()).IsLengthLessThan(1000.0f)) // Example radius
+			return m_sentryGun.Get();
+	}
+	if (m_dispenser.Get() && m_dispenser->IsAlive() && static_cast<CFFBuildableObject*>(m_dispenser.Get())->IsBuilt())
+	{
+		if ((GetAbsOrigin() - m_dispenser->GetAbsOrigin()).IsLengthLessThan(1000.0f)) // Example radius
+			return m_dispenser.Get();
+	}
+	// FF_TODO_CLASS_ENGINEER: Add teleporter checks if they are considered important targets for this context.
+	return NULL;
+}
+
+//--------------------------------------------------------------------------------------------------------------
+bool CFFBot::IsNearPosition(const Vector& pos, float radius) const
+{
+	return (GetAbsOrigin() - pos).IsLengthLessThan(radius);
+}
 
 
 //--------------------------------------------------------------------------------------------------------------
@@ -489,583 +1123,159 @@ void CFFBot::UpkeepClient(void) { BaseClass::UpkeepClient(); } // Example if nee
 // const BotProfile *CFFBot::GetProfile( void ) const { return BaseClass::GetProfile(); } // This is in CBasePlayerBot
 // bool CFFBot::IsAlive( void ) const { return BaseClass::IsAlive(); } // This is in CBasePlayer
 
-// Ensure all other existing function bodies from the read_files output are preserved.
-// This overwrite_file_with_block will replace the entire file.
-// The placeholder functions below are just to satisfy the diff structure if it were a diff.
-
-// ... (The rest of the ff_bot.cpp content from the read_files output, including IsSpy, IsScout, GetMaxSpeed, TryDoubleJump, BotThink, IsBehind, FindSpyTarget, TryToInfiltrate, IsMedic, FindNearbyInjuredTeammate, StartHealing, CaptureObjective, FindResourceSource, TryToFindResources, IsEngineer, TryToBuildSentry, TryToBuildDispenser, FindNearbyDamagedFriendlyBuildable, TryToRepairBuildable, Lua path point accessors etc.)
-
 //--------------------------------------------------------------------------------------------------------------
-CFFWeaponBase* CFFBot::SelectBestWeaponForSituation(CFFPlayer* pEnemy, float flEnemyDist)
-{
-	CFFWeaponBase* pCurrentWeapon = GetActiveFFWeapon();
-	CFFWeaponBase* pBestWeapon = pCurrentWeapon;
-
-	// Rule 1: Out of Ammo
-	bool bCurrentWeaponHasAmmo = true;
-	if (pCurrentWeapon)
-	{
-		if (pCurrentWeapon->IsMeleeWeapon()) // Melee weapons don't use ammo
-		{
-			bCurrentWeaponHasAmmo = true;
-		}
-		else if (pCurrentWeapon->HasPrimaryAmmo()) // Check if it uses primary ammo
-		{
-			if (pCurrentWeapon->Clip1() <= 0 && GetAmmoCount(pCurrentWeapon->GetPrimaryAmmoType()) <= 0)
-			{
-				bCurrentWeaponHasAmmo = false;
-			}
-		}
-		else if (pCurrentWeapon->HasSecondaryAmmo()) // Check if it uses secondary ammo (e.g. some special weapons)
-		{
-			if (pCurrentWeapon->Clip2() <= 0 && GetAmmoCount(pCurrentWeapon->GetSecondaryAmmoType()) <= 0)
-			{
-				bCurrentWeaponHasAmmo = false;
-			}
-		}
-		// If it's not melee and doesn't use primary or secondary ammo (e.g. some builder tools), consider it to have "ammo" for this check.
-	}
-	else // No current weapon, definitely need to find one
-	{
-		bCurrentWeaponHasAmmo = false;
-	}
-
-
-	if (!bCurrentWeaponHasAmmo && (pCurrentWeapon && !pCurrentWeapon->IsMeleeWeapon()))
-	{
-		CFFWeaponBase* pPrimaryCandidate = NULL;
-		CFFWeaponBase* pSecondaryCandidate = NULL;
-		CFFWeaponBase* pMeleeCandidate = NULL;
-
-		for (int i = 0; i < MAX_WEAPONS; ++i)
-		{
-			CBaseCombatWeapon *pWeapon = m_hMyWeapons[i];
-			if (!pWeapon) continue;
-
-			CFFWeaponBase *pFFWeapon = dynamic_cast<CFFWeaponBase*>(pWeapon);
-			if (!pFFWeapon) continue;
-
-			bool bCandidateHasAmmo = true;
-			if (pFFWeapon->IsMeleeWeapon())
-			{
-				bCandidateHasAmmo = true;
-			}
-			else if (pFFWeapon->HasPrimaryAmmo())
-			{
-				if (pFFWeapon->Clip1() <= 0 && GetAmmoCount(pFFWeapon->GetPrimaryAmmoType()) <= 0)
-				{
-					bCandidateHasAmmo = false;
-				}
-			}
-			else if (pFFWeapon->HasSecondaryAmmo())
-			{
-				if (pFFWeapon->Clip2() <= 0 && GetAmmoCount(pFFWeapon->GetSecondaryAmmoType()) <= 0)
-				{
-					bCandidateHasAmmo = false;
-				}
-			}
-
-			if (bCandidateHasAmmo)
-			{
-				switch (pFFWeapon->GetSlot())
-				{
-				case 0: // Primary
-					if (!pPrimaryCandidate) pPrimaryCandidate = pFFWeapon;
-					break;
-				case 1: // Secondary
-					if (!pSecondaryCandidate) pSecondaryCandidate = pFFWeapon;
-					break;
-				case 2: // Melee
-					if (!pMeleeCandidate) pMeleeCandidate = pFFWeapon;
-					break;
-				}
-			}
-		}
-
-		if (pPrimaryCandidate) pBestWeapon = pPrimaryCandidate;
-		else if (pSecondaryCandidate) pBestWeapon = pSecondaryCandidate;
-		else if (pMeleeCandidate) pBestWeapon = pMeleeCandidate;
-		else pBestWeapon = NULL; // No weapon with ammo, stick with current or NULL
-
-		// If we picked a new weapon due to ammo, no need for further rules now
-		return pBestWeapon;
-	}
-
-	// Rule 2: Range & Class Exceptions
-	if (pEnemy && flEnemyDist != -1.0f)
-	{
-		// Scout: Prefers Scattergun (SHOTGUN) at close range, then Pistol, then Melee.
-		if (IsScout())
-		{
-			CFFWeaponBase* pScoutPrimary = GetWeaponByID(FF_WEAPON_SHOTGUN);
-			CFFWeaponBase* pScoutSecondary = GetWeaponByID(FF_WEAPON_JUMPGUN);
-			CFFWeaponBase* pScoutMelee = NULL; // Will be found by generic melee search if needed
-            for (int i = 0; i < MAX_WEAPONS; ++i) { // Find melee weapon
-                CBaseCombatWeapon *pW = m_hMyWeapons[i];
-                if (pW) {
-                    CFFWeaponBase *pFFW = dynamic_cast<CFFWeaponBase*>(pW);
-                    if (pFFW && pFFW->GetSlot() == 2) { // Melee slot
-                        pScoutMelee = pFFW;
-                        break;
-                    }
-                }
-            }
-
-			bool bPrimaryHasAmmo = (pScoutPrimary && !pScoutPrimary->IsMeleeWeapon() && pScoutPrimary->HasPrimaryAmmo() && (pScoutPrimary->Clip1() > 0 || GetAmmoCount(pScoutPrimary->GetPrimaryAmmoType()) > 0));
-			bool bSecondaryHasAmmo = (pScoutSecondary && !pScoutSecondary->IsMeleeWeapon() && pScoutSecondary->HasPrimaryAmmo() && (pScoutSecondary->Clip1() > 0 || GetAmmoCount(pScoutSecondary->GetPrimaryAmmoType()) > 0));
-
-			if (flEnemyDist < SCOUT_PRIMARY_EFFECTIVE_RANGE) // Close range preference
-			{
-				if (bPrimaryHasAmmo) return pScoutPrimary;
-				if (bSecondaryHasAmmo) return pScoutSecondary; // Fallback to secondary if primary is out
-				if (pScoutMelee) return pScoutMelee; // Then melee
-				// If all are unsuitable, fall through to general logic
-			}
-			else // Further range preference for Scout (or no enemy)
-			{
-				if (bSecondaryHasAmmo) return pScoutSecondary;
-				// Shotgun is less ideal at range, but if pistol is out, it's an option.
-				if (bPrimaryHasAmmo) return pScoutPrimary;
-				if (pScoutMelee) return pScoutMelee; // Melee as last resort if enemy happens to be far (unlikely to be chosen)
-				// Fall through
-			}
-			// If Scout logic decided a weapon, it would have returned.
-			// If not (e.g. all specific weapons out of ammo), let generic logic decide (which might pick melee again or other weapons if any).
-		}
-		// Pyro: Prefers Flamethrower at its effective range.
-		else if (IsPyro())
-		{
-			if (flEnemyDist < FLAMETHROWER_EFFECTIVE_RANGE)
-			{
-				CFFWeaponBase* pFlamethrower = GetWeaponByID(FF_WEAPON_FLAMETHROWER); // FF_TODO_WEAPON_STATS: Verify ID
-				if (pFlamethrower && pFlamethrower->HasPrimaryAmmo() && (pFlamethrower->Clip1() > 0 || GetAmmoCount(pFlamethrower->GetPrimaryAmmoType()) > 0) )
-				{
-					return pFlamethrower;
-				}
-				// FF_TODO_CLASS_PYRO: Fallback to Shotgun then Melee can be handled by general logic or specific secondary check here
-			}
-		}
-		// Heavy: Prefers Minigun if enemy is not too close and not too far (unless spun up).
-		else if (IsHeavy())
-		{
-			// MINIGUN_EFFECTIVE_RANGE is already defined for BotThink, use it here too.
-			// Minigun is generally preferred if it has ammo and enemy is within its broad effective cone.
-			if (flEnemyDist > MINIGUN_MIN_ENGAGEMENT_RANGE && flEnemyDist < MINIGUN_EFFECTIVE_RANGE)
-			{
-				CFFWeaponBase* pMinigun = GetWeaponByID(FF_WEAPON_ASSAULTCANNON); // FF_TODO_WEAPON_STATS: Using ID from BotThink, verify
-				if (pMinigun && pMinigun->HasPrimaryAmmo() && (pMinigun->Clip1() > 0 || GetAmmoCount(pMinigun->GetPrimaryAmmoType()) > 0) )
-				{
-					return pMinigun;
-				}
-				// FF_TODO_CLASS_HEAVY: Fallback to Shotgun then Melee
-			}
-		}
-
-		// General Range Rules (Melee & Sniper) - applied if class specific logic above didn't return
-		if (flEnemyDist < MELEE_COMBAT_RANGE)
-		{
-			CFFWeaponBase* pMeleeWeapon = NULL;
-			for (int i = 0; i < MAX_WEAPONS; ++i)
-			{
-				CBaseCombatWeapon *pW = m_hMyWeapons[i];
-				if (pW)
-				{
-					CFFWeaponBase *pFFW = dynamic_cast<CFFWeaponBase*>(pW);
-					if (pFFW && pFFW->GetSlot() == 2) // Melee slot
-					{
-						pMeleeWeapon = pFFW;
-						break;
-					}
-				}
-			}
-			if (pMeleeWeapon)
-			{
-				// FF_TODO_AI_BEHAVIOR: Further refinement: e.g. Heavy might use Fists even if Shotgun is available at this range.
-				// This generic rule is now a fallback if class-specific conditions (like Scout/Pyro primary) weren't met.
-				return pMeleeWeapon;
-			}
-		}
-		else if (flEnemyDist > LONG_COMBAT_RANGE)
-		{
-			// Sniper specific logic (Sniper rifle preference)
-			if (IsSniper())
-			{
-				CFFWeaponBase* pSniperRifle = NULL;
-				for (int i = 0; i < MAX_WEAPONS; ++i)
-				{
-					CBaseCombatWeapon *pW = m_hMyWeapons[i];
-					if (pW)
-					{
-						CFFWeaponBase *pFFW = dynamic_cast<CFFWeaponBase*>(pW);
-						// FF_TODO_WEAPON_STATS: Replace FF_WEAPON_SNIPERRIFLE with actual ID
-						if (pFFW && pFFW->GetWeaponID() == FF_WEAPON_SNIPERRIFLE)
-						{
-                             bool bSniperHasAmmo = true;
-                             if (pFFW->HasPrimaryAmmo() && pFFW->Clip1() <= 0 && GetAmmoCount(pFFW->GetPrimaryAmmoType()) <= 0) bSniperHasAmmo = false;
-
-							if (bSniperHasAmmo) {
-								pSniperRifle = pFFW;
-								break;
-							}
-						}
-					}
-				}
-				if (pSniperRifle)
-				{
-					pBestWeapon = pSniperRifle;
-					return pBestWeapon; // Prefer Sniper Rifle at long range if Sniper class
-				}
-			}
-			// Else, avoid very short-range weapons if a longer-range one with ammo exists. (This is complex without full weapon data)
-			// The default selection below will try to pick something sensible.
-		}
-	}
-
-	// Rule 3: Default/Current Best (Fallback if no specific rules above applied or if current weapon is out of ammo)
-	// If current weapon has ammo and no strong reason from Rule 1 or 2 (or class exceptions) applies, stick with it.
-	if (pBestWeapon == pCurrentWeapon && bCurrentWeaponHasAmmo) // pBestWeapon could have been changed by Sniper logic already
-	{
-		// Current weapon is still the best choice.
-	}
-	else // Current weapon is out of ammo OR a class/range rule decided against it OR no weapon currently equipped
-	{
-		// Try to find a better weapon based on general preference: Primary > Secondary > Melee
-		CFFWeaponBase* pPrimaryCandidate = NULL;
-		CFFWeaponBase* pSecondaryCandidate = NULL;
-		CFFWeaponBase* pMeleeCandidate = NULL;
-
-		for (int i = 0; i < MAX_WEAPONS; ++i)
-		{
-			CBaseCombatWeapon *pWeapon = m_hMyWeapons[i];
-			if (!pWeapon) continue;
-
-			CFFWeaponBase *pFFWeapon = dynamic_cast<CFFWeaponBase*>(pWeapon);
-			if (!pFFWeapon) continue;
-
-			bool bCandidateHasAmmo = true;
-			if (pFFWeapon->IsMeleeWeapon())
-			{
-				bCandidateHasAmmo = true;
-			}
-			else if (pFFWeapon->HasPrimaryAmmo())
-			{
-				if (pFFWeapon->Clip1() <= 0 && GetAmmoCount(pFFWeapon->GetPrimaryAmmoType()) <= 0)
-				{
-					bCandidateHasAmmo = false;
-				}
-			}
-			else if (pFFWeapon->HasSecondaryAmmo())
-			{
-				if (pFFWeapon->Clip2() <= 0 && GetAmmoCount(pFFWeapon->GetSecondaryAmmoType()) <= 0)
-				{
-					bCandidateHasAmmo = false;
-				}
-			}
-
-			if (bCandidateHasAmmo)
-			{
-				switch (pFFWeapon->GetSlot())
-				{
-				case 0: // Primary
-					if (!pPrimaryCandidate) pPrimaryCandidate = pFFWeapon;
-					break;
-				case 1: // Secondary
-					if (!pSecondaryCandidate) pSecondaryCandidate = pFFWeapon;
-					break;
-				case 2: // Melee
-					if (!pMeleeCandidate) pMeleeCandidate = pFFWeapon;
-					break;
-				}
-			}
-		}
-
-		if (pPrimaryCandidate) pBestWeapon = pPrimaryCandidate;
-		else if (pSecondaryCandidate) pBestWeapon = pSecondaryCandidate;
-		else if (pMeleeCandidate) pBestWeapon = pMeleeCandidate;
-		// If all are NULL, pBestWeapon remains what it was (potentially current out-of-ammo melee, or NULL if no weapons)
-	}
-
-	return pBestWeapon;
-}
-
+// Teammate Following Logic
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::BotThink( void )
+void CFFBot::FollowPlayer(CFFPlayer* pPlayerToFollow)
 {
-	// Base class BotThink first
-	BaseClass::BotThink();
-
-	// FF Bot specific thinking
-	if ( IsObserver() )
+	if (!pPlayerToFollow || pPlayerToFollow == this || !pPlayerToFollow->IsAlive() || pPlayerToFollow->GetTeamNumber() != GetTeamNumber())
 	{
-		// If we're an observer, find a player to spectate
-		if ( GetMode() == OBS_MODE_NONE || GetObserverTarget() == NULL || !GetObserverTarget()->IsAlive() || GetObserverTarget()->IsBot() )
-		{
-			SpectateNextPlayer( GetTeamNumber() == TEAM_SPECTATOR ? OBS_MODE_ROAMING : GetMode() );
-		}
-		return;
-	}
-
-	if ( !IsAlive() )
-	{
-		// If we're dead, see if it's time to respawn.
-		if ( FFGameRules()->PlayerShouldRespawn( this ) )
-		{
-			if ( GetTeamNumber() != TEAM_UNASSIGNED && GetTeamNumber() != TEAM_SPECTATOR )
-			{
-				HandleCommand_JoinTeam( GetTeamNumber() ); // Rejoin the same team
-				HandleCommand_JoinClass( m_iDesiredPlayerClass ); // Rejoin the same class
-			}
-			else // Should not happen if bot was properly on a team
-			{
-				TheBots->RespawnPlayer( this );
-			}
-		}
-		return;
-	}
-
-	// Perform weapon selection check periodically
-	if (m_weaponSwitchCheckTimer.IsElapsed())
-	{
-		m_weaponSwitchCheckTimer.Start(RandomFloat(0.5f, 1.0f));
-		CFFPlayer* pEnemy = GetBotEnemy();
-		float flDist = pEnemy ? GetRangeTo(pEnemy) : -1.0f;
-		CFFWeaponBase* pBestWeapon = SelectBestWeaponForSituation(pEnemy, flDist);
-		if (pBestWeapon && GetActiveFFWeapon() != pBestWeapon)
-		{
-			EquipWeapon(pBestWeapon);
-		}
-	}
-
-	// Pyro: Scan for projectiles periodically
-	if (IsPyro() && m_projectileScanTimer.IsElapsed())
-	{
-		m_projectileScanTimer.Start(RandomFloat(0.1f, 0.3f)); // Scan frequently
-		ScanForNearbyProjectiles();
-	}
-
-	// Handle specific class behaviors
-	if (IsMedic())
-	{
-		CFFPlayer* healTarget = FindNearbyInjuredTeammate();
-		if (healTarget)
-		{
-			// FF_TODO_CLASS_MEDIC: Check if already healing this target or if current state allows interruption
-			// For now, simplistic: if find a target, try to heal.
-			// Also, ensure Medigun is equipped.
-			StartHealing(healTarget); // This will set state to HealTeammateState
-		}
-	}
-	else if (IsEngineer())
-	{
-		// Engineer logic is mostly handled by IdleState transitions for now
-	}
-	else if (IsSpy())
-	{
-		// Spy logic is mostly handled by IdleState transitions for now
-	}
-	else if (IsScout())
-	{
-		if (IsStuck()) // Example: try to double jump if stuck as scout
-		{
-			TryDoubleJump();
-		}
-	}
-	else if (IsHeavy())
-	{
-		// Heavy specific logic, e.g. minigun spin management
-		CFFWeaponBase *pMyWeapon = GetActiveFFWeapon();
-		if (pMyWeapon && pMyWeapon->GetWeaponID() == FF_WEAPON_ASSAULTCANNON) // FF_TODO_WEAPON_STATS: Use actual Assault Cannon ID
-		{
-			bool shouldSpin = false;
-			CFFPlayer *enemy = GetBotEnemy();
-			if (enemy && IsEnemyVisible() && GetRangeTo(enemy) < MINIGUN_EFFECTIVE_RANGE)
-			{
-				shouldSpin = true;
-			}
-
-			if (shouldSpin && !IsMinigunSpunUp())
-			{
-				PressButton(IN_ATTACK2); // Start spin up
-				// SetMinigunSpunUp(true) will be handled by weapon event or timer
-			}
-			else if (!shouldSpin && IsMinigunSpunUp())
-			{
-				// FF_TODO_CLASS_HEAVY: Add logic for MINIGUN_SUSTAINED_FIRE_LOST_SIGHT_DURATION
-				// For now, simple stop if no enemy.
-				ReleaseButton(IN_ATTACK2);
-				SetMinigunSpunUp(false);
-			}
-		}
-		else if (IsMinigunSpunUp()) // Switched off minigun while spun up
-		{
-			SetMinigunSpunUp(false);
-		}
-	}
-
-
-	// Double jump logic for Scout (phased execution)
-	if (m_isAttemptingDoubleJump)
-	{
-		switch (m_doubleJumpPhase)
-		{
-			case 1: // First jump pressed, needs release
-				ReleaseButton(IN_JUMP);
-				m_doubleJumpPhase = 2;
-				m_doubleJumpPhaseTimer.Start(0.05f); // Short delay before second press
-				break;
-			case 2: // First jump released, waiting for second press
-				if (m_doubleJumpPhaseTimer.IsElapsed())
-				{
-					PressButton(IN_JUMP);
-					m_doubleJumpPhase = 3;
-					m_doubleJumpPhaseTimer.Start(0.1f); // Hold second jump briefly
-				}
-				break;
-			case 3: // Second jump pressed, needs release
-				if (m_doubleJumpPhaseTimer.IsElapsed())
-				{
-					ReleaseButton(IN_JUMP);
-					m_doubleJumpPhase = 0;
-					m_isAttemptingDoubleJump = false;
-					m_doubleJumpCooldown.Start(1.0f); // Cooldown for next double jump
-				}
-				break;
-		}
-	}
-
-
-	// Update current behavior state
-	if (m_state)
-	{
-		m_state->OnUpdate( this );
-	}
-	else
-	{
-		// This should ideally not happen if bot is alive and spawned.
-		// Go to Idle to select a new state.
+		PrintIfWatched("%s: Cannot follow invalid player %s.\n", GetPlayerName(), pPlayerToFollow ? pPlayerToFollow->GetPlayerName() : "NULL");
 		Idle();
-	}
-}
-
-//--------------------------------------------------------------------------------------------------------------
-// Helper to get CFFWeaponBase from CBaseCombatWeapon
-// FF_TODO_WEAPON_STATS: This function is crucial for many weapon interactions.
-CFFWeaponBase *CFFBot::GetActiveFFWeapon( void ) const
-{
-	return dynamic_cast<CFFWeaponBase *>( GetActiveWeapon() );
-}
-//--------------------------------------------------------------------------------------------------------------
-
-// FF_TODO_AI_BEHAVIOR: More advanced class-specific weapon logic can be added here or in SelectBestWeapon.
-// For example, Pyro might prefer flamethrower even at very close range over melee if enemy is not resistant.
-// Scout might prefer Scattergun over pistol even if pistol has slightly more ammo if at optimal scattergun range.
-// Heavy might have conditions for switching to Shotgun if Minigun is spun down and enemy is suddenly very close.
-
-//--------------------------------------------------------------------------------------------------------------
-void CFFBot::StartSabotaging(CBaseEntity* pBuilding)
-{
-	if (!IsSpy() || !pBuilding) return;
-
-	CFFBuildableObject* pBuildable = dynamic_cast<CFFBuildableObject*>(pBuilding);
-	if (!pBuildable) return;
-
-	// This is where the bot would call the C++ equivalent of TF_BOT_BUTTON_SABOTAGE_SENTRY/DISPENSER
-	// which likely calls something like CFFPlayer::SpyStartSabotaging(pBuildable);
-	PrintIfWatched("Bot %s: Calling CFFPlayer::SpyStartSabotaging on %s (conceptual framework).\n", GetPlayerName(), pBuildable->GetClassname());
-	// FF_CRITICAL_TODO_SPY: Actually call the CFFPlayer method that initiates sabotage if it's discoverable and usable by bots.
-	// For now, this function is a placeholder. The IN_USE in InfiltrateState is the active simulation.
-	// Example: static_cast<CFFPlayer*>(this)->SpyStartSabotaging(pBuildable); // If such a method existed and was appropriate.
-}
-
-//--------------------------------------------------------------------------------------------------------------
-void CFFBot::ScanForNearbyProjectiles()
-{
-	if (!IsPyro() || !GetActiveFFWeapon() || GetActiveFFWeapon()->GetWeaponID() != FF_WEAPON_FLAMETHROWER)
 		return;
+	}
+	m_followTeammateState.SetPlayerToFollow(pPlayerToFollow);
+	SetState(&m_followTeammateState);
+}
 
-	// FF_TODO_PYRO_PROJ: This is a simple sphere check. More optimized methods (e.g. UTIL_EntitiesInSphere) should be used if available.
-	CBaseEntity *pEntity = NULL;
-	while ((pEntity = gEntList.NextEnt(pEntity)) != NULL)
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::TryToFollowNearestTeammate(float maxDist)
+{
+	// FF_TODO_CLASS: Some classes should be less likely to follow (e.g., Snipers, Engineers guarding nest).
+	if (IsSniper() && IsSniping()) return; // Snipers actively sniping shouldn't follow.
+	if (IsEngineer() && (HasSentry() || HasDispenser())) // Engineers with a nest might be less inclined.
 	{
-		if (pEntity == this)
+		// Potentially reduce follow chance or only follow if nest is secure/nearby.
+		if (RandomFloat(0,1) < 0.75f) return;
+	}
+
+
+	CFFPlayer *pClosestFriendly = NULL;
+	float flClosestDistSq = maxDist * maxDist;
+
+	for (int i = 1; i <= gpGlobals->maxClients; ++i)
+	{
+		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
+		if (!pPlayer || pPlayer == this || !pPlayer->IsAlive() || pPlayer->GetTeamNumber() != GetTeamNumber() || pPlayer->IsBot()) // Don't follow other bots for now
 			continue;
 
-		Vector myCenter = WorldSpaceCenter();
-		if (pEntity->GetAbsOrigin().DistToSqr(myCenter) > Square(PYRO_AIRBLAST_DETECTION_RANGE))
+		if (!IsVisible(pPlayer, CHECK_FOV)) // Must see them
 			continue;
 
-		// FF_TODO_PYRO_PROJ: How to identify enemy projectiles? Need classnames or properties.
-		// Assuming "tf_projectile_rocket" for now. This needs to be FF specific.
-		// Also need to identify other relevant projectiles (grenades, stickies if airblastable).
-		if (FClassnameIs(pEntity, "tf_projectile_rocket"))
+		float flDistSq = GetAbsOrigin().DistToSqr(pPlayer->GetAbsOrigin());
+		if (flDistSq < flClosestDistSq)
 		{
-			CBaseProjectile *pProj = dynamic_cast<CBaseProjectile*>(pEntity);
-			if (pProj && pProj->GetTeamNumber() != GetTeamNumber() && pProj->GetOwnerEntity() != this)
+			// Check pathability
+			if (ComputePath(pPlayer->GetAbsOrigin(), FASTEST_ROUTE))
 			{
-				Vector vToProj = pProj->GetAbsOrigin() - myCenter;
-				Vector vProjVel;
-				pProj->GetVelocity(&vProjVel, NULL); // Get projectile's current velocity vector
-
-				if (vProjVel.IsZero()) // Don't react to stationary projectiles unless very close (e.g. stickies)
-				    continue;
-
-				vProjVel.NormalizeInPlace();
-				float flDot = vToProj.Normalized().Dot(vProjVel); // Dot product of vector to projectile and projectile's velocity
-
-				// If flDot is large and positive, projectile is moving roughly away from bot.
-				// If flDot is near zero, it's moving perpendicular.
-				// If flDot is negative, it's generally moving towards bot.
-				// A more precise calculation would involve predicting future position.
-				// FF_TODO_PYRO_PROJ: More precise interception logic (predicting future projectile position).
-				if (flDot < -0.5f && vToProj.LengthSqr() < Square(PYRO_AIRBLAST_REACTION_RANGE))
-				{
-					// FF_TODO_PYRO_PROJ: Calculate if bot can face it in time.
-					if (m_airblastCooldown.IsElapsed())
-					{
-						PrintIfWatched("Pyro %s: Detected incoming projectile %s (dot: %.2f), attempting airblast!\n", GetPlayerName(), pProj->GetClassname(), flDot);
-						SetLookAt("Projectile", pProj->GetAbsOrigin(), PRIORITY_HIGH, 0.5f); // Look briefly
-						TryToAirblast(pProj);
-						return; // React to one projectile at a time
-					}
-				}
+				pClosestFriendly = pPlayer;
+				flClosestDistSq = flDistSq;
 			}
 		}
 	}
+
+	if (pClosestFriendly)
+	{
+		PrintIfWatched("%s: Decided to follow nearest teammate %s.\n", GetPlayerName(), pClosestFriendly->GetPlayerName());
+		FollowPlayer(pClosestFriendly);
+	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::TryToAirblast(CBaseEntity* pTargetProjectile)
+// Flag Notification Methods
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::NotifyPickedUpFlag(CFFInfoScript* pFlagInfoScript, int flagType)
 {
-	if (!IsPyro() || !GetActiveFFWeapon() || GetActiveFFWeapon()->GetWeaponID() != FF_WEAPON_FLAMETHROWER)
-		return;
-
-	if (!m_airblastCooldown.IsElapsed())
-		return;
-
-	if (pTargetProjectile) // Prioritize reflecting a projectile
+	m_carriedFlag = pFlagInfoScript;
+	m_carriedFlagType = flagType;
+	if (pFlagInfoScript)
 	{
-		// Aiming should ideally be handled by SetLookAt before calling, or ensure bot is facing target.
-		// For simplicity, assume SetLookAt has aligned the bot enough.
-		PrintIfWatched("Pyro %s: Airblasting projectile %s!\n", GetPlayerName(), pTargetProjectile->GetClassname());
-		PressButton(IN_ATTACK2);
-		ReleaseButton(IN_ATTACK2); // Simulate a quick press for airblast
-		m_airblastCooldown.Start( GetPlayerClassData()->m_flAirblastCooldown ); // Use class data for cooldown
-	}
-	else // Standard defensive airblast for close enemies
-	{
-		CFFPlayer *enemy = GetBotEnemy();
-		// FF_TODO_CLASS_PYRO: Consider if airblasting a non-visible enemy (e.g. behind corner but very close) is desired.
-		if (enemy && IsEnemyVisible() && GetRangeTo(enemy) < (FLAMETHROWER_EFFECTIVE_RANGE * 0.5f) ) // Airblast if enemy very close
-		{
-			PrintIfWatched("Pyro %s: Airblasting close enemy %s!\n", GetPlayerName(), enemy->GetPlayerName());
-			PressButton(IN_ATTACK2);
-			ReleaseButton(IN_ATTACK2);
-			m_airblastCooldown.Start( GetPlayerClassData()->m_flAirblastCooldown );
-		}
+		const char* flagTypeName = (flagType == 1) ? "enemy" : (flagType == 2 ? "own" : "unknown type");
+		PrintIfWatched("Bot %s: Picked up %s flag '%s' (ent %d).\n",
+			GetPlayerName(),
+			flagTypeName,
+			pFlagInfoScript->GetEntityNameAsCStr() ? pFlagInfoScript->GetEntityNameAsCStr() : "unnamed_flag",
+			pFlagInfoScript->entindex());
+
+		// FF_TODO_AI_BEHAVIOR: Bot's current state might need to react immediately.
+		// For example, if in IdleState, its next OnUpdate will see HasEnemyFlag() and act.
+		// If it was in CaptureObjectiveState targeting this flag, that state's OnUpdate
+		// (after this notification) should handle the successful "pickup" and transition.
 	}
 }
 
-int GetBotFollowCount( CFFPlayer *leader );
-// ... (all other functions from the read_files output)
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::NotifyDroppedFlag(CFFInfoScript* pFlagInfoScript)
+{
+	// Check if the flag being reported as dropped is actually the one we think we're carrying.
+	if (pFlagInfoScript != NULL && m_carriedFlag.Get() == pFlagInfoScript)
+	{
+		const char* flagTypeName = (m_carriedFlagType == 1) ? "enemy" : (m_carriedFlagType == 2 ? "own" : "unknown type");
+		PrintIfWatched("Bot %s: Dropped/Captured %s flag '%s' (ent %d).\n",
+			GetPlayerName(),
+			flagTypeName,
+			pFlagInfoScript->GetEntityNameAsCStr() ? pFlagInfoScript->GetEntityNameAsCStr() : "unnamed_flag",
+			pFlagInfoScript->entindex());
 
+		m_carriedFlag = NULL;
+		m_carriedFlagType = 0;
+
+		// FF_TODO_AI_BEHAVIOR: If bot was in a state like CarryFlagState, it should transition out.
+		// This will be handled by CarryFlagState::OnUpdate checking HasEnemyFlag().
+		// If the bot died, this notification ensures its state is clean for next spawn.
+		// If the flag was successfully captured, this function is also called by the bot itself
+		// from CarryFlagState to signify it's no longer "physically" carrying it.
+		// Example: if (GetState() == &m_carryFlagState) { Idle(); } // Assuming m_carryFlagState instance name
+	}
+	else if (m_carriedFlag.Get() != NULL && pFlagInfoScript != m_carriedFlag.Get())
+	{
+		// This case means a flag was dropped, but it wasn't the one this bot was carrying.
+		// Or, pFlagInfoScript is NULL and we were carrying something.
+		// Generally, no action needed by this bot unless it wants to react to *any* flag drop.
+		// However, if pFlagInfoScript is NULL and we *were* carrying a flag, it's ambiguous.
+		// For now, only clear our flag if the specific flag entity matches.
+	}
+	// If pFlagInfoScript is NULL and m_carriedFlag was already NULL, do nothing.
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::CarryFlagToCapturePoint(const CFFBotManager::LuaObjectivePoint* capturePoint)
+{
+	if (!HasEnemyFlag())
+	{
+		PrintIfWatched("Bot %s: CarryFlagToCapturePoint called, but not carrying enemy flag!\n", GetPlayerName());
+		Idle(); // Go idle if not actually carrying the flag
+		return;
+	}
+	if (!capturePoint)
+	{
+		PrintIfWatched("Bot %s: CarryFlagToCapturePoint called with NULL capturePoint!\n", GetPlayerName());
+		Idle(); // Go idle if no valid capture point provided
+		return;
+	}
+
+	PrintIfWatched("Bot %s: Transitioning to CarryFlagState. Target capture point: '%s'\n", GetPlayerName(), capturePoint->name);
+	m_carryFlagState.SetCaptureTarget(capturePoint);
+	SetState(&m_carryFlagState);
+}
+
+//--------------------------------------------------------------------------------------------------------------
+void CFFBot::DefendObjective(const CFFBotManager::LuaObjectivePoint* pObjective)
+{
+	if (!pObjective)
+	{
+		PrintIfWatched("Bot %s: DefendObjective called with NULL objective!\n", GetPlayerName());
+		Idle(); // Go idle if no valid objective provided
+		return;
+	}
+
+	// Optional: Add checks here if certain classes shouldn't use this generic DefendObjectiveState
+	// or if they should use a specialized version.
+	// Example: if (IsScout()) { Idle(); return; } // Scouts might not be good defenders
+
+	PrintIfWatched("Bot %s: Transitioning to DefendObjectiveState for objective '%s'.\n", GetPlayerName(), pObjective->name);
+	m_defendObjectiveState.SetObjectiveToDefend(pObjective);
+	SetState(&m_defendObjectiveState);
+}
+// End of ff_bot.cpp (ensure all previous content is above this line)
 [end of mp/src/game/server/ff/bot/ff_bot.cpp]

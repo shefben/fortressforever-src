@@ -36,6 +36,7 @@ private:
 	Vector m_guardSpot;                   // The position where the bot will stand to guard
 	CountdownTimer m_repathTimer;           // Timer to periodically repath if stuck
 	bool m_isAtGuardSpot;
+	CountdownTimer m_tendSentryTimer;       // Timer for periodic "tending" to the sentry
 };
 
 #endif // FF_BOT_GUARD_SENTRY_H

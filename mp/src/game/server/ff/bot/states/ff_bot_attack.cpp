@@ -117,6 +117,16 @@ void AttackState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 	if (skill > 0.5f && (me->IsOutnumbered() || me->CanSeeSniper())) dodgeChance = 100.0f;
 	m_shouldDodge = (RandomFloat( 0, 100 ) <= dodgeChance);
 	m_isCoward = (RandomFloat( 0, 100 ) > 100.0f * me->GetProfile()->GetAggression());
+
+	// Cover behavior initialization
+	m_assessCoverTimer.Start(RandomFloat(1.0f, 2.0f)); // Initial delay before first cover check
+	m_isMovingToCover = false;
+	m_coverSpot = vec3_invalid;
+
+	// Evasive action (sidestep) initialization
+	m_evasiveActionTimer.Start(RandomFloat(0.5f, 1.0f));
+	m_isEvading = false;
+	m_evadeToSpot = vec3_invalid;
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -200,25 +210,204 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	me->ResetStuckMonitor();
 
-	CFFWeaponBase *weapon = me->GetActiveFFWeapon(); // FF_TODO_WEAPON_STATS: Changed from CBasePlayerWeapon
-	if (weapon)
-	{
-		// FF_TODO_WEAPON_STATS: Replace with FF specific weapon checks if needed. This was for CS C4/grenades.
-		// Example: if ( weapon->GetWeaponID() == FF_WEAPON_PIPELAUNCHER && me->IsReloading() ) me->EquipBestWeapon();
-		// For now, ensure no direct use of CS Weapon IDs.
-		// FFWeaponID currentID = weapon->GetWeaponID();
-		// if (currentID == FF_WEAPON_DEPLOYDETPACK || // Example FF deployable
-		// 	currentID == FF_WEAPON_GRENADELAUNCHER && weapon->Clip1() == 0) // Example: Don't attack if GL is empty and needs reload
-		// {
-		// 	me->EquipBestWeapon(); // Or appropriate FF weapon switching logic
-		// }
-	}
-
 	CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 	if (enemy == NULL) { StopAttacking( me ); return; }
 
-	// If health is low, consider retreating
-	// Use the constant defined in CFFBot for the threshold
+	// Handle Movement to Cover (High Priority if active)
+	if (m_isMovingToCover)
+	{
+		me->UpdatePathMovement();
+		// Using m_repathTimer from AttackState base, ensure it's used appropriately or a new one is made for cover pathing.
+		// For now, assume m_repathTimer is okay, or path failure will be caught by IsAtGoal/IsMoving.
+		if (me->IsAtGoal() || !me->IsMovingAlongPath() || m_repathTimer.IsYetElapsed())
+		{
+			m_isMovingToCover = false;
+			me->Stop();
+			m_assessCoverTimer.Start(RandomFloat(3.0f, 5.0f)); // Cooldown after reaching/failing cover
+			me->PrintIfWatched("AttackState: Reached cover spot or path failed/stuck, reassessing.\n");
+			// Fall through to regular attack logic for this frame after stopping cover move
+		}
+		else
+		{
+			// FF_TODO_AI_BEHAVIOR: Should the bot shoot while moving to cover? For now, prioritize movement.
+			me->SetLookAt("Enemy While Moving To Cover", enemy->EyePosition(), PRIORITY_HIGH); // Keep looking at enemy
+			return; // Prioritize moving to cover over attacking this frame
+		}
+	}
+
+	// --- Start Evasive Sidestep Logic ---
+	// This is considered if not already committed to a longer cover move.
+	if (m_isEvading)
+	{
+		me->UpdatePathMovement(); // Use existing path follow
+		if (me->IsAtGoal() || !me->IsMovingAlongPath() || m_repathTimer.IsYetElapsed()) // Check m_repathTimer from AttackState
+		{
+			m_isEvading = false;
+			me->StopMovement();
+			m_evasiveActionTimer.Start(RandomFloat(2.0f, 4.0f)); // Cooldown after completing/failing evasion
+			me->PrintIfWatched("AttackState: Evasion sidestep complete/failed. Resuming attack pattern.");
+			// Fall through to other attack logic
+		}
+		else
+		{
+			// If evading, keep looking at enemy but prioritize movement.
+			me->SetLookAt("EvadeLookAtEnemy", enemy->EyePosition(), PRIORITY_HIGH);
+			return; // Skip other attack actions this frame
+		}
+	}
+	else if (me->IsEnemyAimingAtMe(enemy) && m_evasiveActionTimer.IsElapsed() && me->IsOnGround() && !m_isMovingToCover) // Don't try to sidestep if already moving to cover
+	{
+		m_evasiveActionTimer.Start(RandomFloat(2.5f, 4.5f)); // Cooldown for next evasion attempt
+
+		Vector myRight;
+		AngleVectors(me->GetAbsAngles(), NULL, &myRight, NULL);
+		float evadeDist = RandomFloat(80.0f, 120.0f);
+		Vector evadeDir = (RandomFloat(-1.0f, 1.0f) > 0 ? myRight : -myRight);
+		Vector evadeAttemptPos = me->GetAbsOrigin() + evadeDir * evadeDist;
+
+		// Find nearest nav area for the sidestep
+		CNavArea *pEvadeNavArea = TheNavMesh->GetNearestNavArea(evadeAttemptPos, me->GetCurrentNavArea(), 200.0f, true, true);
+		if (pEvadeNavArea && pEvadeNavArea->IsReachable(me))
+		{
+			m_evadeToSpot = pEvadeNavArea->GetCenter();
+			// Check if the evade spot is too close to the enemy or would move into them
+			if ((m_evadeToSpot - enemy->GetAbsOrigin()).IsLengthLessThan(50.0f))
+			{
+				me->PrintIfWatched("AttackState: Sidestep evade spot too close to enemy. Aborting sidestep.");
+			}
+			else if (me->MoveTo(m_evadeToSpot, FASTEST_ROUTE))
+			{
+				m_isEvading = true;
+				me->PrintIfWatched("AttackState: Enemy aiming! Evading with sidestep to %f %f %f", VEC_T_ARGS(m_evadeToSpot));
+				return;
+			}
+			else
+			{
+				me->PrintIfWatched("AttackState: Wanted to sidestep evade, but MoveTo failed.");
+			}
+		}
+		else
+		{
+			me->PrintIfWatched("AttackState: Wanted to sidestep evade, but no suitable nearby nav spot found.");
+		}
+	}
+	// --- End Evasive Sidestep Logic ---
+
+	// Assess Need for Cover (Periodically) - only if not currently evading with a sidestep
+	if (m_assessCoverTimer.IsElapsed() && !m_isMovingToCover && !m_isEvading)
+	{
+		m_assessCoverTimer.Start(RandomFloat(2.0f, 4.0f)); // Time until next assessment. Shorter if under fire.
+		bool shouldTakeCover = false;
+
+		if (me->IsEnemyAimingAtMe(enemy))
+		{
+			if (me->GetHealth() < me->GetMaxHealth() * 0.75f) // More likely to take cover if already hurt
+			{
+				shouldTakeCover = true;
+				m_assessCoverTimer.Start(RandomFloat(1.0f, 2.0f)); // Quicker reassessment if being aimed at and hurt
+			}
+			else if (me->GetHealth() < me->GetMaxHealth() * 0.9f && RandomFloat(0,1) < 0.3f) // Chance even if less hurt
+			{
+                 shouldTakeCover = true;
+			}
+		}
+		// FF_TODO_AI_BEHAVIOR: Add other conditions (e.g., enemy is Sniper and has LOS, bot is low on ammo, bot is outgunned by multiple enemies).
+		// Example: if (enemy->IsSniper() && me->IsEnemyVisible() && me->GetHealth() < me->GetMaxHealth()) shouldTakeCover = true;
+
+		if (shouldTakeCover)
+		{
+			me->PrintIfWatched("AttackState: Assessing cover due to enemy aiming or other threat.\n");
+			Vector enemyPos = enemy->EyePosition();
+			// Vector myPos = me->EyePosition(); // Not used in current simplified LOS check from spot
+			CNavArea *currentArea = me->GetCurrentNavArea();
+			bool foundGoodCover = false;
+
+			if (currentArea)
+			{
+				// Check adjacent areas first
+				for (int i = 0; i < currentArea->GetConnectionCount(); ++i)
+				{
+					CNavConnection *conn = currentArea->GetConnection(i);
+					if (!conn) continue;
+					CNavArea *adjArea = conn->GetConnectedArea();
+
+					if (adjArea && adjArea->IsReachable(me)) // Conceptual: IsReachable might need path test
+					{
+						Vector spot = adjArea->GetCenter();
+						// Check LOS from 'spot' (approximated from nav area center) to 'enemyPos'
+						trace_t tr;
+						UTIL_TraceLine(spot + Vector(0,0,HumanEyeHeight), enemyPos, MASK_SOLID_NOT_PLAYER, me, COLLISION_GROUP_NONE, &tr);
+
+						if (tr.fraction < 1.0f && tr.m_pEnt != enemy) // LOS is blocked by something other than the enemy itself
+						{
+							m_coverSpot = spot;
+							m_isMovingToCover = true;
+							if (me->MoveTo(m_coverSpot, FASTEST_ROUTE)) // Use FASTEST_ROUTE to get to cover
+							{
+								me->PrintIfWatched("AttackState: Enemy aiming, moving to cover at (%.1f, %.1f, %.1f) in area %d!\n", spot.x, spot.y, spot.z, adjArea->GetID());
+								m_repathTimer.Start(1.0f); // Short repath for cover, as it's urgent
+								return; // Action taken for this frame
+							}
+							else
+							{
+								m_isMovingToCover = false; // Pathing failed
+							}
+						}
+					}
+				}
+				// FF_TODO_AI_BEHAVIOR: If no adjacent area offers cover, try moving short distance within current area,
+				// or a bit further back along current path if retreating from enemy was the last move.
+				// Could also try random points around the bot.
+			}
+			if (!m_isMovingToCover)
+			{
+				me->PrintIfWatched("AttackState: Wanted cover, but found no suitable spot nearby.\n");
+				// If no cover found, might increase aggression of dodging or just fight.
+				// For now, just means bot won't move to cover this assessment cycle.
+				m_assessCoverTimer.Start(RandomFloat(4.0f, 7.0f)); // Longer cooldown if no spot found
+			}
+		}
+	}
+
+
+	// If not moving to cover, proceed with normal attack logic:
+
+	// Demoman: Check if should detonate stickies
+	if (me->IsDemoman() && me->m_deployedStickiesCount > 0 && me->m_stickyArmTime.IsElapsed())
+	{
+		// FF_TODO_CLASS_DEMOMAN: More sophisticated check for detonating stickies.
+		// e.g., if enemy is near a known trap location (needs bot to remember trap spots).
+		// For now, a simple check: if enemy is generally in front and within a certain range.
+		if (enemy && me->IsEnemyVisible() && me->IsPlayerFacingMe(enemy, 0.7f) ) // Check if enemy is somewhat in front
+		{
+			float distToEnemySqr = (enemy->GetAbsOrigin() - me->GetAbsOrigin()).LengthSqr();
+			// Detonate if enemy is moderately close, assuming stickies are placed defensively/proximately.
+			// This threshold should ideally relate to where traps are typically laid relative to engagement.
+			const float detonateRangeCheck = Square(600.0f); // Example: detonate if enemy is within 600 units.
+			if (distToEnemySqr < detonateRangeCheck)
+			{
+				CFFWeaponBase *pipeLauncher = me->GetWeaponByID(FF_WEAPON_PIPELAUNCHER);
+				if (me->GetActiveFFWeapon() == pipeLauncher) // Only detonate if pipelauncher is active
+				{
+					me->PrintIfWatched("Demoman %s: Enemy %s is near potential sticky trap area. Detonating!\n", me->GetPlayerName(), enemy->GetPlayerName());
+					me->TryDetonateStickies(enemy);
+					// Detonation might take a frame or have a delay, bot might continue other actions or should pause.
+					// For now, TryDetonateStickies starts a cooldown.
+					// Depending on game mechanics, might want to 'return' here or let other attack logic proceed.
+				}
+			}
+		}
+	}
+
+	CFFWeaponBase *weapon = me->GetActiveFFWeapon();
+	if (weapon)
+	{
+		// FF_TODO_WEAPON_STATS: Add any FF specific logic if certain weapons prevent attacking (e.g. while deploying)
+		// or if bot needs to switch off a weapon that's empty in AttackState.
+		// SelectBestWeaponForSituation in OnEnter and BotThink should mostly handle this.
+	}
+
+	// Health-based retreat check (already present, ensure it's not clashing with cover)
 	if (me->IsAlive() && (me->GetHealth() * 1.0f / me->GetMaxHealth()) < CFFBot::RETREAT_HEALTH_THRESHOLD_PERCENT)
 	{
 		me->PrintIfWatched("AttackState: Health low (%.1f%%), attempting to retreat.\n", (me->GetHealth() * 100.0f) / me->GetMaxHealth());
@@ -264,8 +453,25 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		} return;
 	}
 
-	// FF_TODO_GAME_MECHANIC: Remove shield logic if not applicable
-	// if (me->HasShield()) { ... }
+	// FF_TODO_GAME_MECHANIC: Remove shield logic if not applicable (already done for FF)
+
+	// Heavy Minigun Spin-up/down logic (conceptual, needs CFFBot members like IsMinigunSpunUp)
+	if (me->IsHeavy() && weapon && weapon->GetWeaponID() == FF_WEAPON_ASSAULTCANNON) // FF_TODO_WEAPON_STATS: Verify ID
+	{
+		bool shouldSpin = (me->IsEnemyVisible() && me->GetRangeTo(enemy) < CFFBot::MINIGUN_EFFECTIVE_RANGE);
+		// FF_TODO_CLASS_HEAVY: Access actual CFFBot::IsMinigunSpunUp() and CFFBot::SetMinigunSpunUp()
+		// For now, direct IN_ATTACK2. This might conflict if IN_ATTACK2 is also used for other things.
+		// This logic is simplified and better handled in BotThink or a dedicated weapon handling layer.
+		// if (shouldSpin && !me->IsMinigunSpunUpConcept()) // Conceptual check
+		// {
+		//	me->PressButton(IN_ATTACK2);
+		// }
+		// else if (!shouldSpin && me->IsMinigunSpunUpConcept())
+		// {
+		//	me->ReleaseButton(IN_ATTACK2);
+		// }
+	}
+
 
 	if (me->IsUsingSniperRifle()) // FF_TODO_WEAPON_STATS: Adapt for FF sniper
 	{
@@ -356,5 +562,11 @@ void AttackState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 	me->ResetStuckMonitor();
 	me->PopPostureContext();
 	// FF_TODO_GAME_MECHANIC: Remove shield logic if not applicable
-	// if (me->IsProtectedByShield()) me->SecondaryAttack();
+	// if (me->IsProtectedByShield()) me->SecondaryAttack(); // FF No Shield
+	m_isMovingToCover = false;
+	m_isEvading = false;
+	if (me->IsMovingAlongPath())
+	{
+		me->Stop();
+	}
 }

@@ -62,10 +62,21 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 		return;
 	}
 
-	// Check if objective became inactive
-	if (!m_targetObjective->isActive)
+	// Check if objective became inactive or its state is no longer suitable for capture
+	if (m_targetObjective->m_state != LUA_OBJECTIVE_ACTIVE)
 	{
-		me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is no longer active. Idling.\n", m_targetObjective->name);
+		if (m_targetObjective->m_state == LUA_OBJECTIVE_COMPLETED && m_targetObjective->currentOwnerTeam == me->GetTeamNumber())
+		{
+			me->PrintIfWatched("CaptureObjectiveState: Objective '%s' was already completed by our team. Idling.\n", m_targetObjective->name);
+		}
+		else if (m_targetObjective->m_state == LUA_OBJECTIVE_FAILED)
+		{
+			me->PrintIfWatched("CaptureObjectiveState: Objective '%s' has failed. Idling.\n", m_targetObjective->name);
+		}
+		else
+		{
+			me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is no longer active (state: %d). Idling.\n", m_targetObjective->name, m_targetObjective->m_state);
+		}
 		me->Idle();
 		return;
 	}
@@ -119,13 +130,57 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 
 	if( m_isAtObjective )
 	{
-		// Primary action when at the objective: check status and react.
+		// FF_LUA_FLAGS: Handle flag pickup if this objective is a flag
+		if (m_targetObjective && m_targetObjective->type == 2) // Type 2 is Item_Flag
+		{
+			// Ensure the flag is still available for pickup (ACTIVE or DROPPED)
+			// and not already carried by someone else (currentOwnerTeam should be NEUTRAL for uncarried flags)
+			if ((m_targetObjective->m_state == LUA_OBJECTIVE_ACTIVE || m_targetObjective->m_state == LUA_OBJECTIVE_DROPPED) &&
+				m_targetObjective->currentOwnerTeam == FF_TEAM_NEUTRAL)
+			{
+				me->PrintIfWatched("CaptureObjectiveState: Attempting to pick up flag: %s\n", m_targetObjective->name);
+
+				// Simulate pickup action. In a real scenario, game events would confirm this.
+				// For now, we directly notify the bot.
+				CFFInfoScript* pFlagEnt = dynamic_cast<CFFInfoScript*>(m_targetObjective->m_entity.Get());
+				if (pFlagEnt)
+				{
+					// Determine if it's an enemy flag or own flag based on teamAffiliation
+					int flagType = (me->GetTeamNumber() == m_targetObjective->teamAffiliation) ? 2 /*own_flag*/ : 1 /*enemy_flag*/;
+					me->NotifyPickedUpFlag(pFlagEnt, flagType);
+				}
+
+				// After picking up, go Idle. IdleState will then decide to carry it to a capture point if it's an enemy flag.
+				me->Idle();
+				return;
+			}
+			else if (m_targetObjective->currentOwnerTeam != FF_TEAM_NEUTRAL && m_targetObjective->currentOwnerTeam != me->GetTeamNumber())
+			{
+				me->PrintIfWatched("CaptureObjectiveState: Flag '%s' is already carried by team %d. Idling.\n", m_targetObjective->name, m_targetObjective->currentOwnerTeam);
+				me->Idle(); // Flag already taken by someone else (not us)
+				return;
+			}
+			// If it's our team carrying it, or state is not ACTIVE/DROPPED, the general logic below might apply or lead to idling.
+		}
+
+		// Primary action when at the objective (for non-flag types, or flags that couldn't be picked up): check status and react.
 		if (m_checkObjectiveStatusTimer.IsElapsed())
 		{
-			// Re-check isActive, as it might change while on point
-			if (!m_targetObjective->isActive)
+			// Re-check objective state, as it might change while on point
+			if (m_targetObjective->m_state != LUA_OBJECTIVE_ACTIVE)
 			{
-				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' became inactive while at point. Idling.\n", m_targetObjective->name);
+				if (m_targetObjective->m_state == LUA_OBJECTIVE_COMPLETED && m_targetObjective->currentOwnerTeam == me->GetTeamNumber())
+				{
+					me->PrintIfWatched("CaptureObjectiveState: Objective '%s' successfully completed by our team while at point. Idling.\n", m_targetObjective->name);
+				}
+				else if (m_targetObjective->m_state == LUA_OBJECTIVE_FAILED)
+				{
+					me->PrintIfWatched("CaptureObjectiveState: Objective '%s' failed while at point. Idling.\n", m_targetObjective->name);
+				}
+				else
+				{
+					me->PrintIfWatched("CaptureObjectiveState: Objective '%s' became non-active (state: %d) while at point. Idling.\n", m_targetObjective->name, m_targetObjective->m_state);
+				}
 				me->Idle();
 				return;
 			}
@@ -133,20 +188,15 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 			int currentOwner = m_targetObjective->currentOwnerTeam;
 			if (currentOwner == me->GetTeamNumber())
 			{
-				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is now controlled by our team. Holding briefly.\n", m_targetObjective->name);
+				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is NOW controlled by our team (or confirmed held).\n", m_targetObjective->name);
 				me->SetTask(CFFBot::TaskType::DEFEND_LUA_OBJECTIVE, m_targetObjective);
-				// FF_TODO_AI_BEHAVIOR: Transition to a dedicated DefendObjectiveState or implement more robust holding behavior.
-				// For now, just wait a bit then Idle. This makes m_isDefending member less critical.
-				m_checkObjectiveStatusTimer.Start(RandomFloat(3.0f, 5.0f)); // Hold for a few seconds
-				if (m_checkObjectiveStatusTimer.GetElapsedTime() > 0.1f) { // Ensure it's not the first frame of holding
-					me->Idle(); // After holding, go idle to re-evaluate overall situation.
-					return;
-				}
+				me->DefendObjective(m_targetObjective); // Transition to DefendObjectiveState
+				return;
 			}
 			else // Objective is neutral or enemy controlled
 			{
-				me->PrintIfWatched("CaptureObjectiveState: Attempting to capture/contest '%s' (type %d) currently owned by team %d.\n",
-					m_targetObjective->name, m_targetObjective->type, currentOwner);
+				me->PrintIfWatched("CaptureObjectiveState: Still attempting to capture/contest objective '%s' (Owner: %d, My Team: %d).\n",
+					m_targetObjective->name, currentOwner, me->GetTeamNumber());
 				me->SetTask(CFFBot::TaskType::CAPTURE_LUA_OBJECTIVE, m_targetObjective);
 
 				// Bot remains on point, game logic handles actual capture.
@@ -158,7 +208,8 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 			m_checkObjectiveStatusTimer.Start(1.0f); // Re-check status in 1 second
 		}
 
-		// Engineer behavior: If defending (already confirmed it's ours), consider building.
+		// Engineer behavior: If AT an objective that is NEUTRAL or ENEMY (so still in capture logic), consider building.
+		// If it becomes friendly, the above logic will transition to Idle/Defend.
 		// This is a secondary action after status check.
 		if (m_targetObjective->currentOwnerTeam == me->GetTeamNumber() && me->IsEngineer() && !me->HasSentry())
 		{

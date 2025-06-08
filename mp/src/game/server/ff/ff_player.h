@@ -1032,6 +1032,9 @@ private:
 	// Location of player's current objective (also set by Lua)
 	CNetworkVector( m_vecObjectiveOrigin );
 
+	// Proximity check
+	bool IsNearPosition(const Vector& pos, float radius) const;
+
 	// kill assist stuff
 	// added for kill assists tracking
 	CUtlVector<RecentAttackerInfo> m_recentAttackers;

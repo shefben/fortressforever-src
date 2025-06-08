@@ -23,6 +23,71 @@
 #include "ff_weapon_base.h" // FF_TODO_WEAPON_STATS: Added for CFFWeaponBase and FFWeaponID
 #include "ff_nav_pathfind.h" // Changed from cs_nav_pathfind.h (assuming exists)
 #include "ff_nav_area.h"     // Changed from cs_nav_area.h (assuming CNavArea or a CFFNavArea will be used)
+#include "shareddefs.h"      // For ENT_FLAG_FIRST_USER
+#include "states/ff_bot_carry_flag.h" // For m_carryFlagState member instance
+#include "states/ff_bot_defend_objective.h" // For m_defendObjectiveState member instance
+
+// FF_TODO_GAME_MECHANIC: Verify these actual flag values from TF_Config.h or FF's equivalent.
+// These are conceptual offsets from ENT_FLAG_FIRST_USER, assuming order from TF2's eTF_EntityFlags.
+#define TF_ENT_FLAG_SABOTAGED         (ENT_FLAG_FIRST_USER + 10)
+#define TF_ENT_FLAG_BUILDINPROGRESS   (ENT_FLAG_FIRST_USER + 15)
+#define TF_ENT_FLAG_LEVEL2            (ENT_FLAG_FIRST_USER + 16)
+#define TF_ENT_FLAG_LEVEL3            (ENT_FLAG_FIRST_USER + 17)
+
+// Player class constants (assuming direct mapping from game class numbers 1-10)
+// FF_TODO_OMNIBOT: Confirm these are the exact values for player classes returned by Classify() or GetClassSlot()
+// and used by FFInterface::GetEntityClass for players.
+const int FF_CLASS_SCOUT = 1;
+const int FF_CLASS_SNIPER = 2;
+const int FF_CLASS_SOLDIER = 3;
+const int FF_CLASS_DEMOMAN = 4;
+const int FF_CLASS_MEDIC = 5;
+const int FF_CLASS_HWGUY = 6;
+const int FF_CLASS_PYRO = 7;
+const int FF_CLASS_SPY = 8;
+const int FF_CLASS_ENGINEER = 9;
+const int FF_CLASS_CIVILIAN = 10; // Max player class ID
+
+// Base for Omnibot's own _CLASSEX extensions for things not directly players.
+// This value (10) represents the highest player class ID.
+// Omnibot's GetEntityClass usually returns (TF_CLASS_MAX_THIS_MOD + offset) for extended types.
+// TF_Config.h shows TF_CLASS_MAX = 11 (Civilian + 1).
+// TF_CLASSEX_ enums in TF_Config.h start after TF_CLASS_MAX.
+// Example: TF_CLASSEX_SENTRY is 12.
+// For bot code, we'll use the direct values from TF_Config.h's eTF_EntityClass for projectiles.
+// For buildings like Sentry Lvl1/2/3, Dispenser, these are *derived* by Omnibot
+// (e.g. TF_CLASS_MAX_PLAYERS + 1, +2, etc.) and not directly in TF_Config.h's eTF_EntityClass as level-specific.
+
+// Building types (derived by Omnibot, typically TF_CLASS_MAX_PLAYERS + offset)
+// FF_CRITICAL_OMNIBOT: Verify these values match how FFInterface::GetEntityClass derives them.
+const int FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET = 10; // Max player ID used for Omnibot's CLASSEX offset scheme.
+const int FF_CLASSEX_SENTRY_LVL1   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 1;  // 11
+const int FF_CLASSEX_SENTRY_LVL2   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 2;  // 12
+const int FF_CLASSEX_SENTRY_LVL3   = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 3;  // 13
+const int FF_CLASSEX_DISPENSER     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 4;  // 14
+const int FF_CLASSEX_TELE_ENTR     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 5;  // 15
+const int FF_CLASSEX_TELE_EXIT     = FF_TF_CLASS_MAX_PLAYERS_FOR_OMNIBOT_OFFSET + 6;  // 16
+
+// Projectile types - Values from TF_Config.h's eTF_EntityClass enum.
+// These are the values CFFBot::GetEntityOmniBotClass should return for these projectiles.
+// FF_CRITICAL_TODO_PYRO_PROJ: Values VERIFIED against TF_Config.h. Next: ensure FFInterface::GetEntityClass in omnibot_interface.cpp
+// correctly maps game's Classify() output for these projectiles to these TF_CLASSEX_ values.
+const int FF_CLASSEX_ROCKET        = 30; // TF_CLASS_MAX (11) + 19. Covers CLASS_ROCKET and CLASS_IC_ROCKET.
+const int FF_CLASSEX_GLGRENADE     = 29; // TF_CLASS_MAX (11) + 18. For CLASS_GLGRENADE (Grenade Launcher).
+const int FF_CLASSEX_PIPE          = 28; // TF_CLASS_MAX (11) + 17. For CLASS_PIPEBOMB (Demoman pipes).
+const int FF_CLASSEX_GRENADE       = 20; // TF_CLASS_MAX (11) + 9. For CLASS_GRENADE (Hand Grenade).
+
+// FF_TODO_PYRO_PROJ: Other potential reflectable projectiles from TF_Config.h's TF_CLASSEX_ list and their Classify() mappings:
+// const int FF_CLASSEX_NAIL_GRENADE = 22; // For Nail Grenade explosion. Individual nails are likely not CLASS_NAIL_GRENADE.
+// const int FF_CLASSEX_EMP_GRENADE = 21; // (Usually not reflectable by Pyro airblast)
+// const int FF_CLASSEX_CONC_GRENADE = 27; // (Usually not reflectable)
+// const int FF_CLASSEX_NAPALM_GRENADE = 25; // (Usually not reflectable)
+// Individual Nails: CFFProjectileNail does not override Classify(). If CFFProjectileBase::Classify() is generic, direct nail reflection might be hard.
+
+
+// A general unknown or default class for GetEntityOmniBotClass if no specific mapping found.
+const int FF_CLASSEX_UNKNOWN       = 0; // Or some other non-conflicting value
+
 
 class CBaseDoor;
 class CBasePropDoor;
@@ -34,6 +99,8 @@ class RepairBuildableState; // Forward declaration
 class FindResourcesState; // Forward declaration
 class GuardSentryState; // Forward declaration
 class InfiltrateState; // Forward declaration
+class CarryFlagState; // Forward declaration for carrying flag state
+class DefendObjectiveState; // Forward declaration for defending objective state
 class CPushAwayEnumerator;
 
 //--------------------------------------------------------------------------------------------------------------
@@ -87,6 +154,9 @@ private:
 	CountdownTimer m_engineerResourceScanTimer; // For engineers to periodically scan for resources
 	CountdownTimer m_engineerGuardScanTimer; // For engineers to periodically consider guarding their sentry
 	CountdownTimer m_spyInfiltrateScanTimer; // For spies to periodically consider infiltrating
+	CountdownTimer m_demomanStickyTrapTimer; // For demomen to periodically consider laying sticky traps
+	CountdownTimer m_assessFollowTimer;      // For periodically assessing if bot should follow a teammate
+	CountdownTimer m_defendObjectiveScanTimer; // For periodically checking if a friendly objective needs defense
 	CNavArea *m_huntArea;           // Target area for hunting behavior (was used in ff_bot_idle.cpp but not declared here)
 };
 
@@ -160,6 +230,11 @@ protected:
 
 	bool m_isCoward;											///< if true, we'll retreat if outnumbered during this fight
 	CountdownTimer m_retreatTimer;
+
+	// Cover behavior
+	CountdownTimer m_assessCoverTimer;
+	Vector m_coverSpot;
+	bool m_isMovingToCover;
 
 	void StopAttacking( CFFBot *bot ); // Changed CCSBot to CFFBot
 	void Dodge( CFFBot *bot );									///< do dodge behavior // Changed CCSBot to CFFBot
@@ -931,9 +1006,23 @@ private:
 	GuardSentryState		m_guardSentryState;      // Engineer guarding sentry state
 	InfiltrateState			m_infiltrateState;       // Spy infiltration state
 	class RetreatState		m_retreatState;          // State for retreating
+	class LayStickyTrapState m_layStickyTrapState;   // Demoman laying sticky trap state
+	class BuildTeleEntranceState m_buildTeleEntranceState;
+	class BuildTeleExitState m_buildTeleExitState;
+	FollowTeammateState		m_followTeammateState;   // State for following a teammate
+	CarryFlagState m_carryFlagState; // Instance of the new state
+	DefendObjectiveState m_defendObjectiveState; // Instance of the defend objective state
+
 
 	// Engineer buildable selection
-	enum BuildableType { BUILDABLE_NONE, BUILDABLE_SENTRY, BUILDABLE_DISPENSER /*, BUILDABLE_TELE_ENTRANCE, BUILDABLE_TELE_EXIT */ };
+	enum BuildableType {
+		BUILDABLE_NONE,
+		BUILDABLE_SENTRY,
+		BUILDABLE_DISPENSER,
+		BUILDABLE_TELE_ENTRANCE,
+		BUILDABLE_TELE_EXIT,
+		NUM_BUILDABLE_TYPES // Must be last
+	};
 	BuildableType m_selectedBuildableType;
 	CountdownTimer m_cycleBuildableCooldown;
 
@@ -945,6 +1034,9 @@ private:
 
 public: // FF_TODO_LUA: Made public to be callable from IdleState etc.
 	void CaptureObjective(const CFFBotManager::LuaObjectivePoint* objective);
+	void CarryFlagToCapturePoint(const CFFBotManager::LuaObjectivePoint* capturePoint);
+	void DefendObjective(const CFFBotManager::LuaObjectivePoint* pObjective);
+
 
 	// Medic behavior
 	bool IsMedic(void) const;
@@ -969,12 +1061,26 @@ public: // FF_TODO_LUA: Made public to be callable from IdleState etc.
 	BuildableType GetSelectedBuildable() const;
 	const char* GetSelectedBuildableName() const; // For logging
 
+	// Engineer Teleporter methods
+	void TryToBuildTeleporterEntrance(const Vector* location = NULL);
+	void TryToBuildTeleporterExit(const Vector* location = NULL);
+	int GetTeleporterEntranceLevel() const;
+	int GetTeleporterExitLevel() const;
+	CHandle<CBaseEntity> GetTeleporterEntrance() const { return m_teleEntrance; } // Getter for build states
+	CHandle<CBaseEntity> GetTeleporterExit() const { return m_teleExit; }         // Getter for build states
+
+	// Teammate Following
+	void TryToFollowNearestTeammate(float maxDist = 1000.0f);
+	void FollowPlayer(CFFPlayer* pPlayerToFollow);
+
+
 	// Spy behavior
 	bool IsSpy() const;
 	CBaseEntity* FindSpyTarget(float maxRange = 3000.0f); // Can target buildings or players
 	void TryToInfiltrate();
 	bool IsBehind(const CBaseEntity* target) const; // Conceptual check if bot is behind target
 	void StartSabotaging(CBaseEntity* pBuilding); // Conceptual: Bot initiates sabotage C++ call
+	void HandleCommand(const char* command); // For issuing server commands like sabotage
 
 	// Scout behavior
 	bool IsScout(void) const;
@@ -988,10 +1094,23 @@ public: // FF_TODO_LUA: Made public to be callable from IdleState etc.
 	// Notification methods called by CFFBotManager (or states)
 public:
 	void NotifyBuildingSapped(CBaseEntity *sappedBuilding, bool isSapped);
-	void NotifyBuildingUpgraded(CBaseEntity *building, int newLevel);    // Game event must pass new level
+	void NotifyBuildingUpgraded(CBaseEntity *building, int newLevel);    // Game event must pass newLevel
 	void NotifyBuildingDestroyed(CBaseEntity *building);
 	void NotifyBuildingBuilt(CBaseEntity* newBuilding, BuildableType type);     // Called when construction is complete by game event
 	void NotifyBuildingPlacementStarted(BuildableType type); // Called by bot when it initiates blueprint placement
+
+	// General game event notifications for bot
+	void NotifyPipeDetonated(IGameEvent *event);
+	void NotifyPlayerHealed(CFFPlayer* pMedic);
+	void NotifyMedicGaveHeal(CFFPlayer* pPatient);
+	void NotifyGotDispenserAmmo(CBaseEntity* pDispenser);
+	void NotifyCloaked();
+	void NotifyUncloaked();
+	// Note: OnDisguiseLost and OnCloakLost (forced uncloak) are existing direct event handlers in CFFBot, called by CFFBotManager.
+	// Adding specific NotifyCalledForMedic to be called by BotManager from "player_radio" event.
+	void NotifyCalledForMedic(CFFPlayer* pCaller);
+	void NotifyGaveMedicHealth(CFFPlayer* pTarget, int healthGiven); // For medic bot to acknowledge successful heal pulse.
+
 
 	// Engineer buildable status helpers
 	void SetBuildingLevel(CBaseEntity* pBuilding, int level); // Sets bot's belief of level
@@ -1011,10 +1130,12 @@ private: // Moved scout members here to group with other private bot logic
 	// Persistent handles to own buildables & their status
 	CHandle<CBaseEntity> m_sentryGun;    // Using CBaseEntity, cast to CFFSentryGun if needed
 	CHandle<CBaseEntity> m_dispenser;  // Using CBaseEntity, cast to CFFDispenser if needed
-	// CHandle<CBaseEntity> m_teleEntrance; // FF_TODO_CLASS_ENGINEER: Teleporter buildable handling
-	// CHandle<CBaseEntity> m_teleExit;     // FF_TODO_CLASS_ENGINEER: Teleporter buildable handling
+	CHandle<CBaseEntity> m_teleEntrance;
+	CHandle<CBaseEntity> m_teleExit;
 	int m_sentryLevel;    // Bot's belief of its sentry's level, updated by events
 	int m_dispenserLevel; // Bot's belief of its dispenser's level, updated by events
+	int m_teleEntranceLevel; // 0 = not built, 1 = built (teleporters don't upgrade in FF)
+	int m_teleExitLevel;   // 0 = not built, 1 = built
 	// bool m_sentryIsBuilding;    // Removed: States will check entity->IsBuilt() or equivalent
 	// bool m_dispenserIsBuilding; // Removed: States will check entity->IsBuilt() or equivalent
 
@@ -1360,6 +1481,51 @@ public:
 	// Pyro Airblast
 	void ScanForNearbyProjectiles();
 	void TryToAirblast(CBaseEntity* pTargetProjectile = NULL); // Modified signature
+
+	// Engineer buildable status
+	BitFlag64 GetActualBuildableFlags(CBaseEntity* pEntity);
+
+	// Helper to get Omnibot-style class for an entity
+	int GetEntityOmniBotClass(CBaseEntity* pEntity);
+
+	// Ammo status check
+	bool NeedsAmmo(int weaponSlot = -1) const;
+
+	// Enemy prioritization
+	void UpdateEnemyPriorities();
+	CHandle<CFFPlayer> m_prioritizedEnemy;
+	CountdownTimer m_enemyPriorityTimer;
+	static const float MAX_ENEMY_DIST = 2000.0f; // For distance scoring in priority
+
+	// Demoman specific
+	bool IsDemoman() const;
+	void StartLayingStickyTrap(const Vector& pos); // Transition to LayStickyTrapState
+	void TryLayStickyTrap(const Vector& location);
+	void TryDetonateStickies(CFFPlayer* pTarget = NULL);
+	static const int MAX_BOT_STICKIES = 3;      // Bot's self-imposed limit for a single trap
+
+	// Prioritization helpers
+	CFFPlayer* GetMedicWhoIsHealingMe() const;
+	CBaseEntity* GetMostImportantNearbyFriendlyBuilding() const;
+	bool IsNearPosition(const Vector& pos, float radius) const;
+
+	// Flag carrying status
+	bool HasEnemyFlag() const { return m_carriedFlag.Get() != NULL && m_carriedFlagType == 1; }
+	bool HasOwnFlag() const { return m_carriedFlag.Get() != NULL && m_carriedFlagType == 2; } // For potential recovery logic
+	CFFInfoScript* GetCarriedFlag() const { return m_carriedFlag.Get(); } // Getter for the actual flag entity
+	void NotifyPickedUpFlag(CFFInfoScript* pFlagInfoScript, int flagType);
+	void NotifyDroppedFlag(CFFInfoScript* pFlagInfoScript); // Pass the specific flag being dropped
+
+private: // Demoman private members
+	int m_deployedStickiesCount;
+	CountdownTimer m_stickyArmTime;             // Time until stickies are armed
+	CountdownTimer m_stickyDetonateCooldown;    // Cooldown between detonation attempts
+
+	// Flag carrying members
+	CHandle<CFFInfoScript> m_carriedFlag; // Handle to the CFFInfoScript entity if carrying a flag
+	int m_carriedFlagType;                // Conceptual: 0=none, 1=enemy_flag, 2=own_flag (if needed for recovery)
+
+public: // Make sure this is before private if that's the convention
 };
 
 

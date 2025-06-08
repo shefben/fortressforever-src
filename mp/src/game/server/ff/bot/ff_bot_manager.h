@@ -82,6 +82,19 @@ inline int OtherTeam( int team )
 //
 // The manager for Fortress Forever specific bots
 //
+
+// FF_LUA_SUPPORT: Enum for Lua-controlled objective states
+enum LuaObjectiveState
+{
+	LUA_OBJECTIVE_UNKNOWN = 0,
+	LUA_OBJECTIVE_ACTIVE,      // Objective is active and can be pursued (e.g. a control point, or a flag at its base)
+	LUA_OBJECTIVE_INACTIVE,    // Objective is not currently active (e.g. time-locked, depends on other conditions)
+	LUA_OBJECTIVE_COMPLETED,   // Objective has been successfully completed by a team (e.g. flag captured, payload reached end)
+	LUA_OBJECTIVE_FAILED,      // Objective has failed or is no longer completable (e.g. payload timer ran out)
+	LUA_OBJECTIVE_CARRIED,     // Objective is an item (e.g. flag) and is currently being carried by a player
+	LUA_OBJECTIVE_DROPPED      // Objective is an item (e.g. flag) that was carried and is now dropped in the world, potentially recoverable
+};
+
 class CFFBotManager : public CBotManager
 {
 public:
@@ -264,19 +277,33 @@ private:
 
 	float m_lastSeenEnemyTimestamp;
 	float m_roundStartTimestamp;
+	bool m_isDefenseRushing;								///< whether defensive team is rushing this round or not (conceptual, adapt to FF logic)
 
 	// FF_TODO_LUA: Placeholder structures for Lua-defined objective data
 	struct LuaObjectivePoint
 	{
-		char name[MAX_PATH];
+		char name[MAX_PATH];      // Descriptive name (e.g., entity targetname)
+		char m_id[MAX_PATH];      // Unique ID string for matching with luaevent, typically from info_ff_script's "Lua Objective ID"
 		Vector position;
-		int teamAffiliation;      // e.g., FF_TEAM_RED, FF_TEAM_BLUE, FF_TEAM_NEUTRAL, or specific team if it's a capture point for one team.
-		int type;                 // FF_TODO_LUA: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture, 4=PayloadCheckpoint, 5=PayloadGoal. Conceptual mapping from Omnibot::GoalType: 0=Generic/Unknown, 1=FlagGoal(CapturePoint/OmniCapPoint), 2=Item_Flag(OmniFlag), 3=PayloadCheckpoint, 4=PayloadGoal, 5=BombTarget, 6=RescueZone etc.
+		LuaObjectiveState m_state; // Current state of the objective, updated by luaevent
+		int teamAffiliation;      // e.g., FF_TEAM_RED, FF_TEAM_BLUE, FF_TEAM_NEUTRAL. Initial/design-time affiliation.
+		int type;                 // FF_TODO_LUA: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture etc.
 		float radius;             // Radius for proximity checks.
-		bool isActive;            // Is the objective currently active/relevant?
-		int currentOwnerTeam;     // For capturable points, which team currently owns it.
-		// Add other relevant properties as identified from Lua scripts.
-		LuaObjectivePoint() : position(vec3_origin), teamAffiliation(FF_TEAM_NEUTRAL), type(0), radius(100.0f), isActive(true), currentOwnerTeam(FF_TEAM_NEUTRAL) { name[0] = '\0'; }
+		int currentOwnerTeam;     // For capturable points, which team currently owns it. Updated by game logic/events.
+		CHandle<CBaseEntity> m_entity; // Handle to the actual info_ff_script entity
+
+		LuaObjectivePoint() :
+			position(vec3_origin),
+			m_state(LUA_OBJECTIVE_ACTIVE), // Default to active, as 'isActive' was true by default.
+			teamAffiliation(FF_TEAM_NEUTRAL),
+			type(0),
+			radius(100.0f),
+			currentOwnerTeam(FF_TEAM_NEUTRAL),
+			m_entity(NULL)
+		{
+			name[0] = '\0';
+			m_id[0] = '\0';
+		}
 	};
 	CUtlVector<LuaObjectivePoint> m_luaObjectivePoints;
 
@@ -309,6 +336,7 @@ public:
 
 	// Event Handlers - These will be called by OnGameEvent
 	void OnPlayerDeath( IGameEvent *data );
+	bool IsDefenseRushing( void ) const;
 	void OnPlayerFootstep( IGameEvent *data );
 	void OnPlayerRadio( IGameEvent *data );
 	void OnPlayerFallDamage( IGameEvent *data );
@@ -346,9 +374,20 @@ public:
 	void OnSentryGunDetonated( IGameEvent *data );
 	void OnSentryGunUpgraded( IGameEvent *data );
 	void OnSentryGunSabotaged( IGameEvent *data );
-	void OnDetpackDetonated( IGameEvent *data );
+	void OnDetpackDetonated( IGameEvent *data ); // Will be used for Demoman pipes too
 	void OnManCannonDetonated( IGameEvent *data );
 
+	// New event handlers for Medic and Dispenser interactions
+	void OnPlayerHealed(IGameEvent *data);             // For TF_MSG_GOT_MEDIC_HEALTH / TF_MSG_GAVE_MEDIC_HEALTH
+	void OnPlayerResuppliedFromDispenser(IGameEvent *data); // For TF_MSG_GOT_DISPENSER_AMMO
+
+	// Lua Event handler
+	void OnLuaEvent(IGameEvent *event);
+
+	// Spy cloak/uncloak might be covered by OnCloakLost or player state checks,
+	// but if specific events exist for voluntary cloak/uncloak:
+	// void OnSpyCloak(IGameEvent *data);
+	// void OnSpyUncloak(IGameEvent *data);
 };
 
 inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )

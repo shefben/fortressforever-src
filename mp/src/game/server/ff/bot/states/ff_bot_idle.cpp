@@ -37,6 +37,9 @@ void IdleState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 	m_engineerResourceScanTimer.Start(RandomFloat(4.0f, 6.0f)); // Initialize resource scan timer
 	m_engineerGuardScanTimer.Start(RandomFloat(5.0f, 7.0f)); // Initialize guard scan timer
 	m_spyInfiltrateScanTimer.Start(RandomFloat(3.0f, 6.0f)); // Initialize spy scan timer
+	m_demomanStickyTrapTimer.Start(RandomFloat(15.0f, 25.0f)); // Initialize Demoman sticky trap timer
+	m_assessFollowTimer.Start(RandomFloat(5.0f, 10.0f)); // Initialize follow assessment timer
+	m_defendObjectiveScanTimer.Start(RandomFloat(7.0f, 12.0f)); // Initialize defend objective scan timer
 
 
 	// FF_TODO_WEAPON_STATS: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly for FF item/weapon logic
@@ -53,6 +56,49 @@ void IdleState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
  */
 void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
+	// Check if carrying enemy flag first - this is high priority
+	if (me->HasEnemyFlag())
+	{
+		const CFFBotManager::LuaObjectivePoint* pBestCapturePoint = NULL;
+		float flBestDistSq = FLT_MAX;
+		const CFFInfoScript* carriedFlagEntity = me->GetCarriedFlag(); // Get the entity of the flag we are carrying
+
+		const CUtlVector<CFFBotManager::LuaObjectivePoint>& objectives = me->GetAllLuaObjectivePoints();
+		for (int i = 0; i < objectives.Count(); ++i)
+		{
+			const CFFBotManager::LuaObjectivePoint& point = objectives[i];
+			// Must be a capture point (type 1), active, and belong to our team (or neutral if that's how caps work)
+			if (point.type == 1 && point.m_state == LUA_OBJECTIVE_ACTIVE &&
+				(point.teamAffiliation == me->GetTeamNumber() || point.teamAffiliation == FF_TEAM_NEUTRAL))
+			{
+				// FF_LUA_TODO: Ensure this capture point is valid for the flag we are carrying (e.g. some maps have multiple flags/caps)
+				// For now, any friendly/neutral active capture point will do.
+				float distSq = (point.position - me->GetAbsOrigin()).LengthSqr();
+				if (distSq < flBestDistSq)
+				{
+					pBestCapturePoint = &point;
+					flBestDistSq = distSq;
+				}
+			}
+		}
+
+		if (pBestCapturePoint)
+		{
+			me->PrintIfWatched("IdleState: Carrying enemy flag '%s', moving to capture point '%s'!\n",
+				carriedFlagEntity ? (carriedFlagEntity->GetEntityNameAsCStr() ? carriedFlagEntity->GetEntityNameAsCStr() : "unnamed_flag") : "unknown_flag",
+				pBestCapturePoint->name);
+			me->CarryFlagToCapturePoint(pBestCapturePoint);
+			return; // Exit IdleState
+		}
+		else
+		{
+			me->PrintIfWatched("IdleState: Carrying enemy flag, but no suitable capture point found. Hunting.\n");
+			// No capture point found, maybe just hunt or hold position.
+			me->Hunt(); // Fallback behavior
+			return;
+		}
+	}
+
 	// Medic Behavior: Periodically scan for teammates to heal
 	if (me->IsMedic() && m_medicScanTimer.IsElapsed())
 	{
@@ -100,6 +146,28 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		if (me->GetState() != this) return; // Return if state changed
 	}
 
+	// FF_TODO_CLASS_ENGINEER: Add logic for Teleporter building in IdleState
+	// if (me->IsEngineer() && m_engineerTeleporterScanTimer.IsElapsed()) // Need a new timer m_engineerTeleporterScanTimer
+	// {
+	//    if (me->GetTeleporterEntranceLevel() == 0)
+	//    {
+	//        // FF_TODO_AI_BEHAVIOR: Find good spot for tele entrance (e.g., near spawn, secure area)
+	//        // Vector teleEntrancePos = FindGoodTeleporterEntranceSpot();
+	//        // me->TryToBuildTeleporterEntrance(&teleEntrancePos);
+	//        // return;
+	//    }
+	//    else if (me->GetTeleporterExitLevel() == 0)
+	//    {
+	//        // FF_TODO_AI_BEHAVIOR: Find good spot for tele exit (e.g., near active objective, forward base)
+	//        // Vector teleExitPos = FindGoodTeleporterExitSpot();
+	//        // me->TryToBuildTeleporterExit(&teleExitPos);
+	//        // return;
+	//    }
+	//    // m_engineerTeleporterScanTimer.Start(RandomFloat(15.0f, 25.0f));
+	// }
+	// if (me->GetState() != this) return;
+
+
 	// Engineer Behavior: Periodically scan for damaged buildables to repair
 	if (me->IsEngineer() && m_engineerRepairScanTimer.IsElapsed())
 	{
@@ -142,6 +210,68 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		me->TryToInfiltrate();
 		m_spyInfiltrateScanTimer.Start(RandomFloat(10.0f, 20.0f)); // Reschedule infiltrate scan
 		if (me->GetState() != this) return;
+	}
+
+	// Demoman Behavior: Periodically consider laying a sticky trap
+	if (me->IsDemoman() && me->m_deployedStickiesCount < CFFBot::MAX_BOT_STICKIES && m_demomanStickyTrapTimer.IsElapsed())
+	{
+		// FF_TODO_CLASS_DEMOMAN: More sophisticated logic for when/where to lay traps.
+		// Example: Near a defended objective, or a known chokepoint.
+		// For now, if near a friendly Lua objective that the bot's team owns.
+		const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), me->GetTeamNumber());
+		if (obj && obj->currentOwnerTeam == me->GetTeamNumber() && (me->GetAbsOrigin() - obj->position).IsLengthSqr() < Square(1000.0f)) // Within 1000 units of friendly objective
+		{
+			// Try to find a chokepoint near this objective, or just use the objective position as the trap target.
+			// For simplicity, target the objective position itself for now.
+			Vector trapTargetPos = obj->position;
+			// FF_TODO_AI_BEHAVIOR: Find actual chokepoint near 'obj->position' or visible enemy path.
+			// For now, just pick a point slightly offset from the objective center.
+			trapTargetPos.x += RandomFloat(-50.f, 50.f);
+			trapTargetPos.y += RandomFloat(-50.f, 50.f);
+			// Ensure Z is on the ground, or use nav mesh to find a valid ground position.
+			CNavArea *targetArea = TheNavMesh->GetNearestNavArea(trapTargetPos, true, 150.0f);
+			if (targetArea)
+			{
+				trapTargetPos = targetArea->GetCenter(); // Snap to nav mesh center
+				me->PrintIfWatched("Demoman: Decided to lay sticky trap near objective '%s' at (%.1f, %.1f, %.1f).\n",
+					obj->name, trapTargetPos.x, trapTargetPos.y, trapTargetPos.z);
+				me->StartLayingStickyTrap(trapTargetPos); // This will change state
+				return;
+			}
+		}
+		m_demomanStickyTrapTimer.Start(RandomFloat(20.0f, 40.0f)); // Reschedule
+		if (me->GetState() != this) return; // Check if state changed due to other logic before sticky trap decision
+	}
+
+	// Periodically assess if the bot should follow a nearby teammate
+	if (m_assessFollowTimer.IsElapsed())
+	{
+		// FF_TODO_AI_BEHAVIOR: Add more conditions here, e.g., don't follow if currently defending a point,
+		// or if specific class (Sniper/Engineer) has important solo tasks.
+		// For now, any class might try to follow if idle and other conditions aren't met.
+		bool shouldConsiderFollowing = true;
+		if (me->IsEngineer() && (me->HasSentry() || me->HasDispenser())) // Engineer with nest might not follow
+		{
+			shouldConsiderFollowing = false;
+		}
+		if (me->IsSniper() && me->IsSniping()) // Sniper actively sniping shouldn't follow
+		{
+			shouldConsiderFollowing = false;
+		}
+		// FF_TODO_GAME_MECHANIC: Could also be triggered by a "follow me" radio command if implemented.
+
+		if (shouldConsiderFollowing)
+		{
+			// Only try to follow if not already in an important state (like attacking, building, healing etc.)
+			// The IdleState itself is the "lowest priority" state, so if we're here, we're generally not busy.
+			// However, GetTask() might still be something other than SEEK_AND_DESTROY if a high-level order was given.
+			if (me->GetTask() == CFFBot::SEEK_AND_DESTROY || me->GetTask() == CFFBot::HOLD_POSITION) // Only consider following if not on a specific task
+			{
+				me->TryToFollowNearestTeammate();
+				if (me->GetState() != this) return; // State changed to FollowTeammateState or another state
+			}
+		}
+		m_assessFollowTimer.Start(RandomFloat(10.0f, 20.0f)); // Reschedule follow assessment
 	}
 
 
@@ -318,6 +448,57 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// If all else fails and bot is just idle without a path, make it hunt.
 	if(!me->HasPath())
 	{
+		// Before generic hunting, check if we should proactively defend a friendly objective
+		if (m_defendObjectiveScanTimer.IsElapsed())
+		{
+			m_defendObjectiveScanTimer.Start(RandomFloat(10.0f, 20.0f)); // Reschedule
+
+			// FF_TODO_AI_BEHAVIOR: Add more nuanced conditions for defending (e.g., class roles, game state)
+			// For now, any bot might consider defending if idle.
+			bool shouldConsiderDefending = true;
+			if (me->IsScout() || me->IsSpy()) // Example: Scouts and Spies might be less inclined to static defense
+			{
+				// shouldConsiderDefending = false;
+			}
+
+			if (shouldConsiderDefending)
+			{
+				const CFFBotManager::LuaObjectivePoint* pBestFriendlyObjectiveToDefend = NULL;
+				float flBestDistSq = FLT_MAX;
+
+				const CUtlVector<CFFBotManager::LuaObjectivePoint>& objectives = me->GetAllLuaObjectivePoints();
+				for (int i = 0; i < objectives.Count(); ++i)
+				{
+					const CFFBotManager::LuaObjectivePoint& point = objectives[i];
+					if (point.m_state == LUA_OBJECTIVE_ACTIVE && point.currentOwnerTeam == me->GetTeamNumber())
+					{
+						// Optionally, only defend certain types of objectives (e.g., type 1 control points)
+						// if (point.type != 1) continue;
+
+						// Don't defend if already defending this one (or a task for it)
+						if (me->GetTask() == CFFBot::TaskType::DEFEND_LUA_OBJECTIVE && me->GetTaskEntity() == point.m_entity.Get())
+						{
+							continue;
+						}
+
+						float distSq = (point.position - me->GetAbsOrigin()).LengthSqr();
+						if (distSq < flBestDistSq)
+						{
+							pBestFriendlyObjectiveToDefend = &point;
+							flBestDistSq = distSq;
+						}
+					}
+				}
+
+				if (pBestFriendlyObjectiveToDefend)
+				{
+					me->PrintIfWatched("IdleState: Found friendly objective '%s' to defend. Transitioning to DefendObjectiveState.\n", pBestFriendlyObjectiveToDefend->name);
+					me->DefendObjective(pBestFriendlyObjectiveToDefend);
+					return; // Exit IdleState
+				}
+			}
+		}
+
 		// FF_TODO_LUA: Prioritize Lua objectives before generic hunting
 		if (me->GetLuaObjectivePointCount() > 0)
 		{
@@ -329,11 +510,12 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 			{
 				const CFFBotManager::LuaObjectivePoint& point = objectives[i];
 
-				if (!point.isActive)
+				// Primary filter: Only consider objectives that are currently ACTIVE or DROPPED (for flags).
+				if (point.m_state != LUA_OBJECTIVE_ACTIVE && point.m_state != LUA_OBJECTIVE_DROPPED)
 					continue;
 
-				// Decision to Capture: Type 1 (ControlPoint/FlagGoal)
-				if (point.type == 1) // Conceptual type for capturable static points
+				// Decision to Capture: Type 1 (ControlPoint/FlagGoal) - if not carrying a flag
+				if (point.type == 1 && point.m_state == LUA_OBJECTIVE_ACTIVE)
 				{
 					bool bTargetObjective = false;
 					if (me->IsScout())
@@ -364,17 +546,35 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 						}
 					}
 				}
-				// FF_TODO_LUA: Add logic for flag pickup if point.type == 2 (Item_Flag) and it's the enemy flag,
-				// or own flag dropped and needs returning. This would likely involve checking currentOwnerTeam,
-				// if it's carriable, who is carrying it, etc.
-				// Example:
-				// else if (point.type == 2) // Item_Flag
-				// {
-				//    // if (point.teamAffiliation != me->GetTeamNumber() && point.currentOwnerTeam == FF_TEAM_NEUTRAL) // Enemy flag at its base or dropped
-				//    // { // Go capture it }
-				//    // else if (point.teamAffiliation == me->GetTeamNumber() && point.currentOwnerTeam != me->GetTeamNumber() && point.currentOwnerTeam != FF_TEAM_NEUTRAL) // Our flag, carried by enemy
-				//    // { // Go retrieve it (might involve attacking carrier first) }
-				// }
+				// Decision to Pickup Flag: Type 2 (Item_Flag) - if not carrying a flag
+				else if (point.type == 2 && (point.m_state == LUA_OBJECTIVE_ACTIVE || point.m_state == LUA_OBJECTIVE_DROPPED))
+				{
+					// Target enemy flags at their base (ACTIVE) or any dropped flag (DROPPED + neutral owner)
+					// or our own flag if it's dropped (DROPPED + neutral owner + our teamAffiliation)
+					bool bTargetFlag = false;
+					if (point.teamAffiliation != me->GetTeamNumber() && point.currentOwnerTeam == FF_TEAM_NEUTRAL) // Enemy flag (at base or dropped by enemy/us)
+					{
+						bTargetFlag = true;
+						me->PrintIfWatched("IdleState: Considering enemy flag '%s' (state: %d, owner: %d).\n", point.name, point.m_state, point.currentOwnerTeam);
+					}
+					// FF_TODO_AI_BEHAVIOR: Logic for recovering own team's dropped flag.
+					// else if (point.teamAffiliation == me->GetTeamNumber() && point.m_state == LUA_OBJECTIVE_DROPPED && point.currentOwnerTeam == FF_TEAM_NEUTRAL)
+					// {
+					//     bTargetFlag = true; // Our flag is dropped
+					//     me->PrintIfWatched("IdleState: Considering to recover our dropped flag '%s'.\n", point.name);
+					// }
+
+					if (bTargetFlag)
+					{
+						float distSq = (point.position - me->GetAbsOrigin()).LengthSqr();
+						// FF_TODO_AI_BEHAVIOR: Flags are usually high priority. Could override other objectives unless very far.
+						if (distSq < flBestObjectiveDistSq) // Simple distance check for now
+						{
+							pBestObjective = &point;
+							flBestObjectiveDistSq = distSq;
+						}
+					}
+				}
 			}
 
 			if (pBestObjective)
@@ -394,3 +594,5 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 }
 
 // OnExit for IdleState is not present in cs_bot_idle.cpp, so not adding one here.
+
+[end of mp/src/game/server/ff/bot/states/ff_bot_idle.cpp]

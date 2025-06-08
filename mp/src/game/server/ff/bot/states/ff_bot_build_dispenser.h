@@ -41,11 +41,7 @@ private:
 	CountdownTimer m_repathTimer;         // Timer to periodically check path if stuck
 	CountdownTimer m_waitForBlueprintTimer; // Timer to wait for blueprint to spawn after command
 
-	// Upgrade phase members
-	bool m_isUpgrading;                   // True if currently in the upgrading phase
-	int m_targetUpgradeLevel;             // Target level to upgrade to
-	int m_currentUpgradeLevel;            // Current level of the buildable
-	CountdownTimer m_upgradeProgressTimer;  // Timer for each upgrade level's duration
+	// Upgrade logic removed for dispensers as they do not upgrade in FF.
 };
 
 #endif // FF_BOT_BUILD_DISPENSER_H

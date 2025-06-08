@@ -32,21 +32,20 @@ public:
 
 private:
 	Vector m_buildLocation;         // Target location to build the sentry
-	bool m_isBuilding;            // True if currently in the "hitting with spanner" phase
+	bool m_isBuilding;            // True if currently in the "hitting with spanner" phase (initial construction)
 	bool m_isAtBuildLocation;     // True if bot has reached the build location
 
-	// Conceptual: In a real implementation, this would be a CFFBuildableObject* or similar
 	CHandle<CBaseEntity> m_sentryBeingBuilt;
 
-	CountdownTimer m_buildProgressTimer;  // Timer to simulate initial build duration
+	CountdownTimer m_buildProgressTimer;  // Timer to simulate initial build duration AND upgrade hit cycles
 	CountdownTimer m_repathTimer;         // Timer to periodically check path if stuck
 	CountdownTimer m_waitForBlueprintTimer; // Timer to wait for blueprint to spawn after command
 
 	// Upgrade phase members
 	bool m_isUpgrading;                   // True if currently in the upgrading phase
 	int m_targetUpgradeLevel;             // Target level to upgrade to (e.g., 2 or 3)
-	int m_currentUpgradeLevel;            // Current level of the buildable (assumed 1 after initial build)
-	CountdownTimer m_upgradeProgressTimer;  // Timer for each upgrade level's duration
+	// int m_currentUpgradeLevel;         // Removed: Will use SentryGun->GetLevel() directly
+	// CountdownTimer m_upgradeProgressTimer; // Removed: Consolidated into m_buildProgressTimer
 };
 
 #endif // FF_BOT_BUILD_SENTRY_H

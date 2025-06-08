@@ -49,6 +49,27 @@ int UTIL_FFBotsInGame( void );
 
 ConVar bot_join_delay( "bot_join_delay", "0", FCVAR_GAMEDLL, "Prevents bots from joining the server for this many seconds after a map change." );
 
+// ADDED: For ff_bot_join_team cvar
+extern ConVar ff_bot_join_team;
+extern ConVar bot_quota;
+extern ConVar bot_chatter;
+// extern ConVar bot_prefix; // Not used in FF for now
+extern ConVar bot_join_after_player;
+// extern ConVar bot_allow_rogues; // Concept might not apply
+
+// FF specific weapon allow CVars (ensure these are declared elsewhere, e.g. ff_bot.cpp or ff_shareddefs.cpp)
+extern ConVar ff_bot_allow_pistols;
+extern ConVar ff_bot_allow_shotguns;
+extern ConVar ff_bot_allow_sub_machine_guns;
+extern ConVar ff_bot_allow_assaultcannons;
+extern ConVar ff_bot_allow_rifles;
+extern ConVar ff_bot_allow_sniper_rifles;
+extern ConVar ff_bot_allow_flamethrowers;
+extern ConVar ff_bot_allow_pipe_launchers;
+extern ConVar ff_bot_allow_rocket_launchers;
+extern ConVar ff_bot_allow_tranqguns;
+
+
 #include "util_player_by_index.h" // For UTIL_PlayerByIndex
 
 //--------------------------------------------------------------------------------------------------------------
@@ -106,6 +127,7 @@ CFFBotManager::CFFBotManager() : m_gameEventListener(this)
 	m_serverActive = false;
 	m_roundStartTimestamp = 0.0f;
 	m_isRoundOver = true;
+	m_isDefenseRushing = false; // ADDED: Initialize m_isDefenseRushing
 
 	RegisterGameEventListeners();
 
@@ -138,8 +160,21 @@ void CFFBotManager::RestartRound( void )
 		m_roundStartTimestamp = gpGlobals->curtime + FFGameRules()->GetFreezeTime();
 	else
 		m_roundStartTimestamp = gpGlobals->curtime;
+
+	// ADDED: Logic for m_isDefenseRushing
+	// FF_TODO_AI_BEHAVIOR: Define what "defense" means in FF scenarios to make this meaningful.
+	// For now, random chance like CS. Could be tied to specific objectives or team roles.
+	const float defenseRushChance = 25.0f;
+	m_isDefenseRushing = (RandomFloat( 0.0f, 100.0f ) <= defenseRushChance);
+
 	TheBotPhrases->OnRoundRestart();
 	m_isRoundOver = false;
+}
+
+// ADDED: Implementation for IsDefenseRushing
+bool CFFBotManager::IsDefenseRushing( void ) const
+{
+	return m_isDefenseRushing;
 }
 
 void UTIL_DrawBox( Extent *extent, int lifetime, int red, int green, int blue ) { /* ... (implementation as before) ... */ }
@@ -192,8 +227,15 @@ void CFFBotManager::RegisterGameEventListeners()
 	ListenForGameEvent( "sentrygun_detonated" );
 	ListenForGameEvent( "sentrygun_upgraded" );
 	ListenForGameEvent( "sentrygun_sabotaged" );
-	ListenForGameEvent( "detpack_detonated" );
+	ListenForGameEvent( "detpack_detonated" ); // Used for Demoman pipes/stickies too
 	ListenForGameEvent( "mancannon_detonated" );
+
+	// New events for Medic and Dispenser interactions
+	ListenForGameEvent( "player_healed" );             // Event for player receiving health from a medic
+	ListenForGameEvent( "player_resupplied" );         // Generic resupply, might need filtering for dispenser
+	// FF_TODO_EVENTS: Or a more specific event like "player_got_dispenser_ammo" / "player_got_dispenser_item"
+
+	ListenForGameEvent( "luaevent" ); // Listen for generic Lua events
 }
 
 void CFFBotManager::UnregisterGameEventListeners()
@@ -244,10 +286,216 @@ void CFFBotManager::OnGameEvent( IGameEvent *event )
 	else if ( FStrEq( eventName, "sentrygun_detonated" ) ) OnSentryGunDetonated( event );
 	else if ( FStrEq( eventName, "sentrygun_upgraded" ) ) OnSentryGunUpgraded( event );
 	else if ( FStrEq( eventName, "sentrygun_sabotaged" ) ) OnSentryGunSabotaged( event );
-	else if ( FStrEq( eventName, "detpack_detonated" ) ) OnDetpackDetonated( event );
+	else if ( FStrEq( eventName, "detpack_detonated" ) ) OnDetpackDetonated( event ); // Handles Demoman pipes/stickies
 	else if ( FStrEq( eventName, "mancannon_detonated" ) ) OnManCannonDetonated( event );
+	else if ( FStrEq( eventName, "player_healed" ) ) OnPlayerHealed( event );
+	else if ( FStrEq( eventName, "player_resupplied" ) ) OnPlayerResuppliedFromDispenser( event ); // Assuming "player_resupplied" is the one
+	else if ( FStrEq( eventName, "luaevent" ) ) OnLuaEvent( event );
 }
 
+//--------------------------------------------------------------------------------------------------------------
+// Lua Event Handler
+//--------------------------------------------------------------------------------------------------------------
+void CFFBotManager::OnLuaEvent( IGameEvent *event )
+{
+	const char *objectiveId = event->GetString("objective_id", NULL);
+	const char *newStateStr = event->GetString("objective_state", NULL);
+	// Optional: const char* luaEventName = event->GetString("eventname", "unnamed_lua_event"); // Generic game event name
+	const char* specificEventType = event->GetString("event_type", ""); // Custom field for more specific event types like "flag_picked_up"
+	int userId = event->GetInt("userid", -1); // Userid of the player who triggered the script or is primarily associated with the event.
+
+	if (!objectiveId) // objective_id is crucial for any objective-related event
+	{
+		DevWarning("CFFBotManager::OnLuaEvent: Received luaevent with missing objective_id. EventType: '%s', PlayerID: %d\n", specificEventType, userId);
+		return;
+	}
+
+	// Find the objective first.
+	LuaObjectivePoint* pFoundObjective = NULL;
+	int foundObjectiveIdx = -1;
+	FOR_EACH_VEC(m_luaObjectivePoints, i)
+	{
+		if (m_luaObjectivePoints[i].m_id && FStrEq(m_luaObjectivePoints[i].m_id, objectiveId))
+		{
+			pFoundObjective = &m_luaObjectivePoints[i];
+			foundObjectiveIdx = i;
+			break;
+		}
+	}
+
+	if (!pFoundObjective)
+	{
+		DevWarning("CFFBotManager::OnLuaEvent: Received luaevent for unknown objective_id '%s'. EventType: '%s', PlayerID: %d\n", objectiveId, specificEventType, userId);
+		return;
+	}
+
+	// Handle state changes if "objective_state" is provided
+	LuaObjectiveState newState = pFoundObjective->m_state; // Default to current state
+	bool objectiveStateExplicitlySet = false;
+	if (newStateStr && newStateStr[0] != '\0')
+	{
+		objectiveStateExplicitlySet = true;
+		if (FStrEq(newStateStr, "active")) newState = LUA_OBJECTIVE_ACTIVE;
+		else if (FStrEq(newStateStr, "inactive")) newState = LUA_OBJECTIVE_INACTIVE;
+		else if (FStrEq(newStateStr, "completed")) newState = LUA_OBJECTIVE_COMPLETED;
+		else if (FStrEq(newStateStr, "failed")) newState = LUA_OBJECTIVE_FAILED;
+		else if (FStrEq(newStateStr, "carried")) newState = LUA_OBJECTIVE_CARRIED;
+		else if (FStrEq(newStateStr, "dropped")) newState = LUA_OBJECTIVE_DROPPED;
+		else
+		{
+			DevWarning("CFFBotManager::OnLuaEvent: Invalid objective_state '%s' for objective_id '%s'. EventType: '%s', PID: %d\n", newStateStr, objectiveId, specificEventType, userId);
+			// Don't return; other parameters like owner change might still be valid.
+			objectiveStateExplicitlySet = false; // Treat as if state wasn't set, so it doesn't change below if invalid
+		}
+	}
+
+
+	bool anyPropertyChanged = false;
+
+	// Update state if it was explicitly provided and different
+	if (objectiveStateExplicitlySet && pFoundObjective->m_state != newState)
+	{
+		pFoundObjective->m_state = newState;
+		DevMsg("CFFBotManager::OnLuaEvent: Objective '%s' state updated to '%s' (%d). EventType: '%s', PID: %d\n", objectiveId, newStateStr, newState, specificEventType, userId);
+		anyPropertyChanged = true;
+	}
+
+	// Update owner team if provided
+	// FF_LUA_TODO: Confirm actual key names used in luaevent for team changes (e.g., "new_owner_team", "owner_team_name").
+	int newOwnerTeamId = event->GetInt("new_owner_team", -99);
+	if (newOwnerTeamId != -99) // Integer team ID provided
+	{
+		if (pFoundObjective->currentOwnerTeam != newOwnerTeamId)
+		{
+			pFoundObjective->currentOwnerTeam = newOwnerTeamId;
+			DevMsg("CFFBotManager::OnLuaEvent: Objective '%s' owner updated to team %d. EventType: '%s', PID: %d\n", objectiveId, newOwnerTeamId, specificEventType, userId);
+			anyPropertyChanged = true;
+		}
+	}
+	else // Check for string team name if integer not provided
+	{
+		const char *ownerTeamNameStr = event->GetString("owner_team_name", NULL);
+		if (ownerTeamNameStr && ownerTeamNameStr[0] != '\0')
+		{
+			int parsedTeamId = FF_TEAM_NEUTRAL;
+			if (FStrEq(ownerTeamNameStr, "RED")) parsedTeamId = FF_TEAM_RED;
+			else if (FStrEq(ownerTeamNameStr, "BLUE")) parsedTeamId = FF_TEAM_BLUE;
+			else if (FStrEq(ownerTeamNameStr, "NEUTRAL")) parsedTeamId = FF_TEAM_NEUTRAL;
+			// else DevWarning("CFFBotManager::OnLuaEvent: Objective '%s' received unknown owner_team_name '%s'. EventType: '%s', PID: %d\n", objectiveId, ownerTeamNameStr, specificEventType, userId);
+
+			if (pFoundObjective->currentOwnerTeam != parsedTeamId)
+			{
+				pFoundObjective->currentOwnerTeam = parsedTeamId;
+				DevMsg("CFFBotManager::OnLuaEvent: Objective '%s' owner updated to team '%s' (%d). EventType: '%s', PID: %d\n", objectiveId, ownerTeamNameStr, parsedTeamId, specificEventType, userId);
+				anyPropertyChanged = true;
+			}
+		}
+	}
+
+	// Handle specific event types like flag interactions
+	// FF_LUA_TODO: Confirm event names and parameters for flag actions. These are examples.
+	if (FStrEq(specificEventType, "flag_picked_up"))
+	{
+		int pickerUserId = event->GetInt("picker_userid", userId); // Default to main event userid if specific not given
+		CFFPlayer* pPicker = ToFFPlayer(UTIL_PlayerByUserId(pickerUserId)); // Changed to CFFPlayer
+		CFFBot* pPickerBot = ToFFBot(pPicker);
+
+		// The flag entity itself IS the objective entity, so pFoundObjective->m_entity is the flag.
+		CFFInfoScript* pFlagInfoScript = dynamic_cast<CFFInfoScript*>(pFoundObjective->m_entity.Get());
+
+		if (pPicker && pFlagInfoScript)
+		{
+			int flagTeamAffiliation = pFoundObjective->teamAffiliation; // Get the flag's actual team
+			if (pPickerBot)
+			{
+				pPickerBot->NotifyPickedUpFlag(pFlagInfoScript, (pPickerBot->GetTeamNumber() == flagTeamAffiliation) ? 2 /*own_flag*/ : 1 /*enemy_flag*/);
+			}
+			// Update LuaObjectivePoint state for the flag
+			if (pFoundObjective->m_state != LUA_OBJECTIVE_CARRIED) { // May have already been set by objective_state param
+				pFoundObjective->m_state = LUA_OBJECTIVE_CARRIED;
+				anyPropertyChanged = true;
+				DevMsg("CFFBotManager::OnLuaEvent (flag_picked_up): Objective '%s' state set to CARRIED. PID: %d\n", objectiveId, pickerUserId);
+			}
+			if (pFoundObjective->currentOwnerTeam != pPicker->GetTeamNumber()) { // May have already been set by new_owner_team param
+				pFoundObjective->currentOwnerTeam = pPicker->GetTeamNumber();
+				anyPropertyChanged = true;
+				DevMsg("CFFBotManager::OnLuaEvent (flag_picked_up): Objective '%s' owner set to team %d. PID: %d\n", objectiveId, pPicker->GetTeamNumber(), pickerUserId);
+			}
+		}
+		else
+		{
+			DevWarning("CFFBotManager::OnLuaEvent (flag_picked_up): Missing picker_userid or flag_entindex for objective '%s'. PID: %d\n", objectiveId, userId);
+		}
+	}
+	else if (FStrEq(specificEventType, "flag_dropped"))
+	{
+		// The flag entity IS the objective entity.
+		CFFInfoScript* pFlagInfoScript = dynamic_cast<CFFInfoScript*>(pFoundObjective->m_entity.Get());
+		int dropperUserId = event->GetInt("dropper_userid", userId); // Optional: who dropped it
+		CFFBot* pDropperBot = ToFFBot(UTIL_PlayerByUserId(dropperUserId));
+
+		if (pFlagInfoScript)
+		{
+			if (pDropperBot && pDropperBot->GetCarriedFlag() == pFlagInfoScript) // If a bot dropped it, notify it
+			{
+				pDropperBot->NotifyDroppedFlag(pFlagInfoScript);
+			}
+			else // If a human dropped it, or a bot not correctly tracked, ensure any bot carrying it is cleared.
+			{
+				FF_FOR_EACH_BOT(pBot, i)
+				{
+					if (pBot->GetCarriedFlag() == pFlagInfoScript)
+					{
+						pBot->NotifyDroppedFlag(pFlagInfoScript); // This will clear their internal flag state
+						DevMsg("CFFBotManager::OnLuaEvent (flag_dropped): Notified bot %s of dropping flag %s implicitly.\n", pBot->GetPlayerName(), objectiveId);
+					}
+				}
+			}
+
+			// Update LuaObjectivePoint state for the flag
+			if (pFoundObjective->m_state != LUA_OBJECTIVE_DROPPED) { // May have been set by objective_state param
+				pFoundObjective->m_state = LUA_OBJECTIVE_DROPPED; // Or LUA_OBJECTIVE_ACTIVE if it's immediately available at its new spot
+				anyPropertyChanged = true;
+				DevMsg("CFFBotManager::OnLuaEvent (flag_dropped): Objective '%s' state set to DROPPED. PID: %d\n", objectiveId, dropperUserId);
+			}
+			if (pFoundObjective->currentOwnerTeam != FF_TEAM_NEUTRAL) { // Dropped flags are neutral
+				pFoundObjective->currentOwnerTeam = FF_TEAM_NEUTRAL;
+				anyPropertyChanged = true;
+				DevMsg("CFFBotManager::OnLuaEvent (flag_dropped): Objective '%s' owner set to NEUTRAL. PID: %d\n", objectiveId, dropperUserId);
+			}
+
+			// Update position if provided
+			if (event->GetFloat("flag_pos_x", FLT_MIN) != FLT_MIN) {
+				Vector newFlagPos;
+				newFlagPos.x = event->GetFloat("flag_pos_x");
+				newFlagPos.y = event->GetFloat("flag_pos_y");
+				newFlagPos.z = event->GetFloat("flag_pos_z");
+				if (pFoundObjective->position != newFlagPos)
+				{
+					pFoundObjective->position = newFlagPos;
+					// Also update the actual entity's position if it's not already there (game might do this, or Lua)
+					if (pFlagInfoScript->GetAbsOrigin() != newFlagPos) {
+						// pFlagInfoScript->SetAbsOrigin(newFlagPos); // This might be too direct, Lua/game should own entity pos
+						DevMsg("CFFBotManager::OnLuaEvent (flag_dropped): Objective '%s' new position reported: (%.1f, %.1f, %.1f). Entity should match.\n", objectiveId, newFlagPos.x, newFlagPos.y, newFlagPos.z);
+					}
+					anyPropertyChanged = true;
+				}
+			}
+		}
+		else
+		{
+			DevWarning("CFFBotManager::OnLuaEvent (flag_dropped): Could not find flag entity for objective '%s'. PID: %d\n", objectiveId, userId);
+		}
+	}
+	// Add other specific event types like "flag_captured", "objective_destroyed" etc.
+
+	if (anyPropertyChanged)
+	{
+		// FF_TODO_AI: Potentially trigger bot re-evaluation of objectives more broadly if a significant global change occurred.
+		// For now, individual bots will react based on their current state's OnUpdate logic polling these updated objective points.
+		// PrintIfWatched("CFFBotManager::OnLuaEvent: Property changed for objective '%s'.\n", objectiveId);
+	}
+}
 
 void CFFBotManager::StartFrame( void )
 {
@@ -297,7 +545,7 @@ bool CFFBotManager::IsWeaponUseable( const CBasePlayerWeapon *weapon ) const
 		case FF_WEAPON_RPG: case FF_WEAPON_IC: return ff_bot_allow_rocket_launchers.GetBool();
 		case FF_WEAPON_FLAMETHROWER: return ff_bot_allow_flamethrowers.GetBool();
 		case FF_WEAPON_GRENADELAUNCHER: case FF_WEAPON_PIPELAUNCHER: return ff_bot_allow_pipe_launchers.GetBool();
-		case FF_WEAPON_ASSAULTCANNON: return ff_bot_allow_miniguns.GetBool();
+		case FF_WEAPON_ASSAULTCANNON: return ff_bot_allow_assaultcannons.GetBool(); // MODIFIED for ff_bot_allow_assaultcannons
 		case FF_WEAPON_TRANQUILISER: return ff_bot_allow_tranqguns.GetBool();
 		case FF_WEAPON_NONE: case FF_WEAPON_CUBEMAP: case FF_WEAPON_MAX: return false;
 		default: return true;
@@ -329,8 +577,65 @@ CFFBot::BuildableType CFFBotManager::GetBuildableTypeFromEntity( CBaseEntity *pB
 //--------------------------------------------------------------------------------------------------------------
 void CFFBotManager::OnServerShutdown( IGameEvent *event )
 {
-	// ... (implementation as before) ...
-	// This might be a good place to call UnregisterGameEventListeners if not handled by destructor timing
+	// ADDED: CVar saving logic
+	// Based on CCSBotManager::OnServerShutdown
+	if ( !engine->IsDedicatedServer() )
+	{
+		// Since we're a listen server, save some config info for the next time we start up
+		// FF_TODO_CVARS: Verify these are the correct/desired ConVar names for FF bots
+		static const char *botVars[] =
+		{
+			"bot_quota",
+			"bot_difficulty",
+			"bot_chatter",
+			// "bot_prefix", // FF might not use this
+			"ff_bot_join_team", // FF specific cvar, if it exists
+			// "bot_defer_to_human", // FF might have different logic or cvar
+			"bot_join_after_player",
+			// "bot_allow_rogues", // Concept might not apply or be named differently
+			"ff_bot_allow_pistols",
+			"ff_bot_allow_shotguns",
+			"ff_bot_allow_sub_machine_guns",
+			"ff_bot_allow_assaultcannons",
+			"ff_bot_allow_rifles",
+			"ff_bot_allow_sniper_rifles",
+			"ff_bot_allow_flamethrowers",
+			"ff_bot_allow_pipe_launchers",
+			"ff_bot_allow_rocket_launchers",
+			"ff_bot_allow_tranqguns"
+			// Add other ff_bot_allow_X weapon CVars here if they exist
+		};
+
+		KeyValues *data = new KeyValues( "ServerConfig" );
+
+		if (data)
+		{
+			// Load existing config data to preserve other settings
+			data->LoadFromFile( filesystem, "ServerConfig.vdf", "GAME" );
+
+			for ( int i=0; i<ARRAYSIZE(botVars); ++i )
+			{
+				const char *varName = botVars[i];
+				if ( varName )
+				{
+					ConVarRef var(varName); // Use ConVarRef for safer access
+					if ( var.IsValid() && var.IsFlagSet(FCVAR_ARCHIVE) ) // Only save archived convars
+					{
+						data->SetString( varName, var.GetString() );
+					}
+					else
+					{
+						// Optional: Log if a cvar is not found or not archived
+						// if ( !var.IsValid() ) Msg("CFFBotManager::OnServerShutdown: ConVar '%s' not found for saving.\n", varName);
+						// else if ( !var.IsFlagSet(FCVAR_ARCHIVE) ) Msg("CFFBotManager::OnServerShutdown: ConVar '%s' is not archived, not saving.\n", varName);
+					}
+				}
+			}
+			data->SaveToFile( filesystem, "ServerConfig.vdf", "GAME" );
+			data->deleteThis();
+		}
+	}
+	// UnregisterGameEventListeners(); // This is usually handled in the destructor.
 }
 
 void CFFBotManager::OnPlayerFootstep( IGameEvent *event )
@@ -524,14 +829,29 @@ void CFFBotManager::OnSentryGunDetonated( IGameEvent *event )
 
 void CFFBotManager::OnSentryGunUpgraded( IGameEvent *event )
 {
-	// FF_TODO_GAME_MECHANIC: Verify event parameter "ownerid" vs "userid"
-	// FF_TODO_GAME_MECHANIC: Event might pass "level" parameter
 	int ownerId = event->GetInt("ownerid", event->GetInt("userid", 0));
 	int entIndex = event->GetInt("entindex", 0);
+	int level = event->GetInt("level", 0); // FF_TODO_EVENTS: Verify "level" is the correct key for new level.
+
 	CFFPlayer *pOwner = ToFFPlayer(UTIL_PlayerByUserId(ownerId));
 	CBaseEntity *pBuildable = UTIL_EntityByIndex(entIndex);
-	if (pOwner && pOwner->IsBot() && pBuildable) { static_cast<CFFBot*>(pOwner)->NotifyBuildingUpgraded(pBuildable); }
 
+	if (pOwner && pOwner->IsBot() && pBuildable)
+	{
+		CFFBot* pBotOwner = static_cast<CFFBot*>(pOwner);
+		if (level > 0) // Ensure a valid level is passed from the event
+		{
+			pBotOwner->NotifyBuildingUpgraded(pBuildable, level);
+		}
+		else
+		{
+			// If event doesn't provide level, bot's NotifyBuildingUpgraded will try to derive it.
+			pBotOwner->NotifyBuildingUpgraded(pBuildable, 0);
+			Warning("CFFBotManager::OnSentryGunUpgraded: Event for sentry %d did not provide new level. Bot %s might have outdated info.\n", entIndex, pBotOwner->GetPlayerName());
+		}
+	}
+
+	// Notify all bots about the upgrade for awareness (they might not be the owner)
 	CFFBot *bot;
 	FF_FOR_EACH_BOT( bot, i ) { bot->OnSentryGunUpgraded( event ); }
 }
@@ -571,12 +891,41 @@ void CFFBotManager::OnBuildableSapperRemoved( IGameEvent *event )
 void CFFBotManager::OnDetpackDetonated( IGameEvent *event )
 {
 	int ownerId = event->GetInt("ownerid", event->GetInt("userid", 0));
-	int entIndex = event->GetInt("entindex", 0);
-	CFFPlayer *pOwner = ToFFPlayer(UTIL_PlayerByUserId(ownerId));
-	CBaseEntity *pBuildable = UTIL_EntityByIndex(entIndex);
-	if (pOwner && pOwner->IsBot() && pBuildable) { static_cast<CFFBot*>(pOwner)->NotifyBuildingDestroyed(pBuildable); }
+	int entIndex = event->GetInt("entindex", 0); // entindex of the detpack/pipe itself
+	CFFPlayer *pOwnerPlayer = ToFFPlayer(UTIL_PlayerByUserId(ownerId));
+
+	if (pOwnerPlayer && pOwnerPlayer->IsBot())
+	{
+		CFFBot *pOwnerBot = static_cast<CFFBot*>(pOwnerPlayer);
+		if (pOwnerBot->IsDemoman())
+		{
+			// This event could be for an Engineer's detpack or a Demoman's pipe/sticky.
+			// We need to be sure it's for a Demoman's explosive before calling NotifyPipeDetonated.
+			// The event itself might not distinguish type (pipe vs sticky vs detpack) beyond owner.
+			// CFFPlayer::DetonateStickies() likely fires this for each sticky.
+			// CFFPlayer::FirePipeBomb() for direct pipes also creates entities that explode.
+			// For now, if it's a Demoman owner, let the bot handle it via NotifyPipeDetonated.
+			// The bot can then try to infer more if needed.
+			pOwnerBot->NotifyPipeDetonated(event);
+		}
+		else if (pOwnerBot->IsEngineer()) // If it's an Engineer's detpack (assuming different class or handling)
+		{
+			CBaseEntity *pBuildable = UTIL_EntityByIndex(entIndex);
+			if (pBuildable) // Check if it's one of their known buildables (though detpack isn't tracked like S/D)
+			{
+				// Assuming Engineer detpack destruction means NotifyBuildingDestroyed
+				// FF_TODO_CLASS_ENGINEER: Verify if Engineer detpacks are tracked as "buildings" for this purpose.
+				// pOwnerBot->NotifyBuildingDestroyed(pBuildable);
+				// For now, just log for engineer detpack, as NotifyBuildingDestroyed might not be right
+				// if detpacks aren't "built" and "destroyed" in the same way as S/D.
+				// PrintIfWatched("BotManager: Engineer %s's detpack (ent %d) detonated.\n", pOwnerBot->GetPlayerName(), entIndex);
+			}
+		}
+	}
+
+	// Original broader notification (if any bot needs to know about any detpack detonation)
 	// CFFBot *bot;
-	// FF_FOR_EACH_BOT( bot, i ) { bot->OnDetpackDetonated( event ); }
+	// FF_FOR_EACH_BOT( bot, i ) { bot->OnDetpackDetonated( event ); } // This was CFFBot::OnDetpackDetonated
 }
 
 void CFFBotManager::OnManCannonDetonated( IGameEvent *event )
@@ -589,6 +938,55 @@ void CFFBotManager::OnManCannonDetonated( IGameEvent *event )
 	// CFFBot *bot;
 	// FF_FOR_EACH_BOT( bot, i ) { bot->OnManCannonDetonated( event ); }
 }
+
+
+//--------------------------------------------------------------------------------------------------------------
+// New Event Handler Implementations
+//--------------------------------------------------------------------------------------------------------------
+
+void CFFBotManager::OnPlayerHealed(IGameEvent *event)
+{
+	int patient_userid = event->GetInt("patient_userid", event->GetInt("userid")); // Target of the heal
+	int healer_userid = event->GetInt("healer_userid", event->GetInt("attacker")); // Medic doing the healing
+	int health_healed = event->GetInt("amount", event->GetInt("healing_given")); // Amount of health given
+
+	// Notify the patient if they are a bot
+	CFFPlayer *pPatient = ToFFPlayer(UTIL_PlayerByUserId(patient_userid));
+	CFFBot *pPatientBot = ToFFBot(pPatient);
+	if (pPatientBot)
+	{
+		CFFPlayer *pMedic = ToFFPlayer(UTIL_PlayerByUserId(healer_userid));
+		pPatientBot->NotifyPlayerHealed(pMedic); // Pass the medic CFFPlayer pointer
+	}
+
+	// Notify the medic if they are a bot
+	CFFPlayer *pMedic = ToFFPlayer(UTIL_PlayerByUserId(healer_userid));
+	CFFBot *pMedicBot = ToFFBot(pMedic);
+	if (pMedicBot && pMedicBot->IsMedic()) // Ensure the healer is actually a Medic bot
+	{
+		pMedicBot->NotifyMedicGaveHeal(pPatient, health_healed);
+	}
+}
+
+void CFFBotManager::OnPlayerResuppliedFromDispenser(IGameEvent *event)
+{
+	// FF_TODO_EVENTS: Verify event name and parameter names ("userid", "dispenser_entindex")
+	int player_userid = event->GetInt("userid");
+	int dispenser_entindex = event->GetInt("dispenser_entindex", event->GetInt("entindex")); // entindex of the dispenser
+
+	CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByUserId(player_userid));
+	CFFBot *pBot = ToFFBot(pPlayer);
+
+	if (pBot)
+	{
+		CBaseEntity* pDispenser = UTIL_EntityByIndex(dispenser_entindex);
+		if (pDispenser && FClassnameIs(pDispenser, "obj_dispenser")) // FF_TODO_BUILDING: Verify dispenser classname
+		{
+			pBot->NotifyGotDispenserAmmo(pDispenser);
+		}
+	}
+}
+
 
 void CFFBotManager::OnPlayerChangeTeam( IGameEvent *event )
 {
@@ -779,13 +1177,30 @@ void CFFBotManager::ExtractScenarioData( void )
 			if (pInfoScript)
 			{
 				LuaObjectivePoint point;
-				Q_strncpy(point.name, pInfoScript->GetEntityNameAsCStr(), MAX_PATH - 1);
+				// Populate the descriptive name
+				Q_strncpy(point.name, pInfoScript->GetEntityNameAsCStr(), sizeof(point.name) - 1);
+				point.name[sizeof(point.name)-1] = '\0';
+
+				// Populate the unique Lua objective ID (m_id)
+				// FF_LUA_TODO: This assumes the "objective_id" used in Lua events will match the entity's targetname.
+				// If CFFInfoScript has a separate field for "Lua Objective ID", use that instead.
+				// For example: Q_strncpy(point.m_id, pInfoScript->GetLuaObjectiveId(), sizeof(point.m_id) - 1);
+				Q_strncpy(point.m_id, pInfoScript->GetEntityNameAsCStr(), sizeof(point.m_id) - 1);
+				point.m_id[sizeof(point.m_id)-1] = '\0';
+
 				point.position = pInfoScript->GetAbsOrigin();
 
-				// isActive based on FF_ScriptGoalState_e and m_iPosState
-				point.isActive = (pInfoScript->GetGoalState() != FF_ScriptGoalState_Disabled &&
-				                  pInfoScript->GetGoalState() != FF_ScriptGoalState_Remove &&
-								  pInfoScript->m_iPosState != PS_REMOVED); // m_iPosState is from CPointEntity
+				// Set m_state based on FF_ScriptGoalState_e and m_iPosState
+				if (pInfoScript->GetGoalState() == FF_ScriptGoalState_Disabled ||
+				    pInfoScript->GetGoalState() == FF_ScriptGoalState_Remove ||
+				    pInfoScript->m_iPosState == PS_REMOVED) // m_iPosState is from CPointEntity
+				{
+					point.m_state = LUA_OBJECTIVE_INACTIVE;
+				}
+				else
+				{
+					point.m_state = LUA_OBJECTIVE_ACTIVE; // Default to active if not explicitly disabled/removed
+				}
 
 				point.teamAffiliation = DetermineTeamAffiliationFromTouchFlags(pInfoScript->GetTouchFlags());
 				point.type = MapOmnibotGoalToBotObjectiveType(pInfoScript->GetBotGoalType());
@@ -824,10 +1239,11 @@ void CFFBotManager::ExtractScenarioData( void )
 				// For now, using a default. Some objectives might have hardcoded radii or use bbox.
 				point.radius = 100.0f; // Default radius
 				// Example: if (pInfoScript->HasRadius()) point.radius = pInfoScript->GetRadius();
+				point.m_entity = pInfoScript; // Store handle to the entity
 
 				m_luaObjectivePoints.AddToTail(point);
-				DevMsg("Extracted Lua Objective: %s at (%.f %.f %.f), Type: %d, TeamAff: %d, Active: %d, Owner: %d\n",
-					point.name, point.position.x, point.position.y, point.position.z, point.type, point.teamAffiliation, point.isActive, point.currentOwnerTeam);
+				DevMsg("Extracted Lua Objective: ID '%s', Name '%s' (EntIndex: %d) at (%.f %.f %.f), State: %d, Type: %d, TeamAff: %d, Owner: %d\n",
+					point.m_id, point.name, pInfoScript->entindex(), point.position.x, point.position.y, point.position.z, point.m_state, point.type, point.teamAffiliation, point.currentOwnerTeam);
 
 			}
 		}
@@ -881,20 +1297,18 @@ void CFFBotManager::ServerDeactivate( void ) { BaseClass::ServerDeactivate(); m_
 void CFFBotManager::ClientDisconnect( CBaseEntity *entity ) { BaseClass::ClientDisconnect(entity); }
 bool CFFBotManager::ClientCommand( CBasePlayer *player, const CCommand &args ) { return BaseClass::ClientCommand(player, args); }
 bool CFFBotManager::ServerCommand( const char *cmd ) { return false; }
-unsigned int CFFBotManager::GetPlayerPriority( CBasePlayer *player ) const { return 0; }
-bool CFFBotManager::IsImportantPlayer( CFFPlayer *player ) const { return false; }
+// unsigned int CFFBotManager::GetPlayerPriority( CBasePlayer *player ) const { return 0; } // Already defined
+// bool CFFBotManager::IsImportantPlayer( CFFPlayer *player ) const { return false; } // Already defined
 const CFFBotManager::Zone *CFFBotManager::GetZone( int i ) const { if (i < 0 || i >= m_zoneCount) return NULL; return &m_zone[i]; }
 const CFFBotManager::Zone *CFFBotManager::GetZone( const Vector &pos ) const { return NULL; } // Needs proper implementation
 const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const Vector &pos ) const { return NULL; } // Needs proper implementation
-int CFFBotManager::GetZoneCount( void ) const { return m_zoneCount; }
-void CFFBotManager::CheckForBlockedZones( void ) { }
+// int CFFBotManager::GetZoneCount( void ) const { return m_zoneCount; } // Already defined
+// void CFFBotManager::CheckForBlockedZones( void ) { } // Already defined
 const Vector *CFFBotManager::GetRandomPositionInZone( const Zone *zone ) const { return NULL; }
 CNavArea *CFFBotManager::GetRandomAreaInZone( const Zone *zone ) const { return NULL; }
-bool CFFBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, int weaponType, BotDifficultyType difficulty ) { return false; }
-void CFFBotManager::MaintainBotQuota( void ) { }
-void CFFBotManager::OnPlayerDeath( IGameEvent *event ) { CFFBot *bot; FF_FOR_EACH_BOT( bot, i ) { bot->OnPlayerDeath( event ); } }
+bool CFFBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, int weaponType, BotDifficultyType difficulty ) { return false; } // Placeholder, actual implementation exists
+void CFFBotManager::MaintainBotQuota( void ) { } // Placeholder, actual implementation exists
+// void CFFBotManager::OnPlayerDeath( IGameEvent *event ) { CFFBot *bot; FF_FOR_EACH_BOT( bot, i ) { bot->OnPlayerDeath( event ); } } // Already defined
 // ... and so on for all other event handlers and member functions previously defined in this file ...
 // This is just a structural placeholder to ensure the diff applies; the actual functions are assumed to be present.
 // The critical change is to ExtractScenarioData and the addition of the helper functions.
-
-[end of mp/src/game/server/ff/bot/ff_bot_manager.cpp]

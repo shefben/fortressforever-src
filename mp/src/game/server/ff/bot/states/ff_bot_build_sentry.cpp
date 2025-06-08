@@ -10,18 +10,20 @@
 #include "../ff_player.h"       // For CFFPlayer
 #include "../ff_weapon_base.h"  // For FF_WEAPON_SPANNER etc.
 #include "nav_area.h"         // For CNavArea
+#include "ff_buildable_sentrygun.h" // For CFFSentryGun
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 // Define constants for building
-const float ENGINEER_SENTRY_BUILD_TIME = 5.0f; // Placeholder: Time in seconds to initially build a sentry
-const float BUILD_PLACEMENT_RADIUS = 75.0f;   // How close the bot needs to be to the build location
-const float BUILD_REPATH_TIME = 2.5f;         // How often to repath if stuck
-const float ENGINEER_SENTRY_UPGRADE_TIME_PER_LEVEL = 5.0f; // Placeholder
-const int DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL = 2;     // Target level 2 by default (can be changed)
-extern const int SENTRY_COST_CELLS; // Defined in ff_bot.cpp (or should be moved to a shared consts file)
+const float ENGINEER_SENTRY_BUILD_TIME = 5.0f;
+const float BUILD_PLACEMENT_RADIUS = 75.0f;
+const float BUILD_REPATH_TIME = 2.5f;
+const float ENGINEER_SENTRY_UPGRADE_HIT_CYCLE_TIME = 1.0f; // Time for one "session" of hits for an upgrade attempt
+const int DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL = 2;
+extern const int SENTRY_COST_CELLS;
 const int SENTRY_UPGRADE_COST_CELLS = 50; // FF_TODO_BUILDING: Tune this value
+const int SENTRY_MAX_LEVEL = 3; // Assuming max level is 3, like TF2. Should be from CFFSentryGun::GetMaxUpgradeLevel()
 
 //--------------------------------------------------------------------------------------------------------------
 BuildSentryState::BuildSentryState(void)
@@ -30,14 +32,14 @@ BuildSentryState::BuildSentryState(void)
 	m_isBuilding = false;
 	m_isAtBuildLocation = false;
 	m_sentryBeingBuilt = NULL;
-	m_buildProgressTimer.Invalidate();
+	m_buildProgressTimer.Invalidate(); // Used for initial build and for upgrade hit cycles
 	m_repathTimer.Invalidate();
 	m_waitForBlueprintTimer.Invalidate();
 
 	m_isUpgrading = false;
 	m_targetUpgradeLevel = DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL;
-	m_currentUpgradeLevel = 1; // Assumes level 1 after initial build
-	m_upgradeProgressTimer.Invalidate();
+	// m_currentUpgradeLevel removed
+	// m_upgradeProgressTimer removed (using m_buildProgressTimer)
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -53,26 +55,19 @@ void BuildSentryState::SetBuildLocation(const Vector &location)
 }
 
 //--------------------------------------------------------------------------------------------------------------
-/**
- * Bot is entering the 'BuildSentry' state.
- */
 void BuildSentryState::OnEnter( CFFBot *me )
 {
-	me->SelectSpecificBuildable(CFFBot::BUILDABLE_SENTRY); // Ensure correct blueprint is selected
+	me->SelectSpecificBuildable(CFFBot::BUILDABLE_SENTRY);
 	me->PrintIfWatched( "BuildSentryState: Entering state.\n" );
 	m_isBuilding = false;
 	m_isAtBuildLocation = false;
 	m_sentryBeingBuilt = NULL;
 	m_waitForBlueprintTimer.Invalidate();
 	m_isUpgrading = false;
-	m_currentUpgradeLevel = 1; // Assume starts at level 1 after blueprint
-	m_targetUpgradeLevel = DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL; // Default target
+	m_targetUpgradeLevel = DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL;
 
 	if (m_buildLocation == vec3_invalid)
 	{
-		// If no specific location given, try to find a sensible default.
-		// Placeholder: build 100 units in front.
-		// A real implementation would use strategic point finding (e.g. near guarded objective).
 		Vector forward;
 		AngleVectors(me->GetLocalAngles(), &forward);
 		m_buildLocation = me->GetAbsOrigin() + forward * 100.0f;
@@ -94,15 +89,10 @@ void BuildSentryState::OnEnter( CFFBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-/**
- * Bot is building a sentry.
- */
 void BuildSentryState::OnUpdate( CFFBot *me )
 {
-	// Minimal placeholder logic for now. Will be fleshed out in Phase 2.
-	me->PrintIfWatched( "BuildSentryState: Updating...\n" );
+	// me->PrintIfWatched( "BuildSentryState: Updating...\n" ); // Too spammy
 
-	// Handle enemy threats first
 	if (me->GetBotEnemy() != NULL && me->IsEnemyVisible())
 	{
 		me->PrintIfWatched("BuildSentryState: Enemy detected! Aborting build and attacking.\n");
@@ -131,69 +121,32 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 				}
 				m_repathTimer.Start(BUILD_REPATH_TIME);
 			}
-			return; // Still moving
+			return;
 		}
 	}
 
 	// At build location
-	if (!m_isBuilding)
+	if (!m_isBuilding && !m_isUpgrading) // Phase 1: Place blueprint and wait for initial build
 	{
-		me->PrintIfWatched("BuildSentryState: Attempting to place sentry blueprint.\n");
-		CFFWeaponBase *spanner = me->GetWeaponByID(FF_WEAPON_SPANNER);
-		if (spanner) me->EquipWeapon(spanner);
-		else { me->PrintIfWatched("BuildSentryState: Engineer has no spanner!\n"); me->Idle(); return; }
-
-		// Simulate selecting Sentry from build menu (e.g., press Attack2)
-		// This is highly game-dependent. For now, a placeholder.
-		// FF_TODO_BUILDING: If me->GetSelectedBuildable() is not what this state specifically wants (e.g., in BuildSentryState but BUILDABLE_DISPENSER is selected), call me->CycleSelectedBuildable() N times until the correct one is selected or log an error if it cannot be selected.
-		// For this subtask, assume SelectSpecificBuildable in OnEnter correctly sets it and no cycling is needed here yet.
-		// me->PrimaryAttack(); // This was to "place" the blueprint, now handled by SelectSpecificBuildable (via command) in OnEnter.
-
-		// Start a short timer to wait for the blueprint entity to spawn after the command.
-		if (!m_waitForBlueprintTimer.HasStarted())
+		if (!m_sentryBeingBuilt.Get()) // Try to find/confirm blueprint
 		{
-			m_waitForBlueprintTimer.Start(0.2f); // Short delay (e.g., 200ms)
-		}
-
-		// Only try to find the blueprint after the timer has elapsed
-		if (!m_waitForBlueprintTimer.IsElapsed())
-		{
-			return; // Wait for blueprint to spawn
-		}
-
-		// After conceptual placement via command (in OnEnter), try to find the placed sentry.
-		// This assumes the game has spawned an "obj_sentrygun" (or similar) entity nearby.
-		// The actual classname for FF sentries needs to be verified.
-		float searchRadius = 150.0f;
-		CBaseEntity *pEntity = NULL;
-		while ((pEntity = gEntList.FindEntityInSphere(pEntity, m_buildLocation, searchRadius)) != NULL)
-		{
-			// FF_TODO_BUILDING: Verify actual sentry classname "obj_sentrygun_blueprint" or "obj_sentrygun" in initial state.
-			if (FClassnameIs(pEntity, "obj_sentrygun"))
+			// SelectSpecificBuildable in OnEnter issues the command. Now wait for blueprint.
+			if (!m_waitForBlueprintTimer.HasStarted())
 			{
-				CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(pEntity);
-				// Check if it's ours and if it's in a building phase
-				if (pBuildable && pBuildable->GetBuilder() == me && pBuildable->IsBuilding())
-				{
-					m_sentryBeingBuilt = pBuildable;
-					me->PrintIfWatched("BuildSentryState: Found placed sentry blueprint: %s\n", pBuildable->GetClassname());
-					break;
-				}
+				m_waitForBlueprintTimer.Start(0.3f); // Wait a bit for entity to spawn
 			}
-		}
+			if (!m_waitForBlueprintTimer.IsElapsed())
+			{
+				return;
+			}
 
-		// This search is now inside the IsElapsed() check for m_waitForBlueprintTimer
-		if (!m_sentryBeingBuilt.Get()) // Only search if we haven't found it yet
-		{
 			float searchRadius = 150.0f;
 			CBaseEntity *pEntity = NULL;
 			while ((pEntity = gEntList.FindEntityInSphere(pEntity, m_buildLocation, searchRadius)) != NULL)
 			{
-				// FF_TODO_BUILDING: Verify actual sentry classname "obj_sentrygun_blueprint" or "obj_sentrygun" in initial state.
 				if (FClassnameIs(pEntity, "obj_sentrygun"))
 				{
 					CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(pEntity);
-					// Check if it's ours and if it's in a building phase
 					if (pBuildable && pBuildable->GetBuilder() == me && pBuildable->IsBuilding())
 					{
 						m_sentryBeingBuilt = pBuildable;
@@ -202,148 +155,108 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 					}
 				}
 			}
-		}
 
-		if (!m_sentryBeingBuilt.Get()) // Check again after attempting to find it
-		{
-			me->PrintIfWatched("BuildSentryState: Failed to find placed sentry blueprint nearby after waiting. Idling.\n");
-			// Potentially try placing again after a delay, or give up.
-			me->Idle();
-			return;
-		}
-
-		// Blueprint found, proceed with building logic.
-		// Simulate starting to build
-		// Resource Check for initial build
-		if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_COST_CELLS)
-		{
-			me->PrintIfWatched("BuildSentryState: Not enough cells (%d required) for initial sentry build. Finding resources.\n", SENTRY_COST_CELLS);
-			me->TryToFindResources(); // Assumes this method exists and transitions state
-			return;
-		}
-		me->RemoveAmmo(SENTRY_COST_CELLS, AMMO_CELLS); // Deduct resources
-		me->PrintIfWatched("BuildSentryState: Deducted %d cells for sentry. Remaining: %d\n", SENTRY_COST_CELLS, me->GetAmmoCount(AMMO_CELLS));
-
-		m_isBuilding = true;
-		m_buildProgressTimer.Start(ENGINEER_SENTRY_BUILD_TIME);
-		me->PrintIfWatched("BuildSentryState: Sentry blueprint found/placed. Starting initial build timer.\n");
-	}
-	else if (m_isBuilding && !m_isUpgrading) // Initial construction phase
-	{
-		// Ensure spanner is equipped
-		CFFWeaponBase *spanner = me->GetWeaponByID(FF_WEAPON_SPANNER);
-		if (me->GetActiveFFWeapon() != spanner) {
-			if (spanner) me->EquipWeapon(spanner);
-			else { me->PrintIfWatched("BuildSentryState: Engineer has no spanner during build!\n"); me->Idle(); return; }
-		}
-
-		// Aim at the sentry and "hit" it
-		if (m_sentryBeingBuilt.Get())
-		{
-			me->SetLookAt("Building Sentry", m_sentryBeingBuilt->WorldSpaceCenter(), PRIORITY_HIGH);
-		}
-		else
-		{
-			// Fallback if sentry handle lost, though should ideally not happen if found once.
-			me->SetLookAt("Building Sentry", m_buildLocation, PRIORITY_HIGH);
-		}
-		me->PressButton(IN_ATTACK); // Hold primary fire to hit/build
-
-		if (m_buildProgressTimer.IsElapsed())
-		{
-			me->PrintIfWatched("BuildSentryState: Initial sentry construction complete.\n");
-			me->ReleaseButton(IN_ATTACK); // Stop hitting for a moment
-			m_isBuilding = false; // Initial construction is done
-
-			if (m_sentryBeingBuilt.Get()) // Check if we still have a valid sentry
+			if (!m_sentryBeingBuilt.Get())
 			{
-				// Sync currentUpgradeLevel with the bot's knowledge, which should be set by NotifyBuildingBuilt
-				m_currentUpgradeLevel = me->m_sentryLevel; // Should be 1 after initial build
-				// FF_TODO_BUILDING: Ideally, CFFBuildableObject::GetLevel() should be used if available and reliable here.
-
-				if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure level is valid before upgrading
-				{
-					// Resource Check for upgrade
-					if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_UPGRADE_COST_CELLS)
-					{
-						me->PrintIfWatched("BuildSentryState: Not enough cells (%d required) for sentry upgrade to level %d. Finding resources.\n", SENTRY_UPGRADE_COST_CELLS, m_currentUpgradeLevel + 1);
-						m_isUpgrading = false; // Stop trying to upgrade this sequence
-						me->TryToFindResources();
-						return;
-					}
-					me->RemoveAmmo(SENTRY_UPGRADE_COST_CELLS, AMMO_CELLS); // Deduct resources
-					me->PrintIfWatched("BuildSentryState: Deducted %d cells for sentry upgrade. Remaining: %d\n", SENTRY_UPGRADE_COST_CELLS, me->GetAmmoCount(AMMO_CELLS));
-
-					m_isUpgrading = true;
-					me->PrintIfWatched("BuildSentryState: Starting upgrade to level %d.\n", m_currentUpgradeLevel + 1);
-					m_upgradeProgressTimer.Start(ENGINEER_SENTRY_UPGRADE_TIME_PER_LEVEL);
-				}
-				else
-				{
-					me->PrintIfWatched("BuildSentryState: Sentry already at target level %d. No upgrade needed.\n", m_targetUpgradeLevel);
-					// me->Idle(); // Already at target level - Change to TryToGuardSentry
-					me->TryToGuardSentry();
-					return;
-				}
-			}
-			else
-			{
-				me->PrintIfWatched("BuildSentryState: Sentry became invalid after initial build. Idling.\n");
+				me->PrintIfWatched("BuildSentryState: Failed to find placed sentry blueprint nearby after waiting. Idling.\n");
 				me->Idle();
 				return;
 			}
 		}
-	}
-	else if (m_isUpgrading) // Upgrading phase
-	{
-		if (!m_sentryBeingBuilt.Get())
+
+		// Blueprint found, now "hit" it for initial construction
+		CFFBuildableObject *pSentryObject = dynamic_cast<CFFBuildableObject*>(m_sentryBeingBuilt.Get());
+		if (!pSentryObject) { me->Idle(); return; }
+
+
+		if (pSentryObject->IsBuilt()) // Initial build completed (likely by NotifyBuildingBuilt setting level > 0)
 		{
-			me->PrintIfWatched("BuildSentryState: Sentry being upgraded became NULL. Idling.\n");
+			me->PrintIfWatched("BuildSentryState: Initial sentry construction complete (IsBuilt() is true).\n");
+			me->ReleaseButton(IN_ATTACK);
+
+			CFFSentryGun *pSentryGun = dynamic_cast<CFFSentryGun*>(pSentryObject);
+			if (!pSentryGun) { me->PrintIfWatched("Sentry is not CFFSentryGun after build? Idling.\n"); me->Idle(); return; }
+
+			int currentActualLevel = pSentryGun->GetLevel();
+			me->SetBuildingLevel(pSentryGun, currentActualLevel); // Sync bot's internal belief
+
+			if (currentActualLevel < m_targetUpgradeLevel && currentActualLevel < pSentryGun->GetMaxUpgradeLevel())
+			{
+				if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_UPGRADE_COST_CELLS)
+				{
+					me->PrintIfWatched("BuildSentryState: Not enough cells (%d) for upgrade to L%d. Finding resources.\n", SENTRY_UPGRADE_COST_CELLS, currentActualLevel + 1);
+					me->TryToFindResources();
+					return;
+				}
+				me->RemoveAmmo(SENTRY_UPGRADE_COST_CELLS, AMMO_CELLS);
+				me->PrintIfWatched("BuildSentryState: Deducted %d cells for L%d upgrade. Remaining: %d\n", SENTRY_UPGRADE_COST_CELLS, currentActualLevel + 1, me->GetAmmoCount(AMMO_CELLS));
+
+				m_isUpgrading = true;
+				me->PrintIfWatched("BuildSentryState: Starting upgrade to level %d.\n", currentActualLevel + 1);
+				m_buildProgressTimer.Start(ENGINEER_SENTRY_UPGRADE_HIT_CYCLE_TIME);
+			}
+			else
+			{
+				me->PrintIfWatched("BuildSentryState: Sentry at target/max level %d. Guarding.\n", currentActualLevel);
+				me->TryToGuardSentry();
+			}
+			return;
+		}
+		else // Still in initial construction phase (IsBuilding() was true, IsBuilt() is false)
+		{
+			CFFWeaponBase *spanner = me->GetWeaponByID(FF_WEAPON_SPANNER);
+			if (me->GetActiveFFWeapon() != spanner) {
+				if (spanner) me->EquipWeapon(spanner);
+				else { me->PrintIfWatched("BuildSentryState: Engineer has no spanner!\n"); me->Idle(); return; }
+			}
+			me->SetLookAt("Building Sentry", pSentryObject->WorldSpaceCenter(), PRIORITY_HIGH);
+			me->PressButton(IN_ATTACK); // Hold primary fire to hit/build
+		}
+	}
+	else if (m_isUpgrading) // Phase 2: Upgrading
+	{
+		CFFSentryGun *pSentryGun = dynamic_cast<CFFSentryGun*>(m_sentryBeingBuilt.Get());
+		if (!pSentryGun || !pSentryGun->IsAlive())
+		{
+			me->PrintIfWatched("BuildSentryState: Sentry being upgraded became NULL/dead or not a CFFSentryGun. Idling.\n");
 			me->Idle();
 			return;
 		}
 
-		// Ensure spanner is equipped
 		CFFWeaponBase *spanner = me->GetWeaponByID(FF_WEAPON_SPANNER);
 		if (me->GetActiveFFWeapon() != spanner) {
 			if (spanner) me->EquipWeapon(spanner);
-			else { me->PrintIfWatched("BuildSentryState: Engineer has no spanner during upgrade!\n"); me->Idle(); return; }
+			else { me->PrintIfWatched("BuildSentryState: Engineer has no spanner during upgrade!\n"); m_isUpgrading = false; me->Idle(); return; }
 		}
 
-		me->SetLookAt("Upgrading Sentry", m_sentryBeingBuilt->WorldSpaceCenter(), PRIORITY_HIGH);
-		me->PressButton(IN_ATTACK); // Keep hitting to upgrade
+		me->SetLookAt("Upgrading Sentry", pSentryGun->WorldSpaceCenter(), PRIORITY_HIGH);
+		me->PressButton(IN_ATTACK); // Keep hitting
 
-		// FF_TODO_BUILDING: Ideally, check m_sentryBeingBuilt->GetLevel() to see if it actually leveled up.
-		// For simulation, we rely on the timer.
-		// The actual level increment should be handled by CFFBot::NotifyBuildingUpgraded
-		if (m_upgradeProgressTimer.IsElapsed())
+		if (m_buildProgressTimer.IsElapsed()) // A cycle of hits for upgrade attempt is done
 		{
-			// Sync with the bot's knowledge of the sentry level, which should have been updated by an event
-			m_currentUpgradeLevel = me->m_sentryLevel;
-			me->PrintIfWatched("BuildSentryState: Sentry upgrade timer elapsed. Current known level: %d.\n", m_currentUpgradeLevel);
+			me->ReleaseButton(IN_ATTACK); // Stop hitting to check level
 
-			if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure valid level
+			int currentActualLevel = pSentryGun->GetLevel();
+			me->SetBuildingLevel(pSentryGun, currentActualLevel);
+			me->PrintIfWatched("BuildSentryState: Sentry upgrade hit cycle complete. Current actual level: %d. Target: %d\n", currentActualLevel, m_targetUpgradeLevel);
+
+			if (currentActualLevel < m_targetUpgradeLevel && currentActualLevel < pSentryGun->GetMaxUpgradeLevel())
 			{
-				// Resource Check for next upgrade level
 				if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_UPGRADE_COST_CELLS)
 				{
-					me->PrintIfWatched("BuildSentryState: Not enough cells (%d required) for sentry upgrade to level %d. Stopping upgrade.\n", SENTRY_UPGRADE_COST_CELLS, m_currentUpgradeLevel + 1);
-					m_isUpgrading = false; // Stop trying to upgrade
-					me->Idle(); // Or TryToFindResources() if preferred
+					me->PrintIfWatched("BuildSentryState: Not enough cells (%d) for upgrade to L%d. Finding resources.\n", SENTRY_UPGRADE_COST_CELLS, currentActualLevel + 1);
+					m_isUpgrading = false;
+					me->TryToFindResources();
 					return;
 				}
-				me->RemoveAmmo(SENTRY_UPGRADE_COST_CELLS, AMMO_CELLS); // Deduct resources
-				me->PrintIfWatched("BuildSentryState: Deducted %d cells for sentry upgrade. Remaining: %d\n", SENTRY_UPGRADE_COST_CELLS, me->GetAmmoCount(AMMO_CELLS));
-
-				me->PrintIfWatched("BuildSentryState: Starting upgrade to level %d.\n", m_currentUpgradeLevel + 1);
-				m_upgradeProgressTimer.Start(ENGINEER_SENTRY_UPGRADE_TIME_PER_LEVEL);
+				me->RemoveAmmo(SENTRY_UPGRADE_COST_CELLS, AMMO_CELLS);
+				me->PrintIfWatched("BuildSentryState: Deducted %d cells for next sentry upgrade attempt (to L%d). Remaining: %d\n", SENTRY_UPGRADE_COST_CELLS, currentActualLevel + 1, me->GetAmmoCount(AMMO_CELLS));
+				m_buildProgressTimer.Start(ENGINEER_SENTRY_UPGRADE_HIT_CYCLE_TIME);
 			}
 			else
 			{
-				me->PrintIfWatched("BuildSentryState: Sentry fully upgraded to target level %d.\n", m_targetUpgradeLevel);
-				me->ReleaseButton(IN_ATTACK);
+				me->PrintIfWatched("BuildSentryState: Sentry fully upgraded to target/max level %d. Current actual: %d. Guarding.\n", m_targetUpgradeLevel, currentActualLevel);
 				m_isUpgrading = false;
-				// FF_TODO_ENGINEER: Transition to a "DefendSentryState" or similar - now TryToGuardSentry
 				me->TryToGuardSentry();
 				return;
 			}
@@ -352,19 +265,14 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-/**
- * Bot is exiting the 'BuildSentry' state.
- */
 void BuildSentryState::OnExit( CFFBot *me )
 {
 	me->PrintIfWatched( "BuildSentryState: Exiting state.\n" );
-	me->ReleaseButton(IN_ATTACK); // Ensure attack button is released
+	me->ReleaseButton(IN_ATTACK);
 	me->ClearLookAt();
 
-	// If a sentry was being built/upgraded, check if it needs immediate repair (e.g., took damage during process)
 	if (m_sentryBeingBuilt.Get() && m_sentryBeingBuilt->IsAlive())
 	{
-		// Cast to CFFBuildableObject to check health if needed, or just attempt repair
 		CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(m_sentryBeingBuilt.Get());
 		if (pBuildable && pBuildable->GetHealth() < pBuildable->GetMaxHealth())
 		{
@@ -373,7 +281,6 @@ void BuildSentryState::OnExit( CFFBot *me )
 		}
 	}
 
-	// After attempting repairs (or if no repair was needed), check if we need resources
 	if (me->GetState() == this && me->GetAmmoCount(AMMO_CELLS) < CFFBot::ENGINEER_LOW_CELL_THRESHOLD)
 	{
 		me->PrintIfWatched("BuildSentryState: Low on cells after building/repair. Finding resources.\n");
@@ -385,10 +292,8 @@ void BuildSentryState::OnExit( CFFBot *me )
 	m_sentryBeingBuilt = NULL;
 	m_buildProgressTimer.Invalidate();
 	m_repathTimer.Invalidate();
-
+	m_waitForBlueprintTimer.Invalidate();
 	m_isUpgrading = false;
-	m_upgradeProgressTimer.Invalidate();
-	// m_currentUpgradeLevel and m_targetUpgradeLevel retain values for next entry if needed, or reset in OnEnter.
 }
 
 [end of mp/src/game/server/ff/bot/states/ff_bot_build_sentry.cpp]
