@@ -10,16 +10,16 @@
 #include "cbase.h"
 #include "ff_bot.h"
 #include "ff_bot_manager.h"
-#include "ff_bot_chatter.h"
+// #include "ff_bot_chatter.h" // Removed CS-specific chatter
 #include "ff_gamestate.h"
 #include "../ff_player.h"
 #include "../../shared/ff/weapons/ff_weapon_base.h"
 #include "../../shared/ff/ff_gamerules.h"
 
-// Shared bot headers
-#include "../../shared/bot/bot_profile.h"
-#include "../../shared/bot/bot_constants.h"
-#include "../../shared/bot/bot_util.h"
+// Shared bot headers changed to local
+#include "bot_profile.h"
+#include "bot_constants.h"
+#include "bot_util.h"
 
 // State headers - CFFBot instantiates these
 #include "states/ff_bot_state_idle.h"
@@ -28,11 +28,12 @@
 #include "states/ff_bot_state_investigate_noise.h"
 #include "states/ff_bot_state_buy.h"
 #include "states/ff_bot_state_move_to.h"
-#include "states/ff_bot_state_fetch_bomb.h"
-#include "states/ff_bot_state_plant_bomb.h"
-#include "states/ff_bot_state_defuse_bomb.h"
+// Removed includes for deleted CS bomb states
+// #include "states/ff_bot_state_fetch_bomb.h"
+// #include "states/ff_bot_state_plant_bomb.h"
+// #include "states/ff_bot_state_defuse_bomb.h"
 #include "states/ff_bot_state_hide.h"
-#include "states/ff_bot_state_escape_from_bomb.h"
+// #include "states/ff_bot_state_escape_from_bomb.h"
 #include "states/ff_bot_state_follow.h"
 #include "states/ff_bot_state_use_entity.h"
 #include "states/ff_bot_state_open_door.h"
@@ -145,7 +146,10 @@ int CFFBot::OnTakeDamage( const CTakeDamageInfo &info )
 		CFFPlayer *player = static_cast<CFFPlayer *>( attacker );
 		
 		if (player && InSameTeam( player ) && !player->IsBot()) // Added null check for player
-			GetChatter()->FriendlyFire();
+		{
+			// GetChatter()->FriendlyFire(); // Removed CS-specific chatter
+			// TODO_FF: Consider alternative feedback for friendly fire if needed
+		}
 	}
 
 	if (attacker && attacker->IsPlayer() && IsEnemy( attacker )) // Added null check for attacker
@@ -197,7 +201,7 @@ void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 { 
 //	PrintIfWatched( "Killed( attacker = %s )\n", STRING(pevAttacker->netname) );
 
-	GetChatter()->OnDeath();
+	// GetChatter()->OnDeath(); // Removed CS-specific chatter
 
 	// increase the danger where we died
 	const float deathDanger = 1.0f;
@@ -387,7 +391,7 @@ void CFFBot::SetBotEnemy( CFFPlayer *enemy )
 		m_enemy = enemy; 
 		m_currentEnemyAcquireTimestamp = gpGlobals->curtime;
 
-		PrintIfWatched( "SetBotEnemy: %s\n", (enemy) ? enemy->GetPlayerName() : "(NULL)" );
+		PrintIfWatched(this, "SetBotEnemy: %s\n", (enemy) ? enemy->GetPlayerName() : "(NULL)" ); // Updated PrintIfWatched
 	}
 }
 
@@ -407,12 +411,12 @@ bool CFFBot::StayOnNavMesh( void )
 		{
 			if (!TheNavMesh) return false;
 			goalArea = TheNavMesh->GetNearestNavArea( GetCentroid( this ) );
-			PrintIfWatched( "Started off the nav mesh - moving to closest nav area...\n" );
+			PrintIfWatched(this, "Started off the nav mesh - moving to closest nav area...\n" ); // Updated PrintIfWatched
 		}
 		else
 		{
 			goalArea = m_lastKnownArea;
-			PrintIfWatched( "Getting out of NULL area...\n" );
+			PrintIfWatched(this, "Getting out of NULL area...\n" ); // Updated PrintIfWatched
 		}
 
 		if (goalArea)
@@ -454,48 +458,10 @@ bool CFFBot::IsDoingScenario( void ) const
  * Return true if we noticed the bomb on the ground or on the radar (for T's only)
  */
 // TODO: Bomb logic for FF
-bool CFFBot::NoticeLooseBomb( void ) const
-{
-	if (!TheFFBots() || TheFFBots()->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB) // Null check, SCENARIO_DEFUSE_BOMB is CS
-		return false;
-	CBaseEntity *bomb = TheFFBots()->GetLooseBomb();
-	if (bomb) return true; // Simplified: if bomb entity exists, T's "notice"
-	return false;
-}
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * Return true if can see the bomb lying on the ground
- */
-// TODO: Bomb logic for FF
-bool CFFBot::CanSeeLooseBomb( void ) const
-{
-	if (!TheFFBots() || TheFFBots()->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB) // Null check, SCENARIO_DEFUSE_BOMB is CS
-		return false;
-	CBaseEntity *bomb = TheFFBots()->GetLooseBomb();
-	if (bomb)
-	{
-		if (IsVisible( bomb->GetAbsOrigin(), CHECK_FOV )) // CHECK_FOV needs to be defined
-			return true;
-	}
-	return false;
-}
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * Return true if can see the planted bomb 
- */
-// TODO: Bomb logic for FF
-bool CFFBot::CanSeePlantedBomb( void ) const
-{
-	if (!TheFFBots() || TheFFBots()->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB) // Null check, SCENARIO_DEFUSE_BOMB is CS
-		return false;
-	if (!GetGameState() || !GetGameState()->IsBombPlanted()) return false; // Null check
-	const Vector *bombPos = GetGameState()->GetBombPosition();
-	if (bombPos && IsVisible( *bombPos, CHECK_FOV )) // CHECK_FOV
-		return true;
-	return false;
-}
+// TODO_FF: CS Bomb-specific methods below are removed.
+// bool CFFBot::NoticeLooseBomb( void ) const { ... }
+// bool CFFBot::CanSeeLooseBomb( void ) const { ... }
+// bool CFFBot::CanSeePlantedBomb( void ) const { ... }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
@@ -506,6 +472,17 @@ CFFPlayer *CFFBot::GetAttacker( void ) const
 	if (m_attacker.IsValid() && m_attacker->IsAlive()) // Use .IsValid() for EHANDLE
 		return m_attacker.Get(); // Use .Get() for EHANDLE
 	return NULL;
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+/**
+ * Return the bot's currently equipped weapon
+ */
+CFFWeaponBase *CFFBot::GetActiveFFWeapon() const
+{
+    CBaseCombatWeapon *pCombatWeapon = GetActiveWeapon(); // Inherited from CBasePlayer
+    return dynamic_cast<CFFWeaponBase *>(pCombatWeapon);
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -558,13 +535,13 @@ void CFFBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
 			leastRecent = i;
 		}
 	}
-	if (m_checkedHidingSpotCount < MAX_CHECKED_SPOTS_FF) // Use renamed const
+	if (m_checkedHidingSpotCount < MAX_CHECKED_SPOTS_FF)
 	{
 		m_checkedHidingSpot[ m_checkedHidingSpotCount ].spot = spot;
 		m_checkedHidingSpot[ m_checkedHidingSpotCount ].timestamp = gpGlobals->curtime;
 		++m_checkedHidingSpotCount;
 	}
-	else if (m_checkedHidingSpotCount > 0) // Ensure not to write out of bounds if count is 0
+	else if (m_checkedHidingSpotCount > 0)
 	{
 		m_checkedHidingSpot[ leastRecent ].spot = spot;
 		m_checkedHidingSpot[ leastRecent ].timestamp = gpGlobals->curtime;
@@ -576,22 +553,10 @@ void CFFBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
 /**
  * Periodic check of hostage count in case we lost some
  */
-// TODO: Hostage logic is CS-specific. Adapt or remove for FF.
+// TODO_FF: Hostage logic is CS-specific. Removed.
 void CFFBot::UpdateHostageEscortCount( void )
 {
-	// const float updateInterval = 1.0f;
-	// if (m_hostageEscortCount == 0 || gpGlobals->curtime - m_hostageEscortCountTimestamp < updateInterval)
-	//	return;
-	// m_hostageEscortCountTimestamp = gpGlobals->curtime;
-	// m_hostageEscortCount = 0;
-	// if (g_Hostages.IsValid()) { // g_Hostages
-	//	for( int i=0; i<g_Hostages.Count(); ++i )
-	//	{
-	//		CHostage *hostage = g_Hostages[i]; // CHostage
-	//		if ( !hostage || !hostage->IsValid() || !hostage->IsAlive() ) continue;
-	//		if ( hostage->IsFollowing( this ) ) ++m_hostageEscortCount;
-	//	}
-	// }
+	// CS Hostage logic removed
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -621,21 +586,21 @@ int CFFBot::OutnumberedCount( void ) const
  */
 CFFPlayer *CFFBot::GetImportantEnemy( bool checkVisibility ) const
 {
-	if (!TheFFBots()) return NULL; // Null check
+	if (!TheFFBots()) return NULL;
 	CFFPlayer *nearEnemy = NULL;
-	float nearDist = FLT_MAX; // Use FLT_MAX
+	float nearDist = FLT_MAX;
 
 	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
 	{
 		CBaseEntity *entity = UTIL_PlayerByIndex( i );
 		if (!entity || !entity->IsPlayer()) continue;
 		CFFPlayer *player = static_cast<CFFPlayer *>( entity );
-		if (!player->IsAlive() || InSameTeam( player ) || !TheFFBots()->IsImportantPlayer( player )) continue; // IsImportantPlayer needs FF adaptation
+		if (!player->IsAlive() || InSameTeam( player ) || !TheFFBots()->IsImportantPlayer( player )) continue;
 
 		float distSq = (GetAbsOrigin() - player->GetAbsOrigin()).LengthSqr();
 		if (distSq < nearDist)
 		{
-			if (checkVisibility && !IsVisible( player, true )) continue; // CHECK_FOV = true
+			if (checkVisibility && !IsVisible( player, true )) continue;
 			nearEnemy = player;
 			nearDist = distSq;
 		}
@@ -650,7 +615,7 @@ CFFPlayer *CFFBot::GetImportantEnemy( bool checkVisibility ) const
 void CFFBot::SetDisposition( DispositionType disposition )
 { 
 	m_disposition = disposition;
-	if (m_disposition != IGNORE_ENEMIES) m_ignoreEnemiesTimer.Invalidate(); // IGNORE_ENEMIES enum
+	if (m_disposition != IGNORE_ENEMIES) m_ignoreEnemiesTimer.Invalidate();
 }
 
 
@@ -660,7 +625,7 @@ void CFFBot::SetDisposition( DispositionType disposition )
  */
 CFFBot::DispositionType CFFBot::GetDisposition( void ) const
 {
-	if (!m_ignoreEnemiesTimer.IsElapsed()) return IGNORE_ENEMIES; // IGNORE_ENEMIES enum
+	if (!m_ignoreEnemiesTimer.IsElapsed()) return IGNORE_ENEMIES;
 	return m_disposition;
 }
 
@@ -679,7 +644,7 @@ void CFFBot::IgnoreEnemies( float duration )
  */
 void CFFBot::IncreaseMorale( void )
 {
-	if (m_morale < EXCELLENT) m_morale = static_cast<MoraleType>( m_morale + 1 ); // EXCELLENT enum
+	if (m_morale < EXCELLENT) m_morale = static_cast<MoraleType>( m_morale + 1 );
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -688,7 +653,7 @@ void CFFBot::IncreaseMorale( void )
  */
 void CFFBot::DecreaseMorale( void )
 {
-	if (m_morale > TERRIBLE) m_morale = static_cast<MoraleType>( m_morale - 1 ); // TERRIBLE enum
+	if (m_morale > TERRIBLE) m_morale = static_cast<MoraleType>( m_morale - 1 );
 }
 
 
@@ -698,11 +663,11 @@ void CFFBot::DecreaseMorale( void )
  */
 bool CFFBot::IsRogue( void ) const
 { 
-	if (!TheFFBots() || !TheFFBots()->AllowRogues()) return false; // Null check
+	if (!TheFFBots() || !TheFFBots()->AllowRogues()) return false;
 	if (m_rogueTimer.IsElapsed())
 	{
 		m_rogueTimer.Start( RandomFloat( 10.0f, 30.0f ) );
-		if (GetProfile()) m_isRogue = (RandomFloat( 0, 100 ) < (100.0f * (1.0f - GetProfile()->GetTeamwork()))); // Null check
+		if (GetProfile()) m_isRogue = (RandomFloat( 0, 100 ) < (100.0f * (1.0f - GetProfile()->GetTeamwork())));
 		else m_isRogue = false;
 	}
 	return m_isRogue; 
@@ -716,10 +681,10 @@ bool CFFBot::IsRogue( void ) const
 bool CFFBot::IsHurrying( void ) const
 {
 	if (!m_hurryTimer.IsElapsed()) return true;
-	if (!TheFFBots() || !GetGameState()) return false; // Null checks
+	if (!TheFFBots() || !GetGameState()) return false;
 	// TODO: Update for FF Scenarios and Teams
-	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && TheFFBots()->IsBombPlanted()) return true; // CS Specific
-	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES && GetTeamNumber() == TEAM_TERRORIST && GetGameState()->AreAllHostagesBeingRescued()) return true; // CS Specific
+	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && TheFFBots()->IsBombPlanted()) return true;
+	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES && GetTeamNumber() == TEAM_TERRORIST && GetGameState()->AreAllHostagesBeingRescued()) return true;
 	return false;
 }
 
@@ -729,7 +694,7 @@ bool CFFBot::IsHurrying( void ) const
  */
 bool CFFBot::IsSafe( void ) const
 {
-	if (!TheFFBots()) return true; // Default to safe if manager is null
+	if (!TheFFBots()) return true;
 	if (TheFFBots()->GetElapsedRoundTime() < m_safeTime) return true;
 	return false;
 }
@@ -740,7 +705,7 @@ bool CFFBot::IsSafe( void ) const
  */
 bool CFFBot::IsWellPastSafe( void ) const
 {
-	if (!TheFFBots()) return false; // Default to not well past safe
+	if (!TheFFBots()) return false;
 	if (TheFFBots()->GetElapsedRoundTime() > 2.0f * m_safeTime) return true;
 	return false;
 }
@@ -760,7 +725,7 @@ bool CFFBot::IsEndOfSafeTime( void ) const
  */
 float CFFBot::GetSafeTimeRemaining( void ) const
 {
-	if (!TheFFBots()) return m_safeTime; // Full safe time if manager is null
+	if (!TheFFBots()) return m_safeTime;
 	return m_safeTime - TheFFBots()->GetElapsedRoundTime();
 }
 
@@ -770,11 +735,11 @@ float CFFBot::GetSafeTimeRemaining( void ) const
  */
 void CFFBot::AdjustSafeTime( void )
 {
-	if (!TheFFBots()) return; // Null check
+	if (!TheFFBots()) return;
 	if (TheFFBots()->GetElapsedRoundTime() < m_safeTime)
 	{
 		m_safeTime = TheFFBots()->GetElapsedRoundTime() - 2.0f;
-		if (m_safeTime < 0) m_safeTime = 0; // Ensure safe time is not negative
+		if (m_safeTime < 0) m_safeTime = 0;
 	}
 }
 
@@ -794,11 +759,11 @@ bool CFFBot::HasNotSeenEnemyForLongTime( void ) const
  */
 bool CFFBot::GuardRandomZone( float range )
 {
-	if (!TheFFBots()) return false; // Null check
+	if (!TheFFBots()) return false;
 	const CFFBotManager::Zone *zone = TheFFBots()->GetRandomZone();
 	if (zone)
 	{
-		CNavArea *areaToGuard = TheFFBots()->GetRandomAreaInZone( zone ); // Renamed from rescueArea for clarity
+		CNavArea *areaToGuard = TheFFBots()->GetRandomAreaInZone( zone );
 		if (areaToGuard)
 		{
 			Hide( areaToGuard, -1.0f, range );
@@ -811,9 +776,8 @@ bool CFFBot::GuardRandomZone( float range )
 
 
 //--------------------------------------------------------------------------------------------------------------
-// CollectRetreatSpotsFunctor and FindNearbyRetreatSpot are fine as static/global helpers if not tied to CCSBot state.
-// If they use CCSBot members, they should be CFFBot members or take CFFBot*.
-// Assuming they are general utility for now, or will be adapted in their own definitions.
+// CollectRetreatSpotsFunctor and FindNearbyRetreatSpot are defined in ff_bot.cpp
+// (They were static in CSBot, now global or static within ff_bot.cpp if not moved to bot_util.cpp)
 
 //--------------------------------------------------------------------------------------------------------------
 // FarthestHostage functor and GetRangeToFarthestEscortedHostage are CS-specific (hostages)
@@ -825,9 +789,9 @@ bool CFFBot::GuardRandomZone( float range )
  */
 const char *CFFBot::GetTaskName( void ) const
 {
-	// This static array should be updated with FF TaskType names
-	static const char *name[] = { /* ... FF Task Names ... */ "SEEK_AND_DESTROY", "NUM_TASKS_INVALID" };
-	if (GetTask() < 0 || GetTask() >= NUM_TASKS) return "INVALID_TASK"; // Bounds check
+	// This static array should be updated with FF TaskType names from bot_constants.h
+	static const char *name[] = { "SEEK_AND_DESTROY", /* ... other task names ... */ "NUM_TASKS_INVALID" };
+	if (GetTask() < 0 || GetTask() >= NUM_BOT_TASKS) return "INVALID_TASK"; // Use NUM_BOT_TASKS from bot_constants.h
 	return name[ (int)GetTask() ];
 }
 
@@ -839,7 +803,7 @@ const char *CFFBot::GetTaskName( void ) const
 const char *CFFBot::GetDispositionName( void ) const
 {
 	static const char *name[] = { "ENGAGE_AND_INVESTIGATE", "OPPORTUNITY_FIRE", "SELF_DEFENSE", "IGNORE_ENEMIES", "NUM_DISPOSITIONS_INVALID" };
-	if (GetDisposition() < 0 || GetDisposition() >= NUM_DISPOSITIONS) return "INVALID_DISPOSITION"; // Bounds check
+	if (GetDisposition() < 0 || GetDisposition() >= NUM_DISPOSITIONS) return "INVALID_DISPOSITION"; // NUM_DISPOSITIONS from bot_constants.h
 	return name[ (int)GetDisposition() ];
 }
 
@@ -851,7 +815,7 @@ const char *CFFBot::GetDispositionName( void ) const
 const char *CFFBot::GetMoraleName( void ) const
 {
 	static const char *name[] = { "TERRIBLE", "BAD", "NEGATIVE", "NEUTRAL", "POSITIVE", "GOOD", "EXCELLENT", "NUM_MORALE_TYPES_INVALID" };
-	if (GetMorale() + 3 < 0 || GetMorale() + 3 >= NUM_MORALE_TYPES) return "INVALID_MORALE"; // Bounds check
+	if (GetMorale() + 3 < 0 || GetMorale() + 3 >= NUM_MORALE_TYPES) return "INVALID_MORALE"; // NUM_MORALE_TYPES from bot_constants.h
 	return name[ (int)GetMorale() + 3 ];
 }
 
@@ -867,7 +831,7 @@ void CFFBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwar
 	{
 		if ( m_Local.m_bDucked || m_Local.m_bDucking )
 		{
-			buttons &= ~IN_SPEED; // IN_SPEED needs to be defined
+			buttons &= ~IN_SPEED; // IN_SPEED needs to be defined (e.g. in in_buttons.h)
 		}
 		cmd.command_number = gpGlobals->tickcount;
 		cmd.forwardmove = forwardmove;
@@ -876,22 +840,14 @@ void CFFBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwar
 		cmd.buttons = buttons;
 		cmd.impulse = impulse;
 		VectorCopy( viewangles, cmd.viewangles );
-		if (random) cmd.random_seed = random->RandomInt( 0, 0x7fffffff ); // Null check random
+		if (random) cmd.random_seed = random->RandomInt( 0, 0x7fffffff );
 		else cmd.random_seed = 0;
 	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
-// Constructor, Destructor, ResetValues, SetState, State transition methods (Idle, Attack, etc.),
-// Spawn, Upkeep, Update methods are now assumed to be correctly defined in ff_bot.cpp as per previous refactoring.
-// If they were not fully moved, this would be the place for them.
-// For this subtask, focusing on includes and minor corrections based on current file content.
-// The previous overwrite of ff_bot.cpp included these, so they should be fine there.
-// This ff_bot.cpp snippet from read_files seems to be a more complete version than what was
-// perhaps generated in the previous step. This is good, as it contains the actual logic.
-// The key is that method definitions like CFFBot::Initialize, CFFBot::Spawn etc. are in this file.
-// And state logic (IdleState::OnEnter etc.) is in the state files.
-// And CFFBot::Idle(), CFFBot::Attack() wrappers are in ff_bot_statemachine.cpp.
-// This division of logic seems reasonable.
-
-[end of mp/src/game/server/ff/bot/ff_bot.cpp]
+// Definitions for CFFBot constructor, destructor, ResetValues, SetState, state transition methods (Idle, Attack, etc.),
+// Spawn, Upkeep, Update methods are in ff_bot.cpp.
+// State logic (IdleState::OnEnter etc.) is in the state files (e.g. states/ff_bot_state_idle.cpp).
+// State transition wrappers (CFFBot::Idle(), CFFBot::Attack()) are in ff_bot_statemachine.cpp.
+// This ensures a cleaner separation of concerns.

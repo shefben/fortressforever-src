@@ -1,26 +1,22 @@
 //========= Copyright Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Weapon handling and selection logic for Fortress Forever bots.
 //
 // $NoKeywords: $
 //=============================================================================//
 
-// Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
-
 #include "cbase.h"
 #include "ff_bot.h"
-#include "ff_bot_manager.h" // For TheFFBots()
-#include "../ff_player.h"     // For CFFPlayer
-#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase, FFWeaponID, WEAPONTYPE_*
-#include "../../shared/ff/weapons/ff_weapon_parse.h"  // For GetCSWpnData (becomes GetFFWpnData), CFFWeaponInfo
-// #include "../../shared/ff/ff_gamerules.h" // For FFGameRules() (potentially used)
-#include "ff_gamestate.h"   // For FFGameState
-#include "bot_constants.h"  // For BotTaskType, PriorityType, etc.
-#include "bot_profile.h"    // For BotProfile
-
-// TODO: Replace "basecsgrenade_projectile.h" with FF equivalent if grenade projectiles are handled this way
-// #include "basecsgrenade_projectile.h"
-
+#include "ff_bot_manager.h"
+#include "../ff_player.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+#include "../../shared/ff/weapons/ff_weapon_parse.h"  // For CFFWeaponInfo
+#include "../../shared/ff/ff_playerclass_parse.h" // For CFFPlayerClassInfo (needed for EquipBestWeapon)
+#include "ff_gamestate.h"
+#include "bot_constants.h"
+#include "bot_profile.h"
+#include "bot_util.h"
+#include "ff_bot_weapon_id.h" // For GetWeaponClassTypeFF and FFWeaponID
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -37,158 +33,68 @@ void CFFBot::FireWeaponAtEnemy( void )
 		return;
 	}
 
-	CBasePlayer *enemy = GetBotEnemy();
+	CFFPlayer *enemy = GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 	if (enemy == NULL)
 	{
 		return;
 	}
 
-	// Vector myOrigin = GetCentroid( this ); // Unused
-
-	// TODO: Update for FF sniper rifle logic
-	if (IsUsingSniperRifle())
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (!weapon)
 	{
-		// if we're using a sniper rifle, don't fire until we are standing still, are zoomed in, and not rapidly moving our view
-		if (!IsNotMoving() || IsWaitingForZoom() || (GetProfile() && !HasViewBeenSteady( GetProfile()->GetReactionTime() )) ) // Null check GetProfile
+		return;
+	}
+	const CFFWeaponInfo *pWeaponInfo = weapon->GetFFWpnData();
+	if (!pWeaponInfo)
+	{
+		return;
+	}
+
+	// Sniper rifle specific logic
+	if (GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_SNIPERRIFLE)
+	{
+		// TODO_FF: Implement FF specific sniper logic (zoom levels, charge time if any)
+		// For now, basic steady check:
+		if (!IsNotMoving() || IsWaitingForZoom() || (GetProfile() && !HasViewBeenSteady( GetProfile()->GetReactionTime() )) )
 		{
 			return;
 		}
 	}
 
 	if (gpGlobals->curtime > m_fireWeaponTimestamp &&
-		(!GetProfile() || GetTimeSinceAcquiredCurrentEnemy() >= GetProfile()->GetAttackDelay()) && // Null check GetProfile
+		(!GetProfile() || GetTimeSinceAcquiredCurrentEnemy() >= GetProfile()->GetAttackDelay()) &&
 		!IsSurprised())
 	{
-		// TODO: Update for FF shield logic if any
-		// if (!(IsRecognizedEnemyProtectedByShield() && IsPlayerFacingMe( enemy )) &&
 		if (!IsReloading() &&
-			!IsActiveWeaponClipEmpty() && 
+			weapon->Clip1() > 0 && // Check current weapon's clip directly
 			IsEnemyVisible())
 		{
-			// we have a clear shot - pull trigger if we are aiming at enemy
 			Vector toAimSpot = m_aimSpot - EyePosition();
 			float rangeToEnemy = toAimSpot.NormalizeInPlace();
 
-			// TODO: Update for FF sniper rifle logic (weapon ID, GetInaccuracy, required spread)
-			// if ( IsUsingSniperRifle() )
-			// {
-			//	// check our accuracy versus our target distance
-			//	float fProjectedSpread = rangeToEnemy * GetActiveCSWeapon()->GetInaccuracy();
-			//	float fRequiredSpread = IsUsing( FF_WEAPON_AWP ) ? 50.0f : 25.0f;	// AWP will kill with any hit // FF_WEAPON_AWP is example
-			//	if ( fProjectedSpread > fRequiredSpread )
-			//		return;
-			// }
-
-			// get actual view direction vector
 			Vector aimDir = GetViewVector();
-
 			float onTarget = DotProduct( toAimSpot, aimDir );
 
-			// aim more precisely with a sniper rifle
-			// because rifles' bullets spray, don't have to be very precise
-			// TODO: Update for FF sniper rifle logic and HalfHumanWidth definition
-			const float halfSize = (IsUsingSniperRifle()) ? HalfHumanWidth : 2.0f * HalfHumanWidth;
-
-			// aiming tolerance depends on how close the target is - closer targets subtend larger angles
-			float aimTolerance = (rangeToEnemy > FLT_EPSILON) ? (float)cos( atan( halfSize / rangeToEnemy ) ) : 1.0f; // Avoid div by zero
+			// TODO_FF: Tune aimTolerance based on FF weapon characteristics
+			const float halfSize = HalfHumanWidth; // Standard human width, adjust if needed
+			float aimTolerance = (rangeToEnemy > FLT_EPSILON) ? (float)cos( atan( halfSize / rangeToEnemy ) ) : 1.0f;
 
 			if (onTarget > aimTolerance)
 			{
-				bool doAttack;
-
-				// if friendly fire is on, don't fire if a teammate is blocking our line of fire
-				if (TheFFBots() && TheFFBots()->AllowFriendlyFireDamage()) // Null check
+				bool doAttack = true;
+				if (TheFFBots() && TheFFBots()->AllowFriendlyFireDamage())
 				{
 					if (IsFriendInLineOfFire())
 						doAttack = false;
-					else
-						doAttack = true;
-				}
-				else
-				{
-					// fire freely
-					doAttack = true;
 				}
 
 				if (doAttack)
 				{
-					// TODO: Update for FF knife logic (IsUsingKnife, SecondaryAttack for backstab)
-					// if (IsUsingKnife())
-					// {
-					//	const float knifeRange = 75.0f;		// 50
-					//	if (rangeToEnemy < knifeRange)
-					//	{
-					//		// since we've given ourselves away - run!
-					//		ForceRun( 5.0f );
-
-					//		// if our prey is facing away, backstab him!
-					//		if (!IsPlayerFacingMe( enemy ))
-					//		{
-					//			SecondaryAttack();
-					//		}
-					//		else
-					//		{
-					//			// randomly choose primary and secondary attacks with knife
-					//			const float knifeStabChance = 33.3f;
-					//			if (RandomFloat( 0, 100 ) < knifeStabChance)
-					//				SecondaryAttack();
-					//			else
-					//				PrimaryAttack();
-					//		}
-					//	}
-					// }
-					// else
-					{
-						PrimaryAttack();
-					}
+					PrimaryAttack();
+					// Use weapon's cycle time for next fire timestamp
+					m_fireWeaponTimestamp = gpGlobals->curtime + pWeaponInfo->m_flCycleTime;
 				}
-
-				// TODO: Update for FF pistol logic and skill-based firing rates
-				// if (IsUsingPistol())
-				// {
-				//	// high-skill bots fire their pistols quickly at close range
-				//	const float closePistolRange = 360.0f;
-				//	if (GetProfile() && GetProfile()->GetSkill() > 0.75f && rangeToEnemy < closePistolRange) // Null check
-				//	{
-				//		// fire as fast as possible
-				//		m_fireWeaponTimestamp = 0.0f;
-				//	}
-				//	else
-				//	{
-				//		// fire somewhat quickly
-				//		m_fireWeaponTimestamp = RandomFloat( 0.15f, 0.4f );
-				//	}
-				// }
-				// else	// not using a pistol
-				{
-					const float sprayRange = 400.0f;
-					// TODO: Update for FF machinegun logic
-					if ((GetProfile() && GetProfile()->GetSkill() < 0.5f) || rangeToEnemy < sprayRange || IsUsingMachinegun()) // Null check
-					{
-						// spray 'n pray if enemy is close, or we're not that good, or we're using the big machinegun
-						m_fireWeaponTimestamp = 0.0f;
-					}
-					else
-					{
-						const float distantTargetRange = 800.0f;
-						// TODO: Update for FF sniper logic
-						if (!IsUsingSniperRifle() && rangeToEnemy > distantTargetRange)
-						{
-							// if very far away, fire slowly for better accuracy
-							m_fireWeaponTimestamp = RandomFloat( 0.3f, 0.7f );
-						}
-						else
-						{
-							// fire short bursts for accuracy
-							m_fireWeaponTimestamp = RandomFloat( 0.15f, 0.25f );		// 0.15, 0.5
-						}
-					}
-				}
-
-				// subtract system latency
-				m_fireWeaponTimestamp -= g_BotUpdateInterval; // g_BotUpdateInterval needs to be defined
-
-				m_fireWeaponTimestamp += gpGlobals->curtime;
+				// Removed old CS-specific spray/burst logic for m_fireWeaponTimestamp
 			}
 		}
 	}
@@ -200,38 +106,27 @@ void CFFBot::FireWeaponAtEnemy( void )
  */
 void CFFBot::SetAimOffset( float accuracy )
 {
-	// if our accuracy is less than perfect, it will improve as we "focus in" while not rotating our view
 	if (accuracy < 1.0f)
 	{
-		// if we moved our view, reset our "focus" mechanism
 		if (IsViewMoving( 100.0f ))
 			m_aimSpreadTimestamp = gpGlobals->curtime;
 
-		// focusTime is the time it takes for a bot to "focus in" for very good aim, from 2 to 5 seconds
 		const float focusTime = MAX( 5.0f * (1.0f - accuracy), 2.0f );
 		float focusInterval = gpGlobals->curtime - m_aimSpreadTimestamp;
-
-		float focusAccuracy = (focusTime > FLT_EPSILON) ? (focusInterval / focusTime) : 1.0f; // Avoid div by zero
-
-		// limit how much "focus" will help
+		float focusAccuracy = (focusTime > FLT_EPSILON) ? (focusInterval / focusTime) : 1.0f;
 		const float maxFocusAccuracy = 0.75f;
-		if (focusAccuracy > maxFocusAccuracy)
-			focusAccuracy = maxFocusAccuracy;
-
+		if (focusAccuracy > maxFocusAccuracy) focusAccuracy = maxFocusAccuracy;
 		accuracy = MAX( accuracy, focusAccuracy );
 	}
 
-	// aim error increases with distance, such that actual crosshair error stays about the same
 	float range = (m_lastEnemyPosition - EyePosition()).Length();
-	float maxOffset = (GetFOV()/GetDefaultFOV()) * 0.05f * range;		// 0.1 // GetDefaultFOV needs to be FF compatible
+	float maxOffset = (GetFOV()/GetDefaultFOV()) * 0.05f * range;
 	float error = maxOffset * (1.0f - accuracy);
 
 	m_aimOffsetGoal.x = RandomFloat( -error, error );
 	m_aimOffsetGoal.y = RandomFloat( -error, error );
 	m_aimOffsetGoal.z = RandomFloat( -error, error );
-
-	// define time when aim offset will automatically be updated
-	m_aimOffsetTimestamp = gpGlobals->curtime + RandomFloat( 0.25f, 1.0f ); // 0.25, 1.5f
+	m_aimOffsetTimestamp = gpGlobals->curtime + RandomFloat( 0.25f, 1.0f );
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -242,12 +137,10 @@ void CFFBot::UpdateAimOffset( void )
 {
 	if (gpGlobals->curtime >= m_aimOffsetTimestamp)
 	{
-		if (GetProfile()) SetAimOffset( GetProfile()->GetSkill() ); // Null check
+		if (GetProfile()) SetAimOffset( GetProfile()->GetSkill() );
 	}
-
-	// move current offset towards goal offset
 	Vector d = m_aimOffsetGoal - m_aimOffset;
-	const float stiffness = 0.1f; // This could be a convar or profile setting
+	const float stiffness = 0.1f;
 	m_aimOffset.x += stiffness * d.x;
 	m_aimOffset.y += stiffness * d.y;
 	m_aimOffset.z += stiffness * d.z;
@@ -259,78 +152,62 @@ void CFFBot::UpdateAimOffset( void )
  * Change our zoom level to be appropriate for the given range.
  * Return true if the zoom level changed.
  */
-// TODO: Update for FF sniper/zoom logic
 bool CFFBot::AdjustZoom( float range )
 {
+	// TODO_FF: Update for FF sniper/zoom logic. This is CS-like.
+	// Needs to check current weapon's zoom capabilities from CFFWeaponInfo.
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (!weapon || GetWeaponClassTypeFF(weapon->GetWeaponID()) != WEAPONCLASS_FF_SNIPERRIFLE)
+	{
+		if (GetZoomLevel() != NO_ZOOM) // Assuming NO_ZOOM is 0
+		{
+			SecondaryAttack(); // Send zoom command to unzoom
+			m_zoomTimer.Start(0.25f); // Generic unzoom time
+			return true;
+		}
+		return false;
+	}
+
+	// Example: if FF sniper has multiple zoom levels defined in CFFWeaponInfo
+	// const CFFWeaponInfo *pWeaponInfo = weapon->GetFFWpnData();
+	// if (!pWeaponInfo) return false;
+	// float zoomLevel1Range = pWeaponInfo->m_flZoomRange1; // Hypothetical
+	// float zoomLevel2Range = pWeaponInfo->m_flZoomRange2; // Hypothetical
+
 	bool adjustZoom = false;
+	const float sniperZoomRange = 150.0f;	// Placeholder
+	const float sniperFarZoomRange = 1500.0f; // Placeholder
 
-	if (IsUsingSniperRifle())
-	{
-		const float sniperZoomRange = 150.0f;	// NOTE: This must be less than sniperMinRange in AttackState
-		const float sniperFarZoomRange = 1500.0f;
-
-		if (range <= sniperZoomRange)
-		{
-			if (GetZoomLevel() != NO_ZOOM) adjustZoom = true; // NO_ZOOM from ZoomType enum
-		}
-		else if (range < sniperFarZoomRange)
-		{
-			if (GetZoomLevel() != LOW_ZOOM) adjustZoom = true; // LOW_ZOOM from ZoomType enum
-		}
-		else
-		{
-			if (GetZoomLevel() != HIGH_ZOOM) adjustZoom = true; // HIGH_ZOOM from ZoomType enum
-		}
-	}
-	else
-	{
-		if (GetZoomLevel() != NO_ZOOM) adjustZoom = true;
-	}
+	if (range <= sniperZoomRange) { if (GetZoomLevel() != NO_ZOOM) adjustZoom = true; }
+	else if (range < sniperFarZoomRange) { if (GetZoomLevel() != LOW_ZOOM) adjustZoom = true; } // Assuming LOW_ZOOM = 1
+	else { if (GetZoomLevel() != HIGH_ZOOM) adjustZoom = true; } // Assuming HIGH_ZOOM = 2
 
 	if (adjustZoom)
 	{
-		SecondaryAttack();
-		m_zoomTimer.Start( 0.25f + (GetProfile() ? (1.0f - GetProfile()->GetSkill()) : 0.5f) ); // Null check
+		SecondaryAttack(); // This toggles zoom levels
+		m_zoomTimer.Start( 0.25f + (GetProfile() ? (1.0f - GetProfile()->GetSkill()) : 0.5f) );
 	}
-
 	return adjustZoom;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Returns true if using the specific weapon
+ * Returns true if using the specific weapon ID
  */
-bool CFFBot::IsUsing( FFWeaponID weaponID ) const // Changed CSWeaponID to FFWeaponID
+bool CFFBot::IsUsing( FFWeaponID weaponID ) const
 {
-	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-
-	if (weapon == NULL)
-		return false;
-
-	// TODO: IsA is CS specific, use GetWeaponID() or similar for FF
-	// if (weapon->IsA( weaponID ))
-	if (weapon->GetWeaponID() == weaponID)
-		return true;
-
-	return false;
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon == NULL) return false;
+	return (weapon->GetWeaponID() == weaponID);
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Returns true if we are using a weapon with a removable silencer
+ * FF generally does not have silencers.
  */
-// TODO: Silencer logic is likely CS specific. Adapt or remove for FF.
 bool CFFBot::DoesActiveWeaponHaveSilencer( void ) const
 {
-	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-
-	if (weapon == NULL)
-		return false;
-
-	// TODO: Replace WEAPON_M4A1 and WEAPON_USP with FF equivalents if they have silencers
-	// if (weapon->GetWeaponID() == FF_WEAPON_M4A1 || weapon->GetWeaponID() == FF_WEAPON_USP)
-	//	return weapon->IsSilenced(); // Assuming IsSilenced() method exists on CFFWeaponBase
-
 	return false;
 }
 
@@ -340,12 +217,9 @@ bool CFFBot::DoesActiveWeaponHaveSilencer( void ) const
  */
 bool CFFBot::IsUsingSniperRifle( void ) const
 {
-	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-
-	// TODO: Update for FF weapon types
-	if (weapon && weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE)) // WEAPONTYPE_SNIPER_RIFLE enum
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_SNIPERRIFLE)
 		return true;
-
 	return false;
 }
 
@@ -355,12 +229,12 @@ bool CFFBot::IsUsingSniperRifle( void ) const
  */
 bool CFFBot::IsSniper( void ) const
 {
-	// TODO: Update for FF weapon slots (WEAPON_SLOT_RIFLE) and types
-	CFFWeaponBase *weapon = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_PRIMARY ) ); // WEAPON_SLOT_PRIMARY might be more generic
-
-	if (weapon && weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE)) // WEAPONTYPE_SNIPER_RIFLE enum
-		return true;
-
+	for (int i = 0; i < MAX_WEAPONS; ++i) // MAX_WEAPONS is from CBasePlayer
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_SNIPERRIFLE)
+			return true;
+	}
 	return false;
 }
 
@@ -370,10 +244,9 @@ bool CFFBot::IsSniper( void ) const
  */
 bool CFFBot::IsSniping( void ) const
 {
-	// TODO: Update TaskType enums for FF
+	// Assuming TaskType enum has these values from ff_bot.h
 	if (GetTask() == CFFBot::MOVE_TO_SNIPER_SPOT || GetTask() == CFFBot::SNIPING)
 		return true;
-
 	return false;
 }
 
@@ -383,86 +256,83 @@ bool CFFBot::IsSniping( void ) const
  */
 bool CFFBot::IsUsingShotgun( void ) const
 {
-	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-
-	if (weapon == NULL)
-		return false;
-	// TODO: Update for FF weapon types
-	return weapon->IsKindOf(WEAPONTYPE_SHOTGUN); // WEAPONTYPE_SHOTGUN enum
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_SHOTGUN)
+		return true;
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Returns true if using the big 'ol machinegun
+ * Returns true if using an assault cannon (FF's "machinegun")
  */
-// TODO: Update for FF machinegun logic (WEAPON_M249)
 bool CFFBot::IsUsingMachinegun( void ) const
 {
-	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-
-	// if (weapon && weapon->GetWeaponID() == FF_WEAPON_M249) // Example FF enum
-	//	return true;
-
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_ASSAULTCANNON)
+		return true;
 	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return true if primary weapon doesn't exist or is totally out of ammo
+ * This needs to be class-dependent for FF. For now, checks specific common primary types.
  */
 bool CFFBot::IsPrimaryWeaponEmpty( void ) const
 {
-	// TODO: Update for FF weapon slots (WEAPON_SLOT_RIFLE)
-	CFFWeaponBase *weapon = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_PRIMARY ) );
+	// TODO_FF: Better primary weapon determination based on bot's class
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (!weapon) continue;
 
-	if (weapon == NULL)
-		return true;
-
-	if (weapon->HasAnyAmmo())
-		return false;
-
-	return true;
+		WeaponClassTypeFF wct = GetWeaponClassTypeFF(weapon->GetWeaponID());
+		if (wct == WEAPONCLASS_FF_ASSAULTRIFLE || wct == WEAPONCLASS_FF_SHOTGUN ||
+			wct == WEAPONCLASS_FF_SNIPERRIFLE || wct == WEAPONCLASS_FF_ROCKETLAUNCHER ||
+			wct == WEAPONCLASS_FF_ASSAULTCANNON || wct == WEAPONCLASS_FF_FLAMETHROWER ||
+			wct == WEAPONCLASS_FF_NAILGUN || wct == WEAPONCLASS_FF_PIPEGUN)
+		{
+			if (weapon->HasAnyAmmo()) return false; // Found a primary with ammo
+		}
+	}
+	return true; // No primary with ammo found
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return true if pistol doesn't exist or is totally out of ammo
+ * FF has a single pistol generally.
  */
 bool CFFBot::IsPistolEmpty( void ) const
 {
-	// TODO: Update for FF weapon slots (WEAPON_SLOT_PISTOL)
-	CFFWeaponBase *weapon = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_SECONDARY ) ); // WEAPON_SLOT_SECONDARY might be more generic
-
-	if (weapon == NULL)
-		return true;
-
-	if (weapon->HasAnyAmmo())
-		return false;
-
-	return true;
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_PISTOL)
+		{
+			return !weapon->HasAnyAmmo();
+		}
+	}
+	return true; // No pistol found
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Equip the given item
  */
-bool CFFBot::DoEquip( CFFWeaponBase *weapon ) // Changed to CFFWeaponBase
+bool CFFBot::DoEquip( CFFWeaponBase *weapon )
 {
-	if (weapon == NULL)
-		return false;
+	if (weapon == NULL || !weapon->HasAnyAmmo()) return false;
+	// Only equip if it's not already the active weapon
+	if (GetActiveWeapon() == weapon) return true;
 
-	if (!weapon->HasAnyAmmo())
-		return false;
-
-	SelectItem( weapon->GetClassname() ); // SelectItem might take different params or not exist
-	m_equipTimer.Start();
-
+	SelectItem( weapon->GetClassname() );
+	m_equipTimer.Start(); // Start a timer to prevent rapid re-equipping
 	return true;
 }
 
-
-// throttle how often equipping is allowed
-const float minEquipInterval = 5.0f;
+const float minEquipInterval = 2.0f; // Reduced from 5.0f, bots might need to switch faster.
 
 
 //--------------------------------------------------------------------------------------------------------------
@@ -471,33 +341,100 @@ const float minEquipInterval = 5.0f;
  */
 void CFFBot::EquipBestWeapon( bool mustEquip )
 {
-	if (!mustEquip && m_equipTimer.GetElapsedTime() < minEquipInterval)
+	if (!mustEquip && m_equipTimer.GetElapsedTime() < minEquipInterval && GetActiveFFWeapon() != NULL) return;
+	if (!TheFFBots()) return;
+
+	// TODO_FF: Major refactor for FF weapon selection based on class, situation, enemy range, etc.
+	// This is a placeholder implementation.
+
+	CFFWeaponBase* bestWeapon = NULL;
+	float bestScore = -1.0f;
+
+	CFFPlayer* pOwner = dynamic_cast<CFFPlayer*>(this->GetCommander()); // Assuming CFFBot is owned by CFFPlayer
+	if (!pOwner) return;
+
+	const CFFPlayerClassInfo* pClassInfo = pOwner->GetPlayerClassInfo(); // Assumes CFFPlayer has this method
+	if (!pClassInfo) return;
+
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (!weapon || !weapon->HasAnyAmmo() || !weapon->CanDeploy()) continue;
+
+		const CFFWeaponInfo* pWeaponInfo = weapon->GetFFWpnData();
+		if (!pWeaponInfo) continue;
+
+		// Basic check: is this weapon part of the class's typical loadout?
+		bool isClassWeapon = false;
+		for(int j=0; j < MAX_PLAYERCLASS_WEAPONS; ++j)
+		{
+			if (pClassInfo->m_aWeapons[j].m_iWeaponID != FF_WEAPON_NONE &&
+				pClassInfo->m_aWeapons[j].m_iWeaponID == weapon->GetWeaponID())
+			{
+				isClassWeapon = true;
+				break;
+			}
+		}
+		if (!isClassWeapon && weapon->GetWeaponID() != FF_WEAPON_AXE && weapon->GetWeaponID() != FF_WEAPON_SPANNER) // Always allow axe/spanner
+		{
+			// If not a direct class weapon, maybe it's a pickup the bot is allowed to use?
+			// For now, be restrictive.
+			// continue;
+		}
+
+		float score = 1.0f; // Base score for having ammo and being deployable
+
+		// TODO_FF: Add more sophisticated scoring based on:
+		// - Enemy presence and range (GetBotEnemy(), m_lastEnemyPosition)
+		// - Weapon class type (sniper for long, shotgun for close)
+		// - Ammo count (prefer more ammo)
+		// - Bot's current task (IsSniping(), etc.)
+		// - Weapon damage potential (pWeaponInfo->m_flDamage)
+
+		WeaponClassTypeFF wct = GetWeaponClassTypeFF(weapon->GetWeaponID());
+
+		if (GetBotEnemy())
+		{
+			float distToEnemySqr = (GetBotEnemy()->GetAbsOrigin() - GetAbsOrigin()).LengthSqr();
+			if (wct == WEAPONCLASS_FF_SHOTGUN || wct == WEAPONCLASS_FF_FLAMETHROWER)
+				score += (distToEnemySqr < Square(600.0f)) ? 100.0f : -50.0f; // Prefer at close range
+			else if (wct == WEAPONCLASS_FF_SNIPERRIFLE)
+				score += (distToEnemySqr > Square(1000.0f)) ? 100.0f : -50.0f; // Prefer at long range
+			else if (wct == WEAPONCLASS_FF_ROCKETLAUNCHER || wct == WEAPONCLASS_FF_PIPEGUN || wct == WEAPONCLASS_FF_GRENADELAUNCHER)
+				score += (distToEnemySqr > Square(400.0f) && distToEnemySqr < Square(2000.0f)) ? 80.0f : 0.0f; // Prefer at mid range
+			else if (wct == WEAPONCLASS_FF_ASSAULTRIFLE || wct == WEAPONCLASS_FF_NAILGUN || wct == WEAPONCLASS_FF_ASSAULTCANNON)
+				score += 50.0f; // General purpose
+			else if (wct == WEAPONCLASS_FF_PISTOL)
+				score += 10.0f;
+		}
+		else // No enemy
+		{
+			if (wct == WEAPONCLASS_FF_ASSAULTRIFLE || wct == WEAPONCLASS_FF_NAILGUN) score += 50.0f; // Good general purpose
+			else if (wct == WEAPONCLASS_FF_PISTOL) score += 20.0f;
+		}
+
+		// Prefer weapons with more relative ammo in clip
+		if (pWeaponInfo->m_iMaxClip1 > 0)
+		{
+			score += 10.0f * ((float)weapon->Clip1() / pWeaponInfo->m_iMaxClip1);
+		}
+
+
+		if (score > bestScore)
+		{
+			bestScore = score;
+			bestWeapon = weapon;
+		}
+	}
+
+	if (bestWeapon)
+	{
+		DoEquip(bestWeapon);
 		return;
-
-	if (!TheFFBots()) return; // Null check
-
-	// TODO: Update for FF weapon slots and types
-	CFFWeaponBase *primary = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_PRIMARY ) );
-	if (primary)
-	{
-		// This needs FF equivalent of GetCSWpnData() and m_WeaponType
-		// CSWeaponType weaponClass = primary->GetFFWpnData().m_WeaponType; // Example
-		// if ((TheFFBots()->AllowShotguns() && weaponClass == WEAPONTYPE_SHOTGUN) ||
-		//	 // ... other Allow checks for FF weapon types ...
-		//	)
-		// {
-		//	if (DoEquip( primary ))
-		//		return;
-		// }
 	}
 
-	if (TheFFBots()->AllowPistols())
-	{
-		if (DoEquip( static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_SECONDARY ) ) ))
-			return;
-	}
-
-	EquipKnife(); // TODO: Ensure EquipKnife works for FF
+	// If all else fails, equip Axe (or default FF melee)
+	EquipKnife();
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -506,123 +443,167 @@ void CFFBot::EquipBestWeapon( bool mustEquip )
  */
 void CFFBot::EquipPistol( void )
 {
-	if (m_equipTimer.GetElapsedTime() < minEquipInterval)
-		return;
+	if (m_equipTimer.GetElapsedTime() < minEquipInterval && GetActiveFFWeapon() != NULL && IsUsingPistol()) return;
 
-	if (TheFFBots() && TheFFBots()->AllowPistols() && !IsUsingPistol()) // Null check, TODO: Update IsUsingPistol for FF
+	for (int i = 0; i < MAX_WEAPONS; ++i)
 	{
-		CFFWeaponBase *pistol = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_SECONDARY ) ); // TODO: Update for FF weapon slots
-		DoEquip( pistol );
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_PISTOL)
+		{
+			DoEquip(weapon);
+			return;
+		}
 	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Equip the knife
+ * Equip the melee weapon (Axe in FF)
  */
-// TODO: Update for FF knife (weapon name, IsUsingKnife)
 void CFFBot::EquipKnife( void )
 {
-	// if (!IsUsingKnife())
-	// {
-	//	SelectItem( "weapon_knife" ); // FF knife name
-	// }
+	if (IsUsingKnife()) return;
+
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		// Assuming FF_WEAPON_AXE is the primary melee weapon ID
+		if (weapon && weapon->GetWeaponID() == FF_WEAPON_AXE)
+		{
+			DoEquip(weapon);
+			return;
+		}
+	}
+	// Fallback: Try to equip any melee weapon if Axe not found by ID
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_MELEE)
+		{
+			DoEquip(weapon);
+			return;
+		}
+	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return true if we have a grenade in our inventory
+ * FF has various grenade types, check for any usable grenade weapon.
  */
-// TODO: Update for FF grenades (slot, types)
 bool CFFBot::HasGrenade( void ) const
 {
-	// CFFWeaponBase *grenade = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_GRENADES ) );
-	// return (grenade) ? true : false;
-	return false; // Placeholder
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (!weapon) continue;
+		WeaponClassTypeFF wct = GetWeaponClassTypeFF(weapon->GetWeaponID());
+		// TODO_FF: Define what constitutes a "grenade" weapon class for bots to use with this function.
+		// This could be hand grenades, or weapons that launch grenade-like projectiles.
+		// For now, let's assume it means hand grenades.
+		if (wct == WEAPONCLASS_FF_HANDGRENADE || wct == WEAPONCLASS_FF_NAILGRENADE || wct == WEAPONCLASS_FF_MIRVGRENADE || wct == WEAPONCLASS_FF_EMPGRENADE || wct == WEAPONCLASS_FF_GASGRENADE)
+		{
+			if (weapon->HasAnyAmmo()) return true;
+		}
+	}
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Equip a grenade, return false if we cant
  */
-// TODO: Update for FF grenades (slot, types, IsUsingGrenade, IsSniper)
-bool CFFBot::EquipGrenade( bool noSmoke )
+bool CFFBot::EquipGrenade( bool noSmoke /* FF doesn't have smoke in the same CS way, param might be repurposed */ )
 {
-	// if (IsSniper()) return false;
-	// if (IsUsingGrenade()) return true;
-	// if (HasGrenade())
-	// {
-	//	CFFWeaponBase *grenade = static_cast<CFFWeaponBase *>( Weapon_GetSlot( WEAPON_SLOT_GRENADES ) );
-	//	if (noSmoke && grenade->GetWeaponID() == FF_WEAPON_SMOKEGRENADE) // Example FF enum
-	//		return false;
-	//	SelectItem( grenade->GetClassname() );
-	//	return true;
-	// }
-	return false; // Placeholder
+	// TODO_FF: More nuanced grenade selection based on 'noSmoke' or other criteria.
+	// For now, just equip any available hand grenade.
+	if (IsUsingGrenade() && GetActiveFFWeapon() && GetActiveFFWeapon()->HasAnyAmmo()) return true; // Already using a grenade with ammo
+
+	for (int i = 0; i < MAX_WEAPONS; ++i)
+	{
+		CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(GetWeapon(i));
+		if (!weapon || !weapon->HasAnyAmmo()) continue;
+
+		WeaponClassTypeFF wct = GetWeaponClassTypeFF(weapon->GetWeaponID());
+		if (wct == WEAPONCLASS_FF_HANDGRENADE || wct == WEAPONCLASS_FF_NAILGRENADE || wct == WEAPONCLASS_FF_MIRVGRENADE || wct == WEAPONCLASS_FF_EMPGRENADE || wct == WEAPONCLASS_FF_GASGRENADE)
+		{
+			// Example: if (noSmoke && wct == WEAPONCLASS_FF_GASGRENADE) continue; // If gas grenade is like "smoke"
+			DoEquip(weapon);
+			return true;
+		}
+	}
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Returns true if we have knife equipped
+ * Returns true if we have melee weapon equipped
  */
-// TODO: Update for FF knife (GetActiveFFWeapon, GetWeaponID)
-bool CFFBot::IsUsingKnife( void ) const
+bool CFFBot::IsUsingKnife( void ) const // Renamed from IsUsingAxe for consistency, but refers to melee
 {
-	// CFFWeaponBase *weapon = GetActiveFFWeapon();
-	// if (weapon && weapon->GetWeaponID() == FF_WEAPON_KNIFE) // Example FF enum
-	//	return true;
-	return false; // Placeholder
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_MELEE)
+		return true;
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Returns true if we have pistol equipped
  */
-// TODO: Update for FF pistol (GetActiveFFWeapon, IsPistol method)
 bool CFFBot::IsUsingPistol( void ) const
 {
-	// CFFWeaponBase *weapon = GetActiveFFWeapon();
-	// if (weapon && weapon->IsPistol()) // IsPistol might need to check WEAPONTYPE_PISTOL
-	//	return true;
-	return false; // Placeholder
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (weapon && GetWeaponClassTypeFF(weapon->GetWeaponID()) == WEAPONCLASS_FF_PISTOL)
+		return true;
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Returns true if we have a grenade equipped
+ * Returns true if we have a grenade type weapon equipped
  */
-// TODO: Update for FF grenades (GetActiveFFWeapon, GetWeaponID for various grenade types)
 bool CFFBot::IsUsingGrenade( void ) const
 {
-	// CFFWeaponBase *weapon = GetActiveFFWeapon();
-	// if (!weapon) return false;
-	// if (weapon->GetWeaponID() == FF_WEAPON_GRENADE_FLASH ||
-	//	weapon->GetWeaponID() == FF_WEAPON_GRENADE_SMOKE ||
-	//	weapon->GetWeaponID() == FF_WEAPON_GRENADE_HE) // Example FF enums
-	//	return true;
-	return false; // Placeholder
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (!weapon) return false;
+	WeaponClassTypeFF wct = GetWeaponClassTypeFF(weapon->GetWeaponID());
+	if (wct == WEAPONCLASS_FF_HANDGRENADE || wct == WEAPONCLASS_FF_NAILGRENADE || wct == WEAPONCLASS_FF_MIRVGRENADE || wct == WEAPONCLASS_FF_EMPGRENADE || wct == WEAPONCLASS_FF_GASGRENADE ||
+		wct == WEAPONCLASS_FF_GRENADELAUNCHER || wct == WEAPONCLASS_FF_PIPEGUN ) // Pipegun also launches grenade-like things
+		return true;
+	return false;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Begin the process of throwing the grenade
+ * TODO_FF: Actual grenade throwing logic will be complex (aiming, timing).
  */
-// TODO: Update for FF grenades (IsUsingGrenade, SetLookAt, PRIORITY_UNINTERRUPTABLE)
 void CFFBot::ThrowGrenade( const Vector &target )
 {
-	// if (IsUsingGrenade() && m_grenadeTossState == NOT_THROWING && !IsOnLadder()) // NOT_THROWING enum
-	// {
-	//	m_grenadeTossState = START_THROW; // START_THROW enum
-	//	m_tossGrenadeTimer.Start( 2.0f );
-	//	const float angleTolerance = 3.0f;
-	//	SetLookAt( "GrenadeThrow", target, PRIORITY_UNINTERRUPTABLE, 4.0f, false, angleTolerance );
-	//	Wait( RandomFloat( 2.0f, 4.0f ) );
-	//	if (cv_bot_debug.GetBool() && IsLocalPlayerWatchingMe())
-	//	{
-	//		NDebugOverlay::Cross3D( target, 25.0f, 255, 125, 0, true, 3.0f );
-	//	}
-	//	PrintIfWatched( "%3.2f: Grenade: START_THROW\n", gpGlobals->curtime );
-	// }
+	if (IsUsingGrenade() && m_grenadeTossState == NOT_THROWING && !IsOnLadder())
+	{
+		// For hand grenades, need to start primary attack (pull pin) then release (throw)
+		// For launchers (GL, Pipe), just PrimaryAttack()
+		CFFWeaponBase* activeWeapon = GetActiveFFWeapon();
+		if (!activeWeapon) return;
+
+		WeaponClassTypeFF wct = GetWeaponClassTypeFF(activeWeapon->GetWeaponID());
+		if (wct == WEAPONCLASS_FF_HANDGRENADE || wct == WEAPONCLASS_FF_NAILGRENADE || wct == WEAPONCLASS_FF_MIRVGRENADE || wct == WEAPONCLASS_FF_EMPGRENADE || wct == WEAPONCLASS_FF_GASGRENADE)
+		{
+			// This is simplified. Real hand grenade throwing involves holding attack, then releasing.
+			// Bot AI might need a state machine for this.
+			// For now, just press and assume it throws quickly or the bot handles the hold.
+			PrimaryAttack();
+			m_grenadeTossState = THROWING_GRENADE; // Set a state
+			m_tossGrenadeTimer.Start(1.0f); // Cooldown/timer for state
+		}
+		else if (wct == WEAPONCLASS_FF_GRENADELAUNCHER || wct == WEAPONCLASS_FF_PIPEGUN)
+		{
+			PrimaryAttack();
+			// No complex state needed for direct launchers usually
+		}
+	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -631,34 +612,33 @@ void CFFBot::ThrowGrenade( const Vector &target )
  */
 bool CFFBot::CanActiveWeaponFire( void ) const
 {
-	CBaseCombatWeapon *weapon = GetActiveWeapon(); // Use base class method
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
 	return ( weapon && weapon->m_flNextPrimaryAttack <= gpGlobals->curtime );
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Find spot to throw grenade ahead of us and "around the corner" along our path
+ * TODO_FF: This is complex path-aware AI, for now, return false.
  */
-// TODO: This is complex CS-specific logic, likely needs heavy FF adaptation or removal
 bool CFFBot::FindGrenadeTossPathTarget( Vector *pos )
 {
-	if (!pos || !HasPath()) return false; // Null check
-	// ... (original CS logic with many assumptions about visibility and pathing) ...
-	return false; // Placeholder
+	if (!pos || !HasPath()) return false;
+	// Placeholder: More advanced logic would inspect the path for corners, cover, enemies.
+	return false;
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Look for grenade throw targets and throw the grenade
+ * TODO_FF: Grenade targeting logic needed.
  */
-// TODO: This is complex CS-specific logic, needs heavy FF adaptation or removal
 void CFFBot::LookForGrenadeTargets( void )
 {
-	// if (!IsUsingGrenade() || IsThrowingGrenade()) return;
-	// const CNavArea *tossArea = GetInitialEncounterArea();
-	// if (tossArea == NULL) return;
-	// ... (original CS logic) ...
+	if (!IsUsingGrenade() || IsThrowingGrenade()) return;
+	// Placeholder: Needs logic to decide when and where to throw.
+	// Could be based on enemy clusters, enemy behind cover, etc.
 }
 
 
@@ -666,60 +646,16 @@ void CFFBot::LookForGrenadeTargets( void )
 /**
  * Process the grenade throw state machine
  */
-// TODO: This is complex CS-specific logic, needs heavy FF adaptation or removal
 void CFFBot::UpdateGrenadeThrow( void )
 {
-	// switch( m_grenadeTossState ) // GrenadeTossState enum
-	// {
-	// case START_THROW: { ... }
-	// case FINISH_THROW: { ... }
-	// default: { if (IsUsingGrenade()) PrimaryAttack(); break; }
-	// }
-}
-
-
-//--------------------------------------------------------------------------------------------------------------
-class GrenadeResponse // This class seems okay generically, but its usage is CS specific
-{
-public:
-	GrenadeResponse( CFFBot *me ) // Changed to CFFBot
+	if (m_grenadeTossState == THROWING_GRENADE)
 	{
-		m_me = me;
+		if (m_tossGrenadeTimer.IsElapsed())
+		{
+			m_grenadeTossState = NOT_THROWING;
+		}
 	}
-
-	bool operator() ( ActiveGrenade *ag ) const // ActiveGrenade needs definition for FF
-	{
-		if (!m_me || !ag || !ag->GetEntity()) return true; // Null checks
-
-		// TODO: Update for FF grenade types (IsSmoke, IsFlashbang) and timings
-		// const float retreatRange = 300.0f;
-		// const float hideTime = 1.0f;
-		// if (m_me->IsVisible( ag->GetPosition(), CHECK_FOV, (CBaseEntity *)ag->GetEntity() ))
-		// {
-		// }
-		return true;
-	}
-
-	CFFBot *m_me;
-};
-
-/**
- * React to enemy grenades we see
- */
-void CFFBot::AvoidEnemyGrenades( void )
-{
-	if (!GetProfile() || GetProfile()->GetSkill() < 0.5) return; // Null check
-	if (IsAvoidingGrenade()) return;
-
-	// GrenadeResponse respond( this );
-	// TODO: TheBots global needs to be TheFFBots, and ForEachGrenade needs FF adaptation
-	// if (TheFFBots() && TheFFBots()->ForEachGrenade( respond ) == false)
-	// {
-	//	const float avoidTime = 4.0f;
-	//	m_isAvoidingGrenade.Start( avoidTime );
-	// }
 }
-
 
 //--------------------------------------------------------------------------------------------------------------
 /**
@@ -727,121 +663,64 @@ void CFFBot::AvoidEnemyGrenades( void )
  */
 void CFFBot::ReloadCheck( void )
 {
-	const float safeReloadWaitTime = 3.0f;
-	const float reloadAmmoRatio = 0.6f;
+	CFFWeaponBase *weapon = GetActiveFFWeapon();
+	if (!weapon || !weapon->CanReload() || weapon->IsReloading()) return; // Already reloading or cannot reload
 
-	if (GetEnemiesRemaining() == 0) return;
-	// TODO: Update for FF defusing logic
-	// if (IsDefusingBomb() || IsReloading()) return;
-	if (IsReloading()) return;
+	// if (IsDefusingBomb()) return; // No equivalent in FF directly, maybe capturing a point?
 
-
-	if (IsActiveWeaponClipEmpty())
+	bool needsReload = false;
+	if (weapon->Clip1() <= 0 && weapon->HasAnyAmmo()) // Clip empty but has reserve
 	{
-		// TODO: Update for FF pistol logic and skill checks
-		// if (GetProfile() && GetProfile()->GetSkill() > 0.5f && IsAttacking())
-		// {
-		//	if (GetActiveCSWeapon() && !GetActiveCSWeapon()->IsPistol() && !IsPistolEmpty())
-		//	{
-		//		EquipPistol();
-		//		return;
-		//	}
-		// }
-	}
-	else if (GetTimeSinceLastSawEnemy() > safeReloadWaitTime && GetActiveWeaponAmmoRatio() <= reloadAmmoRatio)
-	{
-		// if (GetProfile() && GetProfile()->GetSkill() > 0.5f && IsAttacking()) return; // Null check
+		needsReload = true;
 	}
 	else
 	{
-		return;
-	}
+		const float safeReloadWaitTime = 3.0f;
+		const float reloadAmmoRatio = 0.6f; // Reload if clip is below 60% AND it's safe
+		const CFFWeaponInfo *pWeaponInfo = weapon->GetFFWpnData();
 
-	// TODO: Update for FF AWP equivalent and clip logic
-	// if (IsUsing( FF_WEAPON_AWP ) && !IsActiveWeaponClipEmpty()) return; // Example FF enum
-
-	Reload();
-
-	if (GetNearbyEnemyCount())
-	{
-		if (!IsHiding() && GetProfile() && RandomFloat( 0, 100 ) < (25.0f + 100.0f * GetProfile()->GetSkill())) // Null check
+		if (pWeaponInfo && pWeaponInfo->m_iMaxClip1 > 0 &&
+			(float)weapon->Clip1() / pWeaponInfo->m_iMaxClip1 <= reloadAmmoRatio)
 		{
-			const float safeTime = 5.0f;
-			if (GetTimeSinceLastSawEnemy() < safeTime)
+			if (GetTimeSinceLastSawEnemy() > safeReloadWaitTime || GetEnemiesRemaining() == 0)
 			{
-				PrintIfWatched( "Retreating to a safe spot to reload!\n" );
-				const Vector *spot = FindNearbyRetreatSpot( this, 1000.0f ); // FindNearbyRetreatSpot
-				if (spot)
+				// Don't interrupt attacks for tactical reloads if skilled and fighting
+				if (GetProfile() && GetProfile()->GetSkill() > 0.5f && IsAttacking() && IsEnemyVisible())
 				{
-					IgnoreEnemies( 10.0f );
-					Run();
-					StandUp();
-					Hide( *spot, 0.0f );
+					// Skilled bot might hold off tactical reload if actively engaging
+				}
+				else
+				{
+					needsReload = true;
 				}
 			}
 		}
 	}
-}
 
-//--------------------------------------------------------------------------------------------------------------
-/**
- * Silence/unsilence our weapon if we must
- */
-// TODO: Silencer logic is CS specific. Adapt or remove for FF.
-void CFFBot::SilencerCheck( void )
-{
-	// const float safeSilencerWaitTime = 3.5f;
-	// if (IsDefusingBomb() || IsReloading() || IsAttacking()) return;
-	// if (!DoesActiveWeaponHaveSilencer()) return;
-	// if (GetTimeSinceLastSawEnemy() < safeSilencerWaitTime) return;
-	// if (GetNearbyEnemyCount() == 0)
-	// {
-	//	CFFWeaponBase *weapon = GetActiveCSWeapon(); // Should be GetActiveFFWeapon()
-	//	if (weapon == NULL || weapon->m_flNextSecondaryAttack >= gpGlobals->curtime) return;
-	//	bool isSilencerOn = weapon->IsSilenced();
-	//	if (GetProfile() && isSilencerOn != (GetProfile()->PrefersSilencer() || GetProfile()->GetSkill() > 0.7f) /*&& !HasShield()*/) // Shield logic for FF?
-	//	{
-	//		PrintIfWatched( "%s silencer!\n", (isSilencerOn) ? "Unequipping" : "Equipping" );
-	//		weapon->SecondaryAttack();
-	//	}
-	// }
-}
+	if (!needsReload) return;
 
+	Reload(); // This is CBaseCombatCharacter::Reload()
+
+	// TODO_FF: Consider if retreating to reload is common FF bot behavior.
+	// The CS logic for retreating to reload based on enemy count might be too specific.
+	// For now, rely on the reload happening and bot continuing other behaviors.
+}
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Invoked when in contact with a CBaseCombatWeapon
+ * TODO_FF: Adapt for FF item pickup logic. FF might not use "slots" in the same way.
+ * This simplified version just checks if the bot can pick it up.
  */
-// TODO: This logic is highly CS specific (weapon slots, weapon IDs, DropRifle)
 bool CFFBot::BumpWeapon( CBaseCombatWeapon *pWeapon )
 {
-	// CFFWeaponBase *droppedGun = dynamic_cast< CFFWeaponBase* >( pWeapon );
-	// if ( droppedGun && droppedGun->GetSlot() == WEAPON_SLOT_PRIMARY ) // WEAPON_SLOT_PRIMARY
-	// {
-	//	CFFWeaponBase *myGun = dynamic_cast< CFFWeaponBase* >( Weapon_GetSlot( WEAPON_SLOT_PRIMARY ) );
-	//	if ( myGun && droppedGun->GetWeaponID() != myGun->GetWeaponID() )
-	//	{
-	//		if ( GetProfile() && GetProfile()->HasPrimaryPreference() ) // Null check
-	//		{
-	//			const float safeTime = 2.5f;
-	//			if ( GetTimeSinceLastSawEnemy() >= safeTime )
-	//			{
-	//				for( int i = 0; i < GetProfile()->GetWeaponPreferenceCount(); ++i )
-	//				{
-	//					FFWeaponID prefID = (FFWeaponID)GetProfile()->GetWeaponPreference( i ); // Cast to FFWeaponID
-	//					if (!IsPrimaryWeapon( prefID )) continue; // IsPrimaryWeapon for FF
-	//					if ( prefID == myGun->GetWeaponID() ) break;
-	//					if ( prefID == droppedGun->GetWeaponID() )
-	//					{
-	//						// DropRifle(); // FF equivalent
-	//						break;
-	//					}
-	//				}
-	//			}
-	//		}
-	//	}
-	// }
-	return BaseClass::BumpWeapon( pWeapon ); // Pass original pWeapon
+	CFFWeaponBase *pFFWeapon = dynamic_cast<CFFWeaponBase*>(pWeapon);
+	if (pFFWeapon)
+	{
+		// Standard player weapon bumping logic will handle most cases (CanPickupWeapon)
+		return BaseClass::BumpWeapon(pWeapon);
+	}
+	return false;
 }
 
 
@@ -853,16 +732,23 @@ bool CFFBot::IsFriendInLineOfFire( void )
 {
 	Vector aimDir = GetViewVector();
 	trace_t result;
-	UTIL_TraceLine( EyePosition(), EyePosition() + 10000.0f * aimDir, MASK_PLAYERSOLID, this, COLLISION_GROUP_NONE, &result );
+	// MASK_PLAYERSOLID might be too restrictive if FF has different collision for players/projectiles.
+	// MASK_SHOT_HULL or MASK_SHOT might be better depending on weapon.
+	UTIL_TraceLine( EyePosition(), EyePosition() + BotDefaultVisibleDistance, MASK_PLAYERSOLID, this, COLLISION_GROUP_PLAYER, &result );
 
-	if (result.DidHitNonWorldEntity() && result.m_pEnt) // Null check m_pEnt
+	if (result.DidHitNonWorldEntity() && result.m_pEnt)
 	{
 		CBaseEntity *victim = result.m_pEnt;
+		// Must be a player and alive
 		if (victim->IsPlayer() && victim->IsAlive())
 		{
-			CBasePlayer *player = static_cast<CBasePlayer *>( victim );
-			if (player->InSameTeam( this ))
+			// Must be on the same team
+			if (victim->GetTeamNumber() == GetTeamNumber())
+			{
+				// Don't shoot self (should be handled by trace filter, but double check)
+				if (victim == static_cast<CBaseEntity*>(this)) return false;
 				return true;
+			}
 		}
 	}
 	return false;
@@ -877,8 +763,9 @@ float CFFBot::ComputeWeaponSightRange( void )
 {
 	Vector aimDir = GetViewVector();
 	trace_t result;
-	UTIL_TraceLine( EyePosition(), EyePosition() + 10000.0f * aimDir, MASK_PLAYERSOLID, this, COLLISION_GROUP_NONE, &result );
-	return (EyePosition() - result.endpos).Length();
+	// Using MASK_SHOT_HULL as a general mask for what blocks weapon fire.
+	UTIL_TraceLine( EyePosition(), EyePosition() + BotDefaultVisibleDistance, MASK_SHOT_HULL, this, COLLISION_GROUP_NONE, &result );
+	return (result.endpos - EyePosition()).Length();
 }
 
 
@@ -888,8 +775,11 @@ float CFFBot::ComputeWeaponSightRange( void )
  */
 bool CFFBot::DidPlayerJustFireWeapon( const CFFPlayer *player ) const
 {
-	if (!player) return false; // Null check
-	CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(player->GetActiveWeapon()); // Cast to CFFWeaponBase
-	// TODO: IsSilenced() might be CS specific. Does FF have silenced weapons?
-	return (weapon && /*!weapon->IsSilenced() &&*/ weapon->m_flNextPrimaryAttack > gpGlobals->curtime);
+	if (!player) return false;
+	CFFWeaponBase *weapon = static_cast<CFFWeaponBase*>(player->GetActiveWeapon());
+	// FF doesn't have silencers, so that check is removed.
+	// Check if the weapon's next primary attack time is in the future, indicating it was just fired.
+	return (weapon && weapon->m_flNextPrimaryAttack > gpGlobals->curtime);
 }
+
+[end of mp/src/game/server/ff/bot/ff_bot_weapon.cpp]

@@ -17,7 +17,7 @@
 
 #include "../../shared/bot/bot.h" // Changed path
 #include "ff_bot_manager.h"
-#include "ff_bot_chatter.h"
+// #include "ff_bot_chatter.h" // Removed CS-specific chatter
 #include "ff_gamestate.h"
 #include "../ff_player.h"                     // Changed path
 #include "../../shared/ff/weapons/ff_weapon_base.h" // Changed path
@@ -37,11 +37,11 @@
 #include "states/ff_bot_state_buy.h"
 #include "states/ff_bot_state_hide.h"
 #include "states/ff_bot_state_follow.h"
-// TODO: Bomb-related states might be FF-specific objectives later (e.g., capture point, deliver flag)
-#include "states/ff_bot_state_fetch_bomb.h"       // CS-specific name, may become FetchObjectiveState
-#include "states/ff_bot_state_plant_bomb.h"       // CS-specific name, may become SecureObjectiveState
-#include "states/ff_bot_state_defuse_bomb.h"      // CS-specific name, may become DefendObjectiveState
-#include "states/ff_bot_state_escape_from_bomb.h" // CS-specific name, may become RetreatState
+// Removed includes for CS-specific bomb states
+// #include "states/ff_bot_state_fetch_bomb.h"
+// #include "states/ff_bot_state_plant_bomb.h"
+// #include "states/ff_bot_state_defuse_bomb.h"
+// #include "states/ff_bot_state_escape_from_bomb.h"
 
 #include "states/ff_bot_state_use_entity.h"
 #include "states/ff_bot_state_open_door.h"
@@ -105,10 +105,10 @@ class OpenDoorState : public BotState { ... };
 /**
  * The Fortress Forever Bot
  */
-class CFFBot : public CBot< CFFPlayer >
+class CFFBot : public CBot< CFFPlayer > // Ensure CFFPlayer
 {
 public:
-	DECLARE_CLASS( CFFBot, CBot< CFFPlayer > );
+	DECLARE_CLASS( CFFBot, CBot< CFFPlayer > ); // Ensure CFFPlayer
 	DECLARE_DATADESC();
 
 	CFFBot( void );
@@ -164,7 +164,7 @@ public:
 	void Hunt( void );
 	bool IsHunting( void ) const;
 
-	void Attack( CFFPlayer *victim );
+	void Attack( CFFPlayer *victim ); // Ensure CFFPlayer
 	void FireWeaponAtEnemy( void );
 	void StopAttacking( void );
 	bool IsAttacking( void ) const;
@@ -201,11 +201,11 @@ public:
 
 	void TryToJoinTeam( int team );
 
-	void Follow( CFFPlayer *player );
+	void Follow( CFFPlayer *player ); // Ensure CFFPlayer
 	void ContinueFollowing( void );
 	void StopFollowing( void );
 	bool IsFollowing( void ) const;
-	CFFPlayer *GetFollowLeader( void ) const;
+	CFFPlayer *GetFollowLeader( void ) const; // Ensure CFFPlayer
 	float GetFollowDuration( void ) const;
 	bool CanAutoFollow( void ) const;
 
@@ -220,8 +220,8 @@ public:
 	bool IsDoingScenario( void ) const;
 
 	//- scenario / gamestate -----------------------------------------------------------------------------------------
-	FFGameState *GetGameState( void );
-	const FFGameState *GetGameState( void ) const;
+	FFGameState *GetGameState( void ); // Ensure FFGameState
+	const FFGameState *GetGameState( void ) const; // Ensure FFGameState
 
 	// TODO: Bomb-specific, adapt for FF objectives
 	bool IsAtBombsite( void );
@@ -296,39 +296,39 @@ public:
 	PriorityType GetNoisePriority( void ) const; // PriorityType enum
 
 	//- radio and chatter--------------------------------------------------------------------------------------------
-	void SendRadioMessage( RadioType event ); // RadioType enum
-	void SpeakAudio( const char *voiceFilename, float duration, int pitch );
-	BotChatterInterface *GetChatter( void );
-	bool RespondToHelpRequest( CFFPlayer *player, Place place, float maxRange = -1.0f ); // Place enum
+	// void SendRadioMessage( RadioType event ); // Radio system removed
+	void SpeakAudio( const char *voiceFilename, float duration, int pitch ); // Generic audio, keep for now
+	// BotChatterInterface *GetChatter( void ); // Removed CS-specific chatter
+	bool RespondToHelpRequest( CFFPlayer *player, Place place, float maxRange = -1.0f ); // Ensure CFFPlayer
 	bool IsUsingVoice() const;
 
 
 	//- enemies ------------------------------------------------------------------------------------------------------
-	void SetBotEnemy( CFFPlayer *enemy );
-	CFFPlayer *GetBotEnemy( void ) const;
+	void SetBotEnemy( CFFPlayer *enemy ); // Ensure CFFPlayer
+	CFFPlayer *GetBotEnemy( void ) const; // Ensure CFFPlayer
 	int GetNearbyEnemyCount( void ) const;
 	unsigned int GetEnemyPlace( void ) const; // Place enum
 	// TODO: Bomb-specific, adapt for FF objectives (e.g. flag carrier)
 	bool CanSeeBomber( void ) const;
-	CFFPlayer *GetBomber( void ) const;
+	CFFPlayer *GetBomber( void ) const; // Ensure CFFPlayer
 
 	int GetNearbyFriendCount( void ) const;
-	CFFPlayer *GetClosestVisibleFriend( void ) const;
-	CFFPlayer *GetClosestVisibleHumanFriend( void ) const;
+	CFFPlayer *GetClosestVisibleFriend( void ) const; // Ensure CFFPlayer
+	CFFPlayer *GetClosestVisibleHumanFriend( void ) const; // Ensure CFFPlayer
 
 	bool IsOutnumbered( void ) const;
 	int OutnumberedCount( void ) const;
 
 	// #define ONLY_VISIBLE_ENEMIES true // Prefer const bool
-	CFFPlayer *GetImportantEnemy( bool checkVisibility = false ) const;
+	CFFPlayer *GetImportantEnemy( bool checkVisibility = false ) const; // Ensure CFFPlayer
 
 	void UpdateReactionQueue( void );
-	CFFPlayer *GetRecognizedEnemy( void );
+	CFFPlayer *GetRecognizedEnemy( void ); // Ensure CFFPlayer
 	bool IsRecognizedEnemyReloading( void );
 	bool IsRecognizedEnemyProtectedByShield( void ); // TODO: Shield logic for FF
 	float GetRangeToNearestRecognizedEnemy( void );
 
-	CFFPlayer *GetAttacker( void ) const;
+	CFFPlayer *GetAttacker( void ) const; // Ensure CFFPlayer
 	float GetTimeSinceAttacked( void ) const;
 	float GetFirstSawEnemyTimestamp( void ) const;
 	float GetLastSawEnemyTimestamp( void ) const;
@@ -345,8 +345,8 @@ public:
 	bool CanSeeSniper( void ) const; // TODO: Sniper logic for FF
 	bool HasSeenSniperRecently( void ) const;
 
-	float GetTravelDistanceToPlayer( CFFPlayer *player ) const;
-	bool DidPlayerJustFireWeapon( const CFFPlayer *player ) const;
+	float GetTravelDistanceToPlayer( CFFPlayer *player ) const; // Ensure CFFPlayer
+	bool DidPlayerJustFireWeapon( const CFFPlayer *player ) const; // Ensure CFFPlayer
 
 	//- navigation --------------------------------------------------------------------------------------------------
 	bool HasPath( void ) const;
@@ -421,18 +421,18 @@ public:
 
 	// #define CHECK_FOV true // Prefer const bool
 	bool IsVisible( const Vector &pos, bool testFOV = false, const CBaseEntity *ignore = NULL ) const;
-	bool IsVisible( CFFPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const;
+	bool IsVisible( CFFPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const; // Ensure CFFPlayer
 
-	bool IsNoticable( const CFFPlayer *player, unsigned char visibleParts ) const;
+	bool IsNoticable( const CFFPlayer *player, unsigned char visibleParts ) const; // Ensure CFFPlayer
 
 	bool IsEnemyPartVisible( VisiblePartType part ) const;
-	const Vector &GetPartPosition( CFFPlayer *player, VisiblePartType part ) const;
+	const Vector &GetPartPosition( CFFPlayer *player, VisiblePartType part ) const; // Ensure CFFPlayer
 
 	float ComputeWeaponSightRange( void );
 
 	bool IsAnyVisibleEnemyLookingAtMe( bool testFOV = false ) const;
 
-	bool IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const;
+	bool IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const; // Ensure CFFPlayer
 
 	//- approach points ---------------------------------------------------------------------------------------------
 	void ComputeApproachPoints( void );
@@ -458,7 +458,7 @@ public:
 	bool IsUsingPistol( void ) const;
 	bool IsUsingGrenade( void ) const;
 	bool IsUsingSniperRifle( void ) const; // TODO: Sniper logic for FF
-	bool IsUsing( FFWeaponID weapon ) const; // FFWeaponID
+	bool IsUsing( FFWeaponID weapon ) const; // FFWeaponID (already correct)
 	bool IsSniper( void ) const; // TODO: Sniper logic for FF
 	bool IsSniping( void ) const; // TODO: Sniper logic for FF
 	bool IsUsingShotgun( void ) const;
@@ -470,7 +470,7 @@ public:
 	bool IsAvoidingGrenade( void ) const;
 	bool DoesActiveWeaponHaveSilencer( void ) const; // TODO: Silencer logic for FF
 	bool CanActiveWeaponFire( void ) const;
-	CFFWeaponBase *GetActiveCSWeapon( void ) const; // Should be GetActiveFFWeapon
+	CFFWeaponBase *GetActiveFFWeapon( void ) const; // Renamed from GetActiveCSWeapon
 
 	void GiveWeapon( const char *weaponAlias );
 
@@ -550,8 +550,10 @@ private:
 	// Friend declarations for states are fine as states are tightly coupled with the bot.
 	friend class IdleState; friend class HuntState; friend class AttackState;
 	friend class InvestigateNoiseState; friend class BuyState; friend class MoveToState;
-	friend class FetchBombState; friend class PlantBombState; friend class DefuseBombState;
-	friend class HideState; friend class EscapeFromBombState; friend class FollowState;
+	// Removed friend declarations for CS-specific bomb states
+	// friend class FetchBombState; friend class PlantBombState; friend class DefuseBombState;
+	// friend class EscapeFromBombState;
+	friend class HideState; friend class FollowState;
 	friend class UseEntityState; friend class OpenDoorState;
 
 
@@ -576,7 +578,7 @@ private:
 	CountdownTimer m_surpriseTimer;
 
 	bool m_isFollowing;
-	CHandle< CFFPlayer > m_leader;
+	CHandle< CFFPlayer > m_leader; // Ensure CFFPlayer
 	float m_followTimestamp;
 	float m_allowAutoFollowTime;
 
@@ -592,11 +594,12 @@ private:
 	InvestigateNoiseState	m_investigateNoiseState;
 	BuyState				m_buyState;
 	MoveToState				m_moveToState;
-	FetchBombState			m_fetchBombState;
-	PlantBombState			m_plantBombState;
-	DefuseBombState			m_defuseBombState;
+	// Removed member variables for CS-specific bomb states
+	// FetchBombState			m_fetchBombState;
+	// PlantBombState			m_plantBombState;
+	// DefuseBombState			m_defuseBombState;
 	HideState				m_hideState;
-	EscapeFromBombState		m_escapeFromBombState;
+	// EscapeFromBombState		m_escapeFromBombState;
 	FollowState				m_followState;
 	UseEntityState			m_useEntityState;
 	OpenDoorState			m_openDoorState;
@@ -692,7 +695,7 @@ private:
 	Vector m_noisePosition;
 	float m_noiseTravelDistance;
 	float m_noiseTimestamp;
-	CNavArea *m_noiseArea;
+	CNavArea *m_noiseArea; // This was the line that caused issues before. Keep as is.
 	PriorityType m_noisePriority; // Enum
 	bool UpdateLookAtNoise( void );
 	CountdownTimer m_noiseBendTimer;
@@ -772,11 +775,11 @@ private:
 	};
 	static PartInfo m_partInfo[ MAX_PLAYERS ]; // MAX_PLAYERS
 
-	void ComputePartPositions( CFFPlayer *player );
+	void ComputePartPositions( CFFPlayer *player ); // Ensure CFFPlayer
 
 	DispositionType m_disposition; // Enum
 	CountdownTimer m_ignoreEnemiesTimer;
-	CHandle< CFFPlayer > m_enemy;
+	CHandle< CFFPlayer > m_enemy; // Ensure CFFPlayer
 	bool m_isEnemyVisible;
 	unsigned char m_visibleEnemyParts;
 	Vector m_lastEnemyPosition;
@@ -790,15 +793,16 @@ private:
 	unsigned int m_enemyPlace; // Place enum
 
 	struct WatchInfo { float timestamp; bool isEnemy; } m_watchInfo[ MAX_PLAYERS ]; // MAX_PLAYERS
-	CHandle< CFFPlayer > m_bomber; // TODO: Bomb logic for FF
+	CHandle< CFFPlayer > m_bomber; // Ensure CFFPlayer if it's a player type
+	// Assuming m_bomber is CFFPlayer based on GetBomber() returning CFFPlayer*
 
 	int m_nearbyFriendCount;
-	CHandle< CFFPlayer > m_closestVisibleFriend;
-	CHandle< CFFPlayer > m_closestVisibleHumanFriend;
+	CHandle< CFFPlayer > m_closestVisibleFriend; // Ensure CFFPlayer
+	CHandle< CFFPlayer > m_closestVisibleHumanFriend; // Ensure CFFPlayer
 
 	IntervalTimer m_attentionInterval;
 
-	CHandle< CFFPlayer > m_attacker;
+	CHandle< CFFPlayer > m_attacker; // Ensure CFFPlayer
 	float m_attackedTimestamp;
 
 	int m_lastVictimID;
@@ -806,7 +810,7 @@ private:
 	bool m_isRapidFiring;
 	IntervalTimer m_equipTimer;
 	CountdownTimer m_zoomTimer;
-	bool DoEquip( CFFWeaponBase *gun );
+	bool DoEquip( CFFWeaponBase *gun ); // Ensure CFFWeaponBase
 
 	void ReloadCheck( void );
 	void SilencerCheck( void ); // TODO: Silencer logic for FF
@@ -819,7 +823,7 @@ private:
 	enum { MAX_ENEMY_QUEUE_FF = 20 }; // Renamed
 	struct ReactionState
 	{
-		CHandle<CFFPlayer> player;
+		CHandle<CFFPlayer> player; // Ensure CFFPlayer
 		bool isReloading;
 		bool isProtectedByShield; // TODO: Shield logic for FF
 	}
@@ -828,7 +832,7 @@ private:
 	byte m_enemyQueueCount;
 	byte m_enemyQueueAttendIndex;
 
-	CFFPlayer *FindMostDangerousThreat( void );
+	CFFPlayer *FindMostDangerousThreat( void ); // Ensure CFFPlayer
 
 	bool m_isStuck;
 	float m_stuckTimestamp;
@@ -843,17 +847,17 @@ private:
 	int m_avgVelCount;
 	Vector m_lastOrigin;
 
-	RadioType m_lastRadioCommand; // Enum
-	float m_lastRadioRecievedTimestamp;
-	float m_lastRadioSentTimestamp;
-	CHandle< CFFPlayer > m_radioSubject;
-	Vector m_radioPosition;
-	void RespondToRadioCommands( void );
-	bool IsRadioCommand( RadioType event ) const; // Enum
+	// RadioType m_lastRadioCommand; // Enum - Radio system removed
+	// float m_lastRadioRecievedTimestamp; // Radio system removed
+	// float m_lastRadioSentTimestamp; // Radio system removed
+	// CHandle< CFFPlayer > m_radioSubject; // Ensure CFFPlayer - Radio system removed
+	// Vector m_radioPosition; // Radio system removed
+	// void RespondToRadioCommands( void ); // Radio system removed
+	bool IsRadioCommand( RadioType event ) const; // Enum - This might still be useful for interpreting player radio for info gathering, keep for now.
 
 	float m_voiceEndTimestamp;
 
-	BotChatterInterface m_chatter;
+	// BotChatterInterface m_chatter; // Removed CS-specific chatter
 	
 	// FF Specific members can be added here
 	// Example for CTF:
@@ -871,7 +875,7 @@ inline void CFFBot::Panic( void ) { /* ... existing logic ... */ }
 inline bool CFFBot::IsPanicking( void ) const { return !m_panicTimer.IsElapsed(); }
 inline void CFFBot::StopPanicking( void ) { m_panicTimer.Invalidate(); }
 inline bool CFFBot::IsNotMoving( float minDuration ) const { return (m_stillTimer.HasStarted() && m_stillTimer.GetElapsedTime() >= minDuration); }
-inline CFFWeaponBase *CFFBot::GetActiveCSWeapon( void ) const { return reinterpret_cast<CFFWeaponBase *>( GetActiveWeapon() ); } // Should be GetActiveFFWeapon
+// Removed inline CFFWeaponBase *CFFBot::GetActiveFFWeapon( void ) const { return reinterpret_cast<CFFWeaponBase *>( GetActiveWeapon() ); }
 inline float CFFBot::GetCombatRange( void ) const { return m_combatRange; }
 inline void CFFBot::SetRogue( bool rogue ) { m_isRogue = rogue; }
 inline void CFFBot::Hurry( float duration ) { m_hurryTimer.Start( duration ); }
@@ -882,7 +886,7 @@ inline void CFFBot::BecomeAlert( void ) { const float alertCooldownTime = 10.0f;
 inline bool CFFBot::IsSneaking( void ) const { return !m_sneakTimer.IsElapsed(); }
 inline void CFFBot::Sneak( float duration ) { m_sneakTimer.Start( duration ); }
 inline bool CFFBot::IsFollowing( void ) const { return m_isFollowing; }
-inline CFFPlayer *CFFBot::GetFollowLeader( void ) const { return m_leader.Get(); } // Use .Get()
+inline CFFPlayer *CFFBot::GetFollowLeader( void ) const { return m_leader.Get(); } // Ensure CFFPlayer
 inline float CFFBot::GetFollowDuration( void ) const { return gpGlobals->curtime - m_followTimestamp; }
 inline bool CFFBot::CanAutoFollow( void ) const { return (gpGlobals->curtime > m_allowAutoFollowTime); }
 inline void CFFBot::AimAtEnemy( void ) { m_isAimingAtEnemy = true; }
@@ -903,16 +907,16 @@ inline CNavArea *CFFBot::GetNoiseArea( void ) const { return m_noiseArea; }
 inline void CFFBot::ForgetNoise( void ) { m_noiseTimestamp = 0.0f; }
 inline float CFFBot::GetNoiseRange( void ) const { if (IsNoiseHeard()) return m_noiseTravelDistance; return 999999999.9f; }
 inline PriorityType CFFBot::GetNoisePriority( void ) const { return m_noisePriority; } // Enum
-inline BotChatterInterface *CFFBot::GetChatter( void ) { return &m_chatter; }
-inline CFFPlayer *CFFBot::GetBotEnemy( void ) const { return m_enemy.Get(); } // Use .Get()
+// inline BotChatterInterface *CFFBot::GetChatter( void ) { return &m_chatter; } // Removed CS-specific chatter
+inline CFFPlayer *CFFBot::GetBotEnemy( void ) const { return m_enemy.Get(); } // Ensure CFFPlayer
 inline int CFFBot::GetNearbyEnemyCount( void ) const { return MIN( GetEnemiesRemaining(), m_nearbyEnemyCount ); } // GetEnemiesRemaining needs definition
 inline unsigned int CFFBot::GetEnemyPlace( void ) const { return m_enemyPlace; } // Place enum
 // TODO: Bomb-specific logic
-inline bool CFFBot::CanSeeBomber( void ) const { return (m_bomber.IsValid() && m_bomber.Get()) ? true : false; } // Use .IsValid() and .Get()
-inline CFFPlayer *CFFBot::GetBomber( void ) const { return m_bomber.Get(); } // Use .Get()
+inline bool CFFBot::CanSeeBomber( void ) const { return (m_bomber.IsValid() && m_bomber.Get()) ? true : false; } // Ensure CFFPlayer if m_bomber is CHandle<CFFPlayer>
+inline CFFPlayer *CFFBot::GetBomber( void ) const { return m_bomber.Get(); } // Ensure CFFPlayer
 inline int CFFBot::GetNearbyFriendCount( void ) const { return MIN( GetFriendsRemaining(), m_nearbyFriendCount ); } // GetFriendsRemaining needs definition
-inline CFFPlayer *CFFBot::GetClosestVisibleFriend( void ) const { return m_closestVisibleFriend.Get(); } // Use .Get()
-inline CFFPlayer *CFFBot::GetClosestVisibleHumanFriend( void ) const { return m_closestVisibleHumanFriend.Get(); } // Use .Get()
+inline CFFPlayer *CFFBot::GetClosestVisibleFriend( void ) const { return m_closestVisibleFriend.Get(); } // Ensure CFFPlayer
+inline CFFPlayer *CFFBot::GetClosestVisibleHumanFriend( void ) const { return m_closestVisibleHumanFriend.Get(); } // Ensure CFFPlayer
 inline float CFFBot::GetTimeSinceAttacked( void ) const { return gpGlobals->curtime - m_attackedTimestamp; }
 inline float CFFBot::GetFirstSawEnemyTimestamp( void ) const { return m_firstSawEnemyTimestamp; }
 inline float CFFBot::GetLastSawEnemyTimestamp( void ) const { return m_lastSawEnemyTimestamp; }
@@ -925,7 +929,7 @@ inline int CFFBot::GetLastVictimID( void ) const { return m_lastVictimID; }
 // TODO: Sniper logic for FF
 inline bool CFFBot::CanSeeSniper( void ) const { return m_isEnemySniperVisible; }
 inline bool CFFBot::HasSeenSniperRecently( void ) const { return !m_sawEnemySniperTimer.IsElapsed(); }
-inline float CFFBot::GetTravelDistanceToPlayer( CFFPlayer *player ) const { if (!player || !player->IsAlive() || player->entindex() < 0 || player->entindex() >= MAX_PLAYERS) return -1.0f; return m_playerTravelDistance[ player->entindex() ]; } // Bounds check
+inline float CFFBot::GetTravelDistanceToPlayer( CFFPlayer *player ) const { if (!player || !player->IsAlive() || player->entindex() < 0 || player->entindex() >= MAX_PLAYERS) return -1.0f; return m_playerTravelDistance[ player->entindex() ]; } // Ensure CFFPlayer
 inline bool CFFBot::HasPath( void ) const { return (m_pathLength) ? true : false; }
 inline void CFFBot::DestroyPath( void ) { m_isStopping = false; m_pathLength = 0; m_pathLadder = NULL; }
 inline CNavArea *CFFBot::GetLastKnownArea( void ) const { return m_lastKnownArea; }
@@ -967,15 +971,15 @@ inline bool CFFBot::IsUsingVoice() const { return m_voiceEndTimestamp > gpGlobal
 inline bool CFFBot::IsOpeningDoor( void ) const { return m_isOpeningDoor; }
 
 // TODO: Update for FF sniper logic
-inline bool IsSniperRifle( CFFWeaponBase *weapon ) { if (weapon == NULL) return false; return weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE); } // WEAPONTYPE_SNIPER_RIFLE
+inline bool IsSniperRifle( CFFWeaponBase *weapon ) { if (weapon == NULL) return false; return weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE); } // Ensure CFFWeaponBase
 
 
 // PathCost class definition moved to ff_bot_pathfind.cpp or a more appropriate location.
 // For now, assuming it's defined elsewhere if CFFBot::ComputePath uses it.
 
 // Prototypes
-extern int GetBotFollowCount( CFFPlayer *leader ); // Ensure this matches CFFPlayer
-// extern const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange = 250.0f ); // This is defined in ff_bot.cpp now
+extern int GetBotFollowCount( CFFPlayer *leader ); // Ensure CFFPlayer
+// extern const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange = 250.0f ); // This is defined in ff_bot.cpp now // me should be CFFBot*
 // extern const HidingSpot *FindInitialEncounterSpot( CBaseEntity *me, const Vector &searchOrigin, float enemyArriveTime, float maxRange, bool isSniper ); // This would be in a nav utility or bot utility file
 
 #endif	// _FF_BOT_H_

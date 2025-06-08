@@ -9,74 +9,150 @@
 #define _FF_GAME_STATE_H_
 
 #include "igameevents.h" // For IGameEvent
-// TODO: Determine if ff_gamerules.h is strictly needed here, or if CFFGameRules is accessed via CFFBot or CFFBotManager
-// #include "../../shared/ff/ff_gamerules.h"
+#include "ehandle.h"     // For CHandle
+#include "mathlib/vector.h" // For Vector
 
-class CFFBot; // Forward declaration for CFFBot
-// class CFFPlayer; // Forward declaration if CFFPlayer is directly used by FFGameState members/methods
+// Forward declarations
+class CFFBot;
+class CFFPlayer;
+class CBaseEntity;
 
-/**
- * This class represents the game state as known by a particular bot
- */
+// Constants for Teams & Objectives
+#define MAX_TEAMS_FF 4
+#define MAX_PLAYABLE_TEAMS_FF 2
+#define MAX_CONTROL_POINTS_FF 8
+
+#define TEAM_ID_NONE -1
+#define TEAM_ID_RED 0
+#define TEAM_ID_BLUE 1
+
+// CTF Flag States
+#define FF_FLAG_STATE_HOME 0
+#define FF_FLAG_STATE_CARRIED 1
+#define FF_FLAG_STATE_DROPPED 2
+
+// VIP Game Mode (Example placeholders)
+#define CLASS_CIVILIAN_FF 10 // Example: Assuming a class ID for VIP/Civilian
+#define VIP_TEAM TEAM_ID_BLUE // Example: Assuming VIP is always on BLUE team
+
 class FFGameState
 {
 public:
 	FFGameState( CFFBot *owner );
 
 	void Reset( void );
+	void Update( void );
 
 	// Generic Event handling
 	void OnRoundEnd( IGameEvent *event );
 	void OnRoundStart( IGameEvent *event );
-	// TODO: Add FF-specific event handlers (e.g., OnFlagCapture, OnControlPointCaptured, OnVIPKilled etc.)
 
-	bool IsRoundOver( void ) const;								///< true if round has been won or lost (but not yet reset)
+	// --- FF-specific CTF Event Handlers ---
+	void OnFlagPickedUp(CBaseEntity* pFlagEntity, CFFPlayer* pPlayer);
+	void OnFlagDropped(CBaseEntity* pFlagEntity, const Vector& dropLocation);
+	void OnFlagCaptured(CBaseEntity* pFlagEntity, CFFPlayer* pCapturer);
+	void OnFlagReturned(CBaseEntity* pFlagEntity);
 
-	// General scenario information
-	enum { UNKNOWN_ZONE = -1 }; // Used for objectives, control points, etc.
+	// --- FF-specific Control Point Event Handlers ---
+	void OnControlPointCaptured(CBaseEntity* pCPEntity, int newOwnerTeam);
+	void OnControlPointProgress(CBaseEntity* pCPEntity, int teamMakingProgress, float newProgress);
+	void OnControlPointBlocked(CBaseEntity* pCPEntity, bool isBlocked);
 
-	// TODO: Add members and methods for CTF (Capture The Flag) state tracking
-	// Example:
-	// FlagState m_ourFlagState;
-	// FlagState m_theirFlagState;
-	// CFFPlayer* m_ourFlagCarrier;
-	// CFFPlayer* m_theirFlagCarrier;
-	// Vector m_ourFlagHomePosition;
-	// Vector m_theirFlagHomePosition;
-	// bool IsOurFlagHome() const;
-	// bool IsTheirFlagHome() const;
-	// CFFPlayer* GetOurFlagCarrier() const;
-	// etc.
+	// --- FF-specific VIP Event Handlers ---
+	void OnVIPKilled(CFFPlayer* pVIPVictim, CBaseEntity* pKiller); // Added pKiller for context
+	void OnVIPEscaped(CFFPlayer* pVIP);
+	void OnPlayerSpawn(CFFPlayer* pPlayer); // To update VIP info if needed on spawn/re-spawn/class change
 
-	// TODO: Add members and methods for CP (Control Point) state tracking
-	// Example:
-	// struct ControlPointInfo {
-	//     int pointID;
-	//     TeamNum controllingTeam; // TeamNum would be FF specific (TEAM_RED, TEAM_BLUE)
-	//     float captureProgress;
-	//     bool isBeingCaptured;
-	// };
-	// CUtlVector<ControlPointInfo> m_controlPoints;
-	// int GetControllingTeam(int pointID) const;
-	// etc.
+	bool IsRoundOver( void ) const;
 
-	// TODO: Add members and methods for VIP Escort state tracking (if applicable to FF)
-	// Example:
-	// CFFPlayer* m_vip;
-	// bool IsVIPEscaped() const;
-	// etc.
+	enum { UNKNOWN_ZONE = -1 };
 
+	// --- CTF (Capture The Flag) State Tracking ---
+	struct FF_FlagState {
+		CHandle<CBaseEntity> entity;
+		int teamAffiliation;
+		int currentState;
+		CHandle<CFFPlayer> carrier;
+		Vector dropLocation;
+		Vector entitySpawnLocation;
+		float returnTime;
+
+		FF_FlagState() { Reset(); }
+		void Reset() {
+			entity = NULL;
+			teamAffiliation = TEAM_ID_NONE;
+			currentState = FF_FLAG_STATE_HOME;
+			carrier = NULL;
+			dropLocation.Init();
+			entitySpawnLocation.Init();
+			returnTime = -1.0f;
+		}
+	};
+
+	const FF_FlagState* GetFlagInfo(int team) const;
+	bool IsTeamFlagHome(int team) const;
+	bool IsTeamFlagCarried(int team, CFFPlayer** pCarrier = NULL) const;
+	bool IsTeamFlagDropped(int team, Vector* pDropLocation = NULL) const;
+    bool IsOtherTeamFlagAtOurBase(int myTeam) const;
+
+
+	// --- Control Point (CP) State Tracking ---
+	struct FF_ControlPointState {
+		CHandle<CBaseEntity> entity;
+		int pointID;
+		int owningTeam;
+		float captureProgress[MAX_TEAMS_FF];
+		bool isLocked;
+
+		FF_ControlPointState() { Reset(); }
+		void Reset() {
+			entity = NULL;
+			pointID = -1;
+			owningTeam = TEAM_ID_NONE;
+			for(int i=0; i < MAX_TEAMS_FF; ++i) captureProgress[i] = 0.0f;
+			isLocked = false;
+		}
+	};
+
+	const FF_ControlPointState* GetControlPointInfo(int cpID) const;
+	int GetControlPointOwner(int cpID) const;
+	float GetControlPointCaptureProgress(int cpID, int team) const;
+	bool IsControlPointLocked(int cpID) const;
+	int GetNumControlPoints( void ) const { return m_numControlPoints; }
+
+
+	// --- VIP Escort State Tracking ---
+	CFFPlayer* GetVIP() const;
+	bool IsVIPAlive() const;
+	bool IsVIPEscaped() const;
 
 private:
-	CFFBot *m_owner;											///< who owns this gamestate
+	// CTF Helpers
+	void InitializeFlagState(int teamID, const char* flagEntityName);
+	int GetFlagTeamFromEntity(CBaseEntity* pFlagEntity) const;
 
-	bool m_isRoundOver;											///< true if round is over, but no yet reset
+	// CP Helpers
+	void InitializeControlPointStates(const char* cpEntityClassName);
+	int GetCPIDFromEntity(CBaseEntity* pCPEntity) const;
 
-	// TODO: Add common state variables relevant to FF game modes
-	// Example:
-	// float m_roundTimer; // Time left in the round
-	// int m_myTeamScore;
-	// int m_enemyTeamScore;
+	// VIP Helper
+	void InitializeVIPState( void );
+    bool IsPlayerVIP(CFFPlayer* pPlayer) const; // Helper to check if a player is the VIP
+
+	CFFBot *m_owner;
+	bool m_isRoundOver;
+
+	// For CTF
+	FF_FlagState m_Flags[MAX_PLAYABLE_TEAMS_FF];
+
+	// For Control Points
+	FF_ControlPointState m_ControlPoints[MAX_CONTROL_POINTS_FF];
+	int m_numControlPoints;
+
+	// For VIP
+	CHandle<CFFPlayer> m_vipPlayer;
+	bool m_isVIPAlive;
+	bool m_isVIPEscaped;
 };
 
 #endif // _FF_GAME_STATE_H_

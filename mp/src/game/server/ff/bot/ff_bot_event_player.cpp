@@ -189,20 +189,28 @@ void CFFBot::OnPlayerRadio( IGameEvent *event )
 	//
 	// Process radio events from our team
 	//
+	// TODO_FF: The bot's own radio response system has been removed.
+	// This function previously stored information about received radio commands
+	// in m_lastRadioCommand, m_radioSubject, etc., which were then processed by
+	// CFFBot::RespondToRadioCommands(). Since those members and the method are gone,
+	// this function body is commented out.
+	// If bots need to react to player radio for informational purposes in a simpler way
+	// (without their own radio command system), this function can be revised.
+	/*
 	if (player && player->GetTeamNumber() == GetTeamNumber() )
 	{
-		/// @todo Distinguish between radio commands and responses
-		RadioType radioEvent = (RadioType)event->GetInt( "slot" ); // TODO: Ensure "slot" gives correct RadioType for FF
+		RadioType radioEvent = (RadioType)event->GetInt( "slot" );
 
-		// TODO: Update radio event names/enums for FF
 		if (radioEvent != RADIO_INVALID && radioEvent != RADIO_AFFIRMATIVE && radioEvent != RADIO_NEGATIVE && radioEvent != RADIO_REPORTING_IN)
 		{
-			m_lastRadioCommand = radioEvent;
-			m_lastRadioRecievedTimestamp = gpGlobals->curtime;
-			m_radioSubject = player;
-			m_radioPosition = GetCentroid( player );
+			// These members are removed:
+			// m_lastRadioCommand = radioEvent;
+			// m_lastRadioRecievedTimestamp = gpGlobals->curtime;
+			// m_radioSubject = player;
+			// m_radioPosition = GetCentroid( player );
 		}
 	}
+	*/
 }
 
 

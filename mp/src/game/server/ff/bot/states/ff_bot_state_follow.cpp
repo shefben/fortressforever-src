@@ -9,14 +9,18 @@
 
 #include "cbase.h"
 #include "ff_bot_state_follow.h"
-#include "../ff_bot.h" // For CFFBot methods called by the state
-#include "../ff_bot_manager.h" // For TheFFBots()
-#include "../../ff_player.h" // For CFFPlayer, CBasePlayer
-#include "../../../shared/ff/weapons/ff_weapon_base.h" // For FFWeaponID (used in CFFBot)
-// #include "../../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-// #include "../../../shared/ff/ff_gamerules.h" // For CFFGameRules or FFGameRules() (potentially used)
-#include "../ff_gamestate.h" // For FFGameState (used in CFFBot)
-#include "nav_mesh.h" // For TheNavMesh (Should be globally accessible or have a more specific path if not)
+#include "../ff_bot.h"
+#include "../ff_bot_manager.h"
+#include "../../ff_player.h"
+#include "../../../shared/ff/weapons/ff_weapon_base.h"
+#include "../ff_gamestate.h"
+#include "../nav_mesh.h"
+#include "../nav_pathfind.h" // For PathCost, NavAreaTravelDistance, SearchSurroundingAreas
+
+// Local bot utility headers
+#include "../bot_constants.h"  // For BotTaskType, RouteType, NUM_DIRECTIONS, etc.
+#include "../bot_profile.h"    // For GetProfile() (potentially used by CFFBot methods)
+#include "../bot_util.h"       // For PrintIfWatched
 
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -28,6 +32,8 @@
  */
 void FollowState::OnEnter( CFFBot *me )
 {
+	if (!me) return; // Null check
+
 	me->StandUp();
 	me->Run();
 	me->DestroyPath();
@@ -35,22 +41,13 @@ void FollowState::OnEnter( CFFBot *me )
 	m_isStopped = false;
 	m_stoppedTimestamp = 0.0f;
 
-	// to force immediate repath
-	m_lastLeaderPos.x = -99999999.9f;
-	m_lastLeaderPos.y = -99999999.9f;
-	m_lastLeaderPos.z = -99999999.9f;
-
+	m_lastLeaderPos = Vector( -99999999.9f, -99999999.9f, -99999999.9f );
 	m_lastSawLeaderTime = 0;
-
-	// set re-pathing frequency
 	m_repathInterval.Invalidate();
-
 	m_isSneaking = false;
-
 	m_walkTime.Invalidate();
 	m_isAtWalkSpeed = false;
-
-	m_leaderMotionState = INVALID;
+	m_leaderMotionState = INVALID_MOTION_STATE; // Use an enum from bot_constants.h or define locally if specific
 	m_idleTimer.Start( RandomFloat( 2.0f, 5.0f ) );
 }
 
@@ -60,37 +57,18 @@ void FollowState::OnEnter( CFFBot *me )
  */
 void FollowState::ComputeLeaderMotionState( float leaderSpeed )
 {
-	// walk = 130, run = 250
 	const float runWalkThreshold = 140.0f;
-	const float walkStopThreshold = 10.0f; // 120.0f;
+	const float walkStopThreshold = 10.0f;
 	LeaderMotionStateType prevState = m_leaderMotionState;
-	if (leaderSpeed > runWalkThreshold)
-	{
-		m_leaderMotionState = RUNNING;
-		m_isAtWalkSpeed = false;
-	}
+
+	if (leaderSpeed > runWalkThreshold) { m_leaderMotionState = MOTION_RUNNING; m_isAtWalkSpeed = false; } // Use enums
 	else if (leaderSpeed > walkStopThreshold)
 	{
-		// track when began to walk
-		if (!m_isAtWalkSpeed)
-		{
-			m_walkTime.Start();
-			m_isAtWalkSpeed = true;
-		}
-
-		const float minWalkTime = 0.25f;
-		if (m_walkTime.GetElapsedTime() > minWalkTime)
-		{
-			m_leaderMotionState = WALKING;
-		}
+		if (!m_isAtWalkSpeed) { m_walkTime.Start(); m_isAtWalkSpeed = true; }
+		if (m_walkTime.GetElapsedTime() > 0.25f) m_leaderMotionState = MOTION_WALKING; // Use enum
 	}
-	else
-	{
-		m_leaderMotionState = STOPPED;
-		m_isAtWalkSpeed = false;
-	}
+	else { m_leaderMotionState = MOTION_STOPPED; m_isAtWalkSpeed = false; } // Use enum
 
-	// track time spent in this motion state
 	if (prevState != m_leaderMotionState)
 	{
 		m_leaderMotionStateTime.Start();
@@ -108,263 +86,122 @@ public:
 	FollowTargetCollector( CBasePlayer *player )
 	{
 		m_player = player;
+		m_targetAreaCount = 0;
+		if (!player) { m_forward.Init(); m_cutoff.Init(); return; } // Null check
 
 		Vector playerVel = player->GetAbsVelocity();
 		m_forward.x = playerVel.x;
 		m_forward.y = playerVel.y;
 		float speed = m_forward.NormalizeInPlace();
-
 		Vector playerOrigin = GetCentroid( player );
 
-		const float walkSpeed = 100.0f;
-		if (speed < walkSpeed)
-		{
-			m_cutoff.x = playerOrigin.x;
-			m_cutoff.y = playerOrigin.y;
-			m_forward.x = 0.0f;
-			m_forward.y = 0.0f;
-		}
+		if (speed < 100.0f) { m_cutoff = playerOrigin.AsVector2D(); m_forward.Init(); }
 		else
 		{
-			const float k = 1.5f; // 2.0f;
 			float trimSpeed = MIN( speed, 200.0f );
-			m_cutoff.x = playerOrigin.x + k * trimSpeed * m_forward.x;
-			m_cutoff.y = playerOrigin.y + k * trimSpeed * m_forward.y;
+			m_cutoff.x = playerOrigin.x + 1.5f * trimSpeed * m_forward.x;
+			m_cutoff.y = playerOrigin.y + 1.5f * trimSpeed * m_forward.y;
 		}
-
-		m_targetAreaCount = 0;
 	}
-
 	enum { MAX_TARGET_AREAS = 128 };
-
 	bool operator() ( CNavArea *area )
 	{
-		if (m_targetAreaCount >= MAX_TARGET_AREAS)
-			return false;
-
-		// only use two-way connections
-		if (!area->GetParent() || area->IsConnected( area->GetParent(), NUM_DIRECTIONS ))
+		if (!area || m_targetAreaCount >= MAX_TARGET_AREAS) return false;
+		if (!area->GetParent() || area->IsConnected( area->GetParent(), NUM_DIRECTIONS )) // NUM_DIRECTIONS from bot_constants.h
 		{
-			if (m_forward.IsZero())
-			{
-				m_targetArea[ m_targetAreaCount++ ] = area;
-			}
+			if (m_forward.IsZero()) m_targetArea[ m_targetAreaCount++ ] = area;
 			else
 			{
-				// collect areas in the direction of the player's forward motion
 				Vector2D to( area->GetCenter().x - m_cutoff.x, area->GetCenter().y - m_cutoff.y );
 				to.NormalizeInPlace();
-
-				//if (DotProduct( to, m_forward ) > 0.7071f)
-				if ((to.x * m_forward.x + to.y * m_forward.y) > 0.7071f)
-					m_targetArea[ m_targetAreaCount++ ] = area;
+				if (DotProduct2D( to, m_forward ) > 0.7071f) m_targetArea[ m_targetAreaCount++ ] = area;
 			}
 		}
-
 		return (m_targetAreaCount < MAX_TARGET_AREAS);
 	}
-
-
-	CBasePlayer *m_player;
-	Vector2D m_forward;
-	Vector2D m_cutoff;
-
-	CNavArea *m_targetArea[ MAX_TARGET_AREAS ];
-	int m_targetAreaCount;
+	CBasePlayer *m_player; Vector2D m_forward; Vector2D m_cutoff;
+	CNavArea *m_targetArea[ MAX_TARGET_AREAS ]; int m_targetAreaCount;
 };
 
 //--------------------------------------------------------------------------------------------------------------
-/**
- * Follow our leader
- * @todo Clean up this nasty mess
- */
 void FollowState::OnUpdate( CFFBot *me )
 {
-	// if we lost our leader, give up
-	if (m_leader == NULL || !m_leader->IsAlive())
-	{
-		me->Idle();
-		return;
-	}
+	if (!me || !me->GetChatter() || !TheNavMesh) return; // Null checks
 
-	// if we are carrying the bomb and at a bombsite, plant
-	if (me->HasC4() && me->IsAtBombsite()) // TODO: Update HasC4 for FF if it's different (e.g. different item name)
-	{
-		// plant it
-		me->SetTask( CFFBot::PLANT_BOMB );
-		me->PlantBomb(); // TODO: Ensure PlantBomb logic is FF specific
+	if (m_leader == NULL || !m_leader->IsAlive()) { me->Idle(); return; }
 
-		// radio to the team
-		me->GetChatter()->PlantingTheBomb( me->GetPlace() );
+	// TODO_FF: C4 logic for FF
+	// if (me->HasC4() && me->IsAtBombsite()) { /* ... plant logic ... */ return; }
 
-		return;
-	}
-
-	// look around
 	me->UpdateLookAround();
+	if (!me->IsNotMoving()) m_idleTimer.Start( RandomFloat( 2.0f, 5.0f ) );
 
-	// if we are moving, we are not idle
-	if (me->IsNotMoving() == false)
-		m_idleTimer.Start( RandomFloat( 2.0f, 5.0f ) );
+	Vector leaderOrigin = GetCentroid( m_leader.Get() ); // Use .Get()
+	ComputeLeaderMotionState( m_leader->GetAbsVelocity().AsVector2D().Length() );
 
-	// compute the leader's speed
-	Vector leaderVel = m_leader->GetAbsVelocity();
-	float leaderSpeed = Vector2D( leaderVel.x, leaderVel.y ).Length();
+	bool isLeaderVisible = me->IsVisible( leaderOrigin );
+	if (isLeaderVisible) m_lastSawLeaderTime = gpGlobals->curtime;
 
-	// determine our leader's movement state
-	ComputeLeaderMotionState( leaderSpeed );
-
-	// track whether we can see the leader
-	bool isLeaderVisible;
-	Vector leaderOrigin = GetCentroid( m_leader );
-	if (me->IsVisible( leaderOrigin ))
-	{
-		m_lastSawLeaderTime = gpGlobals->curtime;
-		isLeaderVisible = true;
-	}
-	else
-	{
-		isLeaderVisible = false;
-	}
-
-
-	// determine whether we should sneak or not
-	const float farAwayRange = 750.0f;
 	Vector myOrigin = GetCentroid( me );
-	if ((leaderOrigin - myOrigin).IsLengthGreaterThan( farAwayRange ))
-	{
-		// far away from leader - run to catch up
-		m_isSneaking = false;
-	}
+	if ((leaderOrigin - myOrigin).IsLengthGreaterThan( 750.0f )) m_isSneaking = false;
 	else if (isLeaderVisible)
 	{
-		// if we see leader walking and we are nearby, walk
-		if (m_leaderMotionState == WALKING)
-			m_isSneaking = true;
-
-		// if we are sneaking and our leader starts running, stop sneaking
-		if (m_isSneaking && m_leaderMotionState == RUNNING)
-			m_isSneaking = false;
+		if (m_leaderMotionState == MOTION_WALKING) m_isSneaking = true; // Enum
+		if (m_isSneaking && m_leaderMotionState == MOTION_RUNNING) m_isSneaking = false; // Enum
 	}
+	if (gpGlobals->curtime - m_lastSawLeaderTime > 20.0f) m_isSneaking = false;
 
-	// if we haven't seen the leader for a long time, run
-	const float longTime = 20.0f;
-	if (gpGlobals->curtime - m_lastSawLeaderTime > longTime)
-		m_isSneaking = false;
-
-	if (m_isSneaking)
-		me->Walk();
-	else
-		me->Run();
-
+	if (m_isSneaking) me->Walk(); else me->Run();
 
 	bool repath = false;
-
-	// if the leader has stopped, hide nearby
-	const float nearLeaderRange = 250.0f;
-	if (!me->HasPath() && m_leaderMotionState == STOPPED && m_leaderMotionStateTime.GetElapsedTime() > m_waitTime)
+	if (!me->HasPath() && m_leaderMotionState == MOTION_STOPPED && m_leaderMotionStateTime.GetElapsedTime() > m_waitTime) // Enum
 	{
-		// throttle how often this check occurs
 		m_waitTime += RandomFloat( 1.0f, 3.0f );
-
-		// the leader has stopped - if we are close to him, take up a hiding spot
-		if ((leaderOrigin - myOrigin).IsLengthLessThan( nearLeaderRange ))
+		if ((leaderOrigin - myOrigin).IsLengthLessThan( 250.0f ))
 		{
-			const float hideRange = 250.0f;
-			if (me->TryToHide( NULL, -1.0f, hideRange, false, USE_NEAREST ))
-			{
-				me->ResetStuckMonitor();
-				return;
-			}
+			if (me->TryToHide( NULL, -1.0f, 250.0f, false, true )) { me->ResetStuckMonitor(); return; } // USE_NEAREST = true
 		}
 	}
+	if (m_idleTimer.IsElapsed()) { repath = true; m_isSneaking = true; }
+	if (m_leader->GetAbsVelocity().AsVector2D().Length() > 100.0f && m_leaderMotionState != MOTION_STOPPED) repath = true; // Enum
 
-	// if we have been idle for awhile, move
-	if (m_idleTimer.IsElapsed())
-	{
-		repath = true;
+	if (me->UpdatePathMovement( false ) != CFFBot::PROGRESSING) me->DestroyPath(); // NO_SPEED_CHANGE = false
 
-		// always walk when we move such a short distance
-		m_isSneaking = true;
-	}
-
-	// if our leader has moved, repath (don't repath if leading is stopping)
-	if (leaderSpeed > 100.0f && m_leaderMotionState != STOPPED)
-	{
-		repath = true;
-	}
-
-	// move along our path
-	if (me->UpdatePathMovement( NO_SPEED_CHANGE ) != CFFBot::PROGRESSING)
-	{
-		me->DestroyPath();
-	}
-
-	// recompute our path if necessary
 	if (repath && m_repathInterval.IsElapsed() && !me->IsOnLadder())
 	{
-		// recompute our path to keep us near our leader
 		m_lastLeaderPos = leaderOrigin;
-
 		me->ResetStuckMonitor();
-
-		const float runSpeed = 200.0f;
-
-		const float collectRange = (leaderSpeed > runSpeed) ? 600.0f : 400.0f;		// 400, 200
-		FollowTargetCollector collector( m_leader );
-		SearchSurroundingAreas( TheNavMesh->GetNearestNavArea( m_lastLeaderPos ), m_lastLeaderPos, collector, collectRange );
-
-		if (cv_bot_debug.GetBool())
+		CNavArea* leaderNavArea = TheNavMesh->GetNearestNavArea( m_lastLeaderPos );
+		if (leaderNavArea) // Null check
 		{
-			for( int i=0; i<collector.m_targetAreaCount; ++i )
-				collector.m_targetArea[i]->Draw( /*255, 0, 0, 2*/ );
-		}
-
-		// move to one of the collected areas
-		if (collector.m_targetAreaCount)
-		{
-			CNavArea *target = NULL;
-			Vector targetPos;
-
-			// if we are idle, pick a random area
-			if (m_idleTimer.IsElapsed())
+			FollowTargetCollector collector( m_leader.Get() ); // Use .Get()
+			SearchSurroundingAreas( leaderNavArea, m_lastLeaderPos, collector, (m_leader->GetAbsVelocity().AsVector2D().Length() > 200.0f) ? 600.0f : 400.0f ); // SearchSurroundingAreas
+			if (cv_bot_debug.GetBool()) { /* ... debug draw ... */ }
+			if (collector.m_targetAreaCount)
 			{
-				target = collector.m_targetArea[ RandomInt( 0, collector.m_targetAreaCount-1 ) ];
-				targetPos = target->GetCenter();
-				me->PrintIfWatched( "%4.1f: Bored. Repathing to a new nearby area\n", gpGlobals->curtime );
-			}
-			else
-			{
-				me->PrintIfWatched( "%4.1f: Repathing to stay with leader.\n", gpGlobals->curtime );
-
-				// find closest area to where we are
-				CNavArea *area;
-				float closeRangeSq = 9999999999.9f;
-				Vector close;
-
-				for( int a=0; a<collector.m_targetAreaCount; ++a )
+				CNavArea *target = NULL; Vector targetPos;
+				if (m_idleTimer.IsElapsed())
 				{
-					area = collector.m_targetArea[a];
-
-					area->GetClosestPointOnArea( myOrigin, &close );
-
-					float rangeSq = (myOrigin - close).LengthSqr();
-					if (rangeSq < closeRangeSq)
+					target = collector.m_targetArea[ RandomInt( 0, collector.m_targetAreaCount-1 ) ];
+					if (target) targetPos = target->GetCenter(); // Null check
+					PrintIfWatched(me, "%4.1f: Bored. Repathing to a new nearby area\n", gpGlobals->curtime ); // Updated
+				}
+				else
+				{
+					PrintIfWatched(me, "%4.1f: Repathing to stay with leader.\n", gpGlobals->curtime ); // Updated
+					float closeRangeSq = FLT_MAX; Vector close;
+					for( int a=0; a<collector.m_targetAreaCount; ++a )
 					{
-						target = area;
-						targetPos = close;
-						closeRangeSq = rangeSq;
+						CNavArea* area = collector.m_targetArea[a]; if (!area) continue;
+						area->GetClosestPointOnArea( myOrigin, &close );
+						float rangeSq = (myOrigin - close).LengthSqr();
+						if (rangeSq < closeRangeSq) { target = area; targetPos = close; closeRangeSq = rangeSq; }
 					}
 				}
+				if (target && me->ComputePath( target->GetCenter(), FASTEST_ROUTE ) == false) PrintIfWatched(me, "Pathfind to leader failed.\n" ); // Updated, FASTEST_ROUTE
+				m_repathInterval.Start( 0.5f );
+				m_idleTimer.Reset();
 			}
-
-			if (target == NULL || me->ComputePath( target->GetCenter(), FASTEST_ROUTE ) == false)
-				me->PrintIfWatched( "Pathfind to leader failed.\n" );
-
-			// throttle how often we repath
-			m_repathInterval.Start( 0.5f );
-
-			m_idleTimer.Reset();
 		}
 	}
 }
@@ -372,4 +209,5 @@ void FollowState::OnUpdate( CFFBot *me )
 //--------------------------------------------------------------------------------------------------------------
 void FollowState::OnExit( CFFBot *me )
 {
+	// TODO_FF: Add any exit logic if needed
 }

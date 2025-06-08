@@ -8,14 +8,17 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "ff_bot_state_investigate_noise.h" // Assuming this is the header for InvestigateNoiseState
+#include "ff_bot_state_investigate_noise.h"
 #include "../ff_bot.h"
-#include "../ff_bot_manager.h" // For TheFFBots() (potentially used)
-#include "../../ff_player.h" // For CFFPlayer (potentially used by CFFBot)
-#include "../../../shared/ff/weapons/ff_weapon_base.h" // For FFWeaponID (used in CFFBot)
-// #include "../../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-// #include "../../../shared/ff/ff_gamerules.h" // For CFFGameRules or FFGameRules() (potentially used)
-#include "../ff_gamestate.h" // For FFGameState (used in CFFBot)
+#include "../ff_bot_manager.h"
+#include "../../ff_player.h"
+#include "../../../shared/ff/weapons/ff_weapon_base.h"
+#include "../ff_gamestate.h"
+
+// Local bot utility headers
+#include "../bot_constants.h"  // For PriorityType, RouteType, CHECK_FOV, etc.
+#include "../bot_profile.h"    // For GetProfile() (potentially used by CFFBot methods)
+#include "../bot_util.h"       // For PrintIfWatched
 
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -27,18 +30,23 @@
  */
 void InvestigateNoiseState::AttendCurrentNoise( CFFBot *me )
 {
-	if (!me->IsNoiseHeard() && me->GetNoisePosition())
+	if (!me || !me->GetChatter()) return; // Null checks
+
+	if (!me->IsNoiseHeard() && me->GetNoisePosition()) // GetNoisePosition can be null if not heard
 		return;
 
+	const Vector *noisePos = me->GetNoisePosition();
+	if (!noisePos) return; // Must have a noise position to attend to
+
 	// remember where the noise we heard was
-	m_checkNoisePosition = *me->GetNoisePosition();
+	m_checkNoisePosition = *noisePos;
 
 	// tell our teammates (unless the noise is obvious, like gunfire)
 	if (me->IsWellPastSafe() && me->HasNotSeenEnemyForLongTime() && me->GetNoisePriority() != PRIORITY_HIGH)
-		me->GetChatter()->HeardNoise( *me->GetNoisePosition() );
+		me->GetChatter()->HeardNoise( *noisePos );
 
 	// figure out how to get to the noise		
-	me->PrintIfWatched( "Attending to noise...\n" );
+	PrintIfWatched(me, "Attending to noise...\n" ); // Updated PrintIfWatched
 	me->ComputePath( m_checkNoisePosition, FASTEST_ROUTE );
 
 	const float minAttendTime = 3.0f;
@@ -52,6 +60,7 @@ void InvestigateNoiseState::AttendCurrentNoise( CFFBot *me )
 //--------------------------------------------------------------------------------------------------------------
 void InvestigateNoiseState::OnEnter( CFFBot *me )
 {
+	if (!me) return;
 	AttendCurrentNoise( me );
 }
 
@@ -61,6 +70,7 @@ void InvestigateNoiseState::OnEnter( CFFBot *me )
  */
 void InvestigateNoiseState::OnUpdate( CFFBot *me )
 {
+	if (!me) return;
 	Vector myOrigin = GetCentroid( me );
 
 	// keep an ear out for closer noises...
@@ -69,7 +79,6 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me )
 		const float nearbyRange = 500.0f;
 		if (me->HeardInterestingNoise() && me->GetNoiseRange() < nearbyRange)
 		{
-			// new sound is closer
 			AttendCurrentNoise( me );
 		}
 	}
@@ -88,6 +97,7 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me )
 	// get distance remaining on our path until we reach the source of the noise
 	float range = me->GetPathDistanceRemaining();
 
+	// TODO_FF: Knife logic
 	if (me->IsUsingKnife())
 	{
 		if (me->IsHurrying())
@@ -122,10 +132,10 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me )
 	const float closeRange = 500.0f;
 	if (range < closeRange)
 	{
-		if (me->IsVisible( m_checkNoisePosition, CHECK_FOV ))
+		if (me->IsVisible( m_checkNoisePosition, true )) // Was CHECK_FOV
 		{
 			// can see noise position
-			me->PrintIfWatched( "Noise location is clear.\n" );
+			PrintIfWatched(me, "Noise location is clear.\n" ); // Updated PrintIfWatched
 			me->ForgetNoise();
 			me->Idle();
 			return;
@@ -133,7 +143,7 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me )
 	}
 
 	// move towards noise
-	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
+	if (me->UpdatePathMovement() != CFFBot::PROGRESSING) // PROGRESSING from PathResult enum
 	{
 		me->Idle();
 	}
@@ -142,6 +152,7 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me )
 //--------------------------------------------------------------------------------------------------------------
 void InvestigateNoiseState::OnExit( CFFBot *me )
 {
+	if (!me) return;
 	// reset to run mode in case we were sneaking about
 	me->Run();
 }

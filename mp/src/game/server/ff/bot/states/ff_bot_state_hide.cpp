@@ -8,15 +8,23 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_simple_hostage.h" // TODO: Check if FF equivalent exists or if shared
 #include "ff_bot_state_hide.h"
-#include "../ff_bot.h" // For CFFBot methods called by the state
-#include "../ff_bot_manager.h" // For TheFFBots() and scenario enums
-#include "../../ff_player.h" // For CFFPlayer
-#include "../../../shared/ff/weapons/ff_weapon_base.h" // For FFWeaponID (used in CFFBot)
-// #include "../../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-// #include "../../../shared/ff/ff_gamerules.h" // For CFFGameRules or FFGameRules() (potentially used)
-#include "../ff_gamestate.h" // For FFGameState (used in CFFBot)
+#include "../ff_bot.h"
+#include "../ff_bot_manager.h"
+#include "../../ff_player.h"
+#include "../../../shared/ff/weapons/ff_weapon_base.h"
+#include "../ff_gamestate.h"
+#include "../nav_mesh.h"       // For TheNavMesh, CNavArea, Place, NAV_MESH_STAND, etc.
+#include "../nav_hiding_spot.h"// For HidingSpot, FindNearbyHidingSpot, FindInitialEncounterSpot
+#include "../nav_pathfind.h"   // For PathCost, FASTEST_ROUTE (if RouteType is here)
+
+// Local bot utility headers
+#include "../bot_constants.h"  // For BotTaskType, DispositionType, TEAM_TERRORIST, TEAM_CT, PriorityType, CHECK_FOV, etc.
+#include "../bot_profile.h"    // For GetProfile()
+#include "../bot_util.h"       // For PrintIfWatched, IsSpotOccupied, UTIL_GetClosestPlayer
+
+// TODO: cs_simple_hostage.h is CS-specific. Remove or replace if FF has hostages.
+// #include "cs_simple_hostage.h"
 
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -25,518 +33,173 @@
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Begin moving to a nearby hidey-hole.
- * NOTE: Do not forget this state may include a very long "move-to" time to get to our hidey spot!
  */
 void HideState::OnEnter( CFFBot *me )
 {
+	if (!me || !me->GetProfile()) return; // Null checks
+
 	m_isAtSpot = false;
 	m_isLookingOutward = false;
 
-	// if duration is "infinite", set it to a reasonably long time to prevent infinite camping
-	if (m_duration < 0.0f)
-	{
-		m_duration = RandomFloat( 30.0f, 60.0f );
-	}
+	if (m_duration < 0.0f) m_duration = RandomFloat( 30.0f, 60.0f );
+	if (RandomFloat( 0.0f, 100.0f ) < 50.0f) m_isHoldingPosition = true;
 
-	// decide whether to "ambush" or not - never set to false so as not to override external setting
-	if (RandomFloat( 0.0f, 100.0f ) < 50.0f)
-	{
-		m_isHoldingPosition = true;
-	}
-
-	// if we are holding position, decide for how long
-	if (m_isHoldingPosition)
-	{
-		m_holdPositionTime = RandomFloat( 3.0f, 10.0f );
-	}
-	else
-	{
-		m_holdPositionTime = 0.0f;
-	}
+	if (m_isHoldingPosition) m_holdPositionTime = RandomFloat( 3.0f, 10.0f );
+	else m_holdPositionTime = 0.0f;
 
 	m_heardEnemy = false;
 	m_firstHeardEnemyTime = 0.0f;
 	m_retry = 0;
 
-	if (me->IsFollowing())
+	if (me->IsFollowing() && me->GetFollowLeader()) // Null check GetFollowLeader
 	{
 		m_leaderAnchorPos = GetCentroid( me->GetFollowLeader() );
 	}
 
-	// if we are a sniper, we need to periodically pause while we retreat to squeeze off a shot or two
-	if (me->IsSniper())
+	if (me->IsSniper()) // TODO_FF: Sniper logic
 	{
-		// start off paused to allow a final shot before retreating
 		m_isPaused = false;
 		m_pauseTimer.Invalidate();
 	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
-/**
- * Move to a nearby hidey-hole.
- * NOTE: Do not forget this state may include a very long "move-to" time to get to our hidey spot!
- */
 void HideState::OnUpdate( CFFBot *me )
 {
+	if (!me || !me->GetGameState() || !TheFFBots() || !TheNavMesh || !me->GetChatter() || !me->GetProfile()) return;
+
 	Vector myOrigin = GetCentroid( me );
 
-	// wait until finished reloading to leave hide state
 	if (!me->IsReloading())
 	{
-		// if we are momentarily hiding while following someone, check to see if he has moved on
 		if (me->IsFollowing())
 		{
-			CFFPlayer *leader = static_cast<CFFPlayer *>( static_cast<CBaseEntity *>( me->GetFollowLeader() ) );
-			Vector leaderOrigin = GetCentroid( leader );
-
-			// BOTPORT: Determine walk/run velocity thresholds
-			float runThreshold = 200.0f;
-			if (leader->GetAbsVelocity().IsLengthGreaterThan( runThreshold ))
+			CFFPlayer *leader = me->GetFollowLeader(); // Already EHANDLE, Get() is implicit
+			if (leader) // Null check leader
 			{
-				// leader is running, stay with him
-				me->Follow( leader );
-				return;
-			}
-
-			// if leader has moved, stay with him
-			const float followRange = 250.0f;
-			if ((m_leaderAnchorPos - leaderOrigin).IsLengthGreaterThan( followRange ))
-			{
-				me->Follow( leader );
+				Vector leaderOrigin = GetCentroid( leader );
+				if (leader->GetAbsVelocity().IsLengthGreaterThan( 200.0f )) { me->Follow( leader ); return; }
+				if ((m_leaderAnchorPos - leaderOrigin).IsLengthGreaterThan( 250.0f )) { me->Follow( leader ); return; }
+			} else { // Leader is null, stop following
+				me->StopFollowing();
+				me->Idle();
 				return;
 			}
 		}
 
-		// if we see a nearby buddy in combat, join him
-		/// @todo - Perhaps tie in to TakeDamage(), so it works for human players, too
+		// TODO_FF: CS Specific scenario logic (Bomb, Hostages) needs heavy adaptation or removal
+		// switch( TheFFBots()->GetScenario() ) { /* ... CS logic ... */ }
 
-		//
-		// Scenario logic
-		//
-		switch( TheFFBots()->GetScenario() )
+		bool isSettledInSniper = (me->IsSniper() && m_isAtSpot); // TODO_FF: Sniper logic
+
+		if (!me->IsReloading() && !isSettledInSniper && me->GetDisposition() == CFFBot::ENGAGE_AND_INVESTIGATE)
 		{
-			case CFFBotManager::SCENARIO_DEFUSE_BOMB:
-			{
-				if (me->GetTeamNumber() == TEAM_CT)
-				{
-					// if we are just holding position (due to a radio order) and the bomb has just planted, go defuse it
-					if (me->GetTask() == CFFBot::HOLD_POSITION &&
-						TheFFBots()->IsBombPlanted() &&
-						TheFFBots()->GetBombPlantTimestamp() > me->GetStateTimestamp())
-					{
-						me->Idle();
-						return;
-					}
-
-					// if we are guarding the defuser and he dies/gives up, stop hiding (to choose another defuser)
-					if (me->GetTask() == CFFBot::GUARD_BOMB_DEFUSER && TheFFBots()->GetBombDefuser() == NULL)
-					{
-						me->Idle();
-						return;
-					}
-
-					// if we are guarding the loose bomb and it is picked up, stop hiding
-					if (me->GetTask() == CFFBot::GUARD_LOOSE_BOMB && TheFFBots()->GetLooseBomb() == NULL)
-					{
-						me->GetChatter()->TheyPickedUpTheBomb();
-						me->Idle();
-						return;
-					}
-
-					// if we are guarding a bombsite and the bomb is dropped and we hear about it, stop guarding
-					if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE && me->GetGameState()->IsLooseBombLocationKnown())
-					{
-						me->Idle();
-						return;
-					}
-
-					// if we are guarding (bombsite, initial encounter, etc) and the bomb is planted, go defuse it
-					if (me->IsDoingScenario() && me->GetTask() != CFFBot::GUARD_BOMB_DEFUSER && TheFFBots()->IsBombPlanted())
-					{
-						me->Idle();
-						return;
-					}
-
-				}
-				else	// TERRORIST
-				{
-					// if we are near the ticking bomb and someone starts defusing it, attack!
-					if (TheFFBots()->GetBombDefuser())
-					{
-						Vector defuserOrigin = GetCentroid( TheFFBots()->GetBombDefuser() );
-						Vector toDefuser = defuserOrigin - myOrigin;
-
-						const float hearDefuseRange = 2000.0f;
-						if (toDefuser.IsLengthLessThan( hearDefuseRange ))
-						{
-							// if we are nearby, attack, otherwise move to the bomb (which will cause us to attack when we see defuser)
-							if (me->CanSeePlantedBomb())
-							{
-								me->Attack( TheFFBots()->GetBombDefuser() );
-							}
-							else
-							{
-								me->MoveTo( defuserOrigin, FASTEST_ROUTE );
-								me->InhibitLookAround( 10.0f );
-							}
-
-							return;
-						}
-					}
-				}
-				break;
-			}
-
-			//--------------------------------------------------------------------------------------------------
-			case CFFBotManager::SCENARIO_RESCUE_HOSTAGES:
-			{
-				// if we're guarding the hostages and they all die or are taken, do something else
-				if (me->GetTask() == CFFBot::GUARD_HOSTAGES)
-				{
-					if (me->GetGameState()->AreAllHostagesBeingRescued() || me->GetGameState()->AreAllHostagesGone())
-					{
-						me->Idle();
-						return;
-					}
-				}
-				else if (me->GetTask() == CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
-				{
-					// if we stumble across a hostage, guard it
-					CHostage *hostage = me->GetGameState()->GetNearestVisibleFreeHostage();
-					if (hostage)
-					{
-						// we see a free hostage, guard it
-						Vector hostageOrigin = GetCentroid( hostage );
-						CNavArea *area = TheNavMesh->GetNearestNavArea( hostageOrigin );
-						if (area)
-						{
-							me->SetTask( CFFBot::GUARD_HOSTAGES );
-							me->Hide( area );
-							me->PrintIfWatched( "I'm guarding hostages I found\n" );
-							// don't chatter here - he'll tell us when he's in his hiding spot
-							return;
-						}
-					}
-				}
-			}
-		}
-
-
-		bool isSettledInSniper = (me->IsSniper() && m_isAtSpot) ? true : false;
-
-		// only investigate noises if we are initiating attacks, and we aren't a "settled in" sniper
-		// dont investigate noises if we are reloading
-		if (!me->IsReloading() &&
-			!isSettledInSniper &&
-			me->GetDisposition() == CFFBot::ENGAGE_AND_INVESTIGATE)
-		{
-			// if we are holding position, and have heard the enemy nearby, investigate after our hold time is up
 			if (m_isHoldingPosition && m_heardEnemy && (gpGlobals->curtime - m_firstHeardEnemyTime > m_holdPositionTime))
 			{
-				/// @todo We might need to remember specific location of last enemy noise here
-				me->InvestigateNoise();
-				return;
+				me->InvestigateNoise(); return;
 			}
-
-			// investigate nearby enemy noises
 			if (me->HeardInterestingNoise())
 			{
-				// if we are holding position, check if enough time has elapsed since we first heard the enemy
 				if (m_isAtSpot && m_isHoldingPosition)
 				{
 					if (!m_heardEnemy)
 					{
-						// first time we heard the enemy
-						m_heardEnemy = true;
-						m_firstHeardEnemyTime = gpGlobals->curtime;
-						me->PrintIfWatched( "Heard enemy, holding position for %f2.1 seconds...\n", m_holdPositionTime );
+						m_heardEnemy = true; m_firstHeardEnemyTime = gpGlobals->curtime;
+						PrintIfWatched(me, "Heard enemy, holding position for %2.1f seconds...\n", m_holdPositionTime ); // Updated
 					}
 				}
-				else
-				{
-					// not holding position - investigate enemy noise
-					me->InvestigateNoise();
-					return;
-				}
-			}
-		}
-	}	// end reloading check
-
-	// look around
-	me->UpdateLookAround();
-
-	// if we are at our hiding spot, crouch and wait
-	if (m_isAtSpot)
-	{
-		me->ResetStuckMonitor();
-
-		CNavArea *area = TheNavMesh->GetNavArea( m_hidingSpot );
-		if ( !area || !( area->GetAttributes() & NAV_MESH_STAND ) )
-		{
-			me->Crouch();
-		}
-
-		// check if duration has expired
-		if (m_hideTimer.IsElapsed())
-		{
-			if (me->GetTask() == CFFBot::GUARD_LOOSE_BOMB)
-			{
-				// if we're guarding the loose bomb, continue to guard it but pick a new spot
-				me->Hide( TheFFBots()->GetLooseBombArea() );
-				return;
-			}
-			else if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE)
-			{
-				// if we're guarding a bombsite, continue to guard it but pick a new spot
-				const CFFBotManager::Zone *zone = TheFFBots()->GetClosestZone( myOrigin );
-				if (zone)
-				{
-					CNavArea *area = TheFFBots()->GetRandomAreaInZone( zone );
-					if (area)
-					{
-						me->Hide( area );
-						return;
-					}
-				}
-			}
-			else if (me->GetTask() == CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
-			{
-				// if we're guarding a rescue zone, continue to guard this or another rescue zone
-				if (me->GuardRandomZone())
-				{
-					me->SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
-					me->PrintIfWatched( "Continuing to guard hostage rescue zones\n" );
-					me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
-					me->GetChatter()->GuardingHostageEscapeZone( IS_PLAN );
-					return;
-				}
-			}
-
-			me->Idle();
-			return;
-		}
-
-/*
-		// if we are watching for an approaching noisy enemy, anticipate and fire before they round the corner
-		/// @todo Need to check if we are looking at an ENEMY_NOISE here
-		const float veryCloseNoise = 250.0f;
-		if (me->IsLookingAtSpot() && me->GetNoiseRange() < veryCloseNoise)
-		{
-			// fire!
-			me->PrimaryAttack();
-			me->PrintIfWatched( "Firing at anticipated enemy coming around the corner!\n" );
-		}
-*/
-
-		// if we have a shield, hide behind it
-		if (me->HasShield() && !me->IsProtectedByShield()) // TODO: Update for FF if shields are different
-			me->SecondaryAttack();
-
-		// while sitting at our hiding spot, if we are being attacked but can't see our attacker, move somewhere else
-		const float hurtRecentlyTime = 1.0f;
-		if (!me->IsEnemyVisible() && me->GetTimeSinceAttacked() < hurtRecentlyTime)
-		{
-			me->Idle();
-			return;
-		}
-
-		// encourage the human player
-		if (!me->IsDoingScenario())
-		{
-			if (me->GetTeamNumber() == TEAM_CT) // TODO: Update for FF Teams
-			{
-				if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE &&
-					me->IsAtHidingSpot() &&
-					TheFFBots()->IsBombPlanted())
-				{
-					if (me->GetNearbyEnemyCount() == 0)
-					{
-						const float someTime = 30.0f;
-						const float littleTime = 11.0;
-
-						if (TheFFBots()->GetBombTimeLeft() > someTime)
-							me->GetChatter()->Encourage( "BombsiteSecure", RandomFloat( 10.0f, 15.0f ) );
-						else if (TheFFBots()->GetBombTimeLeft() > littleTime)
-							me->GetChatter()->Encourage( "WaitingForHumanToDefuseBomb", RandomFloat( 5.0f, 8.0f ) );
-						else
-							me->GetChatter()->Encourage( "WaitingForHumanToDefuseBombPanic", RandomFloat( 3.0f, 4.0f ) );
-					}
-				}
-
-				if (me->GetTask() == CFFBot::GUARD_HOSTAGES && me->IsAtHidingSpot())
-				{
-					if (me->GetNearbyEnemyCount() == 0)
-					{
-						CHostage *hostage = me->GetGameState()->GetNearestVisibleFreeHostage(); // TODO: Update for FF if hostages are different
-						if (hostage)
-						{
-							me->GetChatter()->Encourage( "WaitingForHumanToRescueHostages", RandomFloat( 10.0f, 15.0f ) );
-						}
-					}
-				}
+				else { me->InvestigateNoise(); return; }
 			}
 		}
 	}
-	else
-	{
-		// we are moving to our hiding spot
 
-		// snipers periodically pause and fire while retreating
-		if (me->IsSniper() && me->IsEnemyVisible())
+	me->UpdateLookAround();
+
+	if (m_isAtSpot)
+	{
+		me->ResetStuckMonitor();
+		CNavArea *area = TheNavMesh->GetNavArea( m_hidingSpot );
+		if ( !area || !( area->GetAttributes() & NAV_MESH_STAND ) ) me->Crouch();
+
+		if (m_hideTimer.IsElapsed())
 		{
-			if (m_isPaused)
-			{
-				if (m_pauseTimer.IsElapsed())
-				{
-					// get moving
-					m_isPaused = false;
-					m_pauseTimer.Start( RandomFloat( 1.0f, 3.0f ) );
-				}
-				else
-				{
-					me->Wait( 0.2f );
-				}
-			}
-			else
-			{
-				if (m_pauseTimer.IsElapsed())
-				{
-					// pause for a moment
-					m_isPaused = true;
-					m_pauseTimer.Start( RandomFloat( 0.5f, 1.5f ) );
-				}
-			}
+			// TODO_FF: CS Specific task logic (GUARD_LOOSE_BOMB etc.)
+			// if (me->GetTask() == CFFBot::BOT_TASK_GUARD_LOOSE_BOMB) { /* ... */ }
+			// else if (me->GetTask() == CFFBot::BOT_TASK_GUARD_BOMB_ZONE) { /* ... */ }
+			// else if (me->GetTask() == CFFBot::BOT_TASK_GUARD_HOSTAGE_RESCUE_ZONE) { /* ... */ }
+			me->Idle(); return;
 		}
 
-		// if a Player is using this hiding spot, give up
+		// TODO_FF: Shield logic
+		// if (me->HasShield() && !me->IsProtectedByShield()) me->SecondaryAttack();
+
+		if (!me->IsEnemyVisible() && me->GetTimeSinceAttacked() < 1.0f) { me->Idle(); return; }
+
+		// TODO_FF: CS Specific "encourage" logic
+		// if (!me->IsDoingScenario()) { /* ... */ }
+	}
+	else
+	{
+		// TODO_FF: Sniper logic
+		// if (me->IsSniper() && me->IsEnemyVisible()) { /* ... sniper pausing logic ... */ }
+
 		float range;
 		CFFPlayer *camper = static_cast<CFFPlayer *>( UTIL_GetClosestPlayer( m_hidingSpot, &range ) );
-
-		const float closeRange = 75.0f;
-		if (camper && camper != me && range < closeRange && me->IsVisible( camper, CHECK_FOV ))
+		if (camper && camper != me && range < 75.0f && me->IsVisible( camper, true )) // CHECK_FOV = true
 		{
-			// player is in our hiding spot
-			me->PrintIfWatched( "Someone's in my hiding spot - picking another...\n" );
-
-			const int maxRetries = 3;
-			if (m_retry++ >= maxRetries)
-			{
-				me->PrintIfWatched( "Can't find a free hiding spot, giving up.\n" );
-				me->Idle();
-				return;
-			}
-
-			// pick another hiding spot near where we were planning on hiding
-			me->Hide( TheNavMesh->GetNavArea( m_hidingSpot ) );
-
+			PrintIfWatched(me, "Someone's in my hiding spot - picking another...\n" ); // Updated
+			if (m_retry++ >= 3) { PrintIfWatched(me, "Can't find a free hiding spot, giving up.\n" ); me->Idle(); return; } // Updated
+			CNavArea* currentSpotArea = TheNavMesh->GetNavArea(m_hidingSpot);
+			if (currentSpotArea) me->Hide( currentSpotArea ); // Pass area to hide in
+			else me->Idle(); // Fallback if current spot area is invalid
 			return;
 		}
 
-		Vector toSpot;
-		toSpot.x = m_hidingSpot.x - myOrigin.x;
-		toSpot.y = m_hidingSpot.y - myOrigin.y;
-		toSpot.z = m_hidingSpot.z - me->GetFeetZ(); // use feet location
+		Vector toSpot = m_hidingSpot - myOrigin;
+		toSpot.z = m_hidingSpot.z - me->GetFeetZ();
 		range = toSpot.Length();
 
-		// look outwards as we get close to our hiding spot
 		if (!me->IsEnemyVisible() && !m_isLookingOutward)
 		{
-			const float lookOutwardRange = 200.0f;
-			const float nearSpotRange = 10.0f;
-			if (range < lookOutwardRange && range > nearSpotRange)
+			if (range < 200.0f && range > 10.0f)
 			{
 				m_isLookingOutward = true;
-
-				toSpot.x /= range;
-				toSpot.y /= range;
-				toSpot.z /= range;
-
+				if(range > FLT_EPSILON) toSpot.NormalizeInPlace(); else toSpot = Vector(1,0,0);
 				me->SetLookAt( "Face outward", me->EyePosition() - 1000.0f * toSpot, PRIORITY_HIGH, 3.0f );
 			}
 		}
 
-		const float atDist = 20.0f;
-		if (range < atDist)
+		if (range < 20.0f) // atDist
 		{
-			//-------------------------------------
-			// Just reached our hiding spot
-			//
-			m_isAtSpot = true;
-			m_hideTimer.Start( m_duration );
+			m_isAtSpot = true; m_hideTimer.Start( m_duration );
+			me->ComputeApproachPoints(); me->ClearLookAt();
+			me->EquipBestWeapon( me->IsUsingGrenade() ); // TODO_FF: Grenade logic
+			me->SetDisposition( CFFBot::OPPORTUNITY_FIRE ); // DispositionType enum
 
-			// make sure our approach points are valid, since we'll be watching them
-			me->ComputeApproachPoints();
-			me->ClearLookAt();
+			// TODO_FF: Sniper and other task logic
+			// if (me->GetTask() == CFFBot::BOT_TASK_MOVE_TO_SNIPER_SPOT) { /* ... */ }
+			// else if (me->GetTask() == CFFBot::BOT_TASK_GUARD_INITIAL_ENCOUNTER) { /* ... */ }
 
-			// ready our weapon and prepare to attack
-			me->EquipBestWeapon( me->IsUsingGrenade() );
-			me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
-
-			// if we are a sniper, update our task
-			if (me->GetTask() == CFFBot::MOVE_TO_SNIPER_SPOT)
-			{
-				me->SetTask( CFFBot::SNIPING );
-			}
-			else if (me->GetTask() == CFFBot::GUARD_INITIAL_ENCOUNTER)
-			{
-				const float campChatterChance = 20.0f;
-				if (RandomFloat( 0, 100 ) < campChatterChance)
-				{
-					me->GetChatter()->Say( "WaitingHere" );
-				}
-			}
-
-
-			// determine which way to look
-			trace_t result;
-			float outAngle = 0.0f;
-			float outAngleRange = 0.0f;
+			trace_t result; float outAngle = 0.0f; float outAngleRange = 0.0f;
 			for( float angle = 0.0f; angle < 360.0f; angle += 45.0f )
 			{
-				UTIL_TraceLine( me->EyePosition(), me->EyePosition() + 1000.0f * Vector( BotCOS(angle), BotSIN(angle), 0.0f ), MASK_PLAYERSOLID, me, COLLISION_GROUP_NONE, &result );
-
-				if (result.fraction > outAngleRange)
-				{
-					outAngle = angle;
-					outAngleRange = result.fraction;
-				}
+				UTIL_TraceLine( me->EyePosition(), me->EyePosition() + 1000.0f * Vector( cos(DEG2RAD(angle)), sin(DEG2RAD(angle)), 0.0f ), MASK_PLAYERSOLID, me, COLLISION_GROUP_NONE, &result ); // BotCOS/SIN to cos/sin
+				if (result.fraction > outAngleRange) { outAngle = angle; outAngleRange = result.fraction; }
 			}
-
 			me->SetLookAheadAngle( outAngle );
-
 		}
 
-		// move to hiding spot
-		if (me->UpdatePathMovement() != CFFBot::PROGRESSING && !m_isAtSpot)
+		if (me->UpdatePathMovement() != CFFBot::PROGRESSING && !m_isAtSpot) // PROGRESSING from PathResult
 		{
-			// we couldn't get to our hiding spot - pick another
-			me->PrintIfWatched( "Can't get to my hiding spot - finding another...\n" );
-
-			// search from hiding spot, since we know it was valid
-			const Vector *pos = FindNearbyHidingSpot( me, m_hidingSpot, m_range, me->IsSniper() );
+			PrintIfWatched(me, "Can't get to my hiding spot - finding another...\n" ); // Updated
+			const Vector *pos = FindNearbyHidingSpot( me, m_hidingSpot, m_range, me->IsSniper() ); // FindNearbyHidingSpot
 			if (pos == NULL)
 			{
-				// no available hiding spots
-				me->PrintIfWatched( "No available hiding spots - hiding where I'm at.\n" );
-
-				// hide where we are
-				m_hidingSpot.x = myOrigin.x;
-				m_hidingSpot.y = myOrigin.y; // This line seems to be a typo in the original code (y assigned twice instead of x and y)
-				m_hidingSpot.z = me->GetFeetZ();
+				PrintIfWatched(me, "No available hiding spots - hiding where I'm at.\n" ); // Updated
+				m_hidingSpot = myOrigin; m_hidingSpot.z = me->GetFeetZ();
 			}
-			else
-			{
-				m_hidingSpot = *pos;
-			}
-
-			// build a path to our new hiding spot
-			if (me->ComputePath( m_hidingSpot, FASTEST_ROUTE ) == false)
-			{
-				me->PrintIfWatched( "Can't pathfind to hiding spot\n" );
-				me->Idle();
-				return;
-			}
+			else m_hidingSpot = *pos;
+			if (me->ComputePath( m_hidingSpot, FASTEST_ROUTE ) == false) { PrintIfWatched(me, "Can't pathfind to hiding spot\n" ); me->Idle(); return; } // Updated
 		}
 	}
 }
@@ -544,14 +207,11 @@ void HideState::OnUpdate( CFFBot *me )
 //--------------------------------------------------------------------------------------------------------------
 void HideState::OnExit( CFFBot *me )
 {
+	if (!me) return;
 	m_isHoldingPosition = false;
-
 	me->StandUp();
 	me->ResetStuckMonitor();
-	//me->ClearLookAt();
 	me->ClearApproachPoints();
-
-	// if we have a shield, put it away
-	if (me->HasShield() && me->IsProtectedByShield()) // TODO: Update for FF if shields are different
-		me->SecondaryAttack();
+	// TODO_FF: Shield logic
+	// if (me->HasShield() && me->IsProtectedByShield()) me->SecondaryAttack();
 }
