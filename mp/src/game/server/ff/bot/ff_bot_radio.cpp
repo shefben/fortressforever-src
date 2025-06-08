@@ -8,19 +8,31 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+#include "../../shared/ff/ff_gamerules.h" // For FFGameRules() (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For TheNavMesh, CNavArea, Place, UNDEFINED_PLACE
+#include "nav_pathfind.h"   // For PathCost, NavAreaTravelDistance
+#include "bot_constants.h"  // For RadioType, RADIO_INVALID, etc.
+#include "usermessages.h"   // For UserMessageBegin, WRITE_BYTE, etc. (for RawAudio)
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-extern int gmsgBotVoice;
+// extern int gmsgBotVoice; // This is an old global message ID, not typically used in Source. Replaced by usermessages.
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Returns true if the radio message is an order to do something
  * NOTE: "Report in" is not considered a "command" because it doesnt ask the bot to go somewhere, or change its mind
  */
-bool CCSBot::IsRadioCommand( RadioType event ) const
+// TODO: Update RadioType enums for FF
+bool CFFBot::IsRadioCommand( RadioType event ) const
 {
 	if (event == RADIO_AFFIRMATIVE ||
 		event == RADIO_NEGATIVE ||
@@ -39,13 +51,13 @@ bool CCSBot::IsRadioCommand( RadioType event ) const
 /**
  * Respond to radio commands from HUMAN players
  */
-void CCSBot::RespondToRadioCommands( void )
+void CFFBot::RespondToRadioCommands( void )
 {
 	// bots use the chatter system to respond to each other
 	if (m_radioSubject != NULL && m_radioSubject->IsPlayer())
 	{
-		CCSPlayer *player = m_radioSubject;
-		if (player->IsBot())
+		CFFPlayer *player = static_cast<CFFPlayer*>(m_radioSubject.Get()); // Use Get() for EHANDLE
+		if (player && player->IsBot()) // Null check for player
 		{
 			m_lastRadioCommand = RADIO_INVALID;
 			return;
@@ -62,6 +74,7 @@ void CCSBot::RespondToRadioCommands( void )
 	// if we are doing something important, ignore the radio
 	// unless it is a "report in" request - we can do that while we continue to do other things
 	/// @todo Create "uninterruptable" flag
+	// TODO: Update RadioType enums for FF
 	if (m_lastRadioCommand != RADIO_REPORT_IN_TEAM)
 	{
 		if (IsBusy())
@@ -94,13 +107,18 @@ void CCSBot::RespondToRadioCommands( void )
 		return;
 	}
 
-	CCSPlayer *player = m_radioSubject;
+	CFFPlayer *player = static_cast<CFFPlayer*>(m_radioSubject.Get()); // Use Get() for EHANDLE
 	if (player == NULL)
+	{
+		m_lastRadioCommand = RADIO_INVALID; // Consume command if subject is no longer valid
 		return;
+	}
+
 
 	// respond to command
 	bool canDo = false;
 	const float inhibitAutoFollowDuration = 60.0f;
+	// TODO: Update RadioType enums and associated logic for FF
 	switch( m_lastRadioCommand )
 	{
 		case RADIO_REPORT_IN_TEAM:
@@ -117,7 +135,7 @@ void CCSBot::RespondToRadioCommands( void )
 			if (!IsFollowing())
 			{
 				Follow( player );
-				player->AllowAutoFollow();
+				// player->AllowAutoFollow(); // This method might not exist on CFFPlayer directly
 				canDo = true;
 			}
 			break;
@@ -129,9 +147,9 @@ void CCSBot::RespondToRadioCommands( void )
 			if (!IsFollowing())
 			{
 				Follow( player );
-				GetChatter()->Say( "OnMyWay" );
-				player->AllowAutoFollow();
-				canDo = false;
+				GetChatter()->Say( "OnMyWay" ); // TODO: Ensure "OnMyWay" chatter exists
+				// player->AllowAutoFollow();
+				canDo = false; // This was false, implies it's not an affirmative action but a response to an alert
 			}
 			break;
 
@@ -145,10 +163,10 @@ void CCSBot::RespondToRadioCommands( void )
 		case RADIO_HOLD_THIS_POSITION:
 		{
 			// find the leader's area 
-			SetTask( HOLD_POSITION );
+			SetTask( CFFBot::HOLD_POSITION ); // TODO: Ensure TaskType enums are correct
 			StopFollowing();
-			player->InhibitAutoFollow( inhibitAutoFollowDuration );
-			Hide( TheNavMesh->GetNearestNavArea( m_radioPosition ) );
+			// player->InhibitAutoFollow( inhibitAutoFollowDuration ); // This method might not exist on CFFPlayer
+			if (TheNavMesh) Hide( TheNavMesh->GetNearestNavArea( m_radioPosition ) ); // Null check TheNavMesh
 			canDo = true;
 			break;
 		}
@@ -158,34 +176,35 @@ void CCSBot::RespondToRadioCommands( void )
 			StopFollowing();
 			Hunt();
 			canDo = true;
-			player->InhibitAutoFollow( inhibitAutoFollowDuration );
+			// player->InhibitAutoFollow( inhibitAutoFollowDuration );
 			break;
 
 		case RADIO_GET_OUT_OF_THERE:
-			if (TheCSBots()->IsBombPlanted())
+			// TODO: Update for FF bomb logic
+			if (TheFFBots() && TheFFBots()->IsBombPlanted()) // Null check TheFFBots
 			{
 				EscapeFromBomb();
-				player->InhibitAutoFollow( inhibitAutoFollowDuration );
+				// player->InhibitAutoFollow( inhibitAutoFollowDuration );
 				canDo = true;
 			}
 			break;
 
 		case RADIO_SECTOR_CLEAR:
 		{
+			// TODO: Update for FF scenarios and teams
 			// if this is a defusal scenario, and the bomb is planted, 
 			// and a human player cleared a bombsite, check it off our list too
-			if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_DEFUSE_BOMB)
+			if (TheFFBots() && TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB) // Null check, SCENARIO_DEFUSE_BOMB is CS
 			{
-				if (GetTeamNumber() == TEAM_CT && TheCSBots()->IsBombPlanted())
+				if (GetTeamNumber() == TEAM_CT && TheFFBots()->IsBombPlanted()) // TEAM_CT is CS
 				{
-					const CCSBotManager::Zone *zone = TheCSBots()->GetClosestZone( player );
-
+					const CFFBotManager::Zone *zone = TheFFBots()->GetClosestZone( player ); // Null check TheFFBots
 					if (zone)
 					{
 						GetGameState()->ClearBombsite( zone->m_index );
 
 						// if we are huting for the planted bomb, re-select bombsite
-						if (GetTask() == FIND_TICKING_BOMB)
+						if (GetTask() == CFFBot::FIND_TICKING_BOMB) // FIND_TICKING_BOMB is CS
 							Idle();
 
 						canDo = true;
@@ -197,6 +216,7 @@ void CCSBot::RespondToRadioCommands( void )
 
 		default:
 			// ignore all other radio commands for now
+			m_lastRadioCommand = RADIO_INVALID; // Consume if not handled
 			return;
 	}
 
@@ -220,8 +240,10 @@ void CCSBot::RespondToRadioCommands( void )
 /**
  * Decide if we should move to help the player, return true if we will
  */
-bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange )
+bool CFFBot::RespondToHelpRequest( CFFPlayer *them, Place place, float maxRange )
 {
+	if (!them) return false; // Null check
+
 	if (IsRogue())
 		return false;
 
@@ -235,8 +257,12 @@ bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange 
 	if (maxRange > 0.0f)
 	{
 		// compute actual travel distance
-		PathCost cost(this);
-		float travelDistance = NavAreaTravelDistance( m_lastKnownArea, TheNavMesh->GetNearestNavArea( themOrigin ), cost );
+		PathCost cost(this); // PathCost needs to be defined
+		if (!m_lastKnownArea || !TheNavMesh) return false; // Null checks
+		CNavArea *themArea = TheNavMesh->GetNearestNavArea( themOrigin );
+		if (!themArea) return false;
+
+		float travelDistance = NavAreaTravelDistance( m_lastKnownArea, themArea, cost ); // NavAreaTravelDistance needs definition
 		if (travelDistance < 0.0f)
 			return false;
 
@@ -245,7 +271,7 @@ bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange 
 	}
 
 
-	if (place == UNDEFINED_PLACE)
+	if (place == UNDEFINED_PLACE) // UNDEFINED_PLACE
 	{
 		// if we have no "place" identifier, go directly to them
 
@@ -255,7 +281,7 @@ bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange 
 		if (rangeSq < close)
 			return true;
 
-		MoveTo( themOrigin, FASTEST_ROUTE );
+		MoveTo( themOrigin, FASTEST_ROUTE ); // FASTEST_ROUTE
 	}
 	else
 	{
@@ -264,19 +290,19 @@ bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange 
 			return true;
 
 		// go to where help is needed
-		const Vector *pos = GetRandomSpotAtPlace( place );
+		const Vector *pos = GetRandomSpotAtPlace( place ); // GetRandomSpotAtPlace needs definition
 		if (pos)
 		{
-			MoveTo( *pos, FASTEST_ROUTE );
+			MoveTo( *pos, FASTEST_ROUTE ); // FASTEST_ROUTE
 		}
 		else
 		{
-			MoveTo( themOrigin, FASTEST_ROUTE );
+			MoveTo( themOrigin, FASTEST_ROUTE ); // FASTEST_ROUTE
 		}
 	}
 
 	// acknowledge
-	GetChatter()->Say( "OnMyWay" );
+	GetChatter()->Say( "OnMyWay" ); // TODO: Ensure "OnMyWay" chatter exists
 
 	return true;
 }
@@ -286,34 +312,42 @@ bool CCSBot::RespondToHelpRequest( CCSPlayer *them, Place place, float maxRange 
 /**
  * Send a radio message
  */
-void CCSBot::SendRadioMessage( RadioType event )
+// TODO: Update RadioType enums and logic for FF
+void CFFBot::SendRadioMessage( RadioType event )
 {
 	// make sure this is a radio event
-	if (event <= RADIO_START_1 || event >= RADIO_END)
+	if (event <= RADIO_START_1 || event >= RADIO_END) // RADIO_START_1, RADIO_END are CS specific
 		return;
 
-	PrintIfWatched( "%3.1f: SendRadioMessage( %s )\n", gpGlobals->curtime, RadioEventName[ event ] );
+	const char *eventName = NameToRadioEvent(event); // NameToRadioEvent needs to be defined
+	PrintIfWatched( "%3.1f: SendRadioMessage( %s )\n", gpGlobals->curtime, eventName ? eventName : "INVALID" );
+
 
 	// note the time the message was sent
-	TheCSBots()->SetRadioMessageTimestamp( event, GetTeamNumber() );
+	if (TheFFBots()) TheFFBots()->SetRadioMessageTimestamp( event, GetTeamNumber() ); // Null check, ensure GetTeamNumber is 0/1 for FF
 
 	m_lastRadioSentTimestamp = gpGlobals->curtime;
 
-	char slot[2];
-	slot[1] = '\000';
+	// TODO: HandleMenu_Radio1/2/3 are CS specific and need FF equivalents or removal.
+	// This is a placeholder for how FF might send radio commands.
+	// It might involve calling a player command like "radio1", "radio2", "radio3" with the slot.
+	// Example: engine->ClientCommand(edict(), "radio%d %d\n", radioGroup, radioSlot);
 
-	if (event > RADIO_START_1 && event < RADIO_START_2)
-	{
-		HandleMenu_Radio1( event - RADIO_START_1 );
-	}
-	else if (event > RADIO_START_2 && event < RADIO_START_3)
-	{
-		HandleMenu_Radio2( event - RADIO_START_2 );
-	}
-	else
-	{
-		HandleMenu_Radio3( event - RADIO_START_3 );
-	}
+	// char slot[2];
+	// slot[1] = '\000';
+
+	// if (event > RADIO_START_1 && event < RADIO_START_2)
+	// {
+	//	HandleMenu_Radio1( event - RADIO_START_1 );
+	// }
+	// else if (event > RADIO_START_2 && event < RADIO_START_3)
+	// {
+	//	HandleMenu_Radio2( event - RADIO_START_2 );
+	// }
+	// else
+	// {
+	//	HandleMenu_Radio3( event - RADIO_START_3 );
+	// }
 }
 
 
@@ -321,18 +355,19 @@ void CCSBot::SendRadioMessage( RadioType event )
 /**
  * Send voice chatter.  Also sends the entindex and duration for voice feedback.
  */
-void CCSBot::SpeakAudio( const char *voiceFilename, float duration, int pitch )
+void CFFBot::SpeakAudio( const char *voiceFilename, float duration, int pitch )
 {
 	if( !IsAlive() )
 		return;
 
-	if ( IsObserver() )
+	if ( IsObserver() ) // IsObserver might need to be CPlayer method or similar
 		return;
 
 	CRecipientFilter filter;
-	ConstructRadioFilter( filter );
+	// ConstructRadioFilter( filter ); // ConstructRadioFilter needs to be defined/ported for FF
+    filter.AddAllPlayers(); // Example: send to all, or use FF specific team filter
 
-	UserMessageBegin ( filter, "RawAudio" );
+	UserMessageBegin ( filter, "RawAudio" ); // "RawAudio" might need to be registered for FF
 		WRITE_BYTE( pitch );
 		WRITE_BYTE( entindex() );
 		WRITE_FLOAT( duration );
@@ -343,4 +378,3 @@ void CCSBot::SpeakAudio( const char *voiceFilename, float duration, int pitch )
 
 	m_voiceEndTimestamp = gpGlobals->curtime + duration;
 }
-

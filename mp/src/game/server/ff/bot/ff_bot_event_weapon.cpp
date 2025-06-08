@@ -8,10 +8,17 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_gamerules.h"
-#include "KeyValues.h"
-
 #include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/ff_gamerules.h" // For FFGameRules()
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase, FFWeaponID
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "bot_constants.h"  // For PriorityType, etc.
+
+#include "KeyValues.h"      // Already included, seems fine
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -46,62 +53,49 @@ void CFFBot::OnWeaponFire( IGameEvent *event )
 	if (weapon == NULL)
 		return;
 
+	// TODO: Update all WEAPON_ enums to FFWeaponID equivalents for Fortress Forever
 	switch( weapon->GetWeaponID() )
 	{
 		// silent "firing"
-		case WEAPON_HEGRENADE:
-		case WEAPON_SMOKEGRENADE:
-		case WEAPON_FLASHBANG:
-		case WEAPON_SHIELDGUN:
-		case WEAPON_C4:
-			return;
+		// case FF_WEAPON_GRENADE_HE: // Example for FF
+		// case FF_WEAPON_GRENADE_SMOKE: // Example for FF
+		// case FF_WEAPON_GRENADE_FLASH: // Example for FF
+		// case FF_WEAPON_SHIELDGUN: // If FF has a shield gun
+		// case FF_WEAPON_C4: // If FF has C4 or equivalent
+		//	return;
 
 		// quiet
-		case WEAPON_KNIFE:
-		case WEAPON_TMP:
-			range = ShortRange;
-			break;
+		// case FF_WEAPON_KNIFE: // Example for FF
+		// case FF_WEAPON_TMP_SILENCED: // Example for FF
+		//	range = ShortRange;
+		//	break;
 
-		// M4A1 - check for silencer
-		case WEAPON_M4A1:
-		{					
-			if (weapon->IsSilenced())
-			{
-				range = ShortRange;
-			}
-			else
-			{
-				range = NormalRange;
-			}
-			break;
-		}
-
-		// USP - check for silencer
-		case WEAPON_USP:
-		{
-			if (weapon->IsSilenced())
-			{
-				range = ShortRange;
-			}
-			else
-			{
-				range = NormalRange;
-			}
-			break;
-		}
+		// M4A1 - check for silencer (Example, FF will have different weapons)
+		// case FF_WEAPON_ASSAULTRIFLE: // Example for FF
+		// {
+		//	if (weapon->IsSilenced()) // May not apply or need FF specific check
+		//	{
+		//		range = ShortRange;
+		//	}
+		//	else
+		//	{
+		//		range = NormalRange;
+		//	}
+		//	break;
+		// }
 
 		// loud
-		case WEAPON_AWP:
-			range = 99999.0f;
-			break;
+		// case FF_WEAPON_SNIPERRIFLE_AWP: // Example for FF
+		//	range = 99999.0f;
+		//	break;
 
 		// normal
 		default:
-			range = NormalRange;
+			range = NormalRange; // Default for unknown/unhandled weapons
 			break;
 	}
 
-	OnAudibleEvent( event, player, range, PRIORITY_HIGH, true ); // weapon_fire
+	OnAudibleEvent( event, player, range, PRIORITY_HIGH, true ); // weapon_fire // TODO: Update event name for FF
 }
 
 
@@ -123,7 +117,7 @@ void CFFBot::OnWeaponFireOnEmpty( IGameEvent *event )
 		ForceRun( 5.0f );
 	}
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_fire_on_empty
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_fire_on_empty // TODO: Update event name for FF
 }
 
 
@@ -145,7 +139,7 @@ void CFFBot::OnWeaponReload( IGameEvent *event )
 		ForceRun( 5.0f );
 	}
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_reload
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_reload // TODO: Update event name for FF
 }
 
 
@@ -160,5 +154,5 @@ void CFFBot::OnWeaponZoom( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_zoom
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_zoom // TODO: Update event name for FF
 }

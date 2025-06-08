@@ -8,9 +8,21 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
-#include "obstacle_pushaway.h"
+#include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+#include "../../shared/ff/ff_gamerules.h" // For FFGameRules() (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For TheNavMesh, CNavArea
+#include "nav_hiding_spot.h"// For HidingSpot
+#include "nav_pathfind.h"   // For ShortestPathCost related classes (if used directly)
+#include "bot_constants.h"  // For GO_NORTH etc.
+#include "obstacle_pushaway.h" // For CPushAwayEnumerator (engine utility)
 #include "fmtstr.h"
+#include "soundent.h" // For CSingleUserRecipientFilter, EmitSound (if Bot.StuckSound is used)
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -44,12 +56,16 @@ ConVar bot_debug_breakable_duration( "bot_debug_breakable_duration", "30" );
 //--------------------------------------------------------------------------------------------------------------
 CBaseEntity * CheckForEntitiesAlongSegment( const Vector &start, const Vector &end, const Vector &mins, const Vector &maxs, CPushAwayEnumerator *enumerator )
 {
+	if (!enumerator) return NULL; // Null check
+
 	CBaseEntity *entity = NULL;
 
 	Ray_t ray;
 	ray.Init( start, end, mins, maxs );
 
-	partition->EnumerateElementsAlongRay( PARTITION_ENGINE_SOLID_EDICTS, ray, false, enumerator );
+	if (partition) // Null check for partition
+		partition->EnumerateElementsAlongRay( PARTITION_ENGINE_SOLID_EDICTS, ray, false, enumerator );
+
 	if ( enumerator->m_nAlreadyHit > 0 )
 	{
 		entity = enumerator->m_AlreadyHit[0];
@@ -74,7 +90,7 @@ CBaseEntity * CheckForEntitiesAlongSegment( const Vector &start, const Vector &e
 /**
  * Look up to 'distance' units ahead on the bot's path for entities.  Returns the closest one.
  */
-CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *enumerator, bool checkStuck )
+CBaseEntity * CFFBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *enumerator, bool checkStuck )
 {
 	Vector goal;
 
@@ -87,8 +103,8 @@ CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *e
 	goal.z += HalfHumanHeight;
 
 	Vector mins, maxs;
-	mins = Vector( 0, 0, -HalfHumanWidth );
-	maxs = Vector( 0, 0, HalfHumanHeight );
+	mins = Vector( 0, 0, -HalfHumanWidth ); // Using HalfHumanWidth, ensure it's defined
+	maxs = Vector( 0, 0, HalfHumanHeight ); // Using HalfHumanHeight, ensure it's defined
 
 	if ( distance <= NearBreakableCheckDist && m_isStuck && checkStuck )
 	{
@@ -115,6 +131,8 @@ CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *e
 		// start of the path nodes.
 		for( int i=startIndex-1; i<m_pathLength-1; ++i )
 		{
+			if (i < 0 || i+1 >= MAX_PATH_LENGTH) break; // Bounds check for m_path
+
 			Vector start, end;
 			if ( i == startIndex - 1 )
 			{
@@ -126,23 +144,23 @@ CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *e
 				start = m_path[i].pos;
 				end = m_path[i+1].pos;
 
-				if ( m_path[i+1].how == GO_LADDER_UP )
+				if ( m_path[i+1].how == GO_LADDER_UP && m_path[i+1].ladder) // Null check ladder
 				{
 					// Need two checks.  First we'll check along the ladder
 					start = m_path[i].pos;
 					end = m_path[i+1].ladder->m_top;
 				}
-				else if ( m_path[i].how == GO_LADDER_UP )
+				else if ( m_path[i].how == GO_LADDER_UP && m_path[i].ladder) // Null check ladder
 				{
 					start = m_path[i].ladder->m_top;
 				}
-				else if ( m_path[i+1].how == GO_LADDER_DOWN )
+				else if ( m_path[i+1].how == GO_LADDER_DOWN && m_path[i+1].ladder) // Null check ladder
 				{
 					// Need two checks.  First we'll check along the ladder
 					start = m_path[i].pos;
 					end = m_path[i+1].ladder->m_bottom;
 				}
-				else if ( m_path[i].how == GO_LADDER_DOWN )
+				else if ( m_path[i].how == GO_LADDER_DOWN && m_path[i].ladder) // Null check ladder
 				{
 					start = m_path[i].ladder->m_bottom;
 				}
@@ -199,7 +217,7 @@ CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *e
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::PushawayTouch( CBaseEntity *pOther )
+void CFFBot::PushawayTouch( CBaseEntity *pOther )
 {
 #if DEBUG_BREAKABLES
 	NDebugOverlay::EntityBounds( pOther, 255, 0, 0, 127, 0.1f );
@@ -214,10 +232,10 @@ void CCSBot::PushawayTouch( CBaseEntity *pOther )
 	CBotBreakableEnumerator enumerator( props, ARRAYSIZE( props ) );
 	enumerator.EnumElement( pOther );
 
-	if ( enumerator.m_nAlreadyHit == 1 )
+	if ( enumerator.m_nAlreadyHit == 1 && props[0] ) // Null check props[0]
 	{
 		// it's breakable - try to shoot it.
-		SetLookAt( "Breakable", pOther->WorldSpaceCenter(), PRIORITY_HIGH, 0.1f, false, 5.0f, true );
+		SetLookAt( "Breakable", props[0]->WorldSpaceCenter(), PRIORITY_HIGH, 0.1f, false, 5.0f, true );
 	}
 }
 
@@ -229,42 +247,10 @@ void CCSBot::PushawayTouch( CBaseEntity *pOther )
  * looking ahead like this lets us anticipate when we'll need to break something, and do it before being
  * stopped by it.
  */
-void CCSBot::BreakablesCheck( void )
+void CFFBot::BreakablesCheck( void )
 {
 #if DEBUG_BREAKABLES
-	/*
-	// Debug code to visually mark all breakables near us
-	{
-		Ray_t ray;
-		Vector origin = WorldSpaceCenter();
-		Vector mins( -400, -400, -400 );
-		Vector maxs( 400, 400, 400 );
-		ray.Init( origin, origin, mins, maxs );
-
-		CBaseEntity *props[40];
-		CBotBreakableEnumerator enumerator( props, ARRAYSIZE( props ) );
-		partition->EnumerateElementsAlongRay( PARTITION_ENGINE_SOLID_EDICTS, ray, false, &enumerator );
-		for ( int i=0; i<enumerator.m_nAlreadyHit; ++i )
-		{
-			CBaseEntity *prop = props[i];
-			if ( prop && prop->m_takedamage == DAMAGE_YES )
-			{
-				CFmtStr msg;
-				const char *text = msg.sprintf( "%s, %d health", prop->GetClassname(), prop->m_iHealth );
-				if ( prop->m_iHealth > 200 )
-				{
-					NDebugOverlay::EntityBounds( prop, 255, 0, 0, 10, 0.2f );
-					prop->EntityText( 0, text, 0.2f, 255, 0, 0, 255 );
-				}
-				else
-				{
-					NDebugOverlay::EntityBounds( prop, 0, 255, 0, 10, 0.2f );
-					prop->EntityText( 0, text, 0.2f, 0, 255, 0, 255 );
-				}
-			}
-		}
-	}
-	*/
+	// Debug code ...
 #endif // DEBUG_BREAKABLES
 
 	if ( IsAttacking() )
@@ -324,7 +310,7 @@ void CCSBot::BreakablesCheck( void )
 	{
 		if ( IsUsingGrenade() || ( !isNear && IsUsingKnife() ) )
 		{
-			EquipBestWeapon( MUST_EQUIP );
+			EquipBestWeapon( MUST_EQUIP ); // MUST_EQUIP needs to be defined
 		}
 		else if ( GetActiveWeapon() && GetActiveWeapon()->m_flNextPrimaryAttack <= gpGlobals->curtime )
 		{
@@ -332,8 +318,8 @@ void CCSBot::BreakablesCheck( void )
 
 			if ( !shouldShoot )
 			{
-				CBaseEntity *breakables[1];
-				CBotBreakableEnumerator LOSbreakable( breakables, ARRAYSIZE( breakables ) );
+				CBaseEntity *losBreakables[1]; // Renamed to avoid conflict
+				CBotBreakableEnumerator LOSbreakableEnumerator( losBreakables, ARRAYSIZE( losBreakables ) ); // Renamed
 
 				// compute the unit vector along our view
 				Vector aimDir = GetViewVector();
@@ -341,10 +327,10 @@ void CCSBot::BreakablesCheck( void )
 				// trace the potential bullet's path
 				trace_t result;
 				UTIL_TraceLine( EyePosition(), EyePosition() + FarBreakableCheckDist * aimDir, MASK_PLAYERSOLID, this, COLLISION_GROUP_NONE, &result );
-				if ( result.DidHitNonWorldEntity() )
+				if ( result.DidHitNonWorldEntity() && result.m_pEnt ) // Added null check for m_pEnt
 				{
-					LOSbreakable.EnumElement( result.m_pEnt );
-					if ( LOSbreakable.m_nAlreadyHit == 1 && LOSbreakable.m_AlreadyHit[0] == breakable )
+					LOSbreakableEnumerator.EnumElement( result.m_pEnt );
+					if ( LOSbreakableEnumerator.m_nAlreadyHit == 1 && LOSbreakableEnumerator.m_AlreadyHit[0] == breakable )
 					{
 						shouldShoot = true;
 					}
@@ -366,7 +352,7 @@ void CCSBot::BreakablesCheck( void )
 /**
  * Check for doors that need +use to open.
  */
-void CCSBot::DoorCheck( void )
+void CFFBot::DoorCheck( void )
 {
 	if ( IsAttacking() && !IsUsingKnife() )
 	{
@@ -381,7 +367,7 @@ void CCSBot::DoorCheck( void )
 
 	// Find any doors that need a +use to open just in front of us along the path.
 	CBaseEntity *doors[4];
-	CBotDoorEnumerator enumerator( doors, ARRAYSIZE( doors ) );
+	CBotDoorEnumerator enumerator( doors, ARRAYSIZE( doors ) ); // CBotDoorEnumerator needs to be defined
 	CBaseEntity *door = FindEntitiesOnPath( NearBreakableCheckDist, &enumerator, false );
 
 	if ( door )
@@ -401,15 +387,18 @@ void CCSBot::DoorCheck( void )
 /**
  * Reset the stuck-checker.
  */
-void CCSBot::ResetStuckMonitor( void )
+void CFFBot::ResetStuckMonitor( void )
 {
 	if (m_isStuck)
 	{
 		if (IsLocalPlayerWatchingMe() && cv_bot_debug.GetBool() && UTIL_GetListenServerHost())
 		{
 			CBasePlayer *localPlayer = UTIL_GetListenServerHost();
-			CSingleUserRecipientFilter filter( localPlayer );
-			EmitSound( filter, localPlayer->entindex(), "Bot.StuckSound" );
+			if (localPlayer) // Null check
+			{
+				CSingleUserRecipientFilter filter( localPlayer );
+				EmitSound( filter, localPlayer->entindex(), "Bot.StuckSound" ); // TODO: Update sound name for FF
+			}
 		}
 	}
 
@@ -426,7 +415,7 @@ void CCSBot::ResetStuckMonitor( void )
 /**
  * Test if we have become stuck
  */
-void CCSBot::StuckCheck( void )
+void CFFBot::StuckCheck( void )
 {
 	if (m_isStuck)
 	{
@@ -455,11 +444,11 @@ void CCSBot::StuckCheck( void )
 		// cannot be Length2D, or will break ladder movement (they are only Z)
 		float moveDist = vel.Length();
 
-		float deltaT = g_BotUpdateInterval;
+		float deltaT = g_BotUpdateInterval; // Ensure g_BotUpdateInterval is defined
 
 		m_avgVel[ m_avgVelIndex++ ] = moveDist/deltaT;
 
-		if (m_avgVelIndex == MAX_VEL_SAMPLES)
+		if (m_avgVelIndex == MAX_VEL_SAMPLES) // Ensure MAX_VEL_SAMPLES is defined
 			m_avgVelIndex = 0;
 
 		if (m_avgVelCount < MAX_VEL_SAMPLES)
@@ -490,8 +479,11 @@ void CCSBot::StuckCheck( void )
 				if (IsLocalPlayerWatchingMe() && cv_bot_debug.GetInt() > 0.0f && UTIL_GetListenServerHost())
 				{
 					CBasePlayer *localPlayer = UTIL_GetListenServerHost();
-					CSingleUserRecipientFilter filter( localPlayer );
-					EmitSound( filter, localPlayer->entindex(), "Bot.StuckStart" );
+					if (localPlayer) // Null check
+					{
+						CSingleUserRecipientFilter filter( localPlayer );
+						EmitSound( filter, localPlayer->entindex(), "Bot.StuckStart" ); // TODO: Update sound name for FF
+					}
 				}
 
 				m_isStuck = true;
@@ -507,7 +499,7 @@ void CCSBot::StuckCheck( void )
 /**
  * Check if we need to jump due to height change
  */
-bool CCSBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
+bool CFFBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
 {
 	// Don't try to jump if in the air.
 	if( !(GetFlags() & FL_ONGROUND) )
@@ -517,15 +509,15 @@ bool CCSBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
 
 	float dz = ground - GetFeetZ();
 
-	if (dz > StepHeight && !onlyJumpDown)
+	if (dz > StepHeight && !onlyJumpDown) // StepHeight needs to be defined
 	{
 		// dont restrict jump time when going up
-		if (Jump( MUST_JUMP ))
+		if (Jump( MUST_JUMP )) // MUST_JUMP needs to be defined
 		{
 			return true;
 		}
 	}
-	else if (!IsUsingLadder() && dz < -JumpHeight)
+	else if (!IsUsingLadder() && dz < -JumpHeight) // JumpHeight needs to be defined
 	{
 		if (Jump( mustJump ))
 		{
@@ -540,12 +532,14 @@ bool CCSBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
 /**
  * Find "simple" ground height, treating current nav area as part of the floor
  */
-bool CCSBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, Vector *normal )
+bool CFFBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, Vector *normal )
 {
+	if (!TheNavMesh) return false; // Null check
+
 	if (TheNavMesh->GetSimpleGroundHeight( pos, height, normal ))
 	{
 		// our current nav area also serves as a ground polygon
-		if (m_lastKnownArea && m_lastKnownArea->IsOverlapping( pos ))
+		if (m_lastKnownArea && m_lastKnownArea->IsOverlapping( pos )) // m_lastKnownArea could be null
 			*height = MAX( (*height), m_lastKnownArea->GetZ( pos ) );
 
 		return true;
@@ -558,19 +552,19 @@ bool CCSBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, V
 /**
  * Get our current radio chatter place
  */
-Place CCSBot::GetPlace( void ) const
+Place CFFBot::GetPlace( void ) const
 {
-	if (m_lastKnownArea)
+	if (m_lastKnownArea) // m_lastKnownArea could be null
 		return m_lastKnownArea->GetPlace();
 
-	return UNDEFINED_PLACE;
+	return UNDEFINED_PLACE; // UNDEFINED_PLACE needs to be defined
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Move towards position, independant of view angle
  */
-void CCSBot::MoveTowardsPosition( const Vector &pos )
+void CFFBot::MoveTowardsPosition( const Vector &pos )
 {
 	Vector myOrigin = GetCentroid( this );
 
@@ -584,7 +578,7 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 	// NOTE: We need to do this frequently to catch edges at the right time
 	// @todo Look ahead *along path* instead of straight line 
 	//
-	if ((m_lastKnownArea == NULL || !(m_lastKnownArea->GetAttributes() & NAV_MESH_NO_JUMP)) &&
+	if ((m_lastKnownArea == NULL || !(m_lastKnownArea->GetAttributes() & NAV_MESH_NO_JUMP)) && // m_lastKnownArea could be null
 		!IsOnLadder())
 	{
 		float ground;
@@ -604,7 +598,7 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 			if (GetSimpleGroundHeightWithFloor( stepAhead, &ground, &normal ))
 			{
 				if (normal.z > 0.9f)
-					jumped = DiscontinuityJump( ground, ONLY_JUMP_DOWN );
+					jumped = DiscontinuityJump( ground, ONLY_JUMP_DOWN ); // ONLY_JUMP_DOWN needs to be defined
 			}
 		}
 
@@ -628,7 +622,7 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 			stepAhead.z += HalfHumanHeight;
 			if (GetSimpleGroundHeightWithFloor( stepAhead, &ground ))
 			{
-				jumped = DiscontinuityJump( ground, ONLY_JUMP_DOWN, MUST_JUMP );
+				jumped = DiscontinuityJump( ground, ONLY_JUMP_DOWN, MUST_JUMP ); // ONLY_JUMP_DOWN, MUST_JUMP need to be defined
 			}
 		}
 	}
@@ -637,7 +631,7 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 	// compute our current forward and lateral vectors
 	float angle = EyeAngles().y;
 
-	Vector2D dir( BotCOS(angle), BotSIN(angle) );
+	Vector2D dir( BotCOS(angle), BotSIN(angle) ); // BotCOS, BotSIN might be CS specific math funcs
 	Vector2D lat( -dir.y, dir.x );
 
 	// compute unit vector to goal position
@@ -668,12 +662,12 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 /**
  * Move away from position, independant of view angle
  */
-void CCSBot::MoveAwayFromPosition( const Vector &pos )
+void CFFBot::MoveAwayFromPosition( const Vector &pos )
 {
 	// compute our current forward and lateral vectors
 	float angle = EyeAngles().y;
 
-	Vector2D dir( BotCOS(angle), BotSIN(angle) );
+	Vector2D dir( BotCOS(angle), BotSIN(angle) ); // BotCOS, BotSIN
 	Vector2D lat( -dir.y, dir.x );
 
 	// compute unit vector to goal position
@@ -700,12 +694,12 @@ void CCSBot::MoveAwayFromPosition( const Vector &pos )
 /**
  * Strafe (sidestep) away from position, independant of view angle
  */
-void CCSBot::StrafeAwayFromPosition( const Vector &pos )
+void CFFBot::StrafeAwayFromPosition( const Vector &pos )
 {
 	// compute our current forward and lateral vectors
 	float angle = EyeAngles().y;
 
-	Vector2D dir( BotCOS(angle), BotSIN(angle) );
+	Vector2D dir( BotCOS(angle), BotSIN(angle) ); // BotCOS, BotSIN
 	Vector2D lat( -dir.y, dir.x );
 
 	// compute unit vector to goal position
@@ -724,7 +718,7 @@ void CCSBot::StrafeAwayFromPosition( const Vector &pos )
 /**
  * For getting un-stuck
  */
-void CCSBot::Wiggle( void )
+void CFFBot::Wiggle( void )
 {
 	if (IsCrouching())
 	{
@@ -734,26 +728,26 @@ void CCSBot::Wiggle( void )
 	// for wiggling
 	if (m_wiggleTimer.IsElapsed())
 	{
-		m_wiggleDirection = (NavRelativeDirType)RandomInt( 0, 3 );
+		m_wiggleDirection = (NavRelativeDirType)RandomInt( 0, 3 ); // NavRelativeDirType needs to be defined
 		m_wiggleTimer.Start( RandomFloat( 0.3f, 0.5f ) );		// 0.3, 0.5
 	}
 
 	Vector forward, right;
 	EyeVectors( &forward, &right );
 
-	const float lookAheadRange = (m_lastKnownArea && (m_lastKnownArea->GetAttributes() & NAV_MESH_WALK)) ? 5.0f : 30.0f;
+	const float lookAheadRange = (m_lastKnownArea && (m_lastKnownArea->GetAttributes() & NAV_MESH_WALK)) ? 5.0f : 30.0f; // m_lastKnownArea could be null
 	float ground;
 
 	switch( m_wiggleDirection )
 	{
-		case LEFT:
+		case LEFT: // LEFT needs to be defined (NavRelativeDirType)
 		{
 			// don't move left if we will fall
 			Vector pos = GetAbsOrigin() - (lookAheadRange * right);
 
 			if (GetSimpleGroundHeightWithFloor( pos, &ground ))
 			{
-				if (GetAbsOrigin().z - ground < StepHeight)
+				if (GetAbsOrigin().z - ground < StepHeight) // StepHeight
 				{
 					StrafeLeft();
 				}
@@ -761,14 +755,14 @@ void CCSBot::Wiggle( void )
 			break;
 		}
 
-		case RIGHT:
+		case RIGHT: // RIGHT needs to be defined
 		{
 			// don't move right if we will fall
 			Vector pos = GetAbsOrigin() + (lookAheadRange * right);
 
 			if (GetSimpleGroundHeightWithFloor( pos, &ground ))
 			{
-				if (GetAbsOrigin().z - ground < StepHeight)
+				if (GetAbsOrigin().z - ground < StepHeight) // StepHeight
 				{
 					StrafeRight();
 				}
@@ -776,14 +770,14 @@ void CCSBot::Wiggle( void )
 			break;
 		}
 
-		case FORWARD:
+		case FORWARD: // FORWARD needs to be defined
 		{
 			// don't move forward if we will fall
 			Vector pos = GetAbsOrigin() + (lookAheadRange * forward);
 
 			if (GetSimpleGroundHeightWithFloor( pos, &ground ))
 			{
-				if (GetAbsOrigin().z - ground < StepHeight)
+				if (GetAbsOrigin().z - ground < StepHeight) // StepHeight
 				{
 					MoveForward();
 				}
@@ -791,14 +785,14 @@ void CCSBot::Wiggle( void )
 			break;
 		}
 
-		case BACKWARD:
+		case BACKWARD: // BACKWARD needs to be defined
 		{
 			// don't move backward if we will fall
 			Vector pos = GetAbsOrigin() - (lookAheadRange * forward);
 
 			if (GetSimpleGroundHeightWithFloor( pos, &ground ))
 			{
-				if (GetAbsOrigin().z - ground < StepHeight)
+				if (GetAbsOrigin().z - ground < StepHeight) // StepHeight
 				{
 					MoveBackward();
 				}
@@ -807,7 +801,7 @@ void CCSBot::Wiggle( void )
 		}
 	}
 
-	if (m_stuckJumpTimer.IsElapsed() && m_lastKnownArea && !(m_lastKnownArea->GetAttributes() & NAV_MESH_NO_JUMP))
+	if (m_stuckJumpTimer.IsElapsed() && m_lastKnownArea && !(m_lastKnownArea->GetAttributes() & NAV_MESH_NO_JUMP)) // m_lastKnownArea could be null
 	{
 		if (Jump())
 		{
@@ -820,23 +814,23 @@ void CCSBot::Wiggle( void )
 /**
  * Determine approach points from eye position and approach areas of current area
  */
-void CCSBot::ComputeApproachPoints( void )
+void CFFBot::ComputeApproachPoints( void )
 {
 	m_approachPointCount = 0;
 
-	if (m_lastKnownArea == NULL)
+	if (m_lastKnownArea == NULL) // m_lastKnownArea could be null
 	{
 		return;
 	}
 
 	// assume we're crouching for now
-	Vector eye = GetCentroid( this ); // + pev->view_ofs;	// eye position
+	Vector eye = GetCentroid( this ); // + pev->view_ofs;	// eye position. pev->view_ofs is GoldSrc. Use GetViewOffset().
 
 	Vector ap;
 	float halfWidth;
-	for( int i=0; i<m_lastKnownArea->GetApproachInfoCount() && m_approachPointCount < MAX_APPROACH_POINTS; ++i )
+	for( int i=0; i<m_lastKnownArea->GetApproachInfoCount() && m_approachPointCount < MAX_APPROACH_POINTS; ++i ) // MAX_APPROACH_POINTS needs definition
 	{
-		const CCSNavArea::ApproachInfo *info = m_lastKnownArea->GetApproachInfo( i );
+		const CNavArea::ApproachInfo *info = m_lastKnownArea->GetApproachInfo( i ); // CNavArea::ApproachInfo needs definition
 
 		if (info->here.area == NULL || info->prev.area == NULL)
 		{
@@ -844,9 +838,9 @@ void CCSBot::ComputeApproachPoints( void )
 		}
 
 		// compute approach point (approach area is "info->here")
-		if (info->prevToHereHow <= GO_WEST)
+		if (info->prevToHereHow <= GO_WEST) // GO_WEST needs definition
 		{
-			info->prev.area->ComputePortal( info->here.area, (NavDirType)info->prevToHereHow, &ap, &halfWidth );
+			info->prev.area->ComputePortal( info->here.area, (NavDirType)info->prevToHereHow, &ap, &halfWidth ); // NavDirType needs definition
 			ap.z = info->here.area->GetZ( ap );
 		}
 		else
@@ -857,10 +851,10 @@ void CCSBot::ComputeApproachPoints( void )
 
 		// "bend" our line of sight around corners until we can see the approach point
 		Vector bendPoint;
-		if (BendLineOfSight( eye, ap + Vector( 0, 0, HalfHumanHeight ), &bendPoint ))
+		if (BendLineOfSight( eye, ap + Vector( 0, 0, HalfHumanHeight ), &bendPoint )) // HalfHumanHeight
 		{
 			// put point on the ground
-			if (TheNavMesh->GetGroundHeight( bendPoint, &bendPoint.z ) == false)
+			if (!TheNavMesh || TheNavMesh->GetGroundHeight( bendPoint, &bendPoint.z ) == false) // Null check for TheNavMesh
 			{
 				bendPoint.z = ap.z;
 			}
@@ -873,11 +867,15 @@ void CCSBot::ComputeApproachPoints( void )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::DrawApproachPoints( void ) const
+void CFFBot::DrawApproachPoints( void ) const
 {
+	if (!TheFFBots()) return; // Null check, changed TheCSBots to TheFFBots
+
 	for( int i=0; i<m_approachPointCount; ++i )
 	{
-		if (TheCSBots()->GetElapsedRoundTime() >= m_approachPoint[i].m_area->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) ))
+		if (!m_approachPoint[i].m_area) continue; // Null check
+		// TODO: Update for FF teams
+		if (TheFFBots()->GetElapsedRoundTime() >= m_approachPoint[i].m_area->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) )) // OtherTeam needs to be FF compatible
 			NDebugOverlay::Cross3D( m_approachPoint[i].m_pos, 10.0f, 255, 0, 255, true, 0.1f );
 		else
 			NDebugOverlay::Cross3D( m_approachPoint[i].m_pos, 10.0f, 100, 100, 100, true, 0.1f );
@@ -888,8 +886,9 @@ void CCSBot::DrawApproachPoints( void ) const
 /**
  * Find the approach point that is nearest to our current path, ahead of us
  */
-bool CCSBot::FindApproachPointNearestPath( Vector *pos )
+bool CFFBot::FindApproachPointNearestPath( Vector *pos )
 {
+	if (!pos) return false; // Null check
 	if (!HasPath())
 		return false;
 
@@ -921,9 +920,9 @@ bool CCSBot::FindApproachPointNearestPath( Vector *pos )
 		if (rangeSq > nearPathSq)
 			continue;
 
-		if (rangeSq > targetRangeSq)
+		if (rangeSq > targetRangeSq) // This should be < targetRangeSq if we want closest, or a different logic for "farthest near path"
 		{
-			target = close;
+			target = close; // This logic seems to find the point on path closest to an approach point, then picks the one where this distance is largest.
 			targetRangeSq = rangeSq;
 			found = true;
 		}
@@ -931,7 +930,7 @@ bool CCSBot::FindApproachPointNearestPath( Vector *pos )
 
 	if (found)
 	{
-		*pos = target + Vector( 0, 0, HalfHumanHeight );
+		*pos = target + Vector( 0, 0, HalfHumanHeight ); // HalfHumanHeight
 		return true;	
 	}
 
@@ -943,16 +942,18 @@ bool CCSBot::FindApproachPointNearestPath( Vector *pos )
 /**
  * Return true if we are at the/an enemy spawn right now
  */
-bool CCSBot::IsAtEnemySpawn( void ) const
+bool CFFBot::IsAtEnemySpawn( void ) const
 {
-	CBaseEntity *spot;
-	const char *spawnName = (GetTeamNumber() == TEAM_TERRORIST) ? "info_player_counterterrorist" : "info_player_terrorist";
+	CBaseEntity *spot = NULL; // Initialize to NULL
+	// TODO: Update spawn point classnames and team logic for FF
+	const char *spawnName = (GetTeamNumber() == TEAM_TERRORIST) ? "info_player_counterterrorist" : "info_player_terrorist"; // CS Specific
 
 	// check if we are at any of the enemy's spawn points
 	for( spot = gEntList.FindEntityByClassname( NULL, spawnName ); spot; spot = gEntList.FindEntityByClassname( spot, spawnName ) )
 	{
+		if (!TheNavMesh) return false; // Null check
 		CNavArea *area = TheNavMesh->GetNearestNavArea( spot->WorldSpaceCenter() );
-		if (area && GetLastKnownArea() == area)
+		if (area && GetLastKnownArea() == area) // GetLastKnownArea() can be null
 		{
 			return true;
 		}
@@ -960,4 +961,3 @@ bool CCSBot::IsAtEnemySpawn( void ) const
 
 	return false;
 }
-

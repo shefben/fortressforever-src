@@ -8,10 +8,16 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_gamerules.h"
-#include "KeyValues.h"
-
 #include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/ff_gamerules.h" // For FFGameRules(), WINNER_TER, WINNER_CT etc.
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For TheNavMesh, CNavArea
+#include "bot_constants.h"  // For PriorityType, etc.
+#include "KeyValues.h"      // Already included, seems fine
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -48,7 +54,7 @@ void CFFBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 		if ((IsLocalPlayerWatchingMe() && cv_bot_debug.GetInt() == 3) || cv_bot_debug.GetInt() == 4)
 		{
 			PrintIfWatched( "Heard noise (%s from %s, pri %s, time %3.1f)\n", 
-											(FStrEq( "weapon_fire", event->GetName() )) ? "Weapon fire " : "",
+											(FStrEq( "weapon_fire", event->GetName() )) ? "Weapon fire " : "", // TODO: Update event names for FF if different
 											(player) ? player->GetPlayerName() : "NULL",
 											(priority == PRIORITY_HIGH) ? "HIGH" : ((priority == PRIORITY_MEDIUM) ? "MEDIUM" : "LOW"),
 											gpGlobals->curtime );
@@ -76,6 +82,7 @@ void CFFBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 		/// @todo Better handle when noise occurs off the nav mesh
 		/// @todo Make sure noise area is not through a wall or ceiling from source of noise
 		/// @todo Change GetNavTravelTime to better deal with NULL destination areas
+		if (!TheNavMesh) return; // Guard against null TheNavMesh
 		CNavArea *noiseArea = TheNavMesh->GetNearestNavArea( *newNoisePosition );
 		if (noiseArea == NULL)
 		{
@@ -128,7 +135,7 @@ void CFFBot::OnHEGrenadeDetonate( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 99999.0f, PRIORITY_HIGH, true ); // hegrenade_detonate
+	OnAudibleEvent( event, player, 99999.0f, PRIORITY_HIGH, true ); // hegrenade_detonate // TODO: Update event name for FF
 }
 
 
@@ -143,7 +150,7 @@ void CFFBot::OnFlashbangDetonate( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1000.0f, PRIORITY_LOW, true ); // flashbang_detonate
+	OnAudibleEvent( event, player, 1000.0f, PRIORITY_LOW, true ); // flashbang_detonate // TODO: Update event name for FF
 }
 
 
@@ -158,7 +165,7 @@ void CFFBot::OnSmokeGrenadeDetonate( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1000.0f, PRIORITY_LOW, true ); // smokegrenade_detonate
+	OnAudibleEvent( event, player, 1000.0f, PRIORITY_LOW, true ); // smokegrenade_detonate // TODO: Update event name for FF
 }
 
 
@@ -173,7 +180,7 @@ void CFFBot::OnGrenadeBounce( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 500.0f, PRIORITY_LOW, true ); // grenade_bounce
+	OnAudibleEvent( event, player, 500.0f, PRIORITY_LOW, true ); // grenade_bounce // TODO: Update event name for FF
 }
 
 
@@ -210,7 +217,7 @@ void CFFBot::OnBreakProp( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, true ); // break_prop
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, true ); // break_prop // TODO: Update event name for FF
 }
 
 
@@ -225,7 +232,7 @@ void CFFBot::OnBreakBreakable( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, true ); // break_glass
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, true ); // break_glass // TODO: Update event name for FF (likely break_breakable)
 }
 
 
@@ -240,11 +247,12 @@ void CFFBot::OnDoorMoving( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, false ); // door_moving
+	OnAudibleEvent( event, player, 1100.0f, PRIORITY_MEDIUM, false ); // door_moving // TODO: Update event name for FF
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
+// TODO: Hostage logic is CS-specific and needs to be adapted or removed for FF.
 void CFFBot::OnHostageFollows( IGameEvent *event )
 {
 	if ( !IsAlive() )
@@ -268,7 +276,7 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 	const float range = 1200.0f;
 
 	// this is here so T's not only act on the noise, but look at it, too
-	if (GetTeamNumber() == TEAM_TERRORIST)
+	if (GetTeamNumber() == TEAM_TERRORIST) // TODO: Update for FF Teams
 	{
 		// make sure we can hear the noise
 		if ((playerOrigin - myOrigin).IsLengthGreaterThan( range ))
@@ -278,27 +286,26 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 		GetChatter()->HostagesBeingTaken();
 
 		// only move if we hear them being rescued and can't see any hostages
-		if (GetGameState()->GetNearestVisibleFreeHostage() == NULL)
+		if (GetGameState()->GetNearestVisibleFreeHostage() == NULL) // TODO: Update for FF if hostages are different
 		{			
 			// since we are guarding the hostages, presumably we know where they are
 			// if we're close enough to "hear" this event, either go to where the event occured,
 			// or head for an escape zone to head them off
-			if (GetTask() != CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
+			if (GetTask() != CFFBot::GUARD_HOSTAGE_RESCUE_ZONE) // TODO: Update for FF Tasks
 			{
-				//const float headOffChance = 33.3f;
-				if (true) // || RandomFloat( 0, 100 ) < headOffChance)
+				if (true)
 				{
 					// head them off at a rescue zone
 					if (GuardRandomZone())
 					{
-						SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
+						SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE ); // TODO: Update for FF Tasks
 						SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 						PrintIfWatched( "Trying to beat them to an escape zone!\n" );
 					}
 				}
 				else
 				{
-					SetTask( SEEK_AND_DESTROY );
+					SetTask( CFFBot::SEEK_AND_DESTROY ); // TODO: Update for FF Tasks
 					StandUp();
 					Run();
 					MoveTo( playerOrigin, FASTEST_ROUTE );
@@ -312,7 +319,7 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 		return;
 	}
 
-	OnAudibleEvent( event, player, range, PRIORITY_MEDIUM, false ); // hostage_follows
+	OnAudibleEvent( event, player, range, PRIORITY_MEDIUM, false ); // hostage_follows // TODO: Update event name for FF
 }
 
 
@@ -320,11 +327,12 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 void CFFBot::OnRoundEnd( IGameEvent *event )
 {
 	// Morale adjustments happen even for dead players
+	// TODO: Update WINNER_TER, WINNER_CT for FF teams/win conditions
 	int winner = event->GetInt( "winner" );
 	switch ( winner )
 	{
-	case WINNER_TER:
-		if (GetTeamNumber() == TEAM_CT)
+	case WINNER_TER: // CS Specific
+		if (GetTeamNumber() == TEAM_CT) // CS Specific
 		{
 			DecreaseMorale();
 		}
@@ -334,8 +342,8 @@ void CFFBot::OnRoundEnd( IGameEvent *event )
 		}
 		break;
 
-	case WINNER_CT:
-		if (GetTeamNumber() == TEAM_CT)
+	case WINNER_CT: // CS Specific
+		if (GetTeamNumber() == TEAM_CT) // CS Specific
 		{
 			IncreaseMorale();
 		}
@@ -354,14 +362,15 @@ void CFFBot::OnRoundEnd( IGameEvent *event )
 	if ( !IsAlive() )
 		return;
 
-	if ( event->GetInt( "winner" ) == WINNER_TER )
+	// TODO: Update WINNER_TER, WINNER_CT for FF teams/win conditions
+	if ( event->GetInt( "winner" ) == WINNER_TER ) // CS Specific
 	{
-		if (GetTeamNumber() == TEAM_TERRORIST)
+		if (GetTeamNumber() == TEAM_TERRORIST) // CS Specific
 			GetChatter()->CelebrateWin();
 	}
-	else if ( event->GetInt( "winner" ) == WINNER_CT )
+	else if ( event->GetInt( "winner" ) == WINNER_CT ) // CS Specific
 	{
-		if (GetTeamNumber() == TEAM_CT)
+		if (GetTeamNumber() == TEAM_CT) // CS Specific
 			GetChatter()->CelebrateWin();
 	}
 }
@@ -375,6 +384,7 @@ void CFFBot::OnRoundStart( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
+// TODO: Hostage logic is CS-specific and needs to be adapted or removed for FF.
 void CFFBot::OnHostageRescuedAll( IGameEvent *event )
 {
 	m_gameState.OnHostageRescuedAll( event );
@@ -392,7 +402,7 @@ void CFFBot::OnNavBlocked( IGameEvent *event )
 			// An area was blocked off.  Reset our path if it has this area on it.
 			for( int i=0; i<m_pathLength; ++i )
 			{
-				const ConnectInfo *info = &m_path[ i ];
+				const ConnectInfo *info = &m_path[ i ]; // ConnectInfo is defined in CFFBot
 				if ( info->area && info->area->GetID() == areaID )
 				{
 					DestroyPath();
@@ -410,8 +420,10 @@ void CFFBot::OnNavBlocked( IGameEvent *event )
  */
 void CFFBot::OnEnteredNavArea( CNavArea *newArea )
 {
+	if (!newArea) return; // Added null check
+
 	// assume that we "clear" an area of enemies when we enter it
-	newArea->SetClearedTimestamp( GetTeamNumber()-1 );
+	newArea->SetClearedTimestamp( GetTeamNumber()-1 ); // TODO: Ensure GetTeamNumber() is 0-indexed or 1-indexed as appropriate for FF
 
 	// if we just entered a 'stop' area, set the flag
 	if ( newArea->GetAttributes() & NAV_MESH_STOP )

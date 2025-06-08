@@ -8,8 +8,22 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
-#include "cs_nav_path.h"
+#include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+// #include "../../shared/ff/ff_gamerules.h" // For FFGameRules() (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For TheNavMesh, CNavArea
+#include "nav_pathfind.h"   // For PathCost, NavAreaBuildPath, CNavPath (formerly CCSNavPath)
+#include "nav_hiding_spot.h"// For FindNearbyHidingSpot, FindInitialEncounterSpot
+#include "bot_constants.h"  // For TaskType, RouteType, RadioType etc.
+
+// TODO: cs_nav_path.h was included. If CFFNavPath is a direct replacement, include "ff_nav_path.h".
+// Otherwise, nav_pathfind.h or nav_mesh.h might provide CNavPath or similar generic path objects.
+// For now, assuming CNavPath from nav_pathfind.h or similar.
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -19,27 +33,11 @@
 /**
  * This method is the ONLY legal way to change a bot's current state
  */
-void CCSBot::SetState( BotState *state )
+void CFFBot::SetState( BotState *state )
 {
-	PrintIfWatched( "%s: SetState: %s -> %s\n", GetPlayerName(), (m_state) ? m_state->GetName() : "NULL", state->GetName() );
+	if (!state) return; // Null check
 
-	/*
-	if ( IsDefusingBomb() )
-	{
-		const Vector *bombPos = GetGameState()->GetBombPosition();
-		if ( bombPos != NULL )
-		{
-			if ( TheCSBots()->GetBombDefuser() == this )
-			{
-				if ( TheCSBots()->IsBombPlanted() )
-				{
-					Msg( "Bot %s is switching from defusing the bomb to %s\n",
-						GetPlayerName(), state->GetName() );
-				}
-			}
-		}
-	}
-	*/
+	PrintIfWatched( "%s: SetState: %s -> %s\n", GetPlayerName(), (m_state) ? m_state->GetName() : "NULL", state->GetName() );
 
 	// if we changed state from within the special Attack state, we are no longer attacking
 	if (m_isAttacking)
@@ -56,23 +54,23 @@ void CCSBot::SetState( BotState *state )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::Idle( void )
+void CFFBot::Idle( void )
 {
-	SetTask( SEEK_AND_DESTROY );
+	SetTask( CFFBot::SEEK_AND_DESTROY ); // Ensure TaskType enums are accessible
 	SetState( &m_idleState );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::EscapeFromBomb( void )
+void CFFBot::EscapeFromBomb( void )
 {
-	SetTask( ESCAPE_FROM_BOMB );
+	SetTask( CFFBot::ESCAPE_FROM_BOMB ); // Ensure TaskType enums are accessible
 	SetState( &m_escapeFromBombState );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::Follow( CCSPlayer *player )
+void CFFBot::Follow( CFFPlayer *player )
 {
 	if (player == NULL)
 		return;
@@ -84,7 +82,7 @@ void CCSBot::Follow( CCSPlayer *player )
 	m_isFollowing = true;
 	m_leader = player;
 
-	SetTask( FOLLOW );
+	SetTask( CFFBot::FOLLOW ); // Ensure TaskType enums are accessible
 	m_followState.SetLeader( player );
 	SetState( &m_followState );
 }
@@ -94,11 +92,15 @@ void CCSBot::Follow( CCSPlayer *player )
 /**
  * Continue following our leader after finishing what we were doing
  */
-void CCSBot::ContinueFollowing( void )
+void CFFBot::ContinueFollowing( void )
 {
-	SetTask( FOLLOW );
+	SetTask( CFFBot::FOLLOW ); // Ensure TaskType enums are accessible
 
-	m_followState.SetLeader( m_leader );
+	if (!m_leader.IsValid() || !m_leader.Get()) { // Check if leader is valid
+		Idle(); // Leader lost, go to idle
+		return;
+	}
+	m_followState.SetLeader( m_leader.Get() ); // Use Get() for EHANDLE
 
 	SetState( &m_followState );
 }
@@ -108,7 +110,7 @@ void CCSBot::ContinueFollowing( void )
 /**
  * Stop following
  */
-void CCSBot::StopFollowing( void )
+void CFFBot::StopFollowing( void )
 {
 	m_isFollowing = false;
 	m_leader = NULL;
@@ -120,9 +122,10 @@ void CCSBot::StopFollowing( void )
 /**
  * Begin process of rescuing hostages
  */
-void CCSBot::RescueHostages( void )
+// TODO: Hostage logic is CS-specific. Adapt or remove for FF.
+void CFFBot::RescueHostages( void )
 {
-	SetTask( RESCUE_HOSTAGES );
+	SetTask( CFFBot::RESCUE_HOSTAGES ); // Ensure TaskType enums are accessible
 }
 
 
@@ -130,8 +133,9 @@ void CCSBot::RescueHostages( void )
 /**
  * Use the entity
  */
-void CCSBot::UseEntity( CBaseEntity *entity )
+void CFFBot::UseEntity( CBaseEntity *entity )
 {
+	if (!entity) return; // Null check
 	m_useEntityState.SetEntity( entity );
 	SetState( &m_useEntityState );
 }
@@ -143,10 +147,11 @@ void CCSBot::UseEntity( CBaseEntity *entity )
  * This assumes the bot is directly in front of the door with no obstructions.
  * NOTE: This state is special, like Attack, in that it suspends the current behavior and returns to it when done.
  */
-void CCSBot::OpenDoor( CBaseEntity *door )
+void CFFBot::OpenDoor( CBaseEntity *door )
 {
+	if(!door) return; // Null check
 	m_openDoorState.SetDoor( door );
-	m_isOpeningDoor = true;
+	m_isOpeningDoor = true; // This implies m_openDoorState might not use SetState to become active immediately
 	m_openDoorState.OnEnter( this );
 }
 
@@ -157,7 +162,7 @@ void CCSBot::OpenDoor( CBaseEntity *door )
  * Move to a hiding place.
  * If 'searchFromArea' is non-NULL, hiding spots are looked for from that area first.
  */
-void CCSBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bool holdPosition )
+void CFFBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bool holdPosition )
 {
 	DestroyPath();
 
@@ -171,17 +176,18 @@ void CCSBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bo
 	else
 	{
 		source = m_lastKnownArea;
-		sourcePos = GetCentroid( this );
+		if (source) sourcePos = source->GetCenter(); // Null check m_lastKnownArea
+		else sourcePos = GetCentroid( this ); // Fallback if no area
 	}
 
-	if (source == NULL)
+	if (source == NULL && !searchFromArea) // Corrected logic: if searchFromArea was NULL and m_lastKnownArea was NULL
 	{
 		PrintIfWatched( "Hide from area is NULL.\n" );
 		Idle();
 		return;
 	}
 
-	m_hideState.SetSearchArea( source );
+	m_hideState.SetSearchArea( source ); // source can still be null if searchFromArea was null and m_lastKnownArea was null
 	m_hideState.SetSearchRange( hideRange );
 	m_hideState.SetDuration( duration );
 	m_hideState.SetHoldPosition( holdPosition );
@@ -189,6 +195,7 @@ void CCSBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bo
 	// search around source area for a good hiding spot
 	Vector useSpot;
 
+	// FindNearbyHidingSpot needs to be defined/ported
 	const Vector *pos = FindNearbyHidingSpot( this, sourcePos, hideRange, IsSniper() );
 	if (pos == NULL)
 	{
@@ -204,7 +211,7 @@ void CCSBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bo
 	m_hideState.SetHidingSpot( useSpot );
 
 	// build a path to our new hiding spot
-	if (ComputePath( useSpot, FASTEST_ROUTE ) == false)
+	if (ComputePath( useSpot, FASTEST_ROUTE ) == false) // FASTEST_ROUTE
 	{
 		PrintIfWatched( "Can't pathfind to hiding spot\n" );
 		Idle();
@@ -219,8 +226,9 @@ void CCSBot::Hide( CNavArea *searchFromArea, float duration, float hideRange, bo
 /**
  * Move to the given hiding place
  */
-void CCSBot::Hide( const Vector &hidingSpot, float duration, bool holdPosition )
+void CFFBot::Hide( const Vector &hidingSpot, float duration, bool holdPosition )
 {
+	if (!TheNavMesh) { Idle(); return; } // Null check
 	CNavArea *hideArea = TheNavMesh->GetNearestNavArea( hidingSpot );
 	if (hideArea == NULL)
 	{
@@ -238,7 +246,7 @@ void CCSBot::Hide( const Vector &hidingSpot, float duration, bool holdPosition )
 	m_hideState.SetHidingSpot( hidingSpot );
 
 	// build a path to our new hiding spot
-	if (ComputePath( hidingSpot, FASTEST_ROUTE ) == false)
+	if (ComputePath( hidingSpot, FASTEST_ROUTE ) == false) // FASTEST_ROUTE
 	{
 		PrintIfWatched( "Can't pathfind to hiding spot\n" );
 		Idle();
@@ -254,7 +262,7 @@ void CCSBot::Hide( const Vector &hidingSpot, float duration, bool holdPosition )
  * Try to hide nearby.  Return true if hiding, false if can't hide here.
  * If 'searchFromArea' is non-NULL, hiding spots are looked for from that area first.
  */
-bool CCSBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRange, bool holdPosition, bool useNearest )
+bool CFFBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRange, bool holdPosition, bool useNearest )
 {
 	CNavArea *source;
 	Vector sourcePos;
@@ -266,10 +274,11 @@ bool CCSBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRang
 	else
 	{
 		source = m_lastKnownArea;
-		sourcePos = GetCentroid( this );
+		if (source) sourcePos = source->GetCenter(); // Null check
+		else sourcePos = GetCentroid( this ); // Fallback
 	}
 
-	if (source == NULL)
+	if (source == NULL && !searchFromArea) // Corrected logic
 	{
 		PrintIfWatched( "Hide from area is NULL.\n" );
 		return false;
@@ -281,7 +290,7 @@ bool CCSBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRang
 	m_hideState.SetHoldPosition( holdPosition );
 
 	// search around source area for a good hiding spot
-	const Vector *pos = FindNearbyHidingSpot( this, sourcePos, hideRange, IsSniper(), useNearest );
+	const Vector *pos = FindNearbyHidingSpot( this, sourcePos, hideRange, IsSniper(), useNearest ); // FindNearbyHidingSpot
 	if (pos == NULL)
 	{
 		PrintIfWatched( "No available hiding spots.\n" );
@@ -291,7 +300,7 @@ bool CCSBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRang
 	m_hideState.SetHidingSpot( *pos );
 
 	// build a path to our new hiding spot
-	if (ComputePath( *pos, FASTEST_ROUTE ) == false)
+	if (ComputePath( *pos, FASTEST_ROUTE ) == false) // FASTEST_ROUTE
 	{
 		PrintIfWatched( "Can't pathfind to hiding spot\n" );
 		return false;
@@ -306,9 +315,9 @@ bool CCSBot::TryToHide( CNavArea *searchFromArea, float duration, float hideRang
 /**
  * Retreat to a nearby hiding spot, away from enemies
  */
-bool CCSBot::TryToRetreat( float maxRange, float duration )
+bool CFFBot::TryToRetreat( float maxRange, float duration )
 {
-	const Vector *spot = FindNearbyRetreatSpot( this, maxRange );
+	const Vector *spot = FindNearbyRetreatSpot( this, maxRange ); // FindNearbyRetreatSpot
 	if (spot)
 	{
 		// ignore enemies for a second to give us time to hide
@@ -334,7 +343,7 @@ bool CCSBot::TryToRetreat( float maxRange, float duration )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::Hunt( void )
+void CFFBot::Hunt( void )
 {
 	SetState( &m_huntState );
 }
@@ -345,13 +354,13 @@ void CCSBot::Hunt( void )
  * Attack our the given victim
  * NOTE: Attacking does not change our task.
  */
-void CCSBot::Attack( CCSPlayer *victim )
+void CFFBot::Attack( CFFPlayer *victim )
 {
 	if (victim == NULL)
 		return;
 
 	// zombies never attack
-	if (cv_bot_zombie.GetBool())
+	if (cv_bot_zombie.GetBool()) // cv_bot_zombie needs to be accessible
 		return;
 
 	// cannot attack if we are reloading
@@ -382,9 +391,6 @@ void CCSBot::Attack( CCSPlayer *victim )
 	else
 		m_attackState.SetCrouchAndHold( false );
 
-	//SetState( &m_attackState );
-	//PrintIfWatched( "ATTACK BEGIN (reaction time = %g (+ update time), surprise time = %g, attack delay = %g)\n", 
-	//				GetProfile()->GetReactionTime(), m_surpriseDelay, GetProfile()->GetAttackDelay() );
 	m_isAttacking = true;
 	m_attackState.OnEnter( this );
 
@@ -413,9 +419,12 @@ void CCSBot::Attack( CCSPlayer *victim )
 	// immediately aim at enemy - accuracy penalty depending on how far we must turn to aim
 	// accuracy is halved if we have to turn 180 degrees
 	float turn = deltaYaw / 180.0f;
-	float accuracy = GetProfile()->GetSkill() / (1.0f + turn);
+	if (GetProfile()) // Null check
+	{
+		float accuracy = GetProfile()->GetSkill() / (1.0f + turn);
+		SetAimOffset( accuracy );
+	}
 
-	SetAimOffset( accuracy );
 
 	// define time when aim offset will automatically be updated
 	// longer time the more we had to turn (surprise)
@@ -430,7 +439,7 @@ void CCSBot::Attack( CCSPlayer *victim )
 /**
  * Exit the Attack state
  */
-void CCSBot::StopAttacking( void )
+void CFFBot::StopAttacking( void )
 {
 	PrintIfWatched( "ATTACK END\n" );
 	m_attackState.OnExit( this );
@@ -445,7 +454,7 @@ void CCSBot::StopAttacking( void )
 
 
 //--------------------------------------------------------------------------------------------------------------
-bool CCSBot::IsAttacking( void ) const
+bool CFFBot::IsAttacking( void ) const
 {
 	return m_isAttacking;
 }
@@ -455,7 +464,7 @@ bool CCSBot::IsAttacking( void ) const
 /**
  * Return true if we are escaping from the bomb
  */
-bool CCSBot::IsEscapingFromBomb( void ) const
+bool CFFBot::IsEscapingFromBomb( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_escapeFromBombState ))
 		return true;
@@ -468,7 +477,7 @@ bool CCSBot::IsEscapingFromBomb( void ) const
 /**
  * Return true if we are defusing the bomb
  */
-bool CCSBot::IsDefusingBomb( void ) const
+bool CFFBot::IsDefusingBomb( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_defuseBombState ))
 		return true;
@@ -481,7 +490,7 @@ bool CCSBot::IsDefusingBomb( void ) const
 /**
  * Return true if we are hiding
  */
-bool CCSBot::IsHiding( void ) const
+bool CFFBot::IsHiding( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_hideState ))
 		return true;
@@ -494,7 +503,7 @@ bool CCSBot::IsHiding( void ) const
 /**
  * Return true if we are hiding and at our hiding spot
  */
-bool CCSBot::IsAtHidingSpot( void ) const
+bool CFFBot::IsAtHidingSpot( void ) const
 {
 	if (!IsHiding())
 		return false;
@@ -507,7 +516,7 @@ bool CCSBot::IsAtHidingSpot( void ) const
 /**
  * Return number of seconds we have been at our current hiding spot
  */
-float CCSBot::GetHidingTime( void ) const
+float CFFBot::GetHidingTime( void ) const
 {
 	if (IsHiding())
 	{
@@ -522,7 +531,7 @@ float CCSBot::GetHidingTime( void ) const
 /**
  * Return true if we are huting
  */
-bool CCSBot::IsHunting( void ) const
+bool CFFBot::IsHunting( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_huntState ))
 		return true;
@@ -535,7 +544,7 @@ bool CCSBot::IsHunting( void ) const
 /**
  * Return true if we are in the MoveTo state
  */
-bool CCSBot::IsMovingTo( void ) const
+bool CFFBot::IsMovingTo( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_moveToState ))
 		return true;
@@ -548,7 +557,7 @@ bool CCSBot::IsMovingTo( void ) const
 /**
  * Return true if we are buying
  */
-bool CCSBot::IsBuying( void ) const
+bool CFFBot::IsBuying( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_buyState ))
 		return true;
@@ -558,7 +567,7 @@ bool CCSBot::IsBuying( void ) const
 
 
 //--------------------------------------------------------------------------------------------------------------
-bool CCSBot::IsInvestigatingNoise( void ) const
+bool CFFBot::IsInvestigatingNoise( void ) const
 {
 	if (m_state == static_cast<const BotState *>( &m_investigateNoiseState ))
 		return true;
@@ -571,7 +580,7 @@ bool CCSBot::IsInvestigatingNoise( void ) const
 /**
  * Move to potentially distant position
  */
-void CCSBot::MoveTo( const Vector &pos, RouteType route )
+void CFFBot::MoveTo( const Vector &pos, RouteType route ) // RouteType
 {
 	m_moveToState.SetGoalPosition( pos );
 	m_moveToState.SetRouteType( route );
@@ -580,7 +589,7 @@ void CCSBot::MoveTo( const Vector &pos, RouteType route )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::PlantBomb( void )
+void CFFBot::PlantBomb( void )
 {
 	SetState( &m_plantBombState );
 }
@@ -590,14 +599,14 @@ void CCSBot::PlantBomb( void )
 /**
  * Bomb has been dropped - go get it
  */
-void CCSBot::FetchBomb( void )
+void CFFBot::FetchBomb( void )
 {
 	SetState( &m_fetchBombState );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::DefuseBomb( void )
+void CFFBot::DefuseBomb( void )
 {
 	SetState( &m_defuseBombState );
 }
@@ -607,14 +616,14 @@ void CCSBot::DefuseBomb( void )
 /**
  * Investigate recent enemy noise
  */
-void CCSBot::InvestigateNoise( void )
+void CFFBot::InvestigateNoise( void )
 {
 	SetState( &m_investigateNoiseState );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::Buy( void )
+void CFFBot::Buy( void )
 {
 	SetState( &m_buyState );
 }
@@ -625,13 +634,15 @@ void CCSBot::Buy( void )
  * Move to a hiding spot and wait for initial encounter with enemy team.
  * Return false if can't do this behavior (ie: no hiding spots available).
  */
-bool CCSBot::MoveToInitialEncounter( void )
+// TODO: This logic is highly CS-specific (teams, enemy spawn names)
+bool CFFBot::MoveToInitialEncounter( void )
 {
 	int myTeam = GetTeamNumber();
-	int enemyTeam = OtherTeam( myTeam );
+	int enemyTeam = OtherTeam( myTeam ); // OtherTeam needs to be FF compatible
 
 	// build a path to an enemy spawn point
-	CBaseEntity *enemySpawn = TheCSBots()->GetRandomSpawn( enemyTeam );
+	if (!TheFFBots()) return false; // Null check
+	CBaseEntity *enemySpawn = TheFFBots()->GetRandomSpawn( enemyTeam ); // Ensure GetRandomSpawn handles FF teams
 
 	if (enemySpawn == NULL)
 	{
@@ -640,13 +651,19 @@ bool CCSBot::MoveToInitialEncounter( void )
 	}
 
 	// build a path from us to the enemy spawn
-	CCSNavPath path;
-	PathCost cost( this, FASTEST_ROUTE );
-	path.Compute( WorldSpaceCenter(), enemySpawn->GetAbsOrigin(), cost );
+	CNavPath path; // Assuming CNavPath is the generic path object
+	PathCost cost( this, FASTEST_ROUTE ); // PathCost, FASTEST_ROUTE
+	// path.Compute( WorldSpaceCenter(), enemySpawn->GetAbsOrigin(), cost ); // CNavPath::Compute might differ
+	if ( !NavAreaBuildPath( m_lastKnownArea, TheNavMesh->GetNearestNavArea(enemySpawn->GetAbsOrigin()), &(enemySpawn->GetAbsOrigin()), cost, NULL, TheNavMesh->GetMaxPathNodes(), true, &path ) )
+	{
+		PrintIfWatched( "MoveToInitialEncounter: Pathfind failed.\n" );
+		return false;
+	}
+
 
 	if (!path.IsValid())
 	{
-		PrintIfWatched( "MoveToInitialEncounter: Pathfind failed.\n" );
+		PrintIfWatched( "MoveToInitialEncounter: Pathfind failed (path not valid).\n" );
 		return false;
 	}
 
@@ -654,7 +671,9 @@ bool CCSBot::MoveToInitialEncounter( void )
 	int i;
 	for( i=0; i<path.GetSegmentCount(); ++i )
 	{
-		if (path[i]->area->GetEarliestOccupyTime( myTeam ) > path[i]->area->GetEarliestOccupyTime( enemyTeam ))
+		const CNavPathSegment *segment = path.GetSegment(i);
+		if (!segment || !segment->area) continue; // Null checks
+		if (segment->area->GetEarliestOccupyTime( myTeam ) > segment->area->GetEarliestOccupyTime( enemyTeam ))
 		{
 			break;
 		}
@@ -666,12 +685,15 @@ bool CCSBot::MoveToInitialEncounter( void )
 		return false;
 	}
 
+	const CNavPathSegment *battleSegment = path.GetSegment(i);
+	if (!battleSegment || !battleSegment->area) return false; // Null check
+
 	/// @todo Remove this evil side-effect
-	SetInitialEncounterArea( path[i]->area );
+	SetInitialEncounterArea( battleSegment->area );
 
 	// find a hiding spot on our side of the battlefront that has LOS to it
 	const float maxRange = 1500.0f;
-	const HidingSpot *spot = FindInitialEncounterSpot( this, path[i]->area->GetCenter(), path[i]->area->GetEarliestOccupyTime( enemyTeam ), maxRange, IsSniper() );
+	const HidingSpot *spot = FindInitialEncounterSpot( this, battleSegment->area->GetCenter(), battleSegment->area->GetEarliestOccupyTime( enemyTeam ), maxRange, IsSniper() ); // FindInitialEncounterSpot
 
 	if (spot == NULL)
 	{
@@ -679,8 +701,10 @@ bool CCSBot::MoveToInitialEncounter( void )
 		return false;
 	}
 
-	float timeToWait = path[i]->area->GetEarliestOccupyTime( enemyTeam ) - spot->GetArea()->GetEarliestOccupyTime( myTeam );
-	float minWaitTime = 4.0f * GetProfile()->GetAggression() + 3.0f;
+	if (!spot->GetArea()) return false; // Null check
+
+	float timeToWait = battleSegment->area->GetEarliestOccupyTime( enemyTeam ) - spot->GetArea()->GetEarliestOccupyTime( myTeam );
+	float minWaitTime = 4.0f * (GetProfile() ? GetProfile()->GetAggression() : 0.5f) + 3.0f; // Null check GetProfile
 	if (timeToWait < minWaitTime)
 	{
 		timeToWait = minWaitTime;
@@ -690,4 +714,3 @@ bool CCSBot::MoveToInitialEncounter( void )
 
 	return true;
 }
-

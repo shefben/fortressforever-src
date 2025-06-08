@@ -9,6 +9,16 @@
 
 #include "cbase.h"
 #include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots() (potentially used)
+#include "../ff_player.h"     // For CFFPlayer (potentially used by CFFBot)
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+// #include "../../shared/ff/ff_gamerules.h" // For FFGameRules() (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For CNavArea
+#include "bot_constants.h"  // For PriorityType, DISPOSITION_TYPE (ENGAGE_AND_INVESTIGATE)
+#include "bot_profile.h"    // For BotProfile and GetProfile() related methods.
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -43,7 +53,7 @@ bool CFFBot::HeardInterestingNoise( void )
 		return false;
 
 	// if our disposition is not to investigate, dont investigate
-	if (GetDisposition() != ENGAGE_AND_INVESTIGATE)
+	if (GetDisposition() != CFFBot::ENGAGE_AND_INVESTIGATE) // Corrected enum access
 		return false;
 
 	// listen for enemy noises
@@ -127,6 +137,8 @@ bool CFFBot::CanHearNearbyEnemyGunfire( float range ) const
 bool CFFBot::CanSeeNoisePosition( void ) const
 {
 	trace_t result;
+	// TODO: CTraceFilterNoNPCsOrPlayer might be CS specific or need to be adapted for FF entities.
+	// For now, assuming a generic trace filter or that it's defined/adapted elsewhere.
 	CTraceFilterNoNPCsOrPlayer traceFilter( this, COLLISION_GROUP_NONE );
 	UTIL_TraceLine( EyePositionConst(), m_noisePosition + Vector( 0, 0, HalfHumanHeight ), MASK_VISIBLE_AND_NPCS, &traceFilter, &result );
 	if (result.fraction == 1.0f)

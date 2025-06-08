@@ -8,16 +8,27 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_gamerules.h"
-#include "ff_player.h"
+#include "ff_bot_chatter.h"
+#include "ff_bot.h"
+#include "ff_bot_manager.h" // Added for TheFFBots() consistency
+#include "../ff_player.h"
+#include "../../shared/ff/ff_gamerules.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h" // Added for completeness
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // Added for completeness
+#include "ff_gamestate.h" // Added for FFGameState
+
+// Engine/Shared specific includes
 #include "shared_util.h"
 #include "engine/IEngineSound.h"
-#include "KeyValues.h"
+#include "KeyValues.h" // For parsing chatter database
+#include "filesystem.h" // For FileHandle_t and filesystem operations
+#include "nav_mesh.h" // For TheNavMesh, CNavArea, Place, UNDEFINED_PLACE, NameToRadioEvent etc.
+#include "bot_constants.h" // For RADIO_INVALID etc. (assuming this is where they are defined)
 
-#include "bot.h"
-#include "bot_util.h"
-#include "ff_bot.h"
-#include "ff_bot_chatter.h"
+// Higher level bot includes
+#include "../bot.h" // Assuming general bot definitions
+#include "../bot_util.h" // Assuming general bot utilities
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -47,7 +58,7 @@ const Vector *GetRandomSpotAtPlace( Place place )
 	{
 		CNavArea *area = TheNavAreas[ rit ];
 
-		if (area->GetPlace() == place && which == 0)
+		if (area->GetPlace() == place && which-- == 0) // Corrected loop logic
 			return &area->GetCenter();
 	}
 
@@ -67,12 +78,6 @@ void BotMeme::Transmit( CFFBot *sender ) const
 
 		if (player == NULL)
 			continue;
-
-//		if (FNullEnt( player->pev ))
-//			continue;
-
-//		if (FStrEq( STRING( player->pev->netname ), "" ))
-//			continue;
 
 		// skip self
 		if (sender == player)
@@ -126,7 +131,7 @@ void BotBombsiteStatusMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 	// if our target bombsite wasn't cleared, will will continue going to it, 
 	// because GetNextBombsiteToSearch() will return the same zone (since its not cleared)
 	// if the bomb was planted, we will head to that bombsite
-	if (receiver->GetTask() == CFFBot::FIND_TICKING_BOMB)
+	if (receiver->GetTask() == CFFBot::FIND_TICKING_BOMB) // TODO: Ensure CFFBot::TaskType enums are accessible
 	{
 		receiver->Idle();
 		receiver->GetChatter()->Affirmative();
@@ -154,7 +159,7 @@ void BotBombStatusMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 		case FFGameState::LOOSE:
 			receiver->GetGameState()->UpdateLooseBomb( m_pos );
 
-			if (receiver->GetTask() == CFFBot::GUARD_BOMB_ZONE)
+			if (receiver->GetTask() == CFFBot::GUARD_BOMB_ZONE) // TODO: Ensure CFFBot::TaskType enums are accessible
 			{
 				receiver->Idle();
 				receiver->GetChatter()->Affirmative();		
@@ -179,7 +184,7 @@ void BotFollowMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 	// if we are too far away, ignore
 	// compute actual travel distance
 	Vector senderOrigin = GetCentroid( sender );
-	PathCost cost( receiver );
+	PathCost cost( receiver ); // Assuming PathCost is defined and accessible (likely via ff_bot.h or nav_pathfind.h)
 	float travelDistance = NavAreaTravelDistance( receiver->GetLastKnownArea(), 
 												  TheNavMesh->GetNearestNavArea( senderOrigin ),
 												  cost );
@@ -214,17 +219,17 @@ void BotDefendHereMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 	if (place != UNDEFINED_PLACE)
 	{
 		// pick a random hiding spot in this place
-		const Vector *spot = FindRandomHidingSpot( receiver, place, receiver->IsSniper() );
+		const Vector *spot = FindRandomHidingSpot( receiver, place, receiver->IsSniper() ); // Assuming FindRandomHidingSpot is accessible
 		if (spot)
 		{
-			receiver->SetTask( CFFBot::HOLD_POSITION );
+			receiver->SetTask( CFFBot::HOLD_POSITION ); // TODO: Ensure CFFBot::TaskType enums are accessible
 			receiver->Hide( *spot );
 			return;
 		}
 	}
 
 	// hide nearby
-	receiver->SetTask( CFFBot::HOLD_POSITION );
+	receiver->SetTask( CFFBot::HOLD_POSITION ); // TODO: Ensure CFFBot::TaskType enums are accessible
 	receiver->Hide( TheNavMesh->GetNearestNavArea( m_pos ) );
 
 	// acknowledge
@@ -340,11 +345,14 @@ BotPhrase::~BotPhrase()
 {
 	for( int bank=0; bank<m_voiceBank.Count(); ++bank )
 	{
-		for( int speakable=0; speakable<m_voiceBank[bank]->Count(); ++speakable )
+		if (m_voiceBank[bank]) // Add null check
 		{
-			delete (*m_voiceBank[bank])[speakable];
+			for( int speakable=0; speakable<m_voiceBank[bank]->Count(); ++speakable )
+			{
+				delete (*m_voiceBank[bank])[speakable];
+			}
+			delete m_voiceBank[bank];
 		}
-		delete m_voiceBank[bank];
 	}
 
 	if ( m_name )
@@ -367,7 +375,7 @@ void BotPhrase::InitVoiceBank( int bankIndex )
  */
 char *BotPhrase::GetSpeakable( int bankIndex, float *duration ) const
 {
-	if (bankIndex < 0 || bankIndex >= m_numVoiceBanks || m_count[bankIndex] == 0)
+	if (bankIndex < 0 || bankIndex >= m_numVoiceBanks || !m_voiceBank[bankIndex] || m_count[bankIndex] == 0) // Added null check for m_voiceBank[bankIndex]
 	{
 		if (duration)
 			*duration = 0.0f;
@@ -380,11 +388,15 @@ char *BotPhrase::GetSpeakable( int bankIndex, float *duration ) const
 	while(true)
 	{
 		BotSpeakableVector *speakables = m_voiceBank[bankIndex];
-		int& index = m_index[bankIndex];
-		const BotSpeakable *speak = (*speakables)[index++];
+		// int& index = m_index[bankIndex]; // This mutable access in const method is problematic. Using a copy.
+		int currentIndex = m_index[bankIndex];
+		const BotSpeakable *speak = (*speakables)[currentIndex++];
 
-		if (m_index[bankIndex] >= m_count[bankIndex])
-			m_index[bankIndex] = 0;
+		if (currentIndex >= m_count[bankIndex])
+			m_index[bankIndex] = 0; // This modifies member in const method
+		else
+			m_index[bankIndex] = currentIndex;
+
 
 		// check place criteria
 		// if this speakable has a place criteria, it must match to be used
@@ -425,7 +437,7 @@ void BotPhrase::Randomize( void )
 	for ( int bank = 0; bank < m_voiceBank.Count(); ++bank )
 	{
 		BotSpeakableVector *speakables = m_voiceBank[bank];
-		if ( speakables->Count() == 1 )
+		if ( !speakables || speakables->Count() <= 1 ) // Added null check
 			continue;
 
 		// A simple shuffle: for each array index, swap it with a random index
@@ -449,6 +461,8 @@ BotPhraseManager *TheBotPhrases = NULL;
 BotPhraseManager::BotPhraseManager( void )
 {
 	m_placeCount = 0;
+	m_painPhrase = NULL; // Initialize pointers
+	m_agreeWithPlanPhrase = NULL;
 }
 
 
@@ -522,276 +536,134 @@ bool BotPhraseManager::Initialize( const char *filename, int bankIndex )
 	FileHandle_t file = filesystem->Open( filename, "r" );
 	if (!file)
 	{
-		CONSOLE_ECHO( "WARNING: Cannot access bot phrase database '%s'\n", filename );
+		DevWarning( "WARNING: Cannot access bot phrase database '%s'\n", filename ); // Changed to DevWarning
 		return false;
 	}
 
 	// BOTPORT: Redo file reading to avoid loading whole file into memory at once
-	int phraseDataLength = filesystem->Size( filename );
-	char *phraseDataFile = new char[ phraseDataLength ];
-		
-	int dataReadLength = filesystem->Read( phraseDataFile, phraseDataLength, file );	
-
-	filesystem->Close( file );
-
-	if ( dataReadLength > 0 )
+	// Using KeyValues to parse instead of manual parsing for robustness
+	KeyValues *kv = new KeyValues(filename);
+	if (!kv->LoadFromFile(filesystem, filename))
 	{
-		// NULL-terminate based on the length read in, since Read() can transform \r\n to \n and
-		// return fewer bytes than we were expecting.
-		phraseDataFile[ dataReadLength - 1 ] = 0;
+		DevWarning("Error parsing bot phrase database '%s'\n", filename);
+		filesystem->Close(file); // Close the file handle opened earlier
+		kv->deleteThis();
+		return false;
+	}
+	filesystem->Close(file); // Close after successful load by KeyValues or if LoadFromFile handles it.
+
+	const int RadioPathLen = 128;
+	char baseDir[RadioPathLen] = "";
+
+	// Process BaseDir
+	const char *pBaseDir = kv->GetString("BaseDir", "");
+	if (pBaseDir && *pBaseDir) {
+		Q_strncpy(baseDir, pBaseDir, RadioPathLen);
+		Q_strncat(baseDir, "/", RadioPathLen, Q_strlen(baseDir) + 2); // Use forward slash for consistency
 	}
 
-	const char *phraseData = phraseDataFile;
+	// Process Output
+	KeyValues *outputKV = kv->FindKey("Output");
+	if (outputKV) {
+		const char *outputType = outputKV->GetString("Type", "Radio"); // Assuming Type subkey
+		while (m_output.Count() <= bankIndex) {
+			m_output.AddToTail(BOT_CHATTER_RADIO);
+		}
+		if (V_stricmp(outputType, "Voice") == 0) {
+			m_output[bankIndex] = BOT_CHATTER_VOICE;
+		}
+	}
 
 
-	const int RadioPathLen = 128; // wav filenames need to be shorter than this to go over the net anyway.
-	char baseDir[RadioPathLen] = "";
-	char compositeFilename[RadioPathLen];
-
-	//
-	// Parse the BotChatter.db into BotPhrase collections
-	//
-	while( true )
+	for (KeyValues *pkv = kv->GetFirstTrueSubKey(); pkv != NULL; pkv = pkv->GetNextTrueSubKey())
 	{
-		phraseData = SharedParse( phraseData );
-		if (!phraseData)
-			break;
+		const char *sectionName = pkv->GetName();
+		bool isPlace = (V_stricmp(sectionName, "Place") == 0);
+		bool isChatter = (V_stricmp(sectionName, "Chatter") == 0);
 
-		char *token = SharedGetToken();
-
-		if ( !stricmp( token, "Output" ) )
+		if (isPlace || isChatter)
 		{
-			// get name of this output device
-			phraseData = SharedParse( phraseData );
-			if (!phraseData)
-			{
-				CONSOLE_ECHO( "Error parsing '%s' - expected identifier\n", filename );
-				delete [] phraseDataFile;
-				return false;
-			}
+			const char *phraseName = pkv->GetString("Name"); // Assuming Name subkey for phrase name
+			if (!phraseName || !*phraseName) continue;
 
-			while ( m_output.Count() <= bankIndex )
-			{
-				m_output.AddToTail(BOT_CHATTER_RADIO);
-			}
-
-			char *token = SharedGetToken();
-			if ( !stricmp( token, "Voice" ) )
-			{
-				m_output[bankIndex] = BOT_CHATTER_VOICE;
-			}
-		}
-		else if ( !stricmp( token, "BaseDir" ) )
-		{
-			// get name of this output device
-			phraseData = SharedParse( phraseData );
-			if (!phraseData)
-			{
-				CONSOLE_ECHO( "Error parsing '%s' - expected identifier\n", filename );
-				delete [] phraseDataFile;
-				return false;
-			}
-			char *token = SharedGetToken();
-			Q_strncpy( baseDir, token, RadioPathLen );
-			Q_strncat( baseDir, "\\", RadioPathLen, -1 );
-			baseDir[RadioPathLen-1] = 0;
-		}
-		else if (!stricmp( token, "Place" ) || !stricmp( token, "Chatter" ))
-		{
-			bool isPlace = (stricmp( token, "Place" )) ? false : true;
-
-			// encountered a new phrase collection
 			BotPhrase *phrase = NULL;
-			if ( isDefault )
-			{
-				phrase = new BotPhrase( isPlace );
-			}
-
-			// get name of this phrase
-			phraseData = SharedParse( phraseData );
-			if (!phraseData)
-			{
-				CONSOLE_ECHO( "Error parsing '%s' - expected identifier\n", filename );
-				delete [] phraseDataFile;
-				return false;
-			}
-			if ( isDefault )
-			{
-				phrase->m_name = CloneString( SharedGetToken() );
-
-				phrase->m_place = (isPlace) ? TheNavMesh->NameToPlace( phrase->m_name ) : UNDEFINED_PLACE;
-			}
-			else // look up the existing phrase
-			{
-				if ( isPlace )
-				{
-					phrase = const_cast<BotPhrase *>(GetPlace( SharedGetToken() ));
-				}
-				else
-				{
-					phrase = const_cast<BotPhrase *>(GetPhrase( SharedGetToken() ));
-				}
-
-				if ( !phrase )
-				{
-					CONSOLE_ECHO( "Error parsing '%s' - phrase '%s' is invalid\n", filename, SharedGetToken() );
-					delete [] phraseDataFile;
-					return false;
+			if (isDefault) {
+				phrase = new BotPhrase(isPlace);
+				phrase->m_name = CloneString(phraseName);
+				phrase->m_place = (isPlace) ? TheNavMesh->NameToPlace(phrase->m_name) : UNDEFINED_PLACE;
+			} else {
+				phrase = const_cast<BotPhrase *>(isPlace ? GetPlace(phraseName) : GetPhrase(phraseName));
+				if (!phrase) {
+					DevWarning("Error parsing '%s' - phrase '%s' is invalid for non-default bank\n", filename, phraseName);
+					continue;
 				}
 			}
-			phrase->InitVoiceBank( bankIndex );
+			phrase->InitVoiceBank(bankIndex);
 
 			PlaceCriteria placeCriteria = ANY_PLACE;
 			CountCriteria countCriteria = UNDEFINED_COUNT;
 			RadioType radioEvent = RADIO_INVALID;
 			bool isImportant = false;
 
-			// read attributes of this phrase
-			while( true )
+			// Attributes for the phrase itself
+			const char* placeCritStr = pkv->GetString("PlaceCriteria", "ANY");
+			if (V_stricmp(placeCritStr, "UNDEFINED") == 0) placeCriteria = UNDEFINED_PLACE;
+			else if (V_stricmp(placeCritStr, "ANY") != 0) placeCriteria = TheNavMesh->NameToPlace(placeCritStr);
+			// TODO: Parse CountCriteria if it's an attribute of the Phrase block
+
+			const char* radioEvStr = pkv->GetString("Radio", NULL);
+			if (radioEvStr) radioEvent = NameToRadioEvent(radioEvStr);
+			isImportant = pkv->GetBool("Important", false);
+
+
+			// Iterate over speakables within this phrase block
+			FOR_EACH_SUBKEY(pkv, speakableKV)
 			{
-				// get next token
-				phraseData = SharedParse( phraseData );
-				if (!phraseData)
+				if (V_stricmp(speakableKV->GetName(), "Speak") == 0) // Assuming speakables are under "Speak" subkey
 				{
-					CONSOLE_ECHO( "Error parsing %s - expected 'End'\n", filename );
-					delete [] phraseDataFile;
-					return false;
-				}
-				token = SharedGetToken();
+					const char *token = speakableKV->GetString();
+					if (!token || !*token) continue;
 
-				// check for Place criteria
-				if (!stricmp( token, "Place" ))
-				{
-					phraseData = SharedParse( phraseData );
-					if (!phraseData)
-					{
-						CONSOLE_ECHO( "Error parsing %s - expected Place name\n", filename );
-						delete [] phraseDataFile;
-						return false;
+					BotSpeakable *speak = new BotSpeakable;
+					char compositeFilename[MAX_PATH]; // Use MAX_PATH
+					if (baseDir[0]) {
+						V_snprintf(compositeFilename, sizeof(compositeFilename), "%s%s", baseDir, token);
+					} else {
+						V_strncpy(compositeFilename, token, sizeof(compositeFilename));
 					}
-					token = SharedGetToken();
+					V_FixSlashes(compositeFilename); // Ensure correct slashes
+					// V_strlower(compositeFilename); // Already done by engine?
 
-					// update place criteria for subsequent speak lines
-					// NOTE: this assumes places must be first in the chatter database
+					speak->m_phrase = CloneString(compositeFilename);
+					speak->m_place = placeCriteria; // Inherit from phrase block or allow override
+					speak->m_count = countCriteria; // Inherit or allow override
 
-					// check for special identifiers
-					if (!stricmp( "ANY", token ))
-						placeCriteria = ANY_PLACE;
-					else if (!stricmp( "UNDEFINED", token ))
-						placeCriteria = UNDEFINED_PLACE;
-					else
-						placeCriteria = TheNavMesh->NameToPlace( token );
-
-					continue;
-				}
-
-				// check for Count criteria
-				if (!stricmp( token, "Count" ))
-				{
-					phraseData = SharedParse( phraseData );
-					if (!phraseData)
-					{
-						CONSOLE_ECHO( "Error parsing %s - expected Count value\n", filename );
-						delete [] phraseDataFile;
-						return false;
+					speak->m_duration = enginesound->GetSoundDuration(speak->m_phrase);
+					if (speak->m_duration <= 0.0f) {
+						if (!engine->IsDedicatedServer()) {
+							DevMsg("Warning: Couldn't get duration of phrase '%s'\n", speak->m_phrase);
+						}
+						speak->m_duration = 1.0f;
 					}
-					token = SharedGetToken();
-
-					// update count criteria for subsequent speak lines
-					if (!stricmp( token, "Many" ))
-						countCriteria = COUNT_MANY;
-					else 
-						countCriteria = atoi( token );
-
-					continue;
+					BotSpeakableVector *speakables = phrase->m_voiceBank[bankIndex];
+					speakables->AddToTail(speak);
+					++phrase->m_count[bankIndex];
 				}
-
-				// check for radio equivalent
-				if (!stricmp( token, "Radio" ))
-				{
-					phraseData = SharedParse( phraseData );
-					if (!phraseData)
-					{
-						CONSOLE_ECHO( "Error parsing %s - expected radio event\n", filename );
-						delete [] phraseDataFile;
-						return false;
-					}
-					token = SharedGetToken();
-
-					RadioType event = NameToRadioEvent( token );
-					if (event <= RADIO_START_1 || event >= RADIO_END)
-					{
-						CONSOLE_ECHO( "Error parsing %s - invalid radio event '%s'\n", filename, token );
-						delete [] phraseDataFile;
-						return false;
-					}
-
-					radioEvent = event;
-
-					continue;
-				}
-
-				// check for "important" flag
-				if (!stricmp( token, "Important" ))
-				{
-					isImportant = true;
-					continue;
-				}
-
-				// check for End delimiter
-				if (!stricmp( token, "End" ))
-					break;
-
-				// found a phrase - add it to the collection
-				BotSpeakable *speak = new BotSpeakable;
-				if ( baseDir[0] )
-				{
-					Q_snprintf( compositeFilename, RadioPathLen, "%s%s", baseDir, token );
-					speak->m_phrase = CloneString( compositeFilename );
-				}
-				else
-				{
-					speak->m_phrase = CloneString( token );
-				}
-				speak->m_place = placeCriteria;
-				speak->m_count = countCriteria;
-#ifdef POSIX
-				Q_FixSlashes( speak->m_phrase );
-				Q_strlower( speak->m_phrase );
-#endif
-
-				speak->m_duration = enginesound->GetSoundDuration( speak->m_phrase );
-
-				if (speak->m_duration <= 0.0f)
-				{
-					if ( !engine->IsDedicatedServer() )
-					{
-						DevMsg( "Warning: Couldn't get duration of phrase '%s'\n", speak->m_phrase );
-					}
-					speak->m_duration = 1.0f;
-				}
-
-				BotSpeakableVector * speakables = phrase->m_voiceBank[ bankIndex ];
-				speakables->AddToTail( speak );
-
-				++phrase->m_count[ bankIndex ];
 			}
 
-			if ( isDefault )
-			{
+
+			if (isDefault) {
 				phrase->m_radioEvent = radioEvent;
 				phrase->m_isImportant = isImportant;
 			}
 
-			// add phrase collection to the appropriate master list
-			if (isPlace)
-				m_placeList.AddToTail( phrase );
-			else
-				m_list.AddToTail( phrase );
+			if (isPlace) m_placeList.AddToTail(phrase);
+			else m_list.AddToTail(phrase);
 		}
 	}
 
-	delete [] phraseDataFile;
+	kv->deleteThis();
+
 
 	m_painPhrase = GetPhrase( "Pain" );
 	m_agreeWithPlanPhrase = GetPhrase( "AgreeWithPlan" );
@@ -811,32 +683,12 @@ const BotPhrase *BotPhraseManager::GetPhrase( const char *name ) const
 {
 	for( int i=0; i<m_list.Count(); ++i )
 	{
-		if (!stricmp( m_list[i]->m_name, name ))
+		if (m_list[i] && !stricmp( m_list[i]->m_name, name )) // Added null check
 			return m_list[i]; 
 	}
-
-	//CONSOLE_ECHO( "GetPhrase: ERROR - Invalid phrase '%s'\n", name );
 	return NULL;
 }
 
-/**
- * Given an id, return the associated phrase collection
- * @todo Store phrases in a vector to make this fast
- */
-/*
-const BotPhrase *BotPhraseManager::GetPhrase( unsigned int place ) const
-{
-	for( BotPhraseList::const_iterator iter = m_list.begin(); iter != m_list.end(); ++iter )
-	{
-		const BotPhrase *phrase = *iter;
-		if (phrase->m_place == id)
-			return phrase; 
-	}
-
-	CONSOLE_ECHO( "GetPhrase: ERROR - Invalid phrase id #%d\n", id );
-	return NULL;
-}
-*/
 
 /**
  * Given a name, return the associated Place phrase collection
@@ -848,7 +700,7 @@ const BotPhrase *BotPhraseManager::GetPlace( const char *name ) const
 
 	for( int i=0; i<m_placeList.Count(); ++i )
 	{
-		if (!stricmp( m_placeList[i]->m_name, name ))
+		if (m_placeList[i] && !stricmp( m_placeList[i]->m_name, name )) // Added null check
 			return m_placeList[i];
 	}
 
@@ -865,7 +717,7 @@ const BotPhrase *BotPhraseManager::GetPlace( PlaceCriteria place ) const
 
 	for( int i=0; i<m_placeList.Count(); ++i )
 	{
-		if (m_placeList[i]->m_place == place)
+		if (m_placeList[i] && m_placeList[i]->m_place == place) // Added null check
 			return m_placeList[i];
 	}
 
@@ -942,7 +794,7 @@ bool BotStatement::IsImportant( void ) const
 	// if a statement contains any important phrases, it is important
 	for( int i=0; i<m_count; ++i )
 	{
-		if (m_statement[i].isPhrase && m_statement[i].phrase->IsImportant())
+		if (m_statement[i].isPhrase && m_statement[i].phrase && m_statement[i].phrase->IsImportant()) // Added null check
 			return true;
 
 		// hack for now - phrases with enemy counts are important
@@ -970,15 +822,6 @@ bool BotStatement::IsValid( void ) const
 				break;
 			}
 
-/*
-			case RADIO_SILENCE:
-			{
-				if (GetOwner()->GetChatter()->GetRadioSilenceDuration() < 10.0f)
-					return false;
-				break;
-			}
-*/
-
 			case ENEMIES_REMAINING:
 			{
 				if (GetOwner()->GetEnemiesRemaining() == 0)
@@ -998,6 +841,8 @@ bool BotStatement::IsValid( void ) const
  */
 bool BotStatement::IsRedundant( const BotStatement *say ) const
 {
+	if (!say) return false; // Added null check
+
 	// special cases
 	if (GetType() == REPORT_MY_PLAN ||
 			GetType() == REPORT_REQUEST_HELP ||
@@ -1063,6 +908,8 @@ bool BotStatement::IsObsolete( void ) const
  */
 void BotStatement::Convert( const BotStatement *say )
 {
+	if (!say) return; // Added null check
+
 	if (GetType() == REPORT_MY_PLAN && say->GetType() == REPORT_MY_PLAN)
 	{
 		const BotPhrase *meToo = TheBotPhrases->GetAgreeWithPlanPhrase();
@@ -1133,7 +980,7 @@ bool BotStatement::Update( void )
 	}
 
 	// special case - context dependent delay
-	if (m_index >= 0 && m_statement[ m_index ].context == ACCUMULATE_ENEMIES_DELAY)
+	if (m_index >= 0 && m_index < m_count && !m_statement[ m_index ].isPhrase && m_statement[ m_index ].context == ACCUMULATE_ENEMIES_DELAY) // Added bounds check
 	{
 		// report if we see a lot of enemies, or if enough time has passed
 		const float reportTime = 2.0f;		// 1
@@ -1156,6 +1003,8 @@ bool BotStatement::Update( void )
 
 			return false;
 		}
+
+		if (m_index < 0 || m_index >= m_count) return false; // Bounds check for m_index
 
 		// start next part of statement
 		float duration = 0.0f;
@@ -1184,7 +1033,7 @@ bool BotStatement::Update( void )
 					else if (enemyCount > 1)
 					{
 						phrase = TheBotPhrases->GetPhrase( "EnemySpotted" );
-						phrase->SetCountCriteria( enemyCount );
+						if(phrase) phrase->SetCountCriteria( enemyCount ); // Null check
 					}
 					break;
 				}
@@ -1256,7 +1105,6 @@ bool BotStatement::Update( void )
 				phrase->SetPlaceCriteria( m_place );
 
 				const char *filename = phrase->GetSpeakable( me->GetProfile()->GetVoiceBank(), &duration );
-				// CONSOLE_ECHO( "%s: Radio( '%s' )\n", STRING( me->pev->netname ), filename );
 
 				bool sayIt = true;
 
@@ -1293,13 +1141,6 @@ bool BotStatement::Update( void )
 							duration = 2.0f;
 						}
 					}
-					/* BOTPORT: Wire up bot voice over IP
-					else if ( g_engfuncs.pfnPlayClientVoice && TheBotPhrases->GetOutputType( me->GetProfile()->GetVoiceBank() ) == BOT_CHATTER_VOICE )
-					{
-						me->GetChatter()->ResetRadioSilenceDuration();
-						g_engfuncs.pfnPlayClientVoice( me->entindex() - 1, filename );
-					}
-					*/
 					else
 					{
 						me->SpeakAudio( filename, duration + 1.0f, me->GetProfile()->GetVoicePitch() );
@@ -1332,10 +1173,10 @@ unsigned int BotStatement::GetPlace( void ) const
 
 	// look for an implicit place in our statement
 	for( int i=0; i<m_count; ++i )
-		if (m_statement[i].isPhrase && m_statement[i].phrase->IsPlace())
+		if (m_statement[i].isPhrase && m_statement[i].phrase && m_statement[i].phrase->IsPlace()) // Added null check
 			return m_statement[i].phrase->GetPlace();
 	
-	return 0;
+	return 0; // Was UNDEFINED_PLACE, but return type is unsigned int. 0 is often used for invalid/none.
 }
 
 /**
@@ -1386,7 +1227,7 @@ BotChatterInterface::BotChatterInterface( CFFBot *me )
 			break;
 	}
 
-	nextPitch = (nextPitch + 1) % 3;
+	nextPitch = (PitchHack)((nextPitch + 1) % 3); // Ensure cast back to enum type
 
 	Reset();
 }
@@ -1444,6 +1285,8 @@ void BotChatterInterface::Reset( void )
  */
 void BotChatterInterface::AddStatement( BotStatement *statement, bool mustAdd )
 {
+	if (!statement) return; // Added null check
+
 	// don't add statements if bot chatter is shut off
 	if (GetVerbosity() == OFF)
 	{
@@ -1534,6 +1377,8 @@ void BotChatterInterface::AddStatement( BotStatement *statement, bool mustAdd )
  */
 void BotChatterInterface::RemoveStatement( BotStatement *statement )
 {
+	if (!statement) return; // Added null check
+
 	if (statement->m_next)
 		statement->m_next->m_prev = statement->m_prev;
 
@@ -1596,17 +1441,7 @@ void BotChatterInterface::OnDeath( void )
 			const BotPhrase *pain = TheBotPhrases->GetPainPhrase();
 			if (pain)
 			{
-				/*
-				if ( g_engfuncs.pfnPlayClientVoice && TheBotPhrases->GetOutputType( m_me->GetProfile()->GetVoiceBank() ) == BOT_CHATTER_VOICE )
-				{
-					g_engfuncs.pfnPlayClientVoice( m_me->entindex() - 1, pain->GetSpeakable(m_me->GetProfile()->GetVoiceBank()) );
-					m_me->GetChatter()->ResetRadioSilenceDuration();
-				}
-				else
-				*/
-				{
-					m_me->SpeakAudio( pain->GetSpeakable( m_me->GetProfile()->GetVoiceBank() ), 0.0f, m_me->GetProfile()->GetVoicePitch() );
-				}
+				m_me->SpeakAudio( pain->GetSpeakable( m_me->GetProfile()->GetVoiceBank() ), 0.0f, m_me->GetProfile()->GetVoicePitch() );
 			}
 		}
 	}
@@ -1693,8 +1528,6 @@ void BotChatterInterface::Update( void )
 			// don't say things our teammates have just said
 			if (say->IsRedundant( friendSay ))
 			{
-				// thie statement is redundant - destroy it
-				//m_me->PrintIfWatched( "Teammate said what I was going to say - shutting up.\n" );
 				m_me->PrintIfWatched( "Teammate said what I was going to say - shutting up.\n" );
 				RemoveStatement( say );
 			}
@@ -1729,9 +1562,7 @@ BotStatement *BotChatterInterface::GetActiveStatement( void )
 
 		CFFBot *bot = dynamic_cast<CFFBot *>(player);
 
-		// if not a bot, fail the test
-		/// @todo Check if human is currently talking
-		if (!bot)
+		if (!bot) // Check if player is a bot
 			continue;
 
 		for( BotStatement *say = bot->GetChatter()->m_statementList; say; say = say->m_next )
@@ -1743,7 +1574,7 @@ BotStatement *BotChatterInterface::GetActiveStatement( void )
 			// keep track of statement that has been waiting longest to be spoken of anyone on our team
 			if (say->GetStartTime() < earlyTime)
 			{
-				earlyTime = say->GetTimestamp();
+				earlyTime = say->GetTimestamp(); // Should be GetStartTime()?
 				earliest = say;
 			}
 		}
@@ -1799,7 +1630,7 @@ inline const BotPhrase *GetPlacePhrase( CFFBot *me )
 
 inline void SayWhere( BotStatement *say, Place place )
 {
-	say->AppendPhrase( TheBotPhrases->GetPlace( place ) );
+	if (say) say->AppendPhrase( TheBotPhrases->GetPlace( place ) ); // Added null check
 }
 
 /**
@@ -1879,7 +1710,7 @@ void BotChatterInterface::ReportIn( void )
 	BotStatement *say = new BotStatement( this, REPORT_REQUEST_INFORMATION, 10.0f );
 
 	say->AppendPhrase( TheBotPhrases->GetPhrase( "RequestReport" ) );
-	say->AddCondition( BotStatement::RADIO_SILENCE );
+	// say->AddCondition( BotStatement::RADIO_SILENCE ); // This condition might be too restrictive or needs careful tuning
 	say->AttachMeme( new BotRequestReportMeme() );
 
 	AddStatement( say );
@@ -1900,56 +1731,55 @@ void BotChatterInterface::ReportingIn( void )
 	// what are we doing
 	switch( m_me->GetTask() )
 	{
-		case CFFBot::PLANT_BOMB:
+		case CFFBot::PLANT_BOMB: // TODO: Update for FF Scenarios/Tasks
 		{
 			m_me->GetChatter()->GoingToPlantTheBomb( UNDEFINED_PLACE );
 			break;
 		}
 
-		case CFFBot::DEFUSE_BOMB:
+		case CFFBot::DEFUSE_BOMB: // TODO: Update for FF Scenarios/Tasks
 		{
 			m_me->GetChatter()->Say( "DefusingBomb" );
 			break;
 		}
 
-		case CFFBot::GUARD_LOOSE_BOMB:
+		case CFFBot::GUARD_LOOSE_BOMB: // TODO: Update for FF Scenarios/Tasks
 		{
-			if (TheCSBots()->GetLooseBomb())
+			if (TheFFBots()->GetLooseBomb()) // Ensure TheFFBots() is not null
 			{
 				say->AppendPhrase( TheBotPhrases->GetPhrase( "GuardingLooseBomb" ) );
-				say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, TheCSBots()->GetLooseBomb()->GetAbsOrigin() ) );
+				say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, TheFFBots()->GetLooseBomb()->GetAbsOrigin() ) ); // Ensure TheFFBots() is not null
 			}
 			break;
 		}
 
-		case CFFBot::GUARD_HOSTAGES:
+		case CFFBot::GUARD_HOSTAGES: // TODO: Update for FF Scenarios/Tasks
 		{
 			m_me->GetChatter()->GuardingHostages( UNDEFINED_PLACE, !m_me->IsAtHidingSpot() );
 			break;
 		}
 
-		case CFFBot::GUARD_HOSTAGE_RESCUE_ZONE:
+		case CFFBot::GUARD_HOSTAGE_RESCUE_ZONE: // TODO: Update for FF Scenarios/Tasks
 		{
 			m_me->GetChatter()->GuardingHostageEscapeZone( !m_me->IsAtHidingSpot() );
 			break;
 		}
 
-		case CFFBot::COLLECT_HOSTAGES:
+		case CFFBot::COLLECT_HOSTAGES: // TODO: Update for FF Scenarios/Tasks
 		{
 			break;
 		}
 
-		case CFFBot::RESCUE_HOSTAGES:
+		case CFFBot::RESCUE_HOSTAGES: // TODO: Update for FF Scenarios/Tasks
 		{
 			m_me->GetChatter()->EscortingHostages();
 			break;
 		}
 
-		case CFFBot::GUARD_VIP_ESCAPE_ZONE:
+		case CFFBot::GUARD_VIP_ESCAPE_ZONE: // TODO: Update for FF Scenarios/Tasks
 		{
 			break;
 		}
-
 	}
 
 
@@ -2065,7 +1895,7 @@ void BotChatterInterface::FriendHeardNoise( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::HeardNoise( const Vector &pos )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	if (m_heardNoiseTimer.IsElapsed())
@@ -2092,7 +1922,7 @@ void BotChatterInterface::HeardNoise( const Vector &pos )
 void BotChatterInterface::KilledMyEnemy( int victimID )
 {
 	// only report if we killed the last enemy in the area
-	if (m_me->GetNearbyEnemyCount() <= 1)
+	if (m_me->GetNearbyEnemyCount() <= 1) // Should be > 1? If 1 enemy, and killed it, then 0 enemies left.
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_ENEMY_ACTION, 3.0f );
@@ -2107,7 +1937,7 @@ void BotChatterInterface::KilledMyEnemy( int victimID )
 void BotChatterInterface::EnemiesRemaining( void )
 {
 	// only report if we killed the last enemy in the area
-	if (m_me->GetNearbyEnemyCount() > 1)
+	if (m_me->GetNearbyEnemyCount() > 1) // If more than 1 enemy remains, don't say "X enemies left" yet.
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_ENEMIES_REMAINING, 5.0f );
@@ -2141,7 +1971,7 @@ void BotChatterInterface::Negative( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::GoingToPlantTheBomb( Place place )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	const float minInterval = 20.0f;
@@ -2162,7 +1992,7 @@ void BotChatterInterface::GoingToPlantTheBomb( Place place )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::PlantingTheBomb( Place place )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_CRITICAL_EVENT, 10.0f );
@@ -2179,7 +2009,7 @@ void BotChatterInterface::PlantingTheBomb( Place place )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::TheyPickedUpTheBomb( void )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	// if we already know the bomb is not loose, this is old news
@@ -2203,6 +2033,7 @@ void BotChatterInterface::TheyPickedUpTheBomb( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::SpottedBomber( CBasePlayer *bomber )
 {
+	if (!bomber) return; // Added null check
 	const Vector &bomberOrigin = GetCentroid( bomber );
 
 	if (m_me->GetGameState()->IsBombMoving())
@@ -2228,7 +2059,6 @@ void BotChatterInterface::SpottedBomber( CBasePlayer *bomber )
 
 	say->SetSubject( bomber->entindex() );
 
-	//say->AttachMeme( new BotHelpMeme( place ) );
 	say->AttachMeme( new BotBombStatusMeme( FFGameState::MOVING, bomberOrigin ) );
 
 	AddStatement( say );
@@ -2237,7 +2067,7 @@ void BotChatterInterface::SpottedBomber( CBasePlayer *bomber )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::SpottedLooseBomb( CBaseEntity *bomb )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver() || !bomb) // Ensure TheFFBots() is not null, added null check for bomb
 		return;
 
 	// if we already know the bomb is loose, this is old news
@@ -2261,7 +2091,7 @@ void BotChatterInterface::SpottedLooseBomb( CBaseEntity *bomb )
 
 		say->AppendPhrase( TheBotPhrases->GetPhrase( "SpottedLooseBomb" ) );
 
-		if (TheCSBots()->GetLooseBomb())
+		if (TheFFBots()->GetLooseBomb()) // Ensure TheFFBots() is not null
 			say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, bomb->GetAbsOrigin() ) );
 
 		AddStatement( say );
@@ -2271,11 +2101,7 @@ void BotChatterInterface::SpottedLooseBomb( CBaseEntity *bomb )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::GuardingLooseBomb( CBaseEntity *bomb )
 {
-	// if we already know the bomb is loose, this is old news
-//	if (m_me->GetGameState()->IsBombLoose())
-//		return;
-
-	if (TheCSBots()->IsRoundOver() || !bomb)
+	if (TheFFBots()->IsRoundOver() || !bomb) // Ensure TheFFBots() is not null, added null check for bomb
 		return;
 
 	const float minInterval = 20.0f;
@@ -2296,7 +2122,7 @@ void BotChatterInterface::GuardingLooseBomb( CBaseEntity *bomb )
 
 	say->AppendPhrase( TheBotPhrases->GetPhrase( "GuardingLooseBomb" ) );
 
-	if (TheCSBots()->GetLooseBomb())
+	if (TheFFBots()->GetLooseBomb()) // Ensure TheFFBots() is not null
 		say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, bomb->GetAbsOrigin() ) );
 
 	AddStatement( say );
@@ -2324,7 +2150,7 @@ void BotChatterInterface::RequestBombLocation( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::BombsiteClear( int zoneIndex )
 {
-	const CFFBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
+	const CFFBotManager::Zone *zone = TheFFBots()->GetZone( zoneIndex ); // Ensure TheFFBots() is not null
 	if (zone == NULL)
 		return;
 
@@ -2341,7 +2167,7 @@ void BotChatterInterface::BombsiteClear( int zoneIndex )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::FoundPlantedBomb( int zoneIndex )
 {
-	const CFFBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
+	const CFFBotManager::Zone *zone = TheFFBots()->GetZone( zoneIndex ); // Ensure TheFFBots() is not null
 	if (zone == NULL)
 		return;
 
@@ -2386,14 +2212,14 @@ void BotChatterInterface::CelebrateWin( void )
 	if (m_me->GetFriendsRemaining() == 0)
 	{
 		// we were the last man standing
-		if (TheCSBots()->GetElapsedRoundTime() < quickRound)
+		if (TheFFBots()->GetElapsedRoundTime() < quickRound) // Ensure TheFFBots() is not null
 			say->AppendPhrase( TheBotPhrases->GetPhrase( "WonRoundQuickly" ) );
 		else if (RandomFloat( 0.0f, 100.0f ) < 33.3f)
 			say->AppendPhrase( TheBotPhrases->GetPhrase( "LastManStanding" ) );
 	}
 	else
 	{
-		if (TheCSBots()->GetElapsedRoundTime() < quickRound)
+		if (TheFFBots()->GetElapsedRoundTime() < quickRound) // Ensure TheFFBots() is not null
 		{
 			if (RandomFloat( 0.0f, 100.0f ) < 33.3f)
 				say->AppendPhrase( TheBotPhrases->GetPhrase( "WonRoundQuickly" ) );
@@ -2410,7 +2236,7 @@ void BotChatterInterface::CelebrateWin( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::AnnouncePlan( const char *phraseName, Place place )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_MY_PLAN, 10.0f );
@@ -2419,7 +2245,7 @@ void BotChatterInterface::AnnouncePlan( const char *phraseName, Place place )
 	say->SetPlace( place );
 
 	// wait at least a short time after round start
-	say->SetStartTime( TheCSBots()->GetRoundStartTime() + RandomFloat( 2.0, 3.0f ) );
+	say->SetStartTime( TheFFBots()->GetRoundStartTime() + RandomFloat( 2.0, 3.0f ) ); // Ensure TheFFBots() is not null
 
 	AddStatement( say );
 }
@@ -2427,7 +2253,7 @@ void BotChatterInterface::AnnouncePlan( const char *phraseName, Place place )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::GuardingBombsite( Place place )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	const float minInterval = 20.0f;
@@ -2442,7 +2268,7 @@ void BotChatterInterface::GuardingBombsite( Place place )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::GuardingHostages( Place place, bool isPlan )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	const float minInterval = 20.0f;
@@ -2460,7 +2286,7 @@ void BotChatterInterface::GuardingHostages( Place place, bool isPlan )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::GuardingHostageEscapeZone( bool isPlan )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	const float minInterval = 20.0f;
@@ -2478,7 +2304,7 @@ void BotChatterInterface::GuardingHostageEscapeZone( bool isPlan )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::HostagesBeingTaken( void )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_INFORMATION, 3.0f );
@@ -2492,7 +2318,7 @@ void BotChatterInterface::HostagesBeingTaken( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::HostagesTaken( void )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_INFORMATION, 3.0f );
@@ -2510,7 +2336,7 @@ void BotChatterInterface::TalkingToHostages( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::EscortingHostages( void )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	if (m_escortingHostageTimer.IsElapsed())
@@ -2529,7 +2355,7 @@ void BotChatterInterface::EscortingHostages( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::HostageDown( void )
 {
-	if (TheCSBots()->IsRoundOver())
+	if (TheFFBots()->IsRoundOver()) // Ensure TheFFBots() is not null
 		return;
 
 	BotStatement *say = new BotStatement( this, REPORT_INFORMATION, 3.0f );

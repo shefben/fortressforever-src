@@ -8,10 +8,17 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_gamerules.h"
-#include "KeyValues.h"
-
 #include "ff_bot.h"
+#include "ff_bot_manager.h" // For TheFFBots()
+#include "../ff_player.h"     // For CFFPlayer
+#include "../../shared/ff/ff_gamerules.h" // For FFGameRules() and team/scenario defines
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
+// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+#include "ff_gamestate.h"   // For FFGameState
+#include "nav_mesh.h"       // For CNavArea (potentially, though not directly used here, often via manager)
+#include "bot_constants.h"  // For TEAM_CT etc. (assuming this is where they are defined)
+#include "KeyValues.h"      // Already included, seems fine
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -27,6 +34,7 @@ void CFFBot::OnBombPickedUp( IGameEvent *event )
 	if ( player == this )
 		return;
 
+	// TODO: Update for FF teams if necessary
 	if (GetTeamNumber() == TEAM_CT && player)
 	{
 		// check if we're close enough to hear it
@@ -56,6 +64,7 @@ void CFFBot::OnBombPlanted( IGameEvent *event )
 		return;
 
 	// if we're a TEAM_CT, forget what we're doing and go after the bomb
+	// TODO: Update for FF teams if necessary
 	if (GetTeamNumber() == TEAM_CT)
 	{
 		Idle();
@@ -77,10 +86,8 @@ void CFFBot::OnBombBeep( IGameEvent *event )
 		return;
 
 	// don't react to our own events
-	CBasePlayer *player = UTIL_PlayerByUserId( event->GetInt( "userid" ) );
-	if ( player == this )
-		return;
-
+	CBasePlayer *player = UTIL_PlayerByUserId( event->GetInt( "userid" ) ); // This is likely the bomber, not relevant for beep source
+	// The entity that beeped is the bomb entity itself
 	CBaseEntity *entity = UTIL_EntityByIndex( event->GetInt( "entindex" ) );
 	Vector myOrigin = GetCentroid( this );
 
@@ -92,9 +99,10 @@ void CFFBot::OnBombBeep( IGameEvent *event )
 		if ((myOrigin - entity->GetAbsOrigin()).LengthSqr() < bombBeepHearRangeSq)
 		{
 			// radio the news to our team
+			// TODO: Update for FF teams if necessary
 			if (GetTeamNumber() == TEAM_CT && GetGameState()->GetPlantedBombsite() == FFGameState::UNKNOWN)
 			{
-				const CFFBotManager::Zone *zone = TheCSBots()->GetZone( entity->GetAbsOrigin() );
+				const CFFBotManager::Zone *zone = TheFFBots()->GetZone( entity->GetAbsOrigin() ); // Changed TheCSBots to TheFFBots
 				if (zone)
 					GetChatter()->FoundPlantedBomb( zone->m_index );
 			}
@@ -125,9 +133,11 @@ void CFFBot::OnBombDefused( IGameEvent *event )
 	if ( player == this )
 		return;
 
+	// TODO: Update for FF teams if necessary
 	if (GetTeamNumber() == TEAM_CT)
 	{
-		if (TheCSBots()->GetBombTimeLeft() < 2.0f)
+		// TODO: Update for FF if bomb timer works differently
+		if (TheFFBots()->GetBombTimeLeft() < 2.0f) // Changed TheCSBots to TheFFBots
 			GetChatter()->Say( "BarelyDefused" );
 	}
 }

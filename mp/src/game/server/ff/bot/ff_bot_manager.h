@@ -10,24 +10,34 @@
 #ifndef FF_BOT_MANAGER_H
 #define FF_BOT_MANAGER_H
 
-
-#include "bot_manager.h"
-#include "nav_area.h"
+#include "bot_manager.h" // Base class
+#include "nav_area.h"    // For CNavArea, Extent
 #include "bot_util.h"
 #include "bot_profile.h"
-#include "cs_shareddefs.h"
-#include "ff_player.h"
+#include "../../shared/ff/ff_shareddefs.h" // Changed from cs_shareddefs.h
+#include "../ff_player.h"                   // Changed path
+#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase
+#include "bot_constants.h"  // For TEAM_TERRORIST, TEAM_CT, RadioType, BotDifficultyType, FFWeaponType (was CSWeaponType) etc.
+#include "igameevents.h"    // For IGameEventListener2
 
-extern ConVar friendlyfire;
+extern ConVar friendlyfire; // This should be fine if it's a global convar
+extern ConVar cv_bot_difficulty; // Already used, ensure it's declared elsewhere or here
+extern ConVar mp_freezetime; // Used in RestartRound, ensure it's declared
 
-class CBasePlayerWeapon; // In Fortress Forever, weapons may not derive from CFFWeaponBase directly.
+// Forward declarations
+class CFFBot; // Forward declare CFFBot, as CFFBotManager iterates/manages them
+class CBasePlayerWeapon;
+class IGameEvent;
+class CCommand;
+
 
 /**
  * Given one team, return the other
  */
+// TODO: Update for FF Teams if they differ from CS:S TEAM_TERRORIST/TEAM_CT
 inline int OtherTeam( int team )
 {
-	return (team == TEAM_TERRORIST) ? TEAM_CT : TEAM_TERRORIST;
+	return (team == TEAM_TERRORIST) ? TEAM_CT : TEAM_TERRORIST; // TEAM_TERRORIST and TEAM_CT need to be FF enums
 }
 
 class CFFBotManager;
@@ -35,7 +45,7 @@ class CFFBotManager;
 // accessor for FF-specific bots
 inline CFFBotManager *TheFFBots( void )
 {
-	return reinterpret_cast< CFFBotManager * >( TheBots );
+	return reinterpret_cast< CFFBotManager * >( TheBots ); // TheBots is the global CBotManager instance
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -43,6 +53,7 @@ class BotEventInterface : public IGameEventListener2
 {
 public:
 	virtual const char *GetEventName( void ) const = 0;
+	// FireGameEvent is part of IGameEventListener2, no need to redefine unless overriding
 };
 
 //--------------------------------------------------------------------------------------------------------------
@@ -58,33 +69,38 @@ public:
 	{ \
 		bool m_enabled; \
 	public: \
-		EventClass##Event( void ) \
+		EventClass##Event( CFFBotManager* pMgr ) /* Pass manager to constructor */ \
 		{ \
-			gameeventmanager->AddListener( this, #EventName, true ); \
+			gameeventmanager->AddListener( pMgr->Get##EventClass##Listener(), #EventName, true ); \
 			m_enabled = true; \
 		} \
 		~EventClass##Event( void ) \
 		{ \
-			if ( m_enabled ) gameeventmanager->RemoveListener( this ); \
+			/* if ( m_enabled && gameeventmanager ) gameeventmanager->RemoveListener( this ); */ \
+			/* Removal should be handled by manager or a more robust system */ \
 		} \
 		virtual const char *GetEventName( void ) const \
 		{ \
 			return #EventName; \
 		} \
-		void Enable( bool enable ) \
+		void Enable( bool enable, CFFBotManager* pMgr ) \
 		{ \
 			m_enabled = enable; \
+			if (!gameeventmanager) return; \
 			if ( enable ) \
-				gameeventmanager->AddListener( this, #EventName, true ); \
+				gameeventmanager->AddListener( pMgr->Get##EventClass##Listener(), #EventName, true ); \
 			else \
-				gameeventmanager->RemoveListener( this ); \
+				gameeventmanager->RemoveListener( pMgr->Get##EventClass##Listener() ); \
 		} \
 		bool IsEnabled( void ) const { return m_enabled; } \
-		void FireGameEvent( IGameEvent *event ) \
+		/* FireGameEvent is inherited from IGameEventListener2 */ \
+		/* void FireGameEvent( IGameEvent *event ) \
 		{ \
 			BotManagerSingleton()->On##EventClass( event ); \
-		} \
+		} \ */ \
 	}; \
+	friend class EventClass##Event; /* Allow access to Get##EventClass##Listener */ \
+	EventClass##Event* Get##EventClass##Listener() { return &m_##EventClass##Event; } \
 	EventClass##Event m_##EventClass##Event;
 
 
@@ -118,8 +134,9 @@ class CFFBotManager : public CBotManager
 {
 public:
 	CFFBotManager();
+	// ~CFFBotManager() override; // If virtual destructor is needed
 
-	virtual CBasePlayer *AllocateBotEntity( void );			///< factory method to allocate the appropriate entity for the bot
+	virtual CBasePlayer *AllocateBotEntity( void );
 
 	virtual void ClientDisconnect( CBaseEntity *entity );
 	virtual bool ClientCommand( CBasePlayer *player, const CCommand &args );
@@ -129,213 +146,152 @@ public:
 	virtual bool ServerCommand( const char *cmd );
 	bool IsServerActive( void ) const { return m_serverActive; }
 
-	virtual void RestartRound( void );						///< (EXTEND) invoked when a new round begins
-	virtual void StartFrame( void );						///< (EXTEND) called each frame
+	virtual void RestartRound( void );
+	virtual void StartFrame( void );
 
-	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const;	///< return priority of player (0 = max pri)
-	virtual bool IsImportantPlayer( CFFPlayer *player ) const;				///< return true if player is important to scenario (VIP, bomb carrier, etc)
+	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const;
+	virtual bool IsImportantPlayer( CFFPlayer *player ) const; // TODO: Adapt for FF roles
 
-	void ExtractScenarioData( void );							///< search the map entities to determine the game scenario and define important zones
+	void ExtractScenarioData( void );
 
-	// difficulty levels -----------------------------------------------------------------------------------------
-	static BotDifficultyType GetDifficultyLevel( void )		
-	{ 
-		if (cv_bot_difficulty.GetFloat() < 0.9f)
-			return BOT_EASY;
-		if (cv_bot_difficulty.GetFloat() < 1.9f)
-			return BOT_NORMAL;
-		if (cv_bot_difficulty.GetFloat() < 2.9f)
-			return BOT_HARD;
+	static BotDifficultyType GetDifficultyLevel( void );
 
-		return BOT_EXPERT;
-	}
-
-	// the supported game scenarios ------------------------------------------------------------------------------
+	// TODO: Update GameScenarioType for FF (CTF, CP, Arena, etc.)
 	enum GameScenarioType
 	{
-		SCENARIO_DEATHMATCH,
-		SCENARIO_DEFUSE_BOMB,
-		SCENARIO_RESCUE_HOSTAGES,
-		SCENARIO_ESCORT_VIP
+		SCENARIO_DEATHMATCH,    // Or Arena?
+		SCENARIO_CAPTURETHEFLAG,
+		SCENARIO_CONTROLPOINT,
+		// SCENARIO_DEFUSE_BOMB,    // CS Specific
+		// SCENARIO_RESCUE_HOSTAGES, // CS Specific
+		// SCENARIO_ESCORT_VIP       // CS Specific
+		SCENARIO_INVADE // Example for FF:Invade
 	};
 	GameScenarioType GetScenario( void ) const		{ return m_gameScenario; }
 
-	// "zones" ---------------------------------------------------------------------------------------------------
-	// depending on the game mode, these are bomb zones, rescue zones, etc.
-
-	enum { MAX_ZONES = 4 };										///< max # of zones in a map
-	enum { MAX_ZONE_NAV_AREAS = 16 };							///< max # of nav areas in a zone
+	// "zones" - adaptable for objectives like capture points, flag stands
+	enum { MAX_ZONES = 8 }; // Increased for potentially more complex FF maps
+	enum { MAX_ZONE_NAV_AREAS = 32 }; // Increased
 	struct Zone
 	{
-		CBaseEntity *m_entity;									///< the map entity
-		CNavArea *m_area[ MAX_ZONE_NAV_AREAS ];					///< nav areas that overlap this zone
+		CBaseEntity *m_entity;
+		CNavArea *m_area[ MAX_ZONE_NAV_AREAS ];
 		int m_areaCount;
 		Vector m_center;
-		bool m_isLegacy;										///< if true, use pev->origin and 256 unit radius as zone
+		// bool m_isLegacy; // May not be relevant for FF
 		int m_index;
 		bool m_isBlocked;
 		Extent m_extent;
+		// FF specific zone data:
+		// int m_owningTeam; // TEAM_RED, TEAM_BLUE, TEAM_NEUTRAL
+		// float m_captureProgress;
 	};
 
-	const Zone *GetZone( int i ) const				{ return &m_zone[i]; }
-	const Zone *GetZone( const Vector &pos ) const;				///< return the zone that contains the given position
-	const Zone *GetClosestZone( const Vector &pos ) const;		///< return the closest zone to the given position
-	const Zone *GetClosestZone( const CBaseEntity *entity ) const;	///< return the closest zone to the given entity
+	const Zone *GetZone( int i ) const;
+	const Zone *GetZone( const Vector &pos ) const;
+	const Zone *GetClosestZone( const Vector &pos ) const;
+	const Zone *GetClosestZone( const CBaseEntity *entity ) const;
 	int GetZoneCount( void ) const					{ return m_zoneCount; }
 	void CheckForBlockedZones( void );
 
 
-	const Vector *GetRandomPositionInZone( const Zone *zone ) const;	///< return a random position inside the given zone
-	CNavArea *GetRandomAreaInZone( const Zone *zone ) const;			///< return a random area inside the given zone
+	const Vector *GetRandomPositionInZone( const Zone *zone ) const;
+	CNavArea *GetRandomAreaInZone( const Zone *zone ) const;
 
-	/**
-	 * Return the zone closest to the given position, using the given cost heuristic
-	 */
 	template< typename CostFunctor >
-	const Zone *GetClosestZone( CNavArea *startArea, CostFunctor costFunc, float *travelDistance = NULL ) const
-	{
-		const Zone *closeZone = NULL;
-		float closeDist = 99999999.9f;
+	const Zone *GetClosestZone( CNavArea *startArea, CostFunctor costFunc, float *travelDistance = NULL ) const;
 
-		if (startArea == NULL)
-			return NULL;
+	const Zone *GetRandomZone( void ) const;
 
-		for( int i=0; i<m_zoneCount; ++i )
-		{
-			if (m_zone[i].m_areaCount == 0)
-				continue;
-
-			if ( m_zone[i].m_isBlocked )
-				continue;
-
-			// just use the first overlapping nav area as a reasonable approximation
-			float dist = NavAreaTravelDistance( startArea, m_zone[i].m_area[0], costFunc );
-
-			if (dist >= 0.0f && dist < closeDist)
-			{
-				closeZone = &m_zone[i];
-				closeDist = dist;
-			}
-		}
-
-		if (travelDistance)
-			*travelDistance = closeDist;
-
-		return closeZone;
-	}
-
-	/// pick a zone at random and return it
-	const Zone *GetRandomZone( void ) const
-	{
-		if (m_zoneCount == 0)
-			return NULL;
-
-		int i;
-		CUtlVector< const Zone * > unblockedZones;
-		for ( i=0; i<m_zoneCount; ++i )
-		{
-			if ( m_zone[i].m_isBlocked )
-				continue;
-
-			unblockedZones.AddToTail( &(m_zone[i]) );
-		}
-
-		if ( unblockedZones.Count() == 0 )
-			return NULL;
-
-		return unblockedZones[ RandomInt( 0, unblockedZones.Count()-1 ) ];
-	}
+	CBaseEntity *GetRandomSpawn( int team = 0 ) const; // team = 0 for any, or FF team numbers
 
 
-	/// returns a random spawn point for the given team (no arg means use both team spawnpoints)
-	CBaseEntity *GetRandomSpawn( int team = TEAM_MAXCOUNT ) const;
-
-
-	bool IsBombPlanted( void ) const			{ return m_isBombPlanted; }			///< returns true if bomb has been planted
-	float GetBombPlantTimestamp( void ) const	{ return m_bombPlantTimestamp; }	///< return time bomb was planted
-	bool IsTimeToPlantBomb( void ) const;											///< return true if it's ok to try to plant bomb
-	CFFPlayer *GetBombDefuser( void ) const		{ return m_bombDefuser; }			///< return the player currently defusing the bomb, or NULL
-	float GetBombTimeLeft( void ) const;											///< get the time remaining before the planted bomb explodes
-	CBaseEntity *GetLooseBomb( void )			{ return m_looseBomb; }				///< return the bomb if it is loose on the ground
-	CNavArea *GetLooseBombArea( void ) const	{ return m_looseBombArea; }			///< return area that bomb is in/near
+	// TODO: Bomb-specific logic needs removal or heavy adaptation for FF objectives
+	bool IsBombPlanted( void ) const			{ return m_isBombPlanted; }
+	float GetBombPlantTimestamp( void ) const	{ return m_bombPlantTimestamp; }
+	bool IsTimeToPlantBomb( void ) const;
+	CFFPlayer *GetBombDefuser( void ) const		{ return m_bombDefuser; }
+	float GetBombTimeLeft( void ) const;
+	CBaseEntity *GetLooseBomb( void )			{ return m_looseBomb; }
+	CNavArea *GetLooseBombArea( void ) const	{ return m_looseBombArea; }
 	void SetLooseBomb( CBaseEntity *bomb );
 
 
-	float GetRadioMessageTimestamp( RadioType event, int teamID ) const;			///< return the last time the given radio message was sent for given team
-	float GetRadioMessageInterval( RadioType event, int teamID ) const;				///< return the interval since the last time this message was sent
+	float GetRadioMessageTimestamp( RadioType event, int teamID ) const;
+	float GetRadioMessageInterval( RadioType event, int teamID ) const;
 	void SetRadioMessageTimestamp( RadioType event, int teamID );
 	void ResetRadioMessageTimestamps( void );
 
-	float GetLastSeenEnemyTimestamp( void ) const	{ return m_lastSeenEnemyTimestamp; }	///< return the last time anyone has seen an enemy
+	float GetLastSeenEnemyTimestamp( void ) const	{ return m_lastSeenEnemyTimestamp; }
 	void SetLastSeenEnemyTimestamp( void ) 			{ m_lastSeenEnemyTimestamp = gpGlobals->curtime; }
 
 	float GetRoundStartTime( void ) const			{ return m_roundStartTimestamp; }
-	float GetElapsedRoundTime( void ) const			{ return gpGlobals->curtime - m_roundStartTimestamp; }	///< return the elapsed time since the current round began
+	float GetElapsedRoundTime( void ) const			{ return gpGlobals->curtime - m_roundStartTimestamp; }
 
-	bool AllowRogues( void ) const					{ return cv_bot_allow_rogues.GetBool(); }
-	bool AllowPistols( void ) const					{ return cv_bot_allow_pistols.GetBool(); }
-	bool AllowShotguns( void ) const				{ return cv_bot_allow_shotguns.GetBool(); }
-	bool AllowSubMachineGuns( void ) const			{ return cv_bot_allow_sub_machine_guns.GetBool(); }
-	bool AllowRifles( void ) const					{ return cv_bot_allow_rifles.GetBool(); }
-	bool AllowMachineGuns( void ) const				{ return cv_bot_allow_machine_guns.GetBool(); }
-	bool AllowGrenades( void ) const				{ return cv_bot_allow_grenades.GetBool(); }
-	bool AllowSnipers( void ) const					{ return cv_bot_allow_snipers.GetBool(); }
-#ifdef CS_SHIELD_ENABLED
-	bool AllowTacticalShield( void ) const			{ return cv_bot_allow_shield.GetBool(); }
-#else
-	bool AllowTacticalShield( void ) const			{ return false; }
-#endif // CS_SHIELD_ENABLED
+	bool AllowRogues( void ) const;
+	bool AllowPistols( void ) const;
+	bool AllowShotguns( void ) const;
+	bool AllowSubMachineGuns( void ) const;
+	bool AllowRifles( void ) const;
+	bool AllowMachineGuns( void ) const;
+	bool AllowGrenades( void ) const;
+	bool AllowSnipers( void ) const;
+	// bool AllowTacticalShield( void ) const; // CS Specific
 
-	bool AllowFriendlyFireDamage( void ) const		{ return friendlyfire.GetBool(); }
+	bool AllowFriendlyFireDamage( void ) const;
 
-	bool IsWeaponUseable( const CFFWeaponBase *weapon ) const;	///< return true if the bot can use this weapon
+	bool IsWeaponUseable( const CFFWeaponBase *weapon ) const;
 
-	bool IsDefenseRushing( void ) const				{ return m_isDefenseRushing; }		///< returns true if defense team has "decided" to rush this round
-	bool IsOnDefense( const CFFPlayer *player ) const;		///< return true if this player is on "defense"
-	bool IsOnOffense( const CFFPlayer *player ) const;		///< return true if this player is on "offense"
+	bool IsDefenseRushing( void ) const				{ return m_isDefenseRushing; }
+	bool IsOnDefense( const CFFPlayer *player ) const;
+	bool IsOnOffense( const CFFPlayer *player ) const;
 
-	bool IsRoundOver( void ) const					{ return m_isRoundOver; }		///< return true if the round has ended
+	bool IsRoundOver( void ) const					{ return m_isRoundOver; }
 
-	#define FROM_CONSOLE true
-	bool BotAddCommand( int team, bool isFromConsole = false, const char *profileName = NULL, CSWeaponType weaponType = WEAPONTYPE_UNKNOWN, BotDifficultyType difficulty = NUM_DIFFICULTY_LEVELS );	///< process the "bot_add" console command
+	// TODO: Update CSWeaponType to FFWeaponType
+	bool BotAddCommand( int team, bool isFromConsole = false, const char *profileName = NULL, /*CSWeaponType*/ FFWeaponType weaponType = WEAPONTYPE_UNDEFINED, BotDifficultyType difficulty = NUM_DIFFICULTY_LEVELS );
 
 private:
-	enum SkillType { LOW, AVERAGE, HIGH, RANDOM };
+	// enum SkillType { LOW, AVERAGE, HIGH, RANDOM }; // Already in bot_profile.h likely
 
 	void MaintainBotQuota( void );
 
-	static bool m_isMapDataLoaded;							///< true if we've attempted to load map data
-	bool m_serverActive;									///< true between ServerActivate() and ServerDeactivate()
+	static bool m_isMapDataLoaded;
+	bool m_serverActive;
 
-	GameScenarioType m_gameScenario;						///< what kind of game are we playing
+	GameScenarioType m_gameScenario;
 
 	Zone m_zone[ MAX_ZONES ];							
 	int m_zoneCount;
 
-	bool m_isBombPlanted;									///< true if bomb has been planted
-	float m_bombPlantTimestamp;								///< time bomb was planted
-	float m_earliestBombPlantTimestamp;						///< don't allow planting until after this time has elapsed
-	CFFPlayer *m_bombDefuser;								///< the player currently defusing a bomb
-	EHANDLE m_looseBomb;									///< will be non-NULL if bomb is loose on the ground
-	CNavArea *m_looseBombArea;								///< area that bomb is is/near
+	// TODO: Bomb-specific members, adapt/remove for FF
+	bool m_isBombPlanted;
+	float m_bombPlantTimestamp;
+	float m_earliestBombPlantTimestamp;
+	CHandle<CFFPlayer> m_bombDefuser; // Changed to CHandle
+	CHandle<CBaseEntity> m_looseBomb; // Changed to CHandle
+	CNavArea *m_looseBombArea;
 
-	bool m_isRoundOver;										///< true if the round has ended
+	bool m_isRoundOver;
 
-	CountdownTimer m_checkTransientAreasTimer;				///< when elapsed, all transient nav areas should be checked for blockage
+	CountdownTimer m_checkTransientAreasTimer;
 
-	float m_radioMsgTimestamp[ RADIO_END - RADIO_START_1 ][ 2 ];
+	// TODO: RADIO_END and RADIO_START_1 are CS specific. Adapt for FF radio events.
+	float m_radioMsgTimestamp[ BOT_RADIO_COUNT ][ 2 ]; // BOT_RADIO_COUNT should be FF specific
 
 	float m_lastSeenEnemyTimestamp;
-	float m_roundStartTimestamp;							///< the time when the current round began
+	float m_roundStartTimestamp;
 
-	bool m_isDefenseRushing;								///< whether defensive team is rushing this round or not
+	bool m_isDefenseRushing;
 
 	// Event Handlers --------------------------------------------------------------------------------------------
+	// TODO: Update event names for FF if they differ from CS
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
 
+	// TODO: Bomb events are CS specific. Replace with FF objective events.
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombPickedUp,			bomb_pickup )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombPlanted,			bomb_planted )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombBeep,				bomb_beep )
@@ -353,6 +309,7 @@ private:
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
 
+	// TODO: Hostage events are CS specific.
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HostageFollows,		hostage_follows )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HostageRescuedAll,		hostage_rescued_all )
 
@@ -363,6 +320,7 @@ private:
 
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
 
+	// TODO: Grenade event names might differ for FF
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FlashbangDetonate,		flashbang_detonate )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SmokeGrenadeDetonate,	smokegrenade_detonate )
@@ -372,28 +330,33 @@ private:
 
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
 
-	CUtlVector< BotEventInterface * > m_commonEventListeners;	// These event listeners fire often, and can be disabled for performance gains when no bots are present.
+	// TODO: Add FF specific event listeners (flag_capture, point_captured, etc.)
+
+
+	CUtlVector< BotEventInterface * > m_commonEventListeners;
 	bool m_eventListenersEnabled;
 	void EnableEventListeners( bool enable );
 };
 
 inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )
 {
-	return static_cast<CBasePlayer *>( CreateEntityByName( "ff_bot" ) ); // Changed cs_bot to ff_bot
+	return static_cast<CBasePlayer *>( CreateEntityByName( "ff_bot" ) );
 }
 
+// TODO: Bomb logic needs FF adaptation
 inline bool CFFBotManager::IsTimeToPlantBomb( void ) const
 {
 	return (gpGlobals->curtime >= m_earliestBombPlantTimestamp);
 }
 
+// TODO: HalfHumanHeight needs to be defined
 inline const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const CBaseEntity *entity ) const
 {
 	if (entity == NULL)
 		return NULL;
 
 	Vector centroid = entity->GetAbsOrigin();
-	centroid.z += HalfHumanHeight;
+	// centroid.z += HalfHumanHeight; // This might not be needed if GetClosestZone uses center
 	return GetClosestZone( centroid );
 }
 
