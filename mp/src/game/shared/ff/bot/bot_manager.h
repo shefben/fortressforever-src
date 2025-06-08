@@ -12,18 +12,26 @@
 
 #pragma warning( disable : 4530 )					// STL uses exceptions, but we are not compiling with them - ignore warning
 
+// Ensure CBasePlayer is known, usually from cbase.h or player.h
+#include "cbaseplayer.h" // Or equivalent that defines CBasePlayer
+#include "utllinkedlist.h" // For CUtlLinkedList
+#include "usercmd.h"      // For CCommand
+#include "gamestringpool.h" // For IGameSystem
+#include "interval.h"     // For IntervalTimer
+
 extern float g_BotUpkeepInterval;					///< duration between bot upkeeps
 extern float g_BotUpdateInterval;					///< duration between bot updates
 const int g_BotUpdateSkipCount = 2;					///< number of upkeep periods to skip update
 
-class CNavArea;
+class CNavArea; // Forward declaration
 
-/// TODO: move CS-specific defines into CSBot files
-enum
+// FF_TODO: Review these grenade constants. They might be CS-specific.
+// If FF has different grenade types or radii, these need to be adapted or made generic.
+enum DefaultGrenadeRadii // Renamed for clarity if these are defaults
 {
-	SmokeGrenadeRadius = 155,
-	FlashbangGrenadeRadius = 115,
-	HEGrenadeRadius = 115,
+	DEFAULT_HEGrenadeRadius = 115, // Assuming this might be a generic explosive radius
+	DEFAULT_SmokeGrenadeRadius = 155,
+	DEFAULT_FlashbangGrenadeRadius = 115
 };
 
 //--------------------------------------------------------------------------------------------------------------
@@ -31,17 +39,15 @@ class CBaseGrenade;
 
 /**
  * An ActiveGrenade is a representation of a grenade in the world
- * NOTE: Currently only used for smoke grenade line-of-sight testing
- * @todo Use system allow bots to avoid HE and Flashbangs
  */
 class ActiveGrenade
 {
 public:
 	ActiveGrenade( CBaseGrenade *grenadeEntity );
 
-	void OnEntityGone( void );								///< called when the grenade in the world goes away
-	void Update( void );									///< called every frame
-	bool IsValid( void ) const	;							///< return true if this grenade is valid
+	void OnEntityGone( void );
+	void Update( void );
+	bool IsValid( void ) const	;
 	
 	bool IsEntity( CBaseGrenade *grenade ) const		{ return (grenade == m_entity) ? true : false; }
 	CBaseGrenade *GetEntity( void ) const				{ return m_entity; }
@@ -55,11 +61,11 @@ public:
 	void SetRadius( float radius ) { m_radius = radius; }
 
 private:
-	CBaseGrenade *m_entity;									///< the entity
-	Vector m_detonationPosition;							///< the location where the grenade detonated (smoke)
-	float m_dieTimestamp;									///< time this should go away after m_entity is NULL
-	bool m_isSmoke;											///< true if this is a smoke grenade
-	bool m_isFlashbang;										///< true if this is a flashbang grenade
+	CHandle<CBaseGrenade> m_entity; // Changed to EHANDLE for safety
+	Vector m_detonationPosition;
+	float m_dieTimestamp;
+	bool m_isSmoke;
+	bool m_isFlashbang;
 	float m_radius;
 };
 
@@ -70,14 +76,14 @@ typedef CUtlLinkedList<ActiveGrenade *> ActiveGrenadeList;
 /**
  * This class manages all active bots, propagating events to them and updating them.
  */
-class CBotManager
+class CBotManager : public IGameSystem // For AddDebugMessage to be compatible with engine
 {
 public:
 	CBotManager();
 	virtual ~CBotManager();
 
-	CBasePlayer *AllocateAndBindBotEntity( edict_t *ed );			///< allocate the appropriate entity for the bot and bind it to the given edict
-	virtual CBasePlayer *AllocateBotEntity( void ) = 0;				///< factory method to allocate the appropriate entity for the bot 
+	CBasePlayer *AllocateAndBindBotEntity( edict_t *ed );
+	virtual CBasePlayer *AllocateBotEntity( void ) = 0;
 
 	virtual void ClientDisconnect( CBaseEntity *entity ) = 0;
 	virtual bool ClientCommand( CBasePlayer *player, const CCommand &args ) = 0;
@@ -86,52 +92,32 @@ public:
 	virtual void ServerDeactivate( void ) = 0;
 	virtual bool ServerCommand( const char * pcmd ) = 0;
 
-	virtual void RestartRound( void );							///< (EXTEND) invoked when a new round begins
-	virtual void StartFrame( void );							///< (EXTEND) called each frame
+	virtual void RestartRound( void );
+	virtual void StartFrame( void );
 
-	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const = 0;	///< return priority of player (0 = max pri)
+	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const = 0;
 	
 
-	void AddGrenade( CBaseGrenade *grenade );					///< add an active grenade to the bot's awareness
-	void RemoveGrenade( CBaseGrenade *grenade );				///< the grenade entity in the world is going away
-	void SetGrenadeRadius( CBaseGrenade *grenade, float radius );	///< the radius of the grenade entity (or associated smoke cloud)
-	void ValidateActiveGrenades( void );						///< destroy any invalid active grenades
+	void AddGrenade( CBaseGrenade *grenade );
+	void RemoveGrenade( CBaseGrenade *grenade );
+	void SetGrenadeRadius( CBaseGrenade *grenade, float radius );
+	void ValidateActiveGrenades( void );
 	void DestroyAllGrenades( void );
-	bool IsLineBlockedBySmoke( const Vector &from, const Vector &to, float grenadeBloat = 1.0f );	///< return true if line intersects smoke volume, with grenade radius increased by the grenadeBloat factor
-	bool IsInsideSmokeCloud( const Vector *pos );				///< return true if position is inside a smoke cloud
+	bool IsLineBlockedBySmoke( const Vector &from, const Vector &to, float grenadeBloat = 1.0f );
+	bool IsInsideSmokeCloud( const Vector *pos );
 
-	//
-	// Invoke functor on all active grenades.
-	// If any functor call return false, return false.  Otherwise, return true.
-	//
 	template < typename T >
 	bool ForEachGrenade( T &func )
 	{
 		int it = m_activeGrenadeList.Head();
-
 		while( it != m_activeGrenadeList.InvalidIndex() )
 		{
 			ActiveGrenade *ag = m_activeGrenadeList[ it ];
-
 			int current = it;
 			it = m_activeGrenadeList.Next( it );
-
-			// lazy validation
-			if (!ag->IsValid())
-			{
-				m_activeGrenadeList.Remove( current );
-				delete ag;
-				continue;
-			}
-			else
-			{
-				if (func( ag ) == false)
-				{
-					return false;
-				}
-			}
+			if (!ag->IsValid()) { m_activeGrenadeList.Remove( current ); delete ag; continue; }
+			else { if (func( ag ) == false) return false; }
 		}
-
 		return true;
 	}
 
@@ -142,28 +128,27 @@ public:
 		IntervalTimer m_age;
 	};
 
-	// debug message history -------------------------------------------------------------------------------
-	int GetDebugMessageCount( void ) const;						///< get number of debug messages in history
-	const DebugMessage *GetDebugMessage( int which = 0 ) const;	///< return the debug message emitted by the bot (0 = most recent)
+	int GetDebugMessageCount( void ) const;
+	const DebugMessage *GetDebugMessage( int which = 0 ) const;
 	void ClearDebugMessages( void );
 	void AddDebugMessage( const char *msg );
 
 
 private:
-	ActiveGrenadeList m_activeGrenadeList;///< the list of active grenades the bots are aware of
+	ActiveGrenadeList m_activeGrenadeList;
 
 	enum { MAX_DBG_MSGS = 6 };
-	DebugMessage m_debugMessage[ MAX_DBG_MSGS ];				///< debug message history
+	DebugMessage m_debugMessage[ MAX_DBG_MSGS ];
 	int m_debugMessageCount;
 	int m_currentDebugMessage;
 
-	IntervalTimer m_frameTimer;									///< for measuring each frame's duration
+	IntervalTimer m_frameTimer;
 };
 
 
 inline CBasePlayer *CBotManager::AllocateAndBindBotEntity( edict_t *ed )
 {
-	CBasePlayer::s_PlayerEdict = ed;
+	CBaseEntity::s_Edict = ed; // Correct way to set edict for allocation
 	return AllocateBotEntity();
 }
 
@@ -174,22 +159,14 @@ inline int CBotManager::GetDebugMessageCount( void ) const
 
 inline const CBotManager::DebugMessage *CBotManager::GetDebugMessage( int which ) const
 {
-	if (which >= m_debugMessageCount)
+	if (which >= m_debugMessageCount || which < 0) // Added bounds check
 		return NULL;
 
-	int i = m_currentDebugMessage - which;
-	if (i < 0)
-		i += MAX_DBG_MSGS;
+	int i = (m_currentDebugMessage - which + MAX_DBG_MSGS) % MAX_DBG_MSGS; // Ensure positive index
 
 	return &m_debugMessage[ i ];
 }
 
-
-
-
-
-// global singleton to create and control bots
 extern CBotManager *TheBots;
-
 
 #endif

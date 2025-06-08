@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), April 2005
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "../ff_bot.h" // Changed from cs_bot.h
 #include "BasePropDoor.h"
 #include "doors.h"
 
@@ -21,7 +21,7 @@
  * Face the door and open it.
  * NOTE: This state assumes we are standing in range of the door to be opened, with no obstructions.
  */
-void OpenDoorState::OnEnter( CCSBot *me )
+void OpenDoorState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	m_isDone = false;
 	m_timeout.Start( 1.0f );
@@ -48,7 +48,7 @@ void OpenDoorState::SetDoor( CBaseEntity *door )
 
 
 //-------------------------------------------------------------------------------------------------
-void OpenDoorState::OnUpdate( CCSBot *me )
+void OpenDoorState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	me->ResetStuckMonitor();
 
@@ -61,17 +61,23 @@ void OpenDoorState::OnUpdate( CCSBot *me )
 
 	// look at the door
 	Vector pos;
-	bool isDoorMoving = false;
+	// bool isDoorMoving = false; // This variable is not used
 	if ( m_funcDoor )
 	{
 		pos = m_funcDoor->WorldSpaceCenter();
-		isDoorMoving = m_funcDoor->m_toggle_state == TS_GOING_UP || m_funcDoor->m_toggle_state == TS_GOING_DOWN;
+		// isDoorMoving = m_funcDoor->m_toggle_state == TS_GOING_UP || m_funcDoor->m_toggle_state == TS_GOING_DOWN;
 	}
-	else
+	else if ( m_propDoor ) // Added else if to ensure one path is taken if m_funcDoor is null
 	{
 		pos = m_propDoor->WorldSpaceCenter();
-		isDoorMoving = m_propDoor->IsDoorOpening() || m_propDoor->IsDoorClosing();
+		// isDoorMoving = m_propDoor->IsDoorOpening() || m_propDoor->IsDoorClosing();
 	}
+	else // No valid door entity
+	{
+		m_isDone = true; // Can't operate on a NULL door handle
+		return;
+	}
+
 
 	me->SetLookAt( "Open door", pos, PRIORITY_HIGH );
 
@@ -84,11 +90,8 @@ void OpenDoorState::OnUpdate( CCSBot *me )
 
 
 //-------------------------------------------------------------------------------------------------
-void OpenDoorState::OnExit( CCSBot *me )
+void OpenDoorState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	me->ClearLookAt();
 	me->ResetStuckMonitor();
 }
-
-
-
