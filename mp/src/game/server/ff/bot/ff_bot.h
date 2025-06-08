@@ -15,14 +15,29 @@
 #ifndef _FF_BOT_H_
 #define _FF_BOT_H_
 
-#include "bot/bot.h"
-#include "bot/ff_bot_manager.h"
-#include "bot/ff_bot_chatter.h"
+#include "bot.h"
+#include "ff_bot_manager.h"
+#include "ff_bot_chatter.h"
 #include "ff_gamestate.h"
 #include "ff_player.h"
 #include "weapon_ffbase.h"
 #include "cs_nav_pathfind.h"
 #include "cs_nav_area.h"
+#include "states/ff_bot_state_idle.h"
+#include "states/ff_bot_state_attack.h"
+#include "states/ff_bot_state_hunt.h"
+#include "states/ff_bot_state_investigate_noise.h"
+#include "states/ff_bot_state_move_to.h"
+#include "states/ff_bot_state_buy.h"
+#include "states/ff_bot_state_hide.h"
+#include "states/ff_bot_state_follow.h"
+#include "states/ff_bot_state_fetch_bomb.h"
+#include "states/ff_bot_state_plant_bomb.h"
+#include "states/ff_bot_state_defuse_bomb.h"
+#include "states/ff_bot_state_escape_from_bomb.h"
+#include "states/ff_bot_state_use_entity.h"
+#include "states/ff_bot_state_open_door.h"
+
 
 class CBaseDoor;
 class CBasePropDoor;
@@ -55,315 +70,6 @@ public:
 	virtual void OnUpdate( CFFBot *bot ) { }			///< state behavior
 	virtual void OnExit( CFFBot *bot ) { }				///< when state exited
 	virtual const char *GetName( void ) const = 0;		///< return state name
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * The state is invoked when a bot has nothing to do, or has finished what it was doing.
- * A bot never stays in this state - it is the main action selection mechanism.
- */
-class IdleState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "Idle"; }
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is actively searching for an enemy.
- */
-class HuntState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "Hunt"; }
-
-	void ClearHuntArea( void )						{ m_huntArea = NULL; }
-
-private:
-	CNavArea *m_huntArea;										///< "far away" area we are moving to
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot has an enemy and is attempting to kill it
- */
-class AttackState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "Attack"; }
-	
-	void SetCrouchAndHold( bool crouch )			{ m_crouchAndHold = crouch; }
-
-protected:
-	enum DodgeStateType
-	{
-		STEADY_ON,
-		SLIDE_LEFT,
-		SLIDE_RIGHT,
-		JUMP,
-
-		NUM_ATTACK_STATES
-	};
-	DodgeStateType m_dodgeState;
-	float m_nextDodgeStateTimestamp;
-
-	CountdownTimer m_repathTimer;
-	float m_scopeTimestamp;
-
-	bool m_haveSeenEnemy;										///< false if we haven't yet seen the enemy since we started this attack (told by a friend, etc)
-	bool m_isEnemyHidden;										///< true we if we have lost line-of-sight to our enemy
-	float m_reacquireTimestamp;									///< time when we can fire again, after losing enemy behind cover
-	float m_shieldToggleTimestamp;								///< time to toggle shield deploy state
-	bool m_shieldForceOpen;										///< if true, open up and shoot even if in danger
-
-	float m_pinnedDownTimestamp;								///< time when we'll consider ourselves "pinned down" by the enemy
-
-	bool m_crouchAndHold;
-	bool m_didAmbushCheck;
-	bool m_shouldDodge;
-	bool m_firstDodge;
-
-	bool m_isCoward;											///< if true, we'll retreat if outnumbered during this fight
-	CountdownTimer m_retreatTimer;
-
-	void StopAttacking( CFFBot *bot );
-	void Dodge( CFFBot *bot );									///< do dodge behavior
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot has heard an enemy noise and is moving to find out what it was.
- */
-class InvestigateNoiseState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "InvestigateNoise"; }
-
-private:
-	void AttendCurrentNoise( CFFBot *bot );						///< move towards currently heard noise
-	Vector m_checkNoisePosition;								///< the position of the noise we're investigating
-	CountdownTimer m_minTimer;									///< minimum time we will investigate our current noise
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is buying equipment at the start of a round.
- */
-class BuyState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "Buy"; }
-
-private:
-	bool m_isInitialDelay;
-	int m_prefRetries;											///< for retrying buying preferred weapon at current index
-	int m_prefIndex;											///< where are we in our list of preferred weapons
-
-	int m_retries;
-	bool m_doneBuying;
-	bool m_buyDefuseKit;
-	bool m_buyGrenade;
-	bool m_buyShield;
-	bool m_buyPistol;
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is moving to a potentially far away position in the world.
- */
-class MoveToState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "MoveTo"; }
-	void SetGoalPosition( const Vector &pos )		{ m_goalPosition = pos; }
-	void SetRouteType( RouteType route )			{ m_routeType = route; }
-
-private:
-	Vector m_goalPosition;										///< goal position of move
-	RouteType m_routeType;										///< the kind of route to build
-	bool m_radioedPlan;
-	bool m_askedForCover;
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a Terrorist bot is moving to pick up a dropped bomb.
- */
-class FetchBombState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual const char *GetName( void ) const	{ return "FetchBomb"; }
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a Terrorist bot is actually planting the bomb.
- */
-class PlantBombState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const	{ return "PlantBomb"; }
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a CT bot is actually defusing a live bomb.
- */
-class DefuseBombState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const	{ return "DefuseBomb"; }
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is hiding in a corner.
- * NOTE: This state also includes MOVING TO that hiding spot, which may be all the way
- * across the map!
- */
-class HideState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const	{ return "Hide"; }
-
-	void SetHidingSpot( const Vector &pos )		{ m_hidingSpot = pos; }
-	const Vector &GetHidingSpot( void ) const	{ return m_hidingSpot; }
-
-	void SetSearchArea( CNavArea *area )		{ m_searchFromArea = area; }
-	void SetSearchRange( float range )			{ m_range = range; }
-	void SetDuration( float time )				{ m_duration = time; }
-	void SetHoldPosition( bool hold )			{ m_isHoldingPosition = hold; }
-
-	bool IsAtSpot( void ) const					{ return m_isAtSpot; }
-
-	float GetHideTime( void ) const
-	{
-		if (IsAtSpot())
-		{
-			return m_duration - m_hideTimer.GetRemainingTime();
-		}
-
-		return 0.0f;
-	}
-
-private:
-	CNavArea *m_searchFromArea;
-	float m_range;
-
-	Vector m_hidingSpot;
-	bool m_isLookingOutward;
-	bool m_isAtSpot;
-	float m_duration;
-	CountdownTimer m_hideTimer;								///< how long to hide
-
-	bool m_isHoldingPosition;
-	float m_holdPositionTime;								///< how long to hold our position after we hear nearby enemy noise
-
-	bool m_heardEnemy;										///< set to true when we first hear an enemy
-	float m_firstHeardEnemyTime;							///< when we first heard the enemy
-
-	int m_retry;											///< counter for retrying hiding spot
-
-	Vector m_leaderAnchorPos;								///< the position of our follow leader when we decided to hide
-
-	bool m_isPaused;										///< if true, we have paused in our retreat for a moment
-	CountdownTimer m_pauseTimer;							///< for stoppping and starting our pauses while we retreat
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is attempting to flee from a bomb that is about to explode.
- */
-class EscapeFromBombState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "EscapeFromBomb"; }
-};
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * When a bot is following another player.
- */
-class FollowState : public BotState
-{
-public:
-	virtual void OnEnter( CFFBot *bot );
-	virtual void OnUpdate( CFFBot *bot );
-	virtual void OnExit( CFFBot *bot );
-	virtual const char *GetName( void ) const		{ return "Follow"; }
-
-	void SetLeader( CFFPlayer *player )				{ m_leader = player; }
-
-private:
-	CHandle< CFFPlayer > m_leader;								///< the player we are following
-	Vector m_lastLeaderPos;										///< where the leader was when we computed our follow path
-	bool m_isStopped;
-	float m_stoppedTimestamp;
-
-	enum LeaderMotionStateType
-	{
-		INVALID,
-		STOPPED,
-		WALKING,
-		RUNNING
-	};
-	LeaderMotionStateType m_leaderMotionState;
-	IntervalTimer m_leaderMotionStateTime;
-
-	bool m_isSneaking;
-	float m_lastSawLeaderTime;
-	CountdownTimer m_repathInterval;
-
-	IntervalTimer m_walkTime;
-	bool m_isAtWalkSpeed;
-
-	float m_waitTime;
-	CountdownTimer m_idleTimer;
-
-	void ComputeLeaderMotionState( float leaderSpeed );
 };
 
 
@@ -413,7 +119,7 @@ private:
 //--------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------------------
 /**
- * The Counter-strike Bot
+ * The Fortress Forever Bot
  */
 class CFFBot : public CBot< CFFPlayer >
 {
@@ -2002,3 +1708,4 @@ extern const HidingSpot *FindInitialEncounterSpot( CBaseEntity *me, const Vector
 
 #endif	// _FF_BOT_H_
 
+[end of mp/src/game/server/ff/bot/ff_bot.h]

@@ -264,10 +264,10 @@ void CFFBot::Touch( CBaseEntity *other )
 		CFFPlayer *player = static_cast<CFFPlayer *>( other );
 
 		// get priority of other player
-		unsigned int otherPri = TheCSBots()->GetPlayerPriority( player );
+		unsigned int otherPri = TheFFBots()->GetPlayerPriority( player );
 
 		// get our priority
-		unsigned int myPri = TheCSBots()->GetPlayerPriority( this );
+		unsigned int myPri = TheFFBots()->GetPlayerPriority( this );
 
 		// if our priority is better, don't budge
 		if (myPri < otherPri)
@@ -276,7 +276,7 @@ void CFFBot::Touch( CBaseEntity *other )
 		// they are higher priority - make way, unless we're already making way for someone more important
 		if (m_avoid != NULL)
 		{
-			unsigned int avoidPri = TheCSBots()->GetPlayerPriority( static_cast<CBasePlayer *>( static_cast<CBaseEntity *>( m_avoid ) ) );
+			unsigned int avoidPri = TheFFBots()->GetPlayerPriority( static_cast<CBasePlayer *>( static_cast<CBaseEntity *>( m_avoid ) ) );
 			if (avoidPri < otherPri)
 			{
 				// ignore 'other' because we're already avoiding someone better
@@ -427,7 +427,7 @@ bool CFFBot::IsDoingScenario( void ) const
  */
 bool CFFBot::NoticeLooseBomb( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
@@ -449,7 +449,7 @@ bool CFFBot::NoticeLooseBomb( void ) const
  */
 bool CFFBot::CanSeeLooseBomb( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
@@ -471,7 +471,7 @@ bool CFFBot::CanSeeLooseBomb( void ) const
  */
 bool CFFBot::CanSeePlantedBomb( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
@@ -627,7 +627,7 @@ int CFFBot::OutnumberedCount( void ) const
  */
 CFFPlayer *CFFBot::GetImportantEnemy( bool checkVisibility ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 	CFFPlayer *nearEnemy = NULL;
 	float nearDist = 999999999.9f;
 
@@ -740,7 +740,7 @@ void CFFBot::DecreaseMorale( void )
  */
 bool CFFBot::IsRogue( void ) const
 { 
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 	if (!ctrl->AllowRogues())
 		return false;
 
@@ -768,7 +768,7 @@ bool CFFBot::IsHurrying( void ) const
 	if (!m_hurryTimer.IsElapsed())
 		return true;
 
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	// if the bomb has been planted, we are in a hurry, CT or T (they could be defusing it!)
 	if (ctrl->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && ctrl->IsBombPlanted())
@@ -789,7 +789,7 @@ bool CFFBot::IsHurrying( void ) const
  */
 bool CFFBot::IsSafe( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	if (ctrl->GetElapsedRoundTime() < m_safeTime)
 		return true;
@@ -803,7 +803,7 @@ bool CFFBot::IsSafe( void ) const
  */
 bool CFFBot::IsWellPastSafe( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	if (ctrl->GetElapsedRoundTime() > 2.0f * m_safeTime)
 		return true;
@@ -826,7 +826,7 @@ bool CFFBot::IsEndOfSafeTime( void ) const
  */
 float CFFBot::GetSafeTimeRemaining( void ) const
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	return m_safeTime - ctrl->GetElapsedRoundTime();
 }
@@ -837,7 +837,7 @@ float CFFBot::GetSafeTimeRemaining( void ) const
  */
 void CFFBot::AdjustSafeTime( void )
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	// if we spotted an enemy sooner than we thought possible, adjust our notion of "safe" time
 	if (ctrl->GetElapsedRoundTime() < m_safeTime)
@@ -863,7 +863,7 @@ bool CFFBot::HasNotSeenEnemyForLongTime( void ) const
  */
 bool CFFBot::GuardRandomZone( float range )
 {
-	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheFFBots() );
 
 	const CFFBotManager::Zone *zone = ctrl->GetRandomZone();
 	if (zone)
@@ -1115,3 +1115,5 @@ void CFFBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwar
 }
 
 //--------------------------------------------------------------------------------------------------------------
+
+[end of mp/src/game/server/ff/bot/ff_bot.cpp]

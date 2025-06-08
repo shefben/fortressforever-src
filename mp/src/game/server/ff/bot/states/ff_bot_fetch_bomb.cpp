@@ -8,7 +8,15 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "ff_bot.h"
+#include "ff_bot_state_fetch_bomb.h" // Assuming this is the header for FetchBombState
+#include "../ff_bot.h"
+#include "../ff_bot_manager.h" // For TheFFBots()
+#include "../../ff_player.h" // For CFFPlayer (potentially used by CFFBot)
+#include "../../../shared/ff/weapons/ff_weapon_base.h" // For FFWeaponID (used in CFFBot)
+// #include "../../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
+// #include "../../../shared/ff/ff_gamerules.h" // For CFFGameRules or FFGameRules() (potentially used)
+#include "../ff_gamestate.h" // For FFGameState (used in CFFBot)
+
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -29,7 +37,7 @@ void FetchBombState::OnEnter( CFFBot *me )
  */
 void FetchBombState::OnUpdate( CFFBot *me )
 {
-	if (me->HasC4())
+	if (me->HasC4()) // TODO: Update HasC4 for FF if it's different (e.g. different item name)
 	{
 		me->PrintIfWatched( "I picked up the bomb\n" );
 		me->Idle();
