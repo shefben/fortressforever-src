@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -18,7 +18,7 @@
 /**
  * Move to the bomb on the floor and pick it up
  */
-void FetchBombState::OnEnter( CCSBot *me )
+void FetchBombState::OnEnter( CFFBot *me )
 {
 	me->DestroyPath();
 }
@@ -27,7 +27,7 @@ void FetchBombState::OnEnter( CCSBot *me )
 /**
  * Move to the bomb on the floor and pick it up
  */
-void FetchBombState::OnUpdate( CCSBot *me )
+void FetchBombState::OnUpdate( CFFBot *me )
 {
 	if (me->HasC4())
 	{
@@ -37,7 +37,7 @@ void FetchBombState::OnUpdate( CCSBot *me )
 	}
 
 
-	CBaseEntity *bomb = TheCSBots()->GetLooseBomb();
+	CBaseEntity *bomb = TheFFBots()->GetLooseBomb();
 	if (bomb)
 	{
 		if (!me->HasPath())
@@ -64,6 +64,6 @@ void FetchBombState::OnUpdate( CCSBot *me )
 	// look around
 	me->UpdateLookAround();
 
-	if (me->UpdatePathMovement() != CCSBot::PROGRESSING)
+	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
 		me->Idle();
 }

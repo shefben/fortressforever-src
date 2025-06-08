@@ -9,7 +9,7 @@
 
 #include "cbase.h"
 #include "cs_simple_hostage.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -18,7 +18,7 @@
 /**
  * Begin the hunt
  */
-void HuntState::OnEnter( CCSBot *me )
+void HuntState::OnEnter( CFFBot *me )
 {
 	// lurking death
 	if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
@@ -28,8 +28,8 @@ void HuntState::OnEnter( CCSBot *me )
 
 
 	me->StandUp();
-	me->SetDisposition( CCSBot::ENGAGE_AND_INVESTIGATE );
-	me->SetTask( CCSBot::SEEK_AND_DESTROY );
+	me->SetDisposition( CFFBot::ENGAGE_AND_INVESTIGATE );
+	me->SetTask( CFFBot::SEEK_AND_DESTROY );
 
 	me->DestroyPath();
 }
@@ -38,7 +38,7 @@ void HuntState::OnEnter( CCSBot *me )
 /**
  * Hunt down our enemies
  */
-void HuntState::OnUpdate( CCSBot *me )
+void HuntState::OnUpdate( CFFBot *me )
 {
 	// if we've been hunting for a long time, drop into Idle for a moment to
 	// select something else to do
@@ -53,7 +53,7 @@ void HuntState::OnUpdate( CCSBot *me )
 	}
 
 	// scenario logic
-	if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_DEFUSE_BOMB)
+	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB)
 	{
 		if (me->GetTeamNumber() == TEAM_TERRORIST)
 		{
@@ -62,7 +62,7 @@ void HuntState::OnUpdate( CCSBot *me )
 			{
 				const float safeTime = 3.0f;
 
-				if (TheCSBots()->IsTimeToPlantBomb() || 
+				if (TheFFBots()->IsTimeToPlantBomb() ||
 						(me->IsAtBombsite() && gpGlobals->curtime - me->GetLastSawEnemyTimestamp() > safeTime))
 				{
 					me->Idle();
@@ -81,7 +81,7 @@ void HuntState::OnUpdate( CCSBot *me )
 			const Vector *bombPos = me->GetGameState()->GetBombPosition();
 			if (!me->IsRogue() && me->GetGameState()->IsBombPlanted() && bombPos)
 			{
-				me->SetTask( CCSBot::GUARD_TICKING_BOMB );
+				me->SetTask( CFFBot::GUARD_TICKING_BOMB );
 				me->Hide( TheNavMesh->GetNavArea( *bombPos ) );
 				return;
 			}
@@ -91,15 +91,15 @@ void HuntState::OnUpdate( CCSBot *me )
 			if (!me->IsRogue() && me->CanSeeLooseBomb())
 			{
 				// if we are near the loose bomb and can see it, hide nearby and guard it
-				me->SetTask( CCSBot::GUARD_LOOSE_BOMB );
-				me->Hide( TheCSBots()->GetLooseBombArea() );
-				me->GetChatter()->GuardingLooseBomb( TheCSBots()->GetLooseBomb() );
+				me->SetTask( CFFBot::GUARD_LOOSE_BOMB );
+				me->Hide( TheFFBots()->GetLooseBombArea() );
+				me->GetChatter()->GuardingLooseBomb( TheFFBots()->GetLooseBomb() );
 				return;
 			}
-			else if (TheCSBots()->IsBombPlanted())
+			else if (TheFFBots()->IsBombPlanted())
 			{
 				// rogues will defuse a bomb, but not guard the defuser
-				if (!me->IsRogue() || !TheCSBots()->GetBombDefuser())
+				if (!me->IsRogue() || !TheFFBots()->GetBombDefuser())
 				{
 					// search for the planted bomb to defuse
 					me->Idle();
@@ -108,7 +108,7 @@ void HuntState::OnUpdate( CCSBot *me )
 			}
 		}
 	}
-	else if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_RESCUE_HOSTAGES)
+	else if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES)
 	{
 		if (me->GetTeamNumber() == TEAM_TERRORIST)
 		{
@@ -117,9 +117,9 @@ void HuntState::OnUpdate( CCSBot *me )
 				// all hostages are being rescued, head them off at the escape zones
 				if (me->GuardRandomZone())
 				{
-					me->SetTask( CCSBot::GUARD_HOSTAGE_RESCUE_ZONE );
+					me->SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
 					me->PrintIfWatched( "Trying to beat them to an escape zone!\n" );
-					me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+					me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 					me->GetChatter()->GuardingHostageEscapeZone( IS_PLAN );
 					return;
 				}
@@ -135,7 +135,7 @@ void HuntState::OnUpdate( CCSBot *me )
 					if (area)
 					{
 						// we see a free hostage, guard it
-						me->SetTask( CCSBot::GUARD_HOSTAGES );
+						me->SetTask( CFFBot::GUARD_HOSTAGES );
 						me->Hide( area );
 						me->PrintIfWatched( "I'm guarding hostages\n" );
 						me->GetChatter()->GuardingHostages( area->GetPlace(), IS_PLAN );
@@ -158,14 +158,14 @@ void HuntState::OnUpdate( CCSBot *me )
 
 	// if we have reached our destination area, pick a new one
 	// if our path fails, pick a new one
-	if (me->GetLastKnownArea() == m_huntArea || me->UpdatePathMovement() != CCSBot::PROGRESSING)
+	if (me->GetLastKnownArea() == m_huntArea || me->UpdatePathMovement() != CFFBot::PROGRESSING)
 	{
 		// pick a new hunt area
 		const float earlyGameTime = 45.0f;
-		if (TheCSBots()->GetElapsedRoundTime() < earlyGameTime && !me->HasVisitedEnemySpawn())
+		if (TheFFBots()->GetElapsedRoundTime() < earlyGameTime && !me->HasVisitedEnemySpawn())
 		{
 			// in the early game, rush the enemy spawn
-			CBaseEntity *enemySpawn = TheCSBots()->GetRandomSpawn( OtherTeam( me->GetTeamNumber() ) );
+			CBaseEntity *enemySpawn = TheFFBots()->GetRandomSpawn( OtherTeam( me->GetTeamNumber() ) );
 
 			//ADRIAN: REVISIT
 			if ( enemySpawn )
@@ -229,6 +229,6 @@ void HuntState::OnUpdate( CCSBot *me )
 /**
  * Done hunting
  */
-void HuntState::OnExit( CCSBot *me )
+void HuntState::OnExit( CFFBot *me )
 {
 }

@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,10 +17,10 @@
 /**
  * Begin defusing the bomb
  */
-void DefuseBombState::OnEnter( CCSBot *me )
+void DefuseBombState::OnEnter( CFFBot *me )
 {
 	me->Crouch();
-	me->SetDisposition( CCSBot::SELF_DEFENSE );
+	me->SetDisposition( CFFBot::SELF_DEFENSE );
 	me->GetChatter()->Say( "DefusingBomb" );
 }
 
@@ -28,7 +28,7 @@ void DefuseBombState::OnEnter( CCSBot *me )
 /**
  * Defuse the bomb
  */
-void DefuseBombState::OnUpdate( CCSBot *me )
+void DefuseBombState::OnUpdate( CFFBot *me )
 {
 	const Vector *bombPos = me->GetGameState()->GetBombPosition();
 
@@ -48,13 +48,13 @@ void DefuseBombState::OnUpdate( CCSBot *me )
 	if (gpGlobals->curtime - me->GetStateTimestamp() > 1.0f)
 	{
 		// if we missed starting the defuse, give up
-		if (TheCSBots()->GetBombDefuser() == NULL)
+		if (TheFFBots()->GetBombDefuser() == NULL)
 		{
 			me->PrintIfWatched( "Failed to start defuse, giving up\n" );
 			me->Idle();
 			return;
 		}
-		else if (TheCSBots()->GetBombDefuser() != me)
+		else if (TheFFBots()->GetBombDefuser() != me)
 		{
 			// if someone else got the defuse, give up
 			me->PrintIfWatched( "Someone else started defusing, giving up\n" );
@@ -64,7 +64,7 @@ void DefuseBombState::OnUpdate( CCSBot *me )
 	}
 
 	// if bomb has been defused, give up
-	if (!TheCSBots()->IsBombPlanted())
+	if (!TheFFBots()->IsBombPlanted())
 	{
 		me->Idle();
 		return;
@@ -72,11 +72,11 @@ void DefuseBombState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void DefuseBombState::OnExit( CCSBot *me )
+void DefuseBombState::OnExit( CFFBot *me )
 {
 	me->StandUp();
 	me->ResetStuckMonitor();
-	me->SetTask( CCSBot::SEEK_AND_DESTROY );
-	me->SetDisposition( CCSBot::ENGAGE_AND_INVESTIGATE );
+	me->SetTask( CFFBot::SEEK_AND_DESTROY );
+	me->SetDisposition( CFFBot::ENGAGE_AND_INVESTIGATE );
 	me->ClearLookAt();
 }

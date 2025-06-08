@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,10 +17,10 @@
 /**
  * Plant the bomb.
  */
-void PlantBombState::OnEnter( CCSBot *me )
+void PlantBombState::OnEnter( CFFBot *me )
 {
 	me->Crouch();
-	me->SetDisposition( CCSBot::SELF_DEFENSE );
+	me->SetDisposition( CFFBot::SELF_DEFENSE );
 
 	// look at the floor
 //	Vector down( myOrigin.x, myOrigin.y, -1000.0f );
@@ -37,7 +37,7 @@ void PlantBombState::OnEnter( CCSBot *me )
 /**
  * Plant the bomb.
  */
-void PlantBombState::OnUpdate( CCSBot *me )
+void PlantBombState::OnUpdate( CFFBot *me )
 {
 	CBaseCombatWeapon *gun = me->GetActiveWeapon();
 	bool holdingC4 = false;
@@ -57,7 +57,7 @@ void PlantBombState::OnUpdate( CCSBot *me )
 	if (!me->HasC4())
 	{
 		// move to a hiding spot and watch the bomb
-		me->SetTask( CCSBot::GUARD_TICKING_BOMB );
+		me->SetTask( CFFBot::GUARD_TICKING_BOMB );
 		me->Hide();
 	}
 
@@ -68,12 +68,12 @@ void PlantBombState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void PlantBombState::OnExit( CCSBot *me )
+void PlantBombState::OnExit( CFFBot *me )
 {
 	// equip our rifle (in case we were interrupted while holding C4)
 	me->EquipBestWeapon();
 	me->StandUp();
 	me->ResetStuckMonitor();
-	me->SetDisposition( CCSBot::ENGAGE_AND_INVESTIGATE );
+	me->SetDisposition( CFFBot::ENGAGE_AND_INVESTIGATE );
 	me->ClearLookAt();
 }

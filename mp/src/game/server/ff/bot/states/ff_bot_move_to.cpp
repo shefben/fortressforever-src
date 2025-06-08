@@ -9,7 +9,7 @@
 
 #include "cbase.h"
 #include "cs_simple_hostage.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 #include "cs_gamerules.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -19,7 +19,7 @@
 /**
  * Move to a potentially far away position.
  */
-void MoveToState::OnEnter( CCSBot *me )
+void MoveToState::OnEnter( CFFBot *me )
 {
 	if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
 	{
@@ -35,9 +35,9 @@ void MoveToState::OnEnter( CCSBot *me )
 	RouteType route;
 	switch (me->GetTask())
 	{
-		case CCSBot::FIND_TICKING_BOMB:
-		case CCSBot::DEFUSE_BOMB:
-		case CCSBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION:
+		case CFFBot::FIND_TICKING_BOMB:
+		case CFFBot::DEFUSE_BOMB:
+		case CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION:
 			route = FASTEST_ROUTE;
 			break;
 
@@ -57,12 +57,12 @@ void MoveToState::OnEnter( CCSBot *me )
 /**
  * Move to a potentially far away position.
  */
-void MoveToState::OnUpdate( CCSBot *me )
+void MoveToState::OnUpdate( CFFBot *me )
 {
 	Vector myOrigin = GetCentroid( me );
 
 	// assume that we are paying attention and close enough to know our enemy died
-	if (me->GetTask() == CCSBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION)
+	if (me->GetTask() == CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION)
 	{
 		/// @todo Account for reaction time so we take some time to realized the enemy is dead
 		CBasePlayer *victim = static_cast<CBasePlayer *>( me->GetTaskEntity() );
@@ -80,13 +80,13 @@ void MoveToState::OnUpdate( CCSBot *me )
 	//
 	// Scenario logic
 	//
-	switch (TheCSBots()->GetScenario())
+	switch (TheFFBots()->GetScenario())
 	{
-		case CCSBotManager::SCENARIO_DEFUSE_BOMB:
+		case CFFBotManager::SCENARIO_DEFUSE_BOMB:
 		{
 			// if the bomb has been planted, find it
 			// NOTE: This task is used by both CT and T's to find the bomb
-			if (me->GetTask() == CCSBot::FIND_TICKING_BOMB)
+			if (me->GetTask() == CFFBot::FIND_TICKING_BOMB)
 			{
 				if (!me->GetGameState()->IsBombPlanted())
 				{
@@ -95,7 +95,7 @@ void MoveToState::OnUpdate( CCSBot *me )
 					return;
 				}
 
-				if (me->GetGameState()->GetPlantedBombsite() != CSGameState::UNKNOWN)
+				if (me->GetGameState()->GetPlantedBombsite() != FFGameState::UNKNOWN)
 				{
 					// we know where the bomb is planted, stop searching
 					me->Idle();
@@ -103,13 +103,13 @@ void MoveToState::OnUpdate( CCSBot *me )
 				}
 
 				// check off bombsites that we explore or happen to stumble into
-				for( int z=0; z<TheCSBots()->GetZoneCount(); ++z )
+				for( int z=0; z<TheFFBots()->GetZoneCount(); ++z )
 				{
 					// don't re-check zones
 					if (me->GetGameState()->IsBombsiteClear( z ))
 						continue;
 
-					if (TheCSBots()->GetZone(z)->m_extent.Contains( myOrigin ))
+					if (TheFFBots()->GetZone(z)->m_extent.Contains( myOrigin ))
 					{
 						// note this bombsite is clear
 						me->GetGameState()->ClearBombsite( z );
@@ -138,13 +138,13 @@ void MoveToState::OnUpdate( CCSBot *me )
 				{
 					switch( me->GetTask() )
 					{
-						case CCSBot::DEFUSE_BOMB:
+						case CFFBot::DEFUSE_BOMB:
 						{	
 							// if we are near the bombsite and there is time left, sneak in (unless all enemies are dead)
 							if (me->GetEnemiesRemaining())
 							{
 								const float plentyOfTime = 15.0f;
-								if (TheCSBots()->GetBombTimeLeft() > plentyOfTime)
+								if (TheFFBots()->GetBombTimeLeft() > plentyOfTime)
 								{
 									// get distance remaining on our path until we reach the bombsite
 									float range = me->GetPathDistanceRemaining();
@@ -167,7 +167,7 @@ void MoveToState::OnUpdate( CCSBot *me )
 							}
 
 							// if we are trying to defuse the bomb, and someone has started defusing, guard them instead
-							if (me->CanSeePlantedBomb() && TheCSBots()->GetBombDefuser())
+							if (me->CanSeePlantedBomb() && TheFFBots()->GetBombDefuser())
 							{
 								me->GetChatter()->Say( "CoveringFriend" );
 								me->Idle();
@@ -205,7 +205,7 @@ void MoveToState::OnUpdate( CCSBot *me )
 			}
 			else		// TERRORIST
 			{
-				if (me->GetTask() == CCSBot::PLANT_BOMB )
+				if (me->GetTask() == CFFBot::PLANT_BOMB )
 				{
 					if (  me->GetFriendsRemaining() )
 					{
@@ -244,9 +244,9 @@ void MoveToState::OnUpdate( CCSBot *me )
 		}
 
 		//--------------------------------------------------------------------------------------------------
-		case CCSBotManager::SCENARIO_RESCUE_HOSTAGES:
+		case CFFBotManager::SCENARIO_RESCUE_HOSTAGES:
 		{
-			if (me->GetTask() == CCSBot::COLLECT_HOSTAGES)
+			if (me->GetTask() == CFFBot::COLLECT_HOSTAGES)
 			{
 				//
 				// Since CT's have a radar, they can directly look at the actual hostage state
@@ -303,7 +303,7 @@ void MoveToState::OnUpdate( CCSBot *me )
 					}
 				}
 			}
-			else if (me->GetTask() == CCSBot::RESCUE_HOSTAGES)
+			else if (me->GetTask() == CFFBot::RESCUE_HOSTAGES)
 			{
 				// periodically check if we lost all our hostages
 				if (me->GetHostageEscortCount() == 0)
@@ -319,12 +319,12 @@ void MoveToState::OnUpdate( CCSBot *me )
 	}
 
 
-	if (me->UpdatePathMovement() != CCSBot::PROGRESSING)
+	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
 	{
 		// reached destination
 		switch( me->GetTask() )
 		{
-			case CCSBot::PLANT_BOMB:
+			case CFFBot::PLANT_BOMB:
 				// if we are at bombsite with the bomb, plant it
 				if (me->IsAtBombsite() && me->HasC4())
 				{
@@ -333,7 +333,7 @@ void MoveToState::OnUpdate( CCSBot *me )
 				}
 				break;
 		
-			case CCSBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION:
+			case CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION:
 			{
 				CBasePlayer *victim = static_cast<CBasePlayer *>( me->GetTaskEntity() );
 				if (victim && victim->IsAlive())
@@ -357,10 +357,10 @@ void MoveToState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void MoveToState::OnExit( CCSBot *me )
+void MoveToState::OnExit( CFFBot *me )
 {
 	// reset to run in case we were walking near our goal position
 	me->Run();
-	me->SetDisposition( CCSBot::ENGAGE_AND_INVESTIGATE );
+	me->SetDisposition( CFFBot::ENGAGE_AND_INVESTIGATE );
 	//me->StopAiming();
 }

@@ -11,7 +11,7 @@
 
 #include "cbase.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 #include "nav_area.h"
 #include "cs_gamerules.h"
 #include "shared_util.h"
@@ -27,7 +27,7 @@
 
 CBotManager *TheBots = NULL;
 
-bool CCSBotManager::m_isMapDataLoaded = false;
+bool CFFBotManager::m_isMapDataLoaded = false;
 
 int g_nClientPutInServerOverrides = 0;
 
@@ -38,7 +38,7 @@ ConVar bot_show_occupy_time( "bot_show_occupy_time", "0", FCVAR_GAMEDLL | FCVAR_
 void DrawBattlefront( void );
 ConVar bot_show_battlefront( "bot_show_battlefront", "0", FCVAR_GAMEDLL | FCVAR_CHEAT, "Show areas where rushing players will initially meet." );
 
-int UTIL_CSSBotsInGame( void );
+int UTIL_FFSBotsInGame( void );
 
 ConVar bot_join_delay( "bot_join_delay", "0", FCVAR_GAMEDLL, "Prevents bots from joining the server for this many seconds after a map change." );
 
@@ -65,7 +65,7 @@ void InstallBotControl( void )
 	if ( TheBots != NULL )
 		delete TheBots;
 
-	TheBots = new CCSBotManager;
+	TheBots = new CFFBotManager;
 }
 
 
@@ -94,7 +94,7 @@ CBasePlayer* ClientPutInServerOverride_Bot( edict_t *pEdict, const char *playern
 
 //--------------------------------------------------------------------------------------------------------------
 // Constructor
-CCSBotManager::CCSBotManager()
+CFFBotManager::CFFBotManager()
 {
 	m_zoneCount = 0;
 	SetLooseBomb( NULL );
@@ -128,7 +128,7 @@ CCSBotManager::CCSBotManager()
 /**
  * Invoked when a new round begins
  */
-void CCSBotManager::RestartRound( void )
+void CFFBotManager::RestartRound( void )
 {
 	// extend
 	CBotManager::RestartRound();
@@ -210,7 +210,7 @@ void UTIL_DrawBox( Extent *extent, int lifetime, int red, int green, int blue )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::EnableEventListeners( bool enable )
+void CFFBotManager::EnableEventListeners( bool enable )
 {
 	if ( m_eventListenersEnabled == enable )
 	{
@@ -237,7 +237,7 @@ void CCSBotManager::EnableEventListeners( bool enable )
 /**
  * Called each frame
  */
-void CCSBotManager::StartFrame( void )
+void CFFBotManager::StartFrame( void )
 {
 	if ( !AreBotsAllowed() )
 	{
@@ -249,7 +249,7 @@ void CCSBotManager::StartFrame( void )
 	CBotManager::StartFrame();
 
 	MaintainBotQuota();
-	EnableEventListeners( UTIL_CSSBotsInGame() > 0 );
+	EnableEventListeners( UTIL_FFSBotsInGame() > 0 );
 
 	// debug zone extent visualization
 	if (cv_bot_debug.GetInt() == 5)
@@ -300,7 +300,7 @@ void CCSBotManager::StartFrame( void )
 /**
  * Return true if the bot can use this weapon
  */
-bool CCSBotManager::IsWeaponUseable( const CWeaponCSBase *weapon ) const
+bool CFFBotManager::IsWeaponUseable( const CFFWeaponBase *weapon ) const
 {
 	if (weapon == NULL)
 		return false;
@@ -327,7 +327,7 @@ bool CCSBotManager::IsWeaponUseable( const CWeaponCSBase *weapon ) const
 /**
  * Return true if this player is on "defense"
  */
-bool CCSBotManager::IsOnDefense( const CCSPlayer *player ) const
+bool CFFBotManager::IsOnDefense( const CFFPlayer *player ) const
 {
 	switch (GetScenario())
 	{
@@ -348,7 +348,7 @@ bool CCSBotManager::IsOnDefense( const CCSPlayer *player ) const
 /**
  * Return true if this player is on "offense"
  */
-bool CCSBotManager::IsOnOffense( const CCSPlayer *player ) const
+bool CFFBotManager::IsOnOffense( const CFFPlayer *player ) const
 {
 	return !IsOnDefense( player );
 }
@@ -358,7 +358,7 @@ bool CCSBotManager::IsOnOffense( const CCSPlayer *player ) const
 /**
  * Invoked when a map has just been loaded
  */
-void CCSBotManager::ServerActivate( void )
+void CFFBotManager::ServerActivate( void )
 {
 	m_isMapDataLoaded = false;
 
@@ -429,12 +429,12 @@ void CCSBotManager::ServerActivate( void )
 }
 
 
-void CCSBotManager::ServerDeactivate( void )
+void CFFBotManager::ServerDeactivate( void )
 {
 	m_serverActive = false;
 }
 
-void CCSBotManager::ClientDisconnect( CBaseEntity *entity )
+void CFFBotManager::ClientDisconnect( CBaseEntity *entity )
 {
 /*
 	if ( FBitSet( entity->GetFlags(), FL_FAKECLIENT ) )
@@ -448,7 +448,7 @@ void CCSBotManager::ClientDisconnect( CBaseEntity *entity )
 	CBasePlayer *pPlayer = (CBasePlayer *)CBaseEntity::Instance( pEntity );
 	if ( pPlayer && pPlayer->IsBot() )
 	{
-		CCSBot *pBot = static_cast<CCSBot *>(pPlayer);
+		CFFBot *pBot = static_cast<CFFBot *>(pPlayer);
 		if (pBot)
 		{
 			pBot->EndVoiceFeedback( true );
@@ -539,7 +539,7 @@ CON_COMMAND_F( bot_add, "bot_add <t|ct> <type> <difficulty> <name> - Adds a bot 
 	CSWeaponType weaponType;
 	int team;
 	BotArgumentsFromArgv( args, &name, &weaponType, &difficulty, &team );
-	TheCSBots()->BotAddCommand( team, FROM_CONSOLE, name, weaponType, difficulty );
+	TheFFBots()->BotAddCommand( team, FROM_CONSOLE, name, weaponType, difficulty );
 }
 
 
@@ -553,7 +553,7 @@ CON_COMMAND_F( bot_add_t, "bot_add_t <type> <difficulty> <name> - Adds a terrori
 	BotDifficultyType difficulty;
 	CSWeaponType weaponType;
 	BotArgumentsFromArgv( args, &name, &weaponType, &difficulty );
-	TheCSBots()->BotAddCommand( TEAM_TERRORIST, FROM_CONSOLE, name, weaponType, difficulty );
+	TheFFBots()->BotAddCommand( TEAM_TERRORIST, FROM_CONSOLE, name, weaponType, difficulty );
 }
 
 
@@ -567,7 +567,7 @@ CON_COMMAND_F( bot_add_ct, "bot_add_ct <type> <difficulty> <name> - Adds a Count
 	BotDifficultyType difficulty;
 	CSWeaponType weaponType;
 	BotArgumentsFromArgv( args, &name, &weaponType, &difficulty );
-	TheCSBots()->BotAddCommand( TEAM_CT, FROM_CONSOLE, name, weaponType, difficulty );
+	TheFFBots()->BotAddCommand( TEAM_CT, FROM_CONSOLE, name, weaponType, difficulty );
 }
 
 
@@ -593,7 +593,7 @@ public:
 			return true;
 		}
 
-		CCSBot *bot = dynamic_cast< CCSBot * >(player);
+		CFFBot *bot = dynamic_cast< CFFBot * >(player);
 		if ( !bot || !bot->GetProfile() )
 		{
 			return true;
@@ -654,7 +654,7 @@ public:
 		return true;
 	}
 
-	CUtlVector< CCSBot * > m_bots;
+	CUtlVector< CFFBot * > m_bots;
 
 private:
 	const char *m_name;
@@ -686,7 +686,7 @@ CON_COMMAND_F( bot_kill, "bot_kill <all> <t|ct> <type> <difficulty> <name> - Kil
 
 	for ( int i=0; i<collector.m_bots.Count(); ++i )
 	{
-		CCSBot *bot = collector.m_bots[i];
+		CFFBot *bot = collector.m_bots[i];
 		if ( !bot->IsAlive() )
 			continue;
 
@@ -723,7 +723,7 @@ CON_COMMAND_F( bot_kick, "bot_kick <all> <t|ct> <type> <difficulty> <name> - Kic
 
 	for ( int i=0; i<collector.m_bots.Count(); ++i )
 	{
-		CCSBot *bot = collector.m_bots[i];
+		CFFBot *bot = collector.m_bots[i];
 		engine->ServerCommand( UTIL_VarArgs( "kick \"%s\"\n", bot->GetPlayerName() ) );
 		if ( !all )
 		{
@@ -842,7 +842,7 @@ CON_COMMAND_F( bot_goto_mark, "Sends a bot to the selected nav area (useful for 
 	
 			if (player->IsBot())
 			{
-				CCSBot *bot = dynamic_cast<CCSBot *>( player );
+				CFFBot *bot = dynamic_cast<CFFBot *>( player );
 
 				if ( bot )
 				{
@@ -865,7 +865,7 @@ CON_COMMAND_F( bot_memory_usage, "Reports on the bots' memory usage", FCVAR_GAME
 
 	Msg( "Memory usage:\n" );
 
-	Msg( "  %d bytes per bot\n", sizeof(CCSBot) );
+	Msg( "  %d bytes per bot\n", sizeof(CFFBot) );
 
 	Msg( "  %d Navigation Areas @ %d bytes each = %d bytes\n", 
 					TheNavMesh->GetNavAreaCount(),
@@ -898,13 +898,13 @@ CON_COMMAND_F( bot_memory_usage, "Reports on the bots' memory usage", FCVAR_GAME
 #endif
 
 
-bool CCSBotManager::ServerCommand( const char *cmd )
+bool CFFBotManager::ServerCommand( const char *cmd )
 {
 	return false;
 }
 
 
-bool CCSBotManager::ClientCommand( CBasePlayer *player, const CCommand &args )
+bool CFFBotManager::ClientCommand( CBasePlayer *player, const CCommand &args )
 {
 	return false;
 }
@@ -913,7 +913,7 @@ bool CCSBotManager::ClientCommand( CBasePlayer *player, const CCommand &args )
 /**
  * Process the "bot_add" console command
  */
-bool CCSBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, CSWeaponType weaponType, BotDifficultyType difficulty )
+bool CFFBotManager::BotAddCommand( int team, bool isFromConsole, const char *profileName, CSWeaponType weaponType, BotDifficultyType difficulty )
 {
 	if ( !TheNavMesh->IsLoaded() )
 	{
@@ -1040,7 +1040,7 @@ bool CCSBotManager::BotAddCommand( int team, bool isFromConsole, const char *pro
 	}
 
 	// create the actual bot
-	CCSBot *bot = CreateBot<CCSBot>( profile, team );
+	CFFBot *bot = CreateBot<CFFBot>( profile, team );
 
 	if (bot == NULL)
 	{
@@ -1060,13 +1060,13 @@ bool CCSBotManager::BotAddCommand( int team, bool isFromConsole, const char *pro
 	return true;
 }
 
-int UTIL_CSSBotsInGame()
+int UTIL_FFSBotsInGame()
 {
 	int count = 0;
 
 	for (int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CCSBot *player = dynamic_cast<CCSBot *>(UTIL_PlayerByIndex( i ));
+		CFFBot *player = dynamic_cast<CFFBot *>(UTIL_PlayerByIndex( i ));
 
 		if ( player == NULL )
 			continue;
@@ -1077,14 +1077,14 @@ int UTIL_CSSBotsInGame()
 	return count;
 }
 
-bool UTIL_CSSKickBotFromTeam( int kickTeam )
+bool UTIL_FFSKickBotFromTeam( int kickTeam )
 {
 	int i;
 
 	// try to kick a dead bot first
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CCSBot *player = dynamic_cast<CCSBot *>( UTIL_PlayerByIndex( i ) );
+		CFFBot *player = dynamic_cast<CFFBot *>( UTIL_PlayerByIndex( i ) );
 
 		if (player == NULL)
 			continue;
@@ -1101,7 +1101,7 @@ bool UTIL_CSSKickBotFromTeam( int kickTeam )
 	// no dead bots, kick any bot on the given team
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CCSBot *player = dynamic_cast<CCSBot *>( UTIL_PlayerByIndex( i ) );
+		CFFBot *player = dynamic_cast<CFFBot *>( UTIL_PlayerByIndex( i ) );
 
 		if (player == NULL)
 			continue;
@@ -1123,7 +1123,7 @@ bool UTIL_CSSKickBotFromTeam( int kickTeam )
 /**
  * Keep a minimum quota of bots in the game
  */
-void CCSBotManager::MaintainBotQuota( void )
+void CFFBotManager::MaintainBotQuota( void )
 {
 	if ( !AreBotsAllowed() )
 		return;
@@ -1139,17 +1139,17 @@ void CCSBotManager::MaintainBotQuota( void )
 		return;
 
 	// new players can't spawn immediately after the round has been going for some time
-	if ( !CSGameRules() || !TheCSBots() )
+	if ( !CSGameRules() || !TheFFBots() )
 	{
 		return;
 	}
 
 	int desiredBotCount = cv_bot_quota.GetInt();
-	int botsInGame = UTIL_CSSBotsInGame();
+	int botsInGame = UTIL_FFSBotsInGame();
 
 	/// isRoundInProgress is true if the round has progressed far enough that new players will join as dead.
 	bool isRoundInProgress = CSGameRules()->m_bFirstConnected &&
-							 !TheCSBots()->IsRoundOver() &&
+							 !TheFFBots()->IsRoundOver() &&
 							 ( CSGameRules()->GetRoundElapsedTime() >= 20.0f );
 
 	if ( FStrEq( cv_bot_quota_mode.GetString(), "fill" ) )
@@ -1217,12 +1217,12 @@ void CCSBotManager::MaintainBotQuota( void )
 				{
 					if ( numAliveTerrorist > CSGameRules()->m_iNumCT + 1 )
 					{
-						if ( UTIL_KickBotFromTeam( TEAM_TERRORIST ) )
+						if ( UTIL_FFSKickBotFromTeam( TEAM_TERRORIST ) )
 							return;
 					}
 					else if ( numAliveCT > CSGameRules()->m_iNumTerrorist + 1 )
 					{
-						if ( UTIL_KickBotFromTeam( TEAM_CT ) )
+						if ( UTIL_FFSKickBotFromTeam( TEAM_CT ) )
 							return;
 					}
 				}
@@ -1235,14 +1235,14 @@ void CCSBotManager::MaintainBotQuota( void )
 	{
 		// don't try to add a bot if all teams are full
 		if (!CSGameRules()->TeamFull( TEAM_TERRORIST ) || !CSGameRules()->TeamFull( TEAM_CT ))
-			TheCSBots()->BotAddCommand( TEAM_UNASSIGNED );
+			TheFFBots()->BotAddCommand( TEAM_UNASSIGNED );
 	}
 	else if (desiredBotCount < botsInGame)
 	{
 		// kick a bot to maintain quota
 		
 		// first remove any unassigned bots
-		if (UTIL_CSSKickBotFromTeam( TEAM_UNASSIGNED ))
+		if (UTIL_FFSKickBotFromTeam( TEAM_UNASSIGNED ))
 			return;
 
 		int kickTeam;
@@ -1273,14 +1273,14 @@ void CCSBotManager::MaintainBotQuota( void )
 		}
 
 		// attempt to kick a bot from the given team
-		if (UTIL_CSSKickBotFromTeam( kickTeam ))
+		if (UTIL_FFSKickBotFromTeam( kickTeam ))
 			return;
 
 		// if there were no bots on the team, kick a bot from the other team
 		if (kickTeam == TEAM_TERRORIST)
-			UTIL_CSSKickBotFromTeam( TEAM_CT );
+			UTIL_FFSKickBotFromTeam( TEAM_CT );
 		else
-			UTIL_CSSKickBotFromTeam( TEAM_TERRORIST );
+			UTIL_FFSKickBotFromTeam( TEAM_TERRORIST );
 	}
 }
 
@@ -1292,7 +1292,7 @@ void CCSBotManager::MaintainBotQuota( void )
 class CollectOverlappingAreas
 {
 public:
-	CollectOverlappingAreas( CCSBotManager::Zone *zone )
+	CollectOverlappingAreas( CFFBotManager::Zone *zone )
 	{
 		m_zone = zone;
 
@@ -1310,7 +1310,7 @@ public:
 		{
 			// area overlaps m_zone
 			m_zone->m_area[ m_zone->m_areaCount++ ] = area;
-			if (m_zone->m_areaCount == CCSBotManager::MAX_ZONE_NAV_AREAS)
+			if (m_zone->m_areaCount == CFFBotManager::MAX_ZONE_NAV_AREAS)
 			{
 				return false;
 			}
@@ -1320,7 +1320,7 @@ public:
 	}
 
 private:
-	CCSBotManager::Zone *m_zone;
+	CFFBotManager::Zone *m_zone;
 };
 
 
@@ -1328,7 +1328,7 @@ private:
 /**
  * Search the map entities to determine the game scenario and define important zones.
  */
-void CCSBotManager::ExtractScenarioData( void )
+void CFFBotManager::ExtractScenarioData( void )
 {
 	if (!TheNavMesh->IsLoaded())
 		return;
@@ -1475,7 +1475,7 @@ void CCSBotManager::ExtractScenarioData( void )
 /**
  * Return the zone that contains the given position
  */
-const CCSBotManager::Zone *CCSBotManager::GetZone( const Vector &pos ) const
+const CFFBotManager::Zone *CFFBotManager::GetZone( const Vector &pos ) const
 {
 	for( int z=0; z<m_zoneCount; ++z )
 	{
@@ -1492,7 +1492,7 @@ const CCSBotManager::Zone *CCSBotManager::GetZone( const Vector &pos ) const
 /**
  * Return the closest zone to the given position
  */
-const CCSBotManager::Zone *CCSBotManager::GetClosestZone( const Vector &pos ) const
+const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const Vector &pos ) const
 {
 	const Zone *close = NULL;
 	float closeRangeSq = 999999999.9f;
@@ -1518,7 +1518,7 @@ const CCSBotManager::Zone *CCSBotManager::GetClosestZone( const Vector &pos ) co
 /**
  * Return a random position inside the given zone
  */
-const Vector *CCSBotManager::GetRandomPositionInZone( const Zone *zone ) const
+const Vector *CFFBotManager::GetRandomPositionInZone( const Zone *zone ) const
 {
 	static Vector pos;
 
@@ -1561,12 +1561,12 @@ const Vector *CCSBotManager::GetRandomPositionInZone( const Zone *zone ) const
 /**
  * Return a random area inside the given zone
  */
-CNavArea *CCSBotManager::GetRandomAreaInZone( const Zone *zone ) const
+CNavArea *CFFBotManager::GetRandomAreaInZone( const Zone *zone ) const
 {
 	int areaCount = zone->m_areaCount;
 	if( areaCount == 0 )
 	{
-		assert( false && "CCSBotManager::GetRandomAreaInZone: No areas for this zone" );
+		assert( false && "CFFBotManager::GetRandomAreaInZone: No areas for this zone" );
 		return NULL;
 	}
 
@@ -1586,7 +1586,7 @@ CNavArea *CCSBotManager::GetRandomAreaInZone( const Zone *zone ) const
 
 	if( totalWeight == 0 )
 	{
-		assert( false && "CCSBotManager::GetRandomAreaInZone: No real areas for this zone" );
+		assert( false && "CFFBotManager::GetRandomAreaInZone: No real areas for this zone" );
 		return NULL;
 	}
 
@@ -1612,7 +1612,7 @@ CNavArea *CCSBotManager::GetRandomAreaInZone( const Zone *zone ) const
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnServerShutdown( IGameEvent *event )
+void CFFBotManager::OnServerShutdown( IGameEvent *event )
 {
 	if ( !engine->IsDedicatedServer() )
 	{
@@ -1666,14 +1666,14 @@ void CCSBotManager::OnServerShutdown( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnPlayerFootstep( IGameEvent *event )
+void CFFBotManager::OnPlayerFootstep( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnPlayerFootstep, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnPlayerFootstep, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnPlayerRadio( IGameEvent *event )
+void CFFBotManager::OnPlayerRadio( IGameEvent *event )
 {
 	// if it's an Enemy Spotted radio, update our enemy spotted timestamp
 	if ( event->GetInt( "slot" ) == RADIO_ENEMY_SPOTTED )
@@ -1682,101 +1682,101 @@ void CCSBotManager::OnPlayerRadio( IGameEvent *event )
 		SetLastSeenEnemyTimestamp();
 	}
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnPlayerRadio, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnPlayerRadio, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnPlayerDeath( IGameEvent *event )
+void CFFBotManager::OnPlayerDeath( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnPlayerDeath, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnPlayerDeath, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnPlayerFallDamage( IGameEvent *event )
+void CFFBotManager::OnPlayerFallDamage( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnPlayerFallDamage, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnPlayerFallDamage, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombPickedUp( IGameEvent *event )
+void CFFBotManager::OnBombPickedUp( IGameEvent *event )
 {
 	// bomb no longer loose
 	SetLooseBomb( NULL );
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombPickedUp, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombPickedUp, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombPlanted( IGameEvent *event )
+void CFFBotManager::OnBombPlanted( IGameEvent *event )
 {
 	m_isBombPlanted = true;
 	m_bombPlantTimestamp = gpGlobals->curtime;
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombPlanted, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombPlanted, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombBeep( IGameEvent *event )
+void CFFBotManager::OnBombBeep( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombBeep, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombBeep, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombDefuseBegin( IGameEvent *event )
+void CFFBotManager::OnBombDefuseBegin( IGameEvent *event )
 {
-	m_bombDefuser = static_cast<CCSPlayer *>( UTIL_PlayerByUserId( event->GetInt( "userid" ) ) );
+	m_bombDefuser = static_cast<CFFPlayer *>( UTIL_PlayerByUserId( event->GetInt( "userid" ) ) );
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombDefuseBegin, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombDefuseBegin, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombDefused( IGameEvent *event )
+void CFFBotManager::OnBombDefused( IGameEvent *event )
 {
 	m_isBombPlanted = false;
 	m_bombDefuser = NULL;
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombDefused, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombDefused, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombDefuseAbort( IGameEvent *event )
+void CFFBotManager::OnBombDefuseAbort( IGameEvent *event )
 {
 	m_bombDefuser = NULL;
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombDefuseAbort, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombDefuseAbort, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBombExploded( IGameEvent *event )
+void CFFBotManager::OnBombExploded( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnBombExploded, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBombExploded, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnRoundEnd( IGameEvent *event )
+void CFFBotManager::OnRoundEnd( IGameEvent *event )
 {
 	m_isRoundOver = true;
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnRoundEnd, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnRoundEnd, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnRoundStart( IGameEvent *event )
+void CFFBotManager::OnRoundStart( IGameEvent *event )
 {
 	RestartRound();
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnRoundStart, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnRoundStart, event );
 }
 
 
@@ -1819,7 +1819,7 @@ static CBaseEntity * SelectSpawnSpot( const char *pEntClassName )
  * Pathfind from each zone to a spawn point to ensure it is valid.  Assumes that every spawn can pathfind to
  * every other spawn.
  */
-void CCSBotManager::CheckForBlockedZones( void )
+void CFFBotManager::CheckForBlockedZones( void )
 {
 	CBaseEntity *pSpot = SelectSpawnSpot( "info_player_counterterrorist" );
 	if ( !pSpot )
@@ -1858,7 +1858,7 @@ void CCSBotManager::CheckForBlockedZones( void )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnRoundFreezeEnd( IGameEvent *event )
+void CFFBotManager::OnRoundFreezeEnd( IGameEvent *event )
 {
 	bool reenableEvents = m_NavBlockedEvent.IsEnabled();
 
@@ -1882,17 +1882,17 @@ void CCSBotManager::OnRoundFreezeEnd( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnNavBlocked( IGameEvent *event )
+void CFFBotManager::OnNavBlocked( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnNavBlocked, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnNavBlocked, event );
 	CheckForBlockedZones();
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnDoorMoving( IGameEvent *event )
+void CFFBotManager::OnDoorMoving( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnDoorMoving, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnDoorMoving, event );
 }
 
 
@@ -1937,99 +1937,99 @@ private:
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBreakBreakable( IGameEvent *event )
+void CFFBotManager::OnBreakBreakable( IGameEvent *event )
 {
 	CheckAreasOverlappingBreakable collector( UTIL_EntityByIndex( event->GetInt( "entindex" ) ) );
 	TheNavMesh->ForAllAreas( collector );
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBreakBreakable, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBreakBreakable, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBreakProp( IGameEvent *event )
+void CFFBotManager::OnBreakProp( IGameEvent *event )
 {
 	CheckAreasOverlappingBreakable collector( UTIL_EntityByIndex( event->GetInt( "entindex" ) ) );
 	TheNavMesh->ForAllAreas( collector );
 
-	CCSBOTMANAGER_ITERATE_BOTS( OnBreakProp, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBreakProp, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnHostageFollows( IGameEvent *event )
+void CFFBotManager::OnHostageFollows( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnHostageFollows, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnHostageFollows, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnHostageRescuedAll( IGameEvent *event )
+void CFFBotManager::OnHostageRescuedAll( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnHostageRescuedAll, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnHostageRescuedAll, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnWeaponFire( IGameEvent *event )
+void CFFBotManager::OnWeaponFire( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnWeaponFire, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnWeaponFire, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnWeaponFireOnEmpty( IGameEvent *event )
+void CFFBotManager::OnWeaponFireOnEmpty( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnWeaponFireOnEmpty, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnWeaponFireOnEmpty, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnWeaponReload( IGameEvent *event )
+void CFFBotManager::OnWeaponReload( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnWeaponReload, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnWeaponReload, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnWeaponZoom( IGameEvent *event )
+void CFFBotManager::OnWeaponZoom( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnWeaponZoom, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnWeaponZoom, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnBulletImpact( IGameEvent *event )
+void CFFBotManager::OnBulletImpact( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnBulletImpact, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnBulletImpact, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnHEGrenadeDetonate( IGameEvent *event )
+void CFFBotManager::OnHEGrenadeDetonate( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnHEGrenadeDetonate, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnHEGrenadeDetonate, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnFlashbangDetonate( IGameEvent *event )
+void CFFBotManager::OnFlashbangDetonate( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnFlashbangDetonate, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnFlashbangDetonate, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnSmokeGrenadeDetonate( IGameEvent *event )
+void CFFBotManager::OnSmokeGrenadeDetonate( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnSmokeGrenadeDetonate, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnSmokeGrenadeDetonate, event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::OnGrenadeBounce( IGameEvent *event )
+void CFFBotManager::OnGrenadeBounce( IGameEvent *event )
 {
-	CCSBOTMANAGER_ITERATE_BOTS( OnGrenadeBounce, event );
+	CFFBOTMANAGER_ITERATE_BOTS( OnGrenadeBounce, event );
 }
 
 
@@ -2037,13 +2037,13 @@ void CCSBotManager::OnGrenadeBounce( IGameEvent *event )
 /**
  * Get the time remaining before the planted bomb explodes
  */
-float CCSBotManager::GetBombTimeLeft( void ) const
+float CFFBotManager::GetBombTimeLeft( void ) const
 { 
 	return (mp_c4timer.GetFloat() - (gpGlobals->curtime - m_bombPlantTimestamp));
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBotManager::SetLooseBomb( CBaseEntity *bomb )
+void CFFBotManager::SetLooseBomb( CBaseEntity *bomb )
 {
 	m_looseBomb = bomb;
 
@@ -2061,7 +2061,7 @@ void CCSBotManager::SetLooseBomb( CBaseEntity *bomb )
 /**
  * Return true if player is important to scenario (VIP, bomb carrier, etc)
  */
-bool CCSBotManager::IsImportantPlayer( CCSPlayer *player ) const
+bool CFFBotManager::IsImportantPlayer( CFFPlayer *player ) const
 {
 	switch (GetScenario())
 	{
@@ -2098,7 +2098,7 @@ bool CCSBotManager::IsImportantPlayer( CCSPlayer *player ) const
 /**
  * Return priority of player (0 = max pri)
  */
-unsigned int CCSBotManager::GetPlayerPriority( CBasePlayer *player ) const
+unsigned int CFFBotManager::GetPlayerPriority( CBasePlayer *player ) const
 {
 	const unsigned int lowestPriority = 0xFFFFFFFF;
 
@@ -2109,7 +2109,7 @@ unsigned int CCSBotManager::GetPlayerPriority( CBasePlayer *player ) const
 	if (!player->IsBot())
 		return 0;
 
-	CCSBot *bot = dynamic_cast<CCSBot *>( player );
+	CFFBot *bot = dynamic_cast<CFFBot *>( player );
 
 	if ( !bot )
 		return 0;
@@ -2154,7 +2154,7 @@ unsigned int CCSBotManager::GetPlayerPriority( CBasePlayer *player ) const
 /**
  * Returns a random spawn point for the given team (no arg means use both team spawnpoints)
  */
-CBaseEntity *CCSBotManager::GetRandomSpawn( int team ) const
+CBaseEntity *CFFBotManager::GetRandomSpawn( int team ) const
 {
 	CUtlVector< CBaseEntity * > spawnSet;
 	CBaseEntity *spot;
@@ -2197,7 +2197,7 @@ CBaseEntity *CCSBotManager::GetRandomSpawn( int team ) const
  * Return the last time the given radio message was sent for given team
  * 'teamID' can be TEAM_CT or TEAM_TERRORIST
  */
-float CCSBotManager::GetRadioMessageTimestamp( RadioType event, int teamID ) const
+float CFFBotManager::GetRadioMessageTimestamp( RadioType event, int teamID ) const
 {
 	int i = (teamID == TEAM_TERRORIST) ? 0 : 1;
 
@@ -2211,7 +2211,7 @@ float CCSBotManager::GetRadioMessageTimestamp( RadioType event, int teamID ) con
 /**
  * Return the interval since the last time this message was sent
  */
-float CCSBotManager::GetRadioMessageInterval( RadioType event, int teamID ) const
+float CFFBotManager::GetRadioMessageInterval( RadioType event, int teamID ) const
 {
 	int i = (teamID == TEAM_TERRORIST) ? 0 : 1;
 
@@ -2226,7 +2226,7 @@ float CCSBotManager::GetRadioMessageInterval( RadioType event, int teamID ) cons
  * Set the given radio message timestamp.
  * 'teamID' can be TEAM_CT or TEAM_TERRORIST
  */
-void CCSBotManager::SetRadioMessageTimestamp( RadioType event, int teamID )
+void CFFBotManager::SetRadioMessageTimestamp( RadioType event, int teamID )
 {
 	int i = (teamID == TEAM_TERRORIST) ? 0 : 1;
 
@@ -2238,7 +2238,7 @@ void CCSBotManager::SetRadioMessageTimestamp( RadioType event, int teamID )
 /**
  * Reset all radio message timestamps
  */
-void CCSBotManager::ResetRadioMessageTimestamps( void )
+void CFFBotManager::ResetRadioMessageTimestamps( void )
 {
 	for( int t=0; t<2; ++t )
 	{
@@ -2260,9 +2260,9 @@ void DrawOccupyTime( void )
 
 		int r, g, b;
 		
-		if (TheCSBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_TERRORIST ))
+		if (TheFFBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_TERRORIST ))
 		{
-			if (TheCSBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_CT ))
+			if (TheFFBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_CT ))
 			{
 				r = 255; g = 0; b = 255;
 			}
@@ -2271,7 +2271,7 @@ void DrawOccupyTime( void )
 				r = 255; g = 0; b = 0;
 			}
 		}
-		else if (TheCSBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_CT ))
+		else if (TheFFBots()->GetElapsedRoundTime() > area->GetEarliestOccupyTime( TEAM_CT ))
 		{
 			r = 0; g = 0; b = 255;
 		}
@@ -2328,11 +2328,11 @@ void DrawBattlefront( void )
 static bool CheckAreaAgainstAllZoneAreas(CNavArea *queryArea)
 {
 	// A marked area means they just want to double check this one spot
-	int goalZoneCount = TheCSBots()->GetZoneCount();
+	int goalZoneCount = TheFFBots()->GetZoneCount();
 
 	for( int zoneIndex = 0; zoneIndex < goalZoneCount; zoneIndex++ )
 	{
-		const CCSBotManager::Zone *currentZone = TheCSBots()->GetZone(zoneIndex);
+		const CFFBotManager::Zone *currentZone = TheFFBots()->GetZone(zoneIndex);
 
 		int zoneAreaCount = currentZone->m_areaCount;
 		for( int areaIndex = 0; areaIndex < zoneAreaCount; areaIndex++ )
@@ -2384,7 +2384,3 @@ CON_COMMAND_F( nav_check_connectivity, "Checks to be sure every (or just the mar
 		Msg( "nav_check_connectivity took %2.2f ms\n", time );
 	}
 }
-
-
-
-

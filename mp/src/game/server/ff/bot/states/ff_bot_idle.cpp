@@ -9,7 +9,7 @@
 
 #include "cbase.h"
 #include "cs_simple_hostage.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -23,7 +23,7 @@ const float sniperHideRange = 2000.0f;
  * We never stay in the Idle state - it is a "home base" for the state machine that
  * does various checks to determine what we should do next.
  */
-void IdleState::OnEnter( CCSBot *me )
+void IdleState::OnEnter( CFFBot *me )
 {
 	me->DestroyPath();
 	me->SetBotEnemy( NULL );
@@ -35,15 +35,15 @@ void IdleState::OnEnter( CCSBot *me )
 	//
 	// Since Idle assigns tasks, we assume that coming back to Idle means our task is complete
 	//
-	me->SetTask( CCSBot::SEEK_AND_DESTROY );
-	me->SetDisposition( CCSBot::ENGAGE_AND_INVESTIGATE );
+	me->SetTask( CFFBot::SEEK_AND_DESTROY );
+	me->SetDisposition( CFFBot::ENGAGE_AND_INVESTIGATE );
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Determine what we should do next
  */
-void IdleState::OnUpdate( CCSBot *me )
+void IdleState::OnUpdate( CFFBot *me )
 {
 	// all other states assume GetLastKnownArea() is valid, ensure that it is
 	if (me->GetLastKnownArea() == NULL && me->StayOnNavMesh() == false)
@@ -76,14 +76,14 @@ void IdleState::OnUpdate( CCSBot *me )
 		// if we are escorting hostages, try to get to the rescue zone
 		if (me->GetHostageEscortCount())
 		{
-			const CCSBotManager::Zone *zone = TheCSBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me, FASTEST_ROUTE ) );
-			const Vector *zonePos = TheCSBots()->GetRandomPositionInZone( zone );
+			const CFFBotManager::Zone *zone = TheFFBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me, FASTEST_ROUTE ) );
+			const Vector *zonePos = TheFFBots()->GetRandomPositionInZone( zone );
 
 			if (zonePos)
 			{
-				me->SetTask( CCSBot::RESCUE_HOSTAGES );
+				me->SetTask( CFFBot::RESCUE_HOSTAGES );
 				me->Run();
-				me->SetDisposition( CCSBot::SELF_DEFENSE );
+				me->SetDisposition( CFFBot::SELF_DEFENSE );
 				me->MoveTo( *zonePos, FASTEST_ROUTE );
 				me->PrintIfWatched( "Trying to rescue hostages at the end of the round\n" );
 				return;
@@ -107,23 +107,23 @@ void IdleState::OnUpdate( CCSBot *me )
 	//
 	// Scenario logic
 	//
-	switch (TheCSBots()->GetScenario())
+	switch (TheFFBots()->GetScenario())
 	{
 		//======================================================================================================
-		case CCSBotManager::SCENARIO_DEFUSE_BOMB:
+		case CFFBotManager::SCENARIO_DEFUSE_BOMB:
 		{
 			// if this is a bomb game and we have the bomb, go plant it
 			if (me->GetTeamNumber() == TEAM_TERRORIST)
 			{
 				if (me->GetGameState()->IsBombPlanted())
 				{
-					if (me->GetGameState()->GetPlantedBombsite() != CSGameState::UNKNOWN)
+					if (me->GetGameState()->GetPlantedBombsite() != FFGameState::UNKNOWN)
 					{
 						// T's always know where the bomb is - go defend it
-						const CCSBotManager::Zone *zone = TheCSBots()->GetZone( me->GetGameState()->GetPlantedBombsite() );
+						const CFFBotManager::Zone *zone = TheFFBots()->GetZone( me->GetGameState()->GetPlantedBombsite() );
 						if (zone)
 						{
-							me->SetTask( CCSBot::GUARD_TICKING_BOMB );
+							me->SetTask( CFFBot::GUARD_TICKING_BOMB );
 
 							Place place = TheNavMesh->GetPlace( zone->m_center );
 							if (place != UNDEFINED_PLACE)
@@ -151,10 +151,10 @@ void IdleState::OnUpdate( CCSBot *me )
 						int zoneIndex = me->GetGameState()->GetNextBombsiteToSearch();
 
 						// move to bombsite - if we reach it, we'll update its cleared status, causing us to select another
-						const Vector *pos = TheCSBots()->GetRandomPositionInZone( TheCSBots()->GetZone( zoneIndex ) );
+						const Vector *pos = TheFFBots()->GetRandomPositionInZone( TheFFBots()->GetZone( zoneIndex ) );
 						if (pos)
 						{
-							me->SetTask( CCSBot::FIND_TICKING_BOMB );
+							me->SetTask( CFFBot::FIND_TICKING_BOMB );
 							me->MoveTo( *pos );
 							return;
 						}
@@ -166,7 +166,7 @@ void IdleState::OnUpdate( CCSBot *me )
 					if (me->IsAtBombsite())
 					{
 						// plant it
-						me->SetTask( CCSBot::PLANT_BOMB );
+						me->SetTask( CFFBot::PLANT_BOMB );
 						me->PlantBomb();
 
 						// radio to the team
@@ -174,18 +174,18 @@ void IdleState::OnUpdate( CCSBot *me )
 
 						return;
 					}
-					else if (TheCSBots()->IsTimeToPlantBomb())
+					else if (TheFFBots()->IsTimeToPlantBomb())
 					{
 						// move to the closest bomb site
-						const CCSBotManager::Zone *zone = TheCSBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me ) );
+						const CFFBotManager::Zone *zone = TheFFBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me ) );
 						if (zone)
 						{
 							// pick a random spot within the bomb zone
-							const Vector *pos = TheCSBots()->GetRandomPositionInZone( zone );
+							const Vector *pos = TheFFBots()->GetRandomPositionInZone( zone );
 							if (pos)
 							{
 								// move to bombsite
-								me->SetTask( CCSBot::PLANT_BOMB );
+								me->SetTask( CFFBot::PLANT_BOMB );
 								me->Run();
 								me->MoveTo( *pos );
 
@@ -207,8 +207,8 @@ void IdleState::OnUpdate( CCSBot *me )
 							if (me->MoveToInitialEncounter())
 							{
 								me->PrintIfWatched( "I'm guarding an initial encounter area\n" );
-								me->SetTask( CCSBot::GUARD_INITIAL_ENCOUNTER );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetTask( CFFBot::GUARD_INITIAL_ENCOUNTER );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 						}
@@ -217,9 +217,9 @@ void IdleState::OnUpdate( CCSBot *me )
 					// small chance of sniper camping on offense, if we aren't carrying the bomb
 					if (me->GetFriendsRemaining() && me->IsSniper() && RandomFloat( 0, 100.0f ) < offenseSniperCampChance)
 					{
-						me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+						me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 						me->Hide( me->GetLastKnownArea(), RandomFloat( 10.0f, 30.0f ), sniperHideRange );
-						me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+						me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 						me->PrintIfWatched( "Sniping!\n" );
 						return;
 					}
@@ -238,7 +238,7 @@ void IdleState::OnUpdate( CCSBot *me )
 
 						if (bombPos)
 						{
-							me->SetTask( CCSBot::GUARD_TICKING_BOMB );
+							me->SetTask( CFFBot::GUARD_TICKING_BOMB );
 							me->Hide( TheNavMesh->GetNavArea( *bombPos ) );
 							return;
 						}
@@ -254,11 +254,11 @@ void IdleState::OnUpdate( CCSBot *me )
 					if (bombPos)
 					{
 						// if someone is defusing the bomb, guard them
-						if (TheCSBots()->GetBombDefuser())
+						if (TheFFBots()->GetBombDefuser())
 						{
 							if (!me->IsRogue())
 							{
-								me->SetTask( CCSBot::GUARD_BOMB_DEFUSER );
+								me->SetTask( CFFBot::GUARD_BOMB_DEFUSER );
 								me->Hide( TheNavMesh->GetNavArea( *bombPos ) );
 								return;
 							}
@@ -266,39 +266,39 @@ void IdleState::OnUpdate( CCSBot *me )
 						else if (me->IsDoingScenario())
 						{
 							// move to the bomb and defuse it
-							me->SetTask( CCSBot::DEFUSE_BOMB );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetTask( CFFBot::DEFUSE_BOMB );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							me->MoveTo( *bombPos );
 							return;
 						}
 						else
 						{
 							// we're not allowed to defuse, guard the bomb zone
-							me->SetTask( CCSBot::GUARD_BOMB_ZONE );
+							me->SetTask( CFFBot::GUARD_BOMB_ZONE );
 							me->Hide( TheNavMesh->GetNavArea( *bombPos ) );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
-					else if (me->GetGameState()->GetPlantedBombsite() != CSGameState::UNKNOWN)
+					else if (me->GetGameState()->GetPlantedBombsite() != FFGameState::UNKNOWN)
 					{
 						// we know which bombsite, but not exactly where the bomb is, go there
-						const CCSBotManager::Zone *zone = TheCSBots()->GetZone( me->GetGameState()->GetPlantedBombsite() );
+						const CFFBotManager::Zone *zone = TheFFBots()->GetZone( me->GetGameState()->GetPlantedBombsite() );
 						if (zone)
 						{
 							if (me->IsDoingScenario())
 							{
-								me->SetTask( CCSBot::DEFUSE_BOMB );
+								me->SetTask( CFFBot::DEFUSE_BOMB );
 								me->MoveTo( zone->m_center );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 							else
 							{
 								// we're not allowed to defuse, guard the bomb zone
-								me->SetTask( CCSBot::GUARD_BOMB_ZONE );
+								me->SetTask( CFFBot::GUARD_BOMB_ZONE );
 								me->Hide( TheNavMesh->GetNavArea( zone->m_center ) );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 						}
@@ -308,12 +308,12 @@ void IdleState::OnUpdate( CCSBot *me )
 						// we dont know where the bomb is - we must search the bombsites
 
 						// find closest un-cleared bombsite
-						const CCSBotManager::Zone *zone = NULL;
+						const CFFBotManager::Zone *zone = NULL;
 						float travelDistance = 9999999.9f;
 
-						for( int z=0; z<TheCSBots()->GetZoneCount(); ++z )
+						for( int z=0; z<TheFFBots()->GetZoneCount(); ++z )
 						{
-							if (TheCSBots()->GetZone(z)->m_areaCount == 0)
+							if (TheFFBots()->GetZone(z)->m_areaCount == 0)
 								continue;
 
 							// don't check bombsites that have been cleared
@@ -323,12 +323,12 @@ void IdleState::OnUpdate( CCSBot *me )
 							// just use the first overlapping nav area as a reasonable approximation
 							ShortestPathCost cost = ShortestPathCost();
 							float dist = NavAreaTravelDistance( me->GetLastKnownArea(), 
-																TheNavMesh->GetNearestNavArea( TheCSBots()->GetZone(z)->m_center ), 
+																TheNavMesh->GetNearestNavArea( TheFFBots()->GetZone(z)->m_center ),
 																cost );
 
 							if (dist >= 0.0f && dist < travelDistance)
 							{
-								zone = TheCSBots()->GetZone(z);
+								zone = TheFFBots()->GetZone(z);
 								travelDistance = dist;
 							}
 						}			
@@ -347,16 +347,16 @@ void IdleState::OnUpdate( CCSBot *me )
 						if (zone == NULL)
 						{
 							int zoneIndex = me->GetGameState()->GetNextBombsiteToSearch();
-							zone = TheCSBots()->GetZone( zoneIndex );
+							zone = TheFFBots()->GetZone( zoneIndex );
 						}
 
 						// move to bombsite - if we reach it, we'll update its cleared status, causing us to select another
 						if (zone)
 						{
-							const Vector *pos = TheCSBots()->GetRandomPositionInZone( zone );
+							const Vector *pos = TheFFBots()->GetRandomPositionInZone( zone );
 							if (pos)
 							{
-								me->SetTask( CCSBot::FIND_TICKING_BOMB );
+								me->SetTask( CFFBot::FIND_TICKING_BOMB );
 								me->MoveTo( *pos );
 								return;
 							}
@@ -383,19 +383,19 @@ void IdleState::OnUpdate( CCSBot *me )
 						else
 						{
 							// snipe bomb zone(s)
-							const CCSBotManager::Zone *zone = TheCSBots()->GetRandomZone();
+							const CFFBotManager::Zone *zone = TheFFBots()->GetRandomZone();
 							if (zone)
 							{
-								snipingArea = TheCSBots()->GetRandomAreaInZone( zone );
+								snipingArea = TheFFBots()->GetRandomAreaInZone( zone );
 								me->PrintIfWatched( "Sniping near bombsite\n" );
 							}
 						}
 
 						if (snipingArea)
 						{
-							me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+							me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 							me->Hide( snipingArea, -1.0, sniperHideRange );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
@@ -404,7 +404,7 @@ void IdleState::OnUpdate( CCSBot *me )
 				// rogues just hunt, unless they want to snipe
 				// if the whole team has decided to rush, hunt
 				// if we know the bomb is dropped, hunt for enemies and the loose bomb
-				if (me->IsRogue() || TheCSBots()->IsDefenseRushing() || me->GetGameState()->IsLooseBombLocationKnown())
+				if (me->IsRogue() || TheFFBots()->IsDefenseRushing() || me->GetGameState()->IsLooseBombLocationKnown())
 				{
 					me->Hunt();
 					return;
@@ -421,17 +421,17 @@ void IdleState::OnUpdate( CCSBot *me )
 						float guardRange = 500.0f + 100.0f * (me->GetMorale() + 3);
 
 						// guard bomb zone(s)
-						const CCSBotManager::Zone *zone = TheCSBots()->GetRandomZone();
+						const CFFBotManager::Zone *zone = TheFFBots()->GetRandomZone();
 						if (zone)
 						{
-							CNavArea *area = TheCSBots()->GetRandomAreaInZone( zone );
+							CNavArea *area = TheFFBots()->GetRandomAreaInZone( zone );
 							if (area)
 							{
 								me->PrintIfWatched( "I'm guarding a bombsite\n" );
 								me->GetChatter()->GuardingBombsite( area->GetPlace() );
-								me->SetTask( CCSBot::GUARD_BOMB_ZONE );
+								me->SetTask( CFFBot::GUARD_BOMB_ZONE );
 								me->Hide( area, -1.0, guardRange );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 						}
@@ -448,8 +448,8 @@ void IdleState::OnUpdate( CCSBot *me )
 							if (me->MoveToInitialEncounter())
 							{
 								me->PrintIfWatched( "I'm guarding an initial encounter area\n" );
-								me->SetTask( CCSBot::GUARD_INITIAL_ENCOUNTER );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetTask( CFFBot::GUARD_INITIAL_ENCOUNTER );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 						}
@@ -461,7 +461,7 @@ void IdleState::OnUpdate( CCSBot *me )
 		}
 
 		//======================================================================================================
-		case CCSBotManager::SCENARIO_ESCORT_VIP:
+		case CFFBotManager::SCENARIO_ESCORT_VIP:
 		{
 			if (me->GetTeamNumber() == TEAM_TERRORIST)
 			{
@@ -471,15 +471,15 @@ void IdleState::OnUpdate( CCSBot *me )
 					if (RandomFloat( 0, 100 ) <= defenseSniperCampChance)
 					{
 						// snipe escape zone(s)
-						const CCSBotManager::Zone *zone = TheCSBots()->GetRandomZone();
+						const CFFBotManager::Zone *zone = TheFFBots()->GetRandomZone();
 						if (zone)
 						{
-							CNavArea *area = TheCSBots()->GetRandomAreaInZone( zone );
+							CNavArea *area = TheFFBots()->GetRandomAreaInZone( zone );
 							if (area)
 							{
-								me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+								me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 								me->Hide( area, -1.0, sniperHideRange );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								me->PrintIfWatched( "Sniping near escape zone\n" );
 								return;
 							}
@@ -489,7 +489,7 @@ void IdleState::OnUpdate( CCSBot *me )
 
 				// rogues just hunt, unless they want to snipe
 				// if the whole team has decided to rush, hunt
-				if (me->IsRogue() || TheCSBots()->IsDefenseRushing())
+				if (me->IsRogue() || TheFFBots()->IsDefenseRushing())
 					break;
 
 				// the lower our morale gets, the more we want to camp the escape zone(s)
@@ -498,59 +498,59 @@ void IdleState::OnUpdate( CCSBot *me )
 				if (RandomFloat( 0.0f, 100.0f ) < guardEscapeZoneChance)
 				{
 					// guard escape zone(s)
-					const CCSBotManager::Zone *zone = TheCSBots()->GetRandomZone();
+					const CFFBotManager::Zone *zone = TheFFBots()->GetRandomZone();
 					if (zone)
 					{
-						CNavArea *area = TheCSBots()->GetRandomAreaInZone( zone );
+						CNavArea *area = TheFFBots()->GetRandomAreaInZone( zone );
 						if (area)
 						{
 							// guard the escape zone - stay closer if our morale is low
-							me->SetTask( CCSBot::GUARD_VIP_ESCAPE_ZONE );
+							me->SetTask( CFFBot::GUARD_VIP_ESCAPE_ZONE );
 							me->PrintIfWatched( "I'm guarding an escape zone\n" );
 
 							float escapeGuardRange = 750.0f + 250.0f * (me->GetMorale() + 3);
 							me->Hide( area, -1.0, escapeGuardRange );
 
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
 				}
 			}
-			else	// CT
+			else	// CT ---------------------------------------------------------------------------------
 			{
 				if (me->m_bIsVIP)
 				{
 					// if early in round, pick a random zone, otherwise pick closest zone
 					const float earlyTime = 20.0f;
-					const CCSBotManager::Zone *zone = NULL;
+					const CFFBotManager::Zone *zone = NULL;
 
-					if (TheCSBots()->GetElapsedRoundTime() < earlyTime)
+					if (TheFFBots()->GetElapsedRoundTime() < earlyTime)
 					{
 						// pick random zone
-						zone = TheCSBots()->GetRandomZone();
+						zone = TheFFBots()->GetRandomZone();
 					}
 					else
 					{
 						// pick closest zone
-						zone = TheCSBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me ) );
+						zone = TheFFBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me ) );
 					}
 
 					if (zone)
 					{
 						// pick a random spot within the escape zone
-						const Vector *pos = TheCSBots()->GetRandomPositionInZone( zone );
+						const Vector *pos = TheFFBots()->GetRandomPositionInZone( zone );
 						if (pos)
 						{
 							// move to escape zone
-							me->SetTask( CCSBot::VIP_ESCAPE );
+							me->SetTask( CFFBot::VIP_ESCAPE );
 							me->Run();
 							me->MoveTo( *pos );
 
 							// tell team to follow
 							const float repeatTime = 30.0f;
 							if (me->GetFriendsRemaining() && 
-									TheCSBots()->GetRadioMessageInterval( RADIO_FOLLOW_ME, me->GetTeamNumber() ) > repeatTime)
+									TheFFBots()->GetRadioMessageInterval( RADIO_FOLLOW_ME, me->GetTeamNumber() ) > repeatTime)
 								me->SendRadioMessage( RADIO_FOLLOW_ME );
 							return;
 						}
@@ -561,9 +561,9 @@ void IdleState::OnUpdate( CCSBot *me )
 					// small chance of sniper camping on offense, if we aren't VIP
 					if (me->GetFriendsRemaining() && me->IsSniper() && RandomFloat( 0, 100.0f ) < offenseSniperCampChance)
 					{
-						me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+						me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 						me->Hide( me->GetLastKnownArea(), RandomFloat( 10.0f, 30.0f ), sniperHideRange );
-						me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+						me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 						me->PrintIfWatched( "Sniping!\n" );
 						return;
 					}
@@ -573,7 +573,7 @@ void IdleState::OnUpdate( CCSBot *me )
 		}
 
 		//======================================================================================================
-		case CCSBotManager::SCENARIO_RESCUE_HOSTAGES:
+		case CFFBotManager::SCENARIO_RESCUE_HOSTAGES:
 		{
 			if (me->GetTeamNumber() == TEAM_TERRORIST)
 			{
@@ -591,7 +591,7 @@ void IdleState::OnUpdate( CCSBot *me )
 				else
 				{
 					// later in the game, camp either hostages or escape zone
-					const float campZoneChance = 100.0f * (TheCSBots()->GetElapsedRoundTime() - me->GetSafeTime())/120.0f;
+					const float campZoneChance = 100.0f * (TheFFBots()->GetElapsedRoundTime() - me->GetSafeTime())/120.0f;
 
 					campHostages = (RandomFloat( 0, 100 ) > campZoneChance) ? true : false; 
 				}
@@ -606,8 +606,8 @@ void IdleState::OnUpdate( CCSBot *me )
 						if (me->MoveToInitialEncounter())
 						{
 							me->PrintIfWatched( "I'm sniping an initial encounter area\n" );
-							me->SetTask( CCSBot::GUARD_INITIAL_ENCOUNTER );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetTask( CFFBot::GUARD_INITIAL_ENCOUNTER );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
@@ -617,10 +617,10 @@ void IdleState::OnUpdate( CCSBot *me )
 						const Vector *hostagePos = me->GetGameState()->GetRandomFreeHostagePosition();
 						if (hostagePos && campHostages)
 						{
-							me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+							me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 							me->PrintIfWatched( "Sniping near hostages\n" );
 							me->Hide( TheNavMesh->GetNearestNavArea( *hostagePos ), -1.0, sniperHideRange );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 						else
@@ -628,9 +628,9 @@ void IdleState::OnUpdate( CCSBot *me )
 							// camp the escape zone(s)
 							if (me->GuardRandomZone( sniperHideRange ))
 							{
-								me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+								me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 								me->PrintIfWatched( "Sniping near a rescue zone\n" );
-								me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+								me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 								return;
 							}
 						}
@@ -647,7 +647,7 @@ void IdleState::OnUpdate( CCSBot *me )
 						CNavArea *area = TheNavMesh->GetNearestNavArea( GetCentroid( hostage ) );
 						if (area)
 						{
-							me->SetTask( CCSBot::GUARD_HOSTAGES );
+							me->SetTask( CFFBot::GUARD_HOSTAGES );
 							me->Hide( area );
 							me->PrintIfWatched( "I'm guarding hostages I found\n" );
 							// don't chatter here - he'll tell us when he's in his hiding spot
@@ -664,7 +664,7 @@ void IdleState::OnUpdate( CCSBot *me )
 				// if the whole team has decided to rush, hunt
 				if (me->GetFriendsRemaining())
 				{
-					if (me->IsRogue() || TheCSBots()->IsDefenseRushing() || RandomFloat( 0, 100 ) < huntChance)
+					if (me->IsRogue() || TheFFBots()->IsDefenseRushing() || RandomFloat( 0, 100 ) < huntChance)
 					{
 						me->Hunt();
 						return;
@@ -682,8 +682,8 @@ void IdleState::OnUpdate( CCSBot *me )
 						if (me->MoveToInitialEncounter())
 						{
 							me->PrintIfWatched( "I'm guarding an initial encounter area\n" );
-							me->SetTask( CCSBot::GUARD_INITIAL_ENCOUNTER );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetTask( CFFBot::GUARD_INITIAL_ENCOUNTER );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
@@ -698,12 +698,12 @@ void IdleState::OnUpdate( CCSBot *me )
 					if (area)
 					{
 						// guard the hostages - stay closer to hostages if our morale is low
-						me->SetTask( CCSBot::GUARD_HOSTAGES );
+						me->SetTask( CFFBot::GUARD_HOSTAGES );
 						me->PrintIfWatched( "I'm guarding hostages\n" );
 
 						float hostageGuardRange = 750.0f + 250.0f * (me->GetMorale() + 3);			// 2000
 						me->Hide( area, -1.0, hostageGuardRange );
-						me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+						me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 
 						if (RandomFloat( 0, 100 ) < 50)
 							me->GetChatter()->GuardingHostages( area->GetPlace(), IS_PLAN );
@@ -715,9 +715,9 @@ void IdleState::OnUpdate( CCSBot *me )
 				// guard rescue zone(s)
 				if (me->GuardRandomZone())
 				{
-					me->SetTask( CCSBot::GUARD_HOSTAGE_RESCUE_ZONE );
+					me->SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
 					me->PrintIfWatched( "I'm guarding a rescue zone\n" );
-					me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+					me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 					me->GetChatter()->GuardingHostageEscapeZone( IS_PLAN );
 					return;
 				}
@@ -730,9 +730,9 @@ void IdleState::OnUpdate( CCSBot *me )
 					// small chance of sniper camping on offense
 					if (me->GetFriendsRemaining() && me->IsSniper() && RandomFloat( 0, 100.0f ) < offenseSniperCampChance)
 					{
-						me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+						me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 						me->Hide( me->GetLastKnownArea(), RandomFloat( 10.0f, 30.0f ), sniperHideRange );
-						me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+						me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 						me->PrintIfWatched( "Sniping!\n" );
 						return;
 					}
@@ -761,8 +761,8 @@ void IdleState::OnUpdate( CCSBot *me )
 						if (me->MoveToInitialEncounter())
 						{
 							me->PrintIfWatched( "I'm guarding an initial encounter area\n" );
-							me->SetTask( CCSBot::GUARD_INITIAL_ENCOUNTER );
-							me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+							me->SetTask( CFFBot::GUARD_INITIAL_ENCOUNTER );
+							me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 							return;
 						}
 					}
@@ -779,7 +779,7 @@ void IdleState::OnUpdate( CCSBot *me )
 						CNavArea *area = TheNavMesh->GetNearestNavArea( GetCentroid( hostage ) );
 						if (area)
 						{
-							me->SetTask( CCSBot::GUARD_HOSTAGES );
+							me->SetTask( CFFBot::GUARD_HOSTAGES );
 							me->Hide( area );
 							me->PrintIfWatched( "I'm securing the hostages for a human to rescue\n" );
 							return;
@@ -793,12 +793,12 @@ void IdleState::OnUpdate( CCSBot *me )
 
 				bool fetchHostages = false;
 				bool rescueHostages = false;
-				const CCSBotManager::Zone *zone = NULL;
+				const CFFBotManager::Zone *zone = NULL;
 				me->SetGoalEntity( NULL );
 
 				// if we are escorting hostages, determine where to take them
 				if (me->GetHostageEscortCount())
-					zone = TheCSBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me, FASTEST_ROUTE ) );
+					zone = TheFFBots()->GetClosestZone( me->GetLastKnownArea(), PathCost( me, FASTEST_ROUTE ) );
 
 				// if we are escorting hostages and there are more hostages to rescue, 
 				// determine whether it's faster to rescue the ones we have, or go get the remaining ones
@@ -838,7 +838,7 @@ void IdleState::OnUpdate( CCSBot *me )
 				if (fetchHostages)
 				{
 					// go get hostages
-					me->SetTask( CCSBot::COLLECT_HOSTAGES );
+					me->SetTask( CFFBot::COLLECT_HOSTAGES );
 					me->Run();
 					me->SetGoalEntity( hostage );
 					me->ResetWaitForHostagePatience();
@@ -851,12 +851,12 @@ void IdleState::OnUpdate( CCSBot *me )
 					return;
 				}
 
-				const Vector *zonePos = TheCSBots()->GetRandomPositionInZone( zone );
+				const Vector *zonePos = TheFFBots()->GetRandomPositionInZone( zone );
 				if (rescueHostages && zonePos)
 				{
-					me->SetTask( CCSBot::RESCUE_HOSTAGES );
+					me->SetTask( CFFBot::RESCUE_HOSTAGES );
 					me->Run();
-					me->SetDisposition( CCSBot::SELF_DEFENSE );
+					me->SetDisposition( CFFBot::SELF_DEFENSE );
 					me->MoveTo( *zonePos, FASTEST_ROUTE );
 					me->PrintIfWatched( "I'm rescuing hostages\n" );
 					me->GetChatter()->EscortingHostages();
@@ -871,9 +871,9 @@ void IdleState::OnUpdate( CCSBot *me )
 			// sniping check
 			if (me->GetFriendsRemaining() && me->IsSniper() && RandomFloat( 0, 100.0f ) < offenseSniperCampChance)
 			{
-				me->SetTask( CCSBot::MOVE_TO_SNIPER_SPOT );
+				me->SetTask( CFFBot::MOVE_TO_SNIPER_SPOT );
 				me->Hide( me->GetLastKnownArea(), RandomFloat( 10.0f, 30.0f ), sniperHideRange );
-				me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+				me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 				me->PrintIfWatched( "Sniping!\n" );
 				return;
 			}
@@ -884,4 +884,3 @@ void IdleState::OnUpdate( CCSBot *me )
 	// if we have nothing special to do, go hunting for enemies
 	me->Hunt();
 }
-

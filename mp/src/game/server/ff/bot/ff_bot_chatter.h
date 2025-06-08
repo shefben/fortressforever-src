@@ -7,15 +7,15 @@
 
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
-#ifndef CS_BOT_CHATTER_H
-#define CS_BOT_CHATTER_H
+#ifndef FF_BOT_CHATTER_H
+#define FF_BOT_CHATTER_H
 
 #pragma warning( disable : 4786 )	// long STL names get truncated in browse info.
 
 #include "nav_mesh.h"
-#include "cs_gamestate.h"
+#include "ff_gamestate.h"
 
-class CCSBot;
+class CFFBot;
 class BotChatterInterface;
 
 #define MAX_PLACES_PER_MAP 64
@@ -40,12 +40,12 @@ const Vector *GetRandomSpotAtPlace( Place place );
 class BotMeme
 {
 public:
-	void Transmit( CCSBot *sender ) const;									///< transmit meme to other bots
+	void Transmit( CFFBot *sender ) const;									///< transmit meme to other bots
 	// It is a best practice to always have a virtual destructor in an interface
 	// class. Otherwise if the derived classes have destructors they will not be
 	// called.
 	virtual ~BotMeme() {}
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const = 0;	///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const = 0;	///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ public:
 		m_place = place;
 	}
 
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 
 private:
 	Place m_place;			///< where the help is needed
@@ -75,7 +75,7 @@ public:
 		m_status = status;
 	}
 
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 
 private:
 	int m_zoneIndex;			///< the bombsite
@@ -86,16 +86,16 @@ private:
 class BotBombStatusMeme : public BotMeme
 {
 public:
-	BotBombStatusMeme( CSGameState::BombState state, const Vector &pos )
+	BotBombStatusMeme( FFGameState::BombState state, const Vector &pos )
 	{
 		m_state = state;
 		m_pos = pos;
 	}
 
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 
 private:
-	CSGameState::BombState m_state;
+	FFGameState::BombState m_state;
 	Vector m_pos;
 };
 
@@ -103,7 +103,7 @@ private:
 class BotFollowMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
@@ -115,7 +115,7 @@ public:
 		m_pos = pos;
 	}
 
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 
 private:
 	Vector m_pos;
@@ -125,42 +125,42 @@ private:
 class BotWhereBombMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
 class BotRequestReportMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
 class BotAllHostagesGoneMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
 class BotHostageBeingTakenMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
 class BotHeardNoiseMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
 class BotWarnSniperMeme : public BotMeme
 {
 public:
-	virtual void Interpret( CCSBot *sender, CCSBot *receiver ) const;		///< cause the given bot to act on this meme
+	virtual void Interpret( CFFBot *sender, CFFBot *receiver ) const;		///< cause the given bot to act on this meme
 };
 
 //----------------------------------------------------------------------------------------------------
@@ -389,7 +389,7 @@ public:
 	~BotStatement();
 
 	BotChatterInterface *GetChatter( void ) const	{ return m_chatter; }
-	CCSBot *GetOwner( void ) const;
+	CFFBot *GetOwner( void ) const;
 
 	BotStatementType GetType( void ) const	{ return m_type; }	///< return the type of statement this is
 	bool IsImportant( void ) const;								///< return true if this statement is "important" and not personality chatter
@@ -488,7 +488,7 @@ private:
 class BotChatterInterface
 {
 public:
-	BotChatterInterface( CCSBot *me );
+	BotChatterInterface( CFFBot *me );
 	~BotChatterInterface( );
 
 	void Reset( void );											///< reset to initial state
@@ -506,7 +506,7 @@ public:
 	};
 	VerbosityType GetVerbosity( void ) const;					///< return our current level of verbosity
 
-	CCSBot *GetOwner( void ) const							{ return m_me; }
+	CFFBot *GetOwner( void ) const							{ return m_me; }
 
 	bool IsTalking( void ) const;								///< return true if we are currently talking
 	float GetRadioSilenceDuration( void );						///< return time since any teammate said anything
@@ -582,7 +582,7 @@ private:
 	void ReportEnemies( void );											///< track nearby enemy count and generate enemy activity statements
 	bool ShouldSpeak( void ) const;										///< return true if we speaking makes sense now
 
-	CCSBot *m_me;														///< the bot this chatter is for
+	CFFBot *m_me;														///< the bot this chatter is for
 
 	bool m_seeAtLeastOneEnemy;
 	float m_timeWhenSawFirstEnemy;
@@ -653,4 +653,4 @@ inline void BotChatterInterface::Say( const char *phraseName, float lifetime, fl
 
 
 
-#endif // CS_BOT_CHATTER_H
+#endif // FF_BOT_CHATTER_H

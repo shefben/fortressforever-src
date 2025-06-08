@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,7 +17,7 @@
 /**
  * Move towards currently heard noise
  */
-void InvestigateNoiseState::AttendCurrentNoise( CCSBot *me )
+void InvestigateNoiseState::AttendCurrentNoise( CFFBot *me )
 {
 	if (!me->IsNoiseHeard() && me->GetNoisePosition())
 		return;
@@ -42,7 +42,7 @@ void InvestigateNoiseState::AttendCurrentNoise( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void InvestigateNoiseState::OnEnter( CCSBot *me )
+void InvestigateNoiseState::OnEnter( CFFBot *me )
 {
 	AttendCurrentNoise( me );
 }
@@ -51,7 +51,7 @@ void InvestigateNoiseState::OnEnter( CCSBot *me )
 /**
  * @todo Use TravelDistance instead of distance...
  */
-void InvestigateNoiseState::OnUpdate( CCSBot *me )
+void InvestigateNoiseState::OnUpdate( CFFBot *me )
 {
 	Vector myOrigin = GetCentroid( me );
 
@@ -125,14 +125,14 @@ void InvestigateNoiseState::OnUpdate( CCSBot *me )
 	}
 
 	// move towards noise
-	if (me->UpdatePathMovement() != CCSBot::PROGRESSING)
+	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
 	{
 		me->Idle();
 	}
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void InvestigateNoiseState::OnExit( CCSBot *me )
+void InvestigateNoiseState::OnExit( CFFBot *me )
 {
 	// reset to run mode in case we were sneaking about
 	me->Run();

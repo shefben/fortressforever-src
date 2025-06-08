@@ -11,13 +11,13 @@
 #include "cs_gamerules.h"
 #include "KeyValues.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnPlayerDeath( IGameEvent *event )
+void CFFBot::OnPlayerDeath( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -87,7 +87,7 @@ void CCSBot::OnPlayerDeath( IGameEvent *event )
 				// check that attacker is an enemy (for friendly fire, etc)
 				if (other && other->IsPlayer())
 				{
-					CCSPlayer *killer = static_cast<CCSPlayer *>( other );
+					CFFPlayer *killer = static_cast<CFFPlayer *>( other );
 					if (killer->GetTeamNumber() != GetTeamNumber())
 					{
 						// check if we saw our friend die - dont check FOV - assume we're aware of our surroundings in combat
@@ -166,13 +166,13 @@ void CCSBot::OnPlayerDeath( IGameEvent *event )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnPlayerRadio( IGameEvent *event )
+void CFFBot::OnPlayerRadio( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
 
 	// don't react to our own events
-	CCSPlayer *player = ToCSPlayer( UTIL_PlayerByUserId( event->GetInt( "userid" ) ) );
+	CFFPlayer *player = ToCSPlayer( UTIL_PlayerByUserId( event->GetInt( "userid" ) ) );
 	if ( player == this )
 		return;
 
@@ -196,7 +196,7 @@ void CCSBot::OnPlayerRadio( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnPlayerFallDamage( IGameEvent *event )
+void CFFBot::OnPlayerFallDamage( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -211,7 +211,7 @@ void CCSBot::OnPlayerFallDamage( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnPlayerFootstep( IGameEvent *event )
+void CFFBot::OnPlayerFootstep( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -223,5 +223,3 @@ void CCSBot::OnPlayerFootstep( IGameEvent *event )
 
 	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false, IS_FOOTSTEP ); // player_footstep
 }
-
-

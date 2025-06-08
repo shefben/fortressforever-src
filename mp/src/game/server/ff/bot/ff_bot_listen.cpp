@@ -8,14 +8,14 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 
 //--------------------------------------------------------------------------------------------------------------
-bool CCSBot::IsNoiseHeard( void ) const
+bool CFFBot::IsNoiseHeard( void ) const
 {
 	if (m_noiseTimestamp <= 0.0f)
 		return false;
@@ -33,7 +33,7 @@ bool CCSBot::IsNoiseHeard( void ) const
  * Listen for enemy noises, and determine if we should react to them.
  * Returns true if heard a noise and should move to investigate.
  */
-bool CCSBot::HeardInterestingNoise( void )
+bool CFFBot::HeardInterestingNoise( void )
 {
 	if (IsBlind())
 		return false;
@@ -85,7 +85,7 @@ bool CCSBot::HeardInterestingNoise( void )
  * Return true if we hear nearby threatening enemy gunfire within given range
  * -1 == infinite range
  */
-bool CCSBot::CanHearNearbyEnemyGunfire( float range ) const
+bool CFFBot::CanHearNearbyEnemyGunfire( float range ) const
 {
 	Vector myOrigin = GetCentroid( this );
 
@@ -124,7 +124,7 @@ bool CCSBot::CanHearNearbyEnemyGunfire( float range ) const
  * NOTE: Dont check FOV, since this is used to determine if we should turn our head to look at the noise
  * NOTE: Dont use IsVisible(), because smoke shouldnt cause us to not look toward noises
  */
-bool CCSBot::CanSeeNoisePosition( void ) const
+bool CFFBot::CanSeeNoisePosition( void ) const
 {
 	trace_t result;
 	CTraceFilterNoNPCsOrPlayer traceFilter( this, COLLISION_GROUP_NONE );
@@ -144,7 +144,7 @@ bool CCSBot::CanSeeNoisePosition( void ) const
  * Return true if we decided to look towards the most recent noise source
  * Assumes m_noisePosition is valid.
  */
-bool CCSBot::UpdateLookAtNoise( void )
+bool CFFBot::UpdateLookAtNoise( void )
 {
 	// make sure a noise exists
 	if (!IsNoiseHeard())
@@ -227,4 +227,3 @@ bool CCSBot::UpdateLookAtNoise( void )
 
 	return true;
 }
-

@@ -9,7 +9,7 @@
 
 #include "cbase.h"
 #include "cs_simple_hostage.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -19,7 +19,7 @@
  * Begin moving to a nearby hidey-hole.
  * NOTE: Do not forget this state may include a very long "move-to" time to get to our hidey spot!
  */
-void HideState::OnEnter( CCSBot *me )
+void HideState::OnEnter( CFFBot *me )
 {
 	m_isAtSpot = false;
 	m_isLookingOutward = false;
@@ -69,7 +69,7 @@ void HideState::OnEnter( CCSBot *me )
  * Move to a nearby hidey-hole.
  * NOTE: Do not forget this state may include a very long "move-to" time to get to our hidey spot!
  */
-void HideState::OnUpdate( CCSBot *me )
+void HideState::OnUpdate( CFFBot *me )
 {
 	Vector myOrigin = GetCentroid( me );
 
@@ -79,7 +79,7 @@ void HideState::OnUpdate( CCSBot *me )
 		// if we are momentarily hiding while following someone, check to see if he has moved on
 		if (me->IsFollowing())
 		{
-			CCSPlayer *leader = static_cast<CCSPlayer *>( static_cast<CBaseEntity *>( me->GetFollowLeader() ) );
+			CFFPlayer *leader = static_cast<CFFPlayer *>( static_cast<CBaseEntity *>( me->GetFollowLeader() ) );
 			Vector leaderOrigin = GetCentroid( leader );
 
 			// BOTPORT: Determine walk/run velocity thresholds
@@ -106,30 +106,30 @@ void HideState::OnUpdate( CCSBot *me )
 		//
 		// Scenario logic
 		//
-		switch( TheCSBots()->GetScenario() )
+		switch( TheFFBots()->GetScenario() )
 		{
-			case CCSBotManager::SCENARIO_DEFUSE_BOMB:
+			case CFFBotManager::SCENARIO_DEFUSE_BOMB:
 			{
 				if (me->GetTeamNumber() == TEAM_CT)
 				{
 					// if we are just holding position (due to a radio order) and the bomb has just planted, go defuse it
-					if (me->GetTask() == CCSBot::HOLD_POSITION && 
-						TheCSBots()->IsBombPlanted() &&
-						TheCSBots()->GetBombPlantTimestamp() > me->GetStateTimestamp())
+					if (me->GetTask() == CFFBot::HOLD_POSITION &&
+						TheFFBots()->IsBombPlanted() &&
+						TheFFBots()->GetBombPlantTimestamp() > me->GetStateTimestamp())
 					{
 						me->Idle();
 						return;
 					}
 
 					// if we are guarding the defuser and he dies/gives up, stop hiding (to choose another defuser)
-					if (me->GetTask() == CCSBot::GUARD_BOMB_DEFUSER && TheCSBots()->GetBombDefuser() == NULL)
+					if (me->GetTask() == CFFBot::GUARD_BOMB_DEFUSER && TheFFBots()->GetBombDefuser() == NULL)
 					{
 						me->Idle();
 						return;
 					}
 
 					// if we are guarding the loose bomb and it is picked up, stop hiding
-					if (me->GetTask() == CCSBot::GUARD_LOOSE_BOMB && TheCSBots()->GetLooseBomb() == NULL)
+					if (me->GetTask() == CFFBot::GUARD_LOOSE_BOMB && TheFFBots()->GetLooseBomb() == NULL)
 					{
 						me->GetChatter()->TheyPickedUpTheBomb();
 						me->Idle();
@@ -137,14 +137,14 @@ void HideState::OnUpdate( CCSBot *me )
 					}
 
 					// if we are guarding a bombsite and the bomb is dropped and we hear about it, stop guarding
-					if (me->GetTask() == CCSBot::GUARD_BOMB_ZONE && me->GetGameState()->IsLooseBombLocationKnown())
+					if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE && me->GetGameState()->IsLooseBombLocationKnown())
 					{
 						me->Idle();
 						return;
 					}
 
 					// if we are guarding (bombsite, initial encounter, etc) and the bomb is planted, go defuse it
-					if (me->IsDoingScenario() && me->GetTask() != CCSBot::GUARD_BOMB_DEFUSER && TheCSBots()->IsBombPlanted())
+					if (me->IsDoingScenario() && me->GetTask() != CFFBot::GUARD_BOMB_DEFUSER && TheFFBots()->IsBombPlanted())
 					{
 						me->Idle();
 						return;
@@ -154,9 +154,9 @@ void HideState::OnUpdate( CCSBot *me )
 				else	// TERRORIST
 				{
 					// if we are near the ticking bomb and someone starts defusing it, attack!
-					if (TheCSBots()->GetBombDefuser())
+					if (TheFFBots()->GetBombDefuser())
 					{
-						Vector defuserOrigin = GetCentroid( TheCSBots()->GetBombDefuser() );
+						Vector defuserOrigin = GetCentroid( TheFFBots()->GetBombDefuser() );
 						Vector toDefuser = defuserOrigin - myOrigin;
 
 						const float hearDefuseRange = 2000.0f;
@@ -165,7 +165,7 @@ void HideState::OnUpdate( CCSBot *me )
 							// if we are nearby, attack, otherwise move to the bomb (which will cause us to attack when we see defuser)
 							if (me->CanSeePlantedBomb())
 							{
-								me->Attack( TheCSBots()->GetBombDefuser() );
+								me->Attack( TheFFBots()->GetBombDefuser() );
 							}
 							else
 							{
@@ -181,10 +181,10 @@ void HideState::OnUpdate( CCSBot *me )
 			}
 
 			//--------------------------------------------------------------------------------------------------
-			case CCSBotManager::SCENARIO_RESCUE_HOSTAGES:
+			case CFFBotManager::SCENARIO_RESCUE_HOSTAGES:
 			{
 				// if we're guarding the hostages and they all die or are taken, do something else
-				if (me->GetTask() == CCSBot::GUARD_HOSTAGES)
+				if (me->GetTask() == CFFBot::GUARD_HOSTAGES)
 				{
 					if (me->GetGameState()->AreAllHostagesBeingRescued() || me->GetGameState()->AreAllHostagesGone())
 					{
@@ -192,7 +192,7 @@ void HideState::OnUpdate( CCSBot *me )
 						return;
 					}
 				}
-				else if (me->GetTask() == CCSBot::GUARD_HOSTAGE_RESCUE_ZONE)
+				else if (me->GetTask() == CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
 				{
 					// if we stumble across a hostage, guard it
 					CHostage *hostage = me->GetGameState()->GetNearestVisibleFreeHostage();
@@ -203,7 +203,7 @@ void HideState::OnUpdate( CCSBot *me )
 						CNavArea *area = TheNavMesh->GetNearestNavArea( hostageOrigin );
 						if (area)
 						{
-							me->SetTask( CCSBot::GUARD_HOSTAGES );
+							me->SetTask( CFFBot::GUARD_HOSTAGES );
 							me->Hide( area );
 							me->PrintIfWatched( "I'm guarding hostages I found\n" );
 							// don't chatter here - he'll tell us when he's in his hiding spot
@@ -221,7 +221,7 @@ void HideState::OnUpdate( CCSBot *me )
 		// dont investigate noises if we are reloading
 		if (!me->IsReloading() && 
 			!isSettledInSniper && 
-			me->GetDisposition() == CCSBot::ENGAGE_AND_INVESTIGATE)
+			me->GetDisposition() == CFFBot::ENGAGE_AND_INVESTIGATE)
 		{
 			// if we are holding position, and have heard the enemy nearby, investigate after our hold time is up
 			if (m_isHoldingPosition && m_heardEnemy && (gpGlobals->curtime - m_firstHeardEnemyTime > m_holdPositionTime))
@@ -272,19 +272,19 @@ void HideState::OnUpdate( CCSBot *me )
 		// check if duration has expired
 		if (m_hideTimer.IsElapsed()) 
 		{
-			if (me->GetTask() == CCSBot::GUARD_LOOSE_BOMB)
+			if (me->GetTask() == CFFBot::GUARD_LOOSE_BOMB)
 			{
 				// if we're guarding the loose bomb, continue to guard it but pick a new spot
-				me->Hide( TheCSBots()->GetLooseBombArea() );
+				me->Hide( TheFFBots()->GetLooseBombArea() );
 				return;
 			}
-			else if (me->GetTask() == CCSBot::GUARD_BOMB_ZONE)
+			else if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE)
 			{
 				// if we're guarding a bombsite, continue to guard it but pick a new spot
-				const CCSBotManager::Zone *zone = TheCSBots()->GetClosestZone( myOrigin );
+				const CFFBotManager::Zone *zone = TheFFBots()->GetClosestZone( myOrigin );
 				if (zone)
 				{
-					CNavArea *area = TheCSBots()->GetRandomAreaInZone( zone );
+					CNavArea *area = TheFFBots()->GetRandomAreaInZone( zone );
 					if (area)
 					{
 						me->Hide( area );
@@ -292,14 +292,14 @@ void HideState::OnUpdate( CCSBot *me )
 					}
 				}
 			}
-			else if (me->GetTask() == CCSBot::GUARD_HOSTAGE_RESCUE_ZONE)
+			else if (me->GetTask() == CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
 			{
 				// if we're guarding a rescue zone, continue to guard this or another rescue zone
 				if (me->GuardRandomZone())
 				{
-					me->SetTask( CCSBot::GUARD_HOSTAGE_RESCUE_ZONE );
+					me->SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
 					me->PrintIfWatched( "Continuing to guard hostage rescue zones\n" );
-					me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+					me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 					me->GetChatter()->GuardingHostageEscapeZone( IS_PLAN );
 					return;
 				}
@@ -338,25 +338,25 @@ void HideState::OnUpdate( CCSBot *me )
 		{
 			if (me->GetTeamNumber() == TEAM_CT)
 			{
-				if (me->GetTask() == CCSBot::GUARD_BOMB_ZONE && 
+				if (me->GetTask() == CFFBot::GUARD_BOMB_ZONE &&
 					me->IsAtHidingSpot() && 
-					TheCSBots()->IsBombPlanted())
+					TheFFBots()->IsBombPlanted())
 				{
 					if (me->GetNearbyEnemyCount() == 0)
 					{
 						const float someTime = 30.0f;
 						const float littleTime = 11.0;
 
-						if (TheCSBots()->GetBombTimeLeft() > someTime)
+						if (TheFFBots()->GetBombTimeLeft() > someTime)
 							me->GetChatter()->Encourage( "BombsiteSecure", RandomFloat( 10.0f, 15.0f ) );
-						else if (TheCSBots()->GetBombTimeLeft() > littleTime)
+						else if (TheFFBots()->GetBombTimeLeft() > littleTime)
 							me->GetChatter()->Encourage( "WaitingForHumanToDefuseBomb", RandomFloat( 5.0f, 8.0f ) );
 						else
 							me->GetChatter()->Encourage( "WaitingForHumanToDefuseBombPanic", RandomFloat( 3.0f, 4.0f ) );
 					}
 				}
 
-				if (me->GetTask() == CCSBot::GUARD_HOSTAGES && me->IsAtHidingSpot())
+				if (me->GetTask() == CFFBot::GUARD_HOSTAGES && me->IsAtHidingSpot())
 				{
 					if (me->GetNearbyEnemyCount() == 0)
 					{
@@ -403,7 +403,7 @@ void HideState::OnUpdate( CCSBot *me )
 
 		// if a Player is using this hiding spot, give up
 		float range;
-		CCSPlayer *camper = static_cast<CCSPlayer *>( UTIL_GetClosestPlayer( m_hidingSpot, &range ) );
+		CFFPlayer *camper = static_cast<CFFPlayer *>( UTIL_GetClosestPlayer( m_hidingSpot, &range ) );
 
 		const float closeRange = 75.0f;
 		if (camper && camper != me && range < closeRange && me->IsVisible( camper, CHECK_FOV ))
@@ -463,14 +463,14 @@ void HideState::OnUpdate( CCSBot *me )
 
 			// ready our weapon and prepare to attack
 			me->EquipBestWeapon( me->IsUsingGrenade() );
-			me->SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+			me->SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 
 			// if we are a sniper, update our task
-			if (me->GetTask() == CCSBot::MOVE_TO_SNIPER_SPOT)
+			if (me->GetTask() == CFFBot::MOVE_TO_SNIPER_SPOT)
 			{
-				me->SetTask( CCSBot::SNIPING );
+				me->SetTask( CFFBot::SNIPING );
 			}
-			else if (me->GetTask() == CCSBot::GUARD_INITIAL_ENCOUNTER)
+			else if (me->GetTask() == CFFBot::GUARD_INITIAL_ENCOUNTER)
 			{
 				const float campChatterChance = 20.0f;
 				if (RandomFloat( 0, 100 ) < campChatterChance)
@@ -500,7 +500,7 @@ void HideState::OnUpdate( CCSBot *me )
 		}
 
 		// move to hiding spot
-		if (me->UpdatePathMovement() != CCSBot::PROGRESSING && !m_isAtSpot)
+		if (me->UpdatePathMovement() != CFFBot::PROGRESSING && !m_isAtSpot)
 		{
 			// we couldn't get to our hiding spot - pick another
 			me->PrintIfWatched( "Can't get to my hiding spot - finding another...\n" );
@@ -534,7 +534,7 @@ void HideState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void HideState::OnExit( CCSBot *me )
+void HideState::OnExit( CFFBot *me )
 {
 	m_isHoldingPosition = false;
 

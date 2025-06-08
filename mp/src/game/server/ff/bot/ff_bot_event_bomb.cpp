@@ -11,13 +11,13 @@
 #include "cs_gamerules.h"
 #include "KeyValues.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombPickedUp( IGameEvent *event )
+void CFFBot::OnBombPickedUp( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -43,7 +43,7 @@ void CCSBot::OnBombPickedUp( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombPlanted( IGameEvent *event )
+void CFFBot::OnBombPlanted( IGameEvent *event )
 {
 	m_gameState.OnBombPlanted( event );
 
@@ -71,7 +71,7 @@ void CCSBot::OnBombPlanted( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombBeep( IGameEvent *event )
+void CFFBot::OnBombBeep( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -92,9 +92,9 @@ void CCSBot::OnBombBeep( IGameEvent *event )
 		if ((myOrigin - entity->GetAbsOrigin()).LengthSqr() < bombBeepHearRangeSq)
 		{
 			// radio the news to our team
-			if (GetTeamNumber() == TEAM_CT && GetGameState()->GetPlantedBombsite() == CSGameState::UNKNOWN)
+			if (GetTeamNumber() == TEAM_CT && GetGameState()->GetPlantedBombsite() == FFGameState::UNKNOWN)
 			{
-				const CCSBotManager::Zone *zone = TheCSBots()->GetZone( entity->GetAbsOrigin() );
+				const CFFBotManager::Zone *zone = TheCSBots()->GetZone( entity->GetAbsOrigin() );
 				if (zone)
 					GetChatter()->FoundPlantedBomb( zone->m_index );
 			}
@@ -107,13 +107,13 @@ void CCSBot::OnBombBeep( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombDefuseBegin( IGameEvent *event )
+void CFFBot::OnBombDefuseBegin( IGameEvent *event )
 {
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombDefused( IGameEvent *event )
+void CFFBot::OnBombDefused( IGameEvent *event )
 {
 	m_gameState.OnBombDefused( event );
 
@@ -134,7 +134,7 @@ void CCSBot::OnBombDefused( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombDefuseAbort( IGameEvent *event )
+void CFFBot::OnBombDefuseAbort( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -149,10 +149,7 @@ void CCSBot::OnBombDefuseAbort( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBombExploded( IGameEvent *event )
+void CFFBot::OnBombExploded( IGameEvent *event )
 {
 	m_gameState.OnBombExploded( event );
 }
-
-
-

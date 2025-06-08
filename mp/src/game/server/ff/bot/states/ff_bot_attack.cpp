@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,7 +17,7 @@
 /**
  * Begin attacking
  */
-void AttackState::OnEnter( CCSBot *me )
+void AttackState::OnEnter( CFFBot *me )
 {
 	CBasePlayer *enemy = me->GetBotEnemy();
 
@@ -65,7 +65,7 @@ void AttackState::OnEnter( CCSBot *me )
 	}
 	else
 	{
-		// decide whether to crouch where we are, or run and gun (if we havent already - see CCSBot::Attack())
+		// decide whether to crouch where we are, or run and gun (if we havent already - see CFFBot::Attack())
 		if (!m_crouchAndHold)
 		{
 			if (enemy)
@@ -135,9 +135,9 @@ void AttackState::OnEnter( CCSBot *me )
 /**
  * When we are done attacking, this is invoked
  */
-void AttackState::StopAttacking( CCSBot *me )
+void AttackState::StopAttacking( CFFBot *me )
 {
-	if (me->GetTask() == CCSBot::SNIPING)
+	if (me->GetTask() == CFFBot::SNIPING)
 	{
 		// stay in our hiding spot
 		me->Hide( me->GetLastKnownArea(), -1.0f, 50.0f );
@@ -152,7 +152,7 @@ void AttackState::StopAttacking( CCSBot *me )
 /**
  * Do dodge behavior
  */
-void AttackState::Dodge( CCSBot *me )
+void AttackState::Dodge( CFFBot *me )
 {
 	//
 	// Dodge.
@@ -294,13 +294,13 @@ void AttackState::Dodge( CCSBot *me )
 /**
  * Perform attack behavior
  */
-void AttackState::OnUpdate( CCSBot *me )
+void AttackState::OnUpdate( CFFBot *me )
 {
 	// can't be stuck while attacking
 	me->ResetStuckMonitor();
 
 	// if we somehow ended up with the C4 or a grenade in our hands, grab our weapon!
-	CWeaponCSBase *weapon = me->GetActiveCSWeapon();
+	CFFWeaponBase *weapon = me->GetActiveCSWeapon();
 	if (weapon)
 	{
 		if (weapon->GetWeaponID() == WEAPON_C4 || 
@@ -432,7 +432,7 @@ void AttackState::OnUpdate( CCSBot *me )
 			}
 
 			// move towards victim
-			if (me->UpdatePathMovement( NO_SPEED_CHANGE ) != CCSBot::PROGRESSING)
+			if (me->UpdatePathMovement( NO_SPEED_CHANGE ) != CFFBot::PROGRESSING)
 			{
 				me->DestroyPath();
 			}
@@ -510,7 +510,7 @@ void AttackState::OnUpdate( CCSBot *me )
 		float targetRange = toAimSpot3D.Length();
 
 		// dont adjust zoom level if we're already zoomed in - just fire
-		if (me->GetZoomLevel() == CCSBot::NO_ZOOM && me->AdjustZoom( targetRange ))
+		if (me->GetZoomLevel() == CFFBot::NO_ZOOM && me->AdjustZoom( targetRange ))
 			m_scopeTimestamp = gpGlobals->curtime;
 	
 		const float waitScopeTime = 0.3f + me->GetProfile()->GetReactionTime();
@@ -569,7 +569,7 @@ void AttackState::OnUpdate( CCSBot *me )
 
 		if (notSeenEnemyTime > 0.1f)
 		{
-			if (me->GetDisposition() == CCSBot::ENGAGE_AND_INVESTIGATE)
+			if (me->GetDisposition() == CFFBot::ENGAGE_AND_INVESTIGATE)
 			{
 				// decide whether we should hide and "ambush" our enemy
 				if (m_haveSeenEnemy && !m_didAmbushCheck)
@@ -634,7 +634,7 @@ void AttackState::OnUpdate( CCSBot *me )
 	if (!me->IsEnemyVisible() && (notSeenEnemyTime > chaseTime || !m_haveSeenEnemy))
 	{
 		// snipers don't chase their prey - they wait for their prey to come to them
-		if (me->GetTask() == CCSBot::SNIPING)
+		if (me->GetTask() == CFFBot::SNIPING)
 		{
 			StopAttacking( me );
 			return;
@@ -642,7 +642,7 @@ void AttackState::OnUpdate( CCSBot *me )
 		else
 		{
 			// move to last known position of enemy
-			me->SetTask( CCSBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION, enemy );
+			me->SetTask( CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION, enemy );
 			me->MoveTo( me->GetLastKnownEnemyPosition() );
 			return;
 		}
@@ -687,7 +687,7 @@ void AttackState::OnUpdate( CCSBot *me )
 /**
  * Finish attack
  */
-void AttackState::OnExit( CCSBot *me )
+void AttackState::OnExit( CFFBot *me )
 {
 	me->PrintIfWatched( "AttackState:OnExit()\n" );
 
@@ -707,4 +707,3 @@ void AttackState::OnExit( CCSBot *me )
 
 	//me->StopAiming();
 }
-

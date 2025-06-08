@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,7 +17,7 @@
 /**
  * Escape from the bomb.
  */
-void EscapeFromBombState::OnEnter( CCSBot *me )
+void EscapeFromBombState::OnEnter( CFFBot *me )
 {
 	me->StandUp();
 	me->Run();
@@ -29,7 +29,7 @@ void EscapeFromBombState::OnEnter( CCSBot *me )
 /**
  * Escape from the bomb.
  */
-void EscapeFromBombState::OnUpdate( CCSBot *me )
+void EscapeFromBombState::OnUpdate( CFFBot *me )
 {
 	const Vector *bombPos = me->GetGameState()->GetBombPosition();
 
@@ -46,7 +46,7 @@ void EscapeFromBombState::OnUpdate( CCSBot *me )
 	// look around
 	me->UpdateLookAround();
 
-	if (me->UpdatePathMovement() != CCSBot::PROGRESSING)
+	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
 	{
 		// we have no path, or reached the end of one - create a new path far away from the bomb
 		FarAwayFromPositionFunctor func( *bombPos );
@@ -61,7 +61,7 @@ void EscapeFromBombState::OnUpdate( CCSBot *me )
 /**
  * Escape from the bomb.
  */
-void EscapeFromBombState::OnExit( CCSBot *me )
+void EscapeFromBombState::OnExit( CFFBot *me )
 {
 	me->EquipBestWeapon();
 }

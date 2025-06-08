@@ -13,14 +13,14 @@
 #include "func_breakablesurf.h"
 #include "obstacle_pushaway.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-LINK_ENTITY_TO_CLASS( cs_bot, CCSBot );
+LINK_ENTITY_TO_CLASS( ff_bot, CFFBot );
 
-BEGIN_DATADESC( CCSBot )
+BEGIN_DATADESC( CFFBot )
 
 END_DATADESC()
 
@@ -29,7 +29,7 @@ END_DATADESC()
 /**
  * Return the number of bots following the given player
  */
-int GetBotFollowCount( CCSPlayer *leader )
+int GetBotFollowCount( CFFPlayer *leader )
 {
 	int count = 0;
 
@@ -48,7 +48,7 @@ int GetBotFollowCount( CCSPlayer *leader )
  		if (!player->IsAlive())
  			continue;
 
-		CCSBot *bot = dynamic_cast<CCSBot *>( player );
+		CFFBot *bot = dynamic_cast<CFFBot *>( player );
 		if (bot && bot->GetFollowLeader() == leader)
 			++count;
 	}
@@ -61,7 +61,7 @@ int GetBotFollowCount( CCSPlayer *leader )
 /**
  * Change movement speed to walking
  */
-void CCSBot::Walk( void )
+void CFFBot::Walk( void )
 {
 	if (m_mustRunTimer.IsElapsed())
 	{
@@ -79,7 +79,7 @@ void CCSBot::Walk( void )
  * Return true if jump was started.
  * This is extended from the base jump to disallow jumping when in a crouch area.
  */
-bool CCSBot::Jump( bool mustJump )
+bool CFFBot::Jump( bool mustJump )
 {
 	// prevent jumping if we're crouched, unless we're in a crouchjump area - jump wins
 	bool inCrouchJumpArea = (m_lastKnownArea && 
@@ -100,7 +100,7 @@ bool CCSBot::Jump( bool mustJump )
  * Invoked when injured by something
  * NOTE: We dont want to directly call Attack() here, or the bots will have super-human reaction times when injured
  */
-int CCSBot::OnTakeDamage( const CTakeDamageInfo &info )
+int CFFBot::OnTakeDamage( const CTakeDamageInfo &info )
 {
 	CBaseEntity *attacker = info.GetInflictor();
 
@@ -111,7 +111,7 @@ int CCSBot::OnTakeDamage( const CTakeDamageInfo &info )
 	// if we were attacked by a teammate, rebuke
 	if (attacker->IsPlayer())
 	{
-		CCSPlayer *player = static_cast<CCSPlayer *>( attacker );
+		CFFPlayer *player = static_cast<CFFPlayer *>( attacker );
 		
 		if (InSameTeam( player ) && !player->IsBot())
 			GetChatter()->FriendlyFire();
@@ -120,11 +120,11 @@ int CCSBot::OnTakeDamage( const CTakeDamageInfo &info )
 	if (attacker->IsPlayer() && IsEnemy( attacker ))
 	{
 		// Track previous attacker so we don't try to panic multiple times for a shotgun blast
-		CCSPlayer *lastAttacker = m_attacker;
+		CFFPlayer *lastAttacker = m_attacker;
 		float lastAttackedTimestamp = m_attackedTimestamp;
 
 		// keep track of our last attacker
-		m_attacker = reinterpret_cast<CCSPlayer *>( attacker );
+		m_attacker = reinterpret_cast<CFFPlayer *>( attacker );
 		m_attackedTimestamp = gpGlobals->curtime;
 
 		// no longer safe
@@ -132,7 +132,7 @@ int CCSBot::OnTakeDamage( const CTakeDamageInfo &info )
 
 		if ( !IsSurprised() && (m_attacker != lastAttacker || m_attackedTimestamp != lastAttackedTimestamp) )
 		{
-			CCSPlayer *enemy = static_cast<CCSPlayer *>( attacker );
+			CFFPlayer *enemy = static_cast<CFFPlayer *>( attacker );
 
 			// being hurt by an enemy we can't see causes panic
 			if (!IsVisible( enemy, CHECK_FOV ))
@@ -162,7 +162,7 @@ int CCSBot::OnTakeDamage( const CTakeDamageInfo &info )
 /**
  * Invoked when killed
  */
-void CCSBot::Event_Killed( const CTakeDamageInfo &info )
+void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 { 
 //	PrintIfWatched( "Killed( attacker = %s )\n", STRING(pevAttacker->netname) );
 
@@ -244,7 +244,7 @@ extern void UTIL_DrawBox( Extent *extent, int lifetime, int red, int green, int 
 /**
  * When bot is touched by another entity.
  */
-void CCSBot::Touch( CBaseEntity *other )
+void CFFBot::Touch( CBaseEntity *other )
 {
 	// EXTEND
 	BaseClass::Touch( other );
@@ -261,7 +261,7 @@ void CCSBot::Touch( CBaseEntity *other )
 		if (IsUsingLadder())
 			return;
 
-		CCSPlayer *player = static_cast<CCSPlayer *>( other );
+		CFFPlayer *player = static_cast<CFFPlayer *>( other );
 
 		// get priority of other player
 		unsigned int otherPri = TheCSBots()->GetPlayerPriority( player );
@@ -305,7 +305,7 @@ void CCSBot::Touch( CBaseEntity *other )
 /**
  * Return true if we are busy doing something important
  */
-bool CCSBot::IsBusy( void ) const
+bool CFFBot::IsBusy( void ) const
 {
 	if (IsAttacking() || 
 		IsBuying() ||
@@ -321,7 +321,7 @@ bool CCSBot::IsBusy( void ) const
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::BotDeathThink( void )
+void CFFBot::BotDeathThink( void )
 {
 }
 
@@ -330,7 +330,7 @@ void CCSBot::BotDeathThink( void )
 /**
  * Try to join the given team
  */
-void CCSBot::TryToJoinTeam( int team )
+void CFFBot::TryToJoinTeam( int team )
 {
 	m_desiredTeam = team;
 }
@@ -340,7 +340,7 @@ void CCSBot::TryToJoinTeam( int team )
 /**
  * Assign given player as our current enemy to attack
  */
-void CCSBot::SetBotEnemy( CCSPlayer *enemy )
+void CFFBot::SetBotEnemy( CFFPlayer *enemy )
 {
 	if (m_enemy != enemy)
 	{
@@ -357,7 +357,7 @@ void CCSBot::SetBotEnemy( CCSPlayer *enemy )
  * move towards last known area.
  * Return false if off mesh.
  */
-bool CCSBot::StayOnNavMesh( void )
+bool CFFBot::StayOnNavMesh( void )
 {
 	if (m_currentArea == NULL)
 	{
@@ -408,7 +408,7 @@ bool CCSBot::StayOnNavMesh( void )
 /**
  * Return true if we will do scenario-related tasks
  */
-bool CCSBot::IsDoingScenario( void ) const
+bool CFFBot::IsDoingScenario( void ) const
 {
 	// if we are deferring to humans, and there is a live human on our team, don't do the scenario
 	if (cv_bot_defer_to_human.GetBool())
@@ -425,11 +425,11 @@ bool CCSBot::IsDoingScenario( void ) const
 /**
  * Return true if we noticed the bomb on the ground or on the radar (for T's only)
  */
-bool CCSBot::NoticeLooseBomb( void ) const
+bool CFFBot::NoticeLooseBomb( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
-	if (ctrl->GetScenario() != CCSBotManager::SCENARIO_DEFUSE_BOMB)
+	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
 
 	CBaseEntity *bomb = ctrl->GetLooseBomb();
@@ -447,11 +447,11 @@ bool CCSBot::NoticeLooseBomb( void ) const
 /**
  * Return true if can see the bomb lying on the ground
  */
-bool CCSBot::CanSeeLooseBomb( void ) const
+bool CFFBot::CanSeeLooseBomb( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
-	if (ctrl->GetScenario() != CCSBotManager::SCENARIO_DEFUSE_BOMB)
+	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
 
 	CBaseEntity *bomb = ctrl->GetLooseBomb();
@@ -469,11 +469,11 @@ bool CCSBot::CanSeeLooseBomb( void ) const
 /**
  * Return true if can see the planted bomb 
  */
-bool CCSBot::CanSeePlantedBomb( void ) const
+bool CFFBot::CanSeePlantedBomb( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
-	if (ctrl->GetScenario() != CCSBotManager::SCENARIO_DEFUSE_BOMB)
+	if (ctrl->GetScenario() != CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		return false;
 
 	if (!GetGameState()->IsBombPlanted())
@@ -491,7 +491,7 @@ bool CCSBot::CanSeePlantedBomb( void ) const
 /**
  * Return last enemy that hurt us
  */
-CCSPlayer *CCSBot::GetAttacker( void ) const
+CFFPlayer *CFFBot::GetAttacker( void ) const
 {
 	if (m_attacker && m_attacker->IsAlive())
 		return m_attacker;
@@ -503,7 +503,7 @@ CCSPlayer *CCSBot::GetAttacker( void ) const
 /**
  * Immediately jump off of our ladder, if we're on one
  */
-void CCSBot::GetOffLadder( void )
+void CFFBot::GetOffLadder( void )
 {
 	if (IsUsingLadder())
 	{
@@ -518,7 +518,7 @@ void CCSBot::GetOffLadder( void )
 /**
  * Return time when given spot was last checked
  */
-float CCSBot::GetHidingSpotCheckTimestamp( HidingSpot *spot ) const
+float CFFBot::GetHidingSpotCheckTimestamp( HidingSpot *spot ) const
 {
 	for( int i=0; i<m_checkedHidingSpotCount; ++i )
 		if (m_checkedHidingSpot[i].spot->GetID() == spot->GetID())
@@ -532,7 +532,7 @@ float CCSBot::GetHidingSpotCheckTimestamp( HidingSpot *spot ) const
  * Set the timestamp of the given spot to now.
  * If the spot is not in the set, overwrite the least recently checked spot.
  */
-void CCSBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
+void CFFBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
 {
 	int leastRecent = 0;
 	float leastRecentTime = gpGlobals->curtime + 1.0f;
@@ -574,7 +574,7 @@ void CCSBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
 /**
  * Periodic check of hostage count in case we lost some
  */
-void CCSBot::UpdateHostageEscortCount( void )
+void CFFBot::UpdateHostageEscortCount( void )
 {
 	const float updateInterval = 1.0f;
 	if (m_hostageEscortCount == 0 || gpGlobals->curtime - m_hostageEscortCountTimestamp < updateInterval)
@@ -603,7 +603,7 @@ void CCSBot::UpdateHostageEscortCount( void )
 /**
  * Return true if we are outnumbered by enemies
  */
-bool CCSBot::IsOutnumbered( void ) const
+bool CFFBot::IsOutnumbered( void ) const
 {
 	return (GetNearbyFriendCount() < GetNearbyEnemyCount()-1) ? true : false;		
 }
@@ -612,7 +612,7 @@ bool CCSBot::IsOutnumbered( void ) const
 /**
  * Return number of enemies we are outnumbered by
  */
-int CCSBot::OutnumberedCount( void ) const
+int CFFBot::OutnumberedCount( void ) const
 {
 	if (IsOutnumbered())
 		return (GetNearbyEnemyCount()-1) - GetNearbyFriendCount();
@@ -625,10 +625,10 @@ int CCSBot::OutnumberedCount( void ) const
 /**
  * Return the closest "important" enemy for the given scenario (bomb carrier, VIP, hostage escorter)
  */
-CCSPlayer *CCSBot::GetImportantEnemy( bool checkVisibility ) const
+CFFPlayer *CFFBot::GetImportantEnemy( bool checkVisibility ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
-	CCSPlayer *nearEnemy = NULL;
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
+	CFFPlayer *nearEnemy = NULL;
 	float nearDist = 999999999.9f;
 
 	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
@@ -648,7 +648,7 @@ CCSPlayer *CCSBot::GetImportantEnemy( bool checkVisibility ) const
 		if (!entity->IsPlayer())
 			continue;
 
-		CCSPlayer *player = static_cast<CCSPlayer *>( entity );
+		CFFPlayer *player = static_cast<CFFPlayer *>( entity );
 
 		// is it alive?
 		if (!player->IsAlive())
@@ -682,7 +682,7 @@ CCSPlayer *CCSBot::GetImportantEnemy( bool checkVisibility ) const
 /**
  * Sets our current disposition
  */
-void CCSBot::SetDisposition( DispositionType disposition ) 
+void CFFBot::SetDisposition( DispositionType disposition )
 { 
 	m_disposition = disposition;
 
@@ -695,7 +695,7 @@ void CCSBot::SetDisposition( DispositionType disposition )
 /**
  * Return our current disposition
  */
-CCSBot::DispositionType CCSBot::GetDisposition( void ) const
+CFFBot::DispositionType CFFBot::GetDisposition( void ) const
 {
 	if (!m_ignoreEnemiesTimer.IsElapsed())
 		return IGNORE_ENEMIES;
@@ -707,7 +707,7 @@ CCSBot::DispositionType CCSBot::GetDisposition( void ) const
 /**
  * Ignore enemies for a short durationy
  */
-void CCSBot::IgnoreEnemies( float duration )
+void CFFBot::IgnoreEnemies( float duration )
 {
 	m_ignoreEnemiesTimer.Start( duration );
 }
@@ -716,7 +716,7 @@ void CCSBot::IgnoreEnemies( float duration )
 /**
  * Increase morale one step
  */
-void CCSBot::IncreaseMorale( void )
+void CFFBot::IncreaseMorale( void )
 {
 	if (m_morale < EXCELLENT)
 		m_morale = static_cast<MoraleType>( m_morale + 1 );
@@ -726,7 +726,7 @@ void CCSBot::IncreaseMorale( void )
 /**
  * Decrease morale one step
  */
-void CCSBot::DecreaseMorale( void )
+void CFFBot::DecreaseMorale( void )
 {
 	if (m_morale > TERRIBLE)
 		m_morale = static_cast<MoraleType>( m_morale - 1 );
@@ -738,9 +738,9 @@ void CCSBot::DecreaseMorale( void )
  * Return true if we are acting like a rogue (not listening to teammates, not doing scenario goals)
  * @todo Account for morale
  */
-bool CCSBot::IsRogue( void ) const
+bool CFFBot::IsRogue( void ) const
 { 
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 	if (!ctrl->AllowRogues())
 		return false;
 
@@ -763,19 +763,19 @@ bool CCSBot::IsRogue( void ) const
 /**
  * Return true if we are in a hurry 
  */
-bool CCSBot::IsHurrying( void ) const
+bool CFFBot::IsHurrying( void ) const
 {
 	if (!m_hurryTimer.IsElapsed())
 		return true;
 
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
 	// if the bomb has been planted, we are in a hurry, CT or T (they could be defusing it!)
-	if (ctrl->GetScenario() == CCSBotManager::SCENARIO_DEFUSE_BOMB && ctrl->IsBombPlanted())
+	if (ctrl->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && ctrl->IsBombPlanted())
 		return true;
 	
 	// if we are a T and hostages are being rescued, we are in a hurry
-	if (ctrl->GetScenario() == CCSBotManager::SCENARIO_RESCUE_HOSTAGES && 
+	if (ctrl->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES &&
 		GetTeamNumber() == TEAM_TERRORIST && 
 		GetGameState()->AreAllHostagesBeingRescued())
 		return true;
@@ -787,9 +787,9 @@ bool CCSBot::IsHurrying( void ) const
 /**
  * Return true if it is the early, "safe", part of the round
  */
-bool CCSBot::IsSafe( void ) const
+bool CFFBot::IsSafe( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
 	if (ctrl->GetElapsedRoundTime() < m_safeTime)
 		return true;
@@ -801,9 +801,9 @@ bool CCSBot::IsSafe( void ) const
 /**
  * Return true if it is well past the early, "safe", part of the round
  */
-bool CCSBot::IsWellPastSafe( void ) const
+bool CFFBot::IsWellPastSafe( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
 	if (ctrl->GetElapsedRoundTime() > 2.0f * m_safeTime)
 		return true;
@@ -815,7 +815,7 @@ bool CCSBot::IsWellPastSafe( void ) const
 /**
  * Return true if we were in the safe time last update, but not now
  */
-bool CCSBot::IsEndOfSafeTime( void ) const
+bool CFFBot::IsEndOfSafeTime( void ) const
 {
 	return m_wasSafe && !IsSafe();
 }
@@ -824,9 +824,9 @@ bool CCSBot::IsEndOfSafeTime( void ) const
 /**
  * Return the amount of "safe time" we have left
  */
-float CCSBot::GetSafeTimeRemaining( void ) const
+float CFFBot::GetSafeTimeRemaining( void ) const
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
 	return m_safeTime - ctrl->GetElapsedRoundTime();
 }
@@ -835,9 +835,9 @@ float CCSBot::GetSafeTimeRemaining( void ) const
 /**
  * Called when enemy seen to adjust safe time for this round
  */
-void CCSBot::AdjustSafeTime( void )
+void CFFBot::AdjustSafeTime( void )
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
 	// if we spotted an enemy sooner than we thought possible, adjust our notion of "safe" time
 	if (ctrl->GetElapsedRoundTime() < m_safeTime)
@@ -851,7 +851,7 @@ void CCSBot::AdjustSafeTime( void )
 /**
  * Return true if we haven't seen an enemy for "a long time"
  */
-bool CCSBot::HasNotSeenEnemyForLongTime( void ) const
+bool CFFBot::HasNotSeenEnemyForLongTime( void ) const
 {
 	const float longTime = 30.0f;
 	return (GetTimeSinceLastSawEnemy() > longTime);
@@ -861,11 +861,11 @@ bool CCSBot::HasNotSeenEnemyForLongTime( void ) const
 /**
  * Pick a random zone and hide near it
  */
-bool CCSBot::GuardRandomZone( float range )
+bool CFFBot::GuardRandomZone( float range )
 {
-	CCSBotManager *ctrl = static_cast<CCSBotManager *>( TheCSBots() );
+	CFFBotManager *ctrl = static_cast<CFFBotManager *>( TheCSBots() );
 
-	const CCSBotManager::Zone *zone = ctrl->GetRandomZone();
+	const CFFBotManager::Zone *zone = ctrl->GetRandomZone();
 	if (zone)
 	{
 		CNavArea *rescueArea = ctrl->GetRandomAreaInZone( zone );
@@ -885,7 +885,7 @@ bool CCSBot::GuardRandomZone( float range )
 class CollectRetreatSpotsFunctor
 {
 public:
-	CollectRetreatSpotsFunctor( CCSBot *me, float range )
+	CollectRetreatSpotsFunctor( CFFBot *me, float range )
 	{
 		m_me = me;
 		m_count = 0;
@@ -938,7 +938,7 @@ public:
 		return true;
 	}
 
-	CCSBot *m_me;
+	CFFBot *m_me;
 	float m_range;
 
 	const Vector *m_spot[ MAX_SPOTS ];
@@ -950,7 +950,7 @@ public:
  * Do a breadth-first search to find a good retreat spot.
  * Don't pick a spot that a Player is currently occupying.
  */
-const Vector *FindNearbyRetreatSpot( CCSBot *me, float maxRange )
+const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange )
 {
 	CNavArea *area = me->GetLastKnownArea();
 	if (area == NULL)
@@ -972,7 +972,7 @@ const Vector *FindNearbyRetreatSpot( CCSBot *me, float maxRange )
 class FarthestHostage
 {
 public:
-	FarthestHostage( const CCSBot *me )
+	FarthestHostage( const CFFBot *me )
 	{
 		m_me = me;
 		m_farRange = -1.0f;
@@ -992,7 +992,7 @@ public:
 		return true;
 	}
 
-	const CCSBot *m_me;
+	const CFFBot *m_me;
 	float m_farRange;
 };
 
@@ -1000,7 +1000,7 @@ public:
  * Return euclidean distance to farthest escorted hostage.
  * Return -1 if no hostage is following us.
  */
-float CCSBot::GetRangeToFarthestEscortedHostage( void ) const
+float CFFBot::GetRangeToFarthestEscortedHostage( void ) const
 {
 	FarthestHostage away( this );
 
@@ -1013,9 +1013,9 @@ float CCSBot::GetRangeToFarthestEscortedHostage( void ) const
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return string describing current task
- * NOTE: This MUST be kept in sync with the CCSBot::TaskType enum
+ * NOTE: This MUST be kept in sync with the CFFBot::TaskType enum
  */
-const char *CCSBot::GetTaskName( void ) const
+const char *CFFBot::GetTaskName( void ) const
 {
 	static const char *name[ NUM_TASKS ] = 
 	{
@@ -1049,9 +1049,9 @@ const char *CCSBot::GetTaskName( void ) const
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return string describing current disposition
- * NOTE: This MUST be kept in sync with the CCSBot::DispositionType enum
+ * NOTE: This MUST be kept in sync with the CFFBot::DispositionType enum
  */
-const char *CCSBot::GetDispositionName( void ) const
+const char *CFFBot::GetDispositionName( void ) const
 {
 	static const char *name[ NUM_DISPOSITIONS ] = 
 	{
@@ -1068,9 +1068,9 @@ const char *CCSBot::GetDispositionName( void ) const
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return string describing current morale
- * NOTE: This MUST be kept in sync with the CCSBot::MoraleType enum
+ * NOTE: This MUST be kept in sync with the CFFBot::MoraleType enum
  */
-const char *CCSBot::GetMoraleName( void ) const
+const char *CFFBot::GetMoraleName( void ) const
 {
 	static const char *name[ EXCELLENT - TERRIBLE + 1 ] = 
 	{
@@ -1091,7 +1091,7 @@ const char *CCSBot::GetMoraleName( void ) const
 /**
  * Fill in a CUserCmd with our data
  */
-void CCSBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwardmove, float sidemove, float upmove, int buttons, byte impulse )
+void CFFBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwardmove, float sidemove, float upmove, int buttons, byte impulse )
 {
 	Q_memset( &cmd, 0, sizeof( cmd ) );
 	if ( !RunMimicCommand( cmd ) )

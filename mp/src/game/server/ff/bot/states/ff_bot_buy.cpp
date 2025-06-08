@@ -9,7 +9,7 @@
 
 #include "cbase.h"
 #include "cs_gamerules.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -23,7 +23,7 @@ ConVar bot_randombuy( "bot_randombuy", "0", FCVAR_CHEAT, "should bots ignore the
 /**
  *  Debug command to give a named weapon
  */
-void CCSBot::GiveWeapon( const char *weaponAlias )
+void CFFBot::GiveWeapon( const char *weaponAlias )
 {
 	const char *translatedAlias = GetTranslatedWeaponAlias( weaponAlias );
 
@@ -35,7 +35,7 @@ void CCSBot::GiveWeapon( const char *weaponAlias )
 		return;
 	}
 
-	CCSWeaponInfo *pWeaponInfo = dynamic_cast< CCSWeaponInfo* >( GetFileWeaponInfoFromHandle( hWpnInfo ) );
+	CFFWeaponInfo *pWeaponInfo = dynamic_cast< CFFWeaponInfo* >( GetFileWeaponInfoFromHandle( hWpnInfo ) );
 	if ( !pWeaponInfo )
 	{
 		return;
@@ -61,9 +61,9 @@ void CCSBot::GiveWeapon( const char *weaponAlias )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-static bool HasDefaultPistol( CCSBot *me )
+static bool HasDefaultPistol( CFFBot *me )
 {
-	CWeaponCSBase *pistol = (CWeaponCSBase *)me->Weapon_GetSlot( WEAPON_SLOT_PISTOL );
+	CFFWeaponBase *pistol = (CFFWeaponBase *)me->Weapon_GetSlot( WEAPON_SLOT_PISTOL );
 
 	if (pistol == NULL)
 		return false;
@@ -82,7 +82,7 @@ static bool HasDefaultPistol( CCSBot *me )
 /**
  * Buy weapons, armor, etc.
  */
-void BuyState::OnEnter( CCSBot *me )
+void BuyState::OnEnter( CFFBot *me )
 {
 	m_retries = 0;
 	m_prefRetries = 0;
@@ -117,7 +117,7 @@ void BuyState::OnEnter( CCSBot *me )
 
 	if (me->GetTeamNumber() == TEAM_CT)
 	{
-		if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_DEFUSE_BOMB)
+		if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB)
 		{
 			// CT's sometimes buy defuse kits in the bomb scenario (except in career mode, where the player should defuse)
 			if (CSGameRules()->IsCareer() == false)
@@ -131,7 +131,7 @@ void BuyState::OnEnter( CCSBot *me )
 		}
 
 		// determine if we want a tactical shield
-		if (!me->HasPrimaryWeapon() && TheCSBots()->AllowTacticalShield())
+		if (!me->HasPrimaryWeapon() && TheFFBots()->AllowTacticalShield())
 		{
 			if (me->m_iAccount > 2500)
 			{
@@ -143,7 +143,7 @@ void BuyState::OnEnter( CCSBot *me )
 		}
 	}
 
-	if (TheCSBots()->AllowGrenades())
+	if (TheFFBots()->AllowGrenades())
 	{
 		m_buyGrenade = (RandomFloat( 0.0f, 100.0f ) < 33.3f) ? true : false;
 	}
@@ -154,7 +154,7 @@ void BuyState::OnEnter( CCSBot *me )
 
 
 	m_buyPistol = false;
-	if (TheCSBots()->AllowPistols())
+	if (TheFFBots()->AllowPistols())
 	{
 		// check if we have a pistol
 		if (me->Weapon_GetSlot( WEAPON_SLOT_PISTOL ))
@@ -163,12 +163,12 @@ void BuyState::OnEnter( CCSBot *me )
 			if (HasDefaultPistol( me ))
 			{
 				// if everything other than pistols is disallowed, buy a pistol
-				if (TheCSBots()->AllowShotguns() == false &&
-					TheCSBots()->AllowSubMachineGuns() == false &&
-					TheCSBots()->AllowRifles() == false &&
-					TheCSBots()->AllowMachineGuns() == false &&
-					TheCSBots()->AllowTacticalShield() == false &&
-					TheCSBots()->AllowSnipers() == false)
+				if (TheFFBots()->AllowShotguns() == false &&
+					TheFFBots()->AllowSubMachineGuns() == false &&
+					TheFFBots()->AllowRifles() == false &&
+					TheFFBots()->AllowMachineGuns() == false &&
+					TheFFBots()->AllowTacticalShield() == false &&
+					TheFFBots()->AllowSnipers() == false)
 				{
 					m_buyPistol = (RandomFloat( 0, 100 ) < 75.0f);
 				}
@@ -304,7 +304,7 @@ inline WeaponType GetWeaponType( const char *alias )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void BuyState::OnUpdate( CCSBot *me )
+void BuyState::OnUpdate( CFFBot *me )
 {
 	char cmdBuffer[256];
 
@@ -439,7 +439,7 @@ void BuyState::OnUpdate( CCSBot *me )
 
 			if (weaponPreference == WEAPON_SHIELDGUN)
 			{
-				if (TheCSBots()->AllowTacticalShield())
+				if (TheFFBots()->AllowTacticalShield())
 					buyAlias = "shield";
 			}
 			else
@@ -449,32 +449,32 @@ void BuyState::OnUpdate( CCSBot *me )
 				switch( type )
 				{
 					case PISTOL:
-						if (!TheCSBots()->AllowPistols())
+						if (!TheFFBots()->AllowPistols())
 							buyAlias = NULL;
 						break;
 
 					case SHOTGUN:
-						if (!TheCSBots()->AllowShotguns())
+						if (!TheFFBots()->AllowShotguns())
 							buyAlias = NULL;
 						break;
 
 					case SUB_MACHINE_GUN:
-						if (!TheCSBots()->AllowSubMachineGuns())
+						if (!TheFFBots()->AllowSubMachineGuns())
 							buyAlias = NULL;
 						break;
 
 					case RIFLE:
-						if (!TheCSBots()->AllowRifles())
+						if (!TheFFBots()->AllowRifles())
 							buyAlias = NULL;
 						break;
 
 					case MACHINE_GUN:
-						if (!TheCSBots()->AllowMachineGuns())
+						if (!TheFFBots()->AllowMachineGuns())
 							buyAlias = NULL;
 						break;
 
 					case SNIPER_RIFLE:
-						if (!TheCSBots()->AllowSnipers())
+						if (!TheFFBots()->AllowSnipers())
 							buyAlias = NULL;
 						break;
 				}
@@ -530,11 +530,11 @@ void BuyState::OnUpdate( CCSBot *me )
 
 				for( int i=0; i<PRIMARY_WEAPON_BUY_COUNT; ++i )
 				{
-					if ((masterPrimary[i].type == SHOTGUN && TheCSBots()->AllowShotguns()) ||
-						(masterPrimary[i].type == SUB_MACHINE_GUN && TheCSBots()->AllowSubMachineGuns()) ||
-						(masterPrimary[i].type == RIFLE && TheCSBots()->AllowRifles()) ||
-						(masterPrimary[i].type == SNIPER_RIFLE && TheCSBots()->AllowSnipers() && wantSniper) ||
-						(masterPrimary[i].type == MACHINE_GUN && TheCSBots()->AllowMachineGuns()))
+					if ((masterPrimary[i].type == SHOTGUN && TheFFBots()->AllowShotguns()) ||
+						(masterPrimary[i].type == SUB_MACHINE_GUN && TheFFBots()->AllowSubMachineGuns()) ||
+						(masterPrimary[i].type == RIFLE && TheFFBots()->AllowRifles()) ||
+						(masterPrimary[i].type == SNIPER_RIFLE && TheFFBots()->AllowSnipers() && wantSniper) ||
+						(masterPrimary[i].type == MACHINE_GUN && TheFFBots()->AllowMachineGuns()))
 					{
 						stockPrimary[ stockPrimaryCount++ ] = &masterPrimary[i];
 					}
@@ -546,7 +546,7 @@ void BuyState::OnUpdate( CCSBot *me )
 					int which;
 
 					// on hard difficulty levels, bots try to buy preferred weapons on the first pass
-					if (m_retries == 0 && TheCSBots()->GetDifficultyLevel() >= BOT_HARD && bot_randombuy.GetBool() == false )
+					if (m_retries == 0 && TheFFBots()->GetDifficultyLevel() >= BOT_HARD && bot_randombuy.GetBool() == false )
 					{
 						// count up available preferred weapons
 						int prefCount = 0;
@@ -604,7 +604,7 @@ void BuyState::OnUpdate( CCSBot *me )
 			me->ClientCommand( args );
 
 			// pistols - if we have no preferred pistol, buy at random
-			if (TheCSBots()->AllowPistols() && !me->GetProfile()->HasPistolPreference())
+			if (TheFFBots()->AllowPistols() && !me->GetProfile()->HasPistolPreference())
 			{
 				if (m_buyPistol)
 				{
@@ -682,9 +682,8 @@ void BuyState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void BuyState::OnExit( CCSBot *me )
+void BuyState::OnExit( CFFBot *me )
 {
 	me->ResetStuckMonitor();
 	me->EquipBestWeapon();
 }
-

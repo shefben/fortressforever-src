@@ -11,7 +11,7 @@
 #include "cs_gamerules.h"
 #include "KeyValues.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -20,7 +20,7 @@
 /**
  * Checks if the bot can hear the event
  */
-void CCSBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range, PriorityType priority, bool isHostile, bool isFootstep, const Vector *actualOrigin )
+void CFFBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range, PriorityType priority, bool isHostile, bool isFootstep, const Vector *actualOrigin )
 {
 	/// @todo Listen to non-player sounds
 	if (player == NULL)
@@ -99,7 +99,7 @@ void CCSBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 		m_noisePosition.y = newNoisePosition->y + RandomFloat( -errorRadius, errorRadius );
 
 		// note the *travel distance* to the noise
-		m_noiseTravelDistance = GetTravelDistanceToPlayer( (CCSPlayer *)player );
+		m_noiseTravelDistance = GetTravelDistanceToPlayer( (CFFPlayer *)player );
 
 		// make sure noise position remains in the same area
 		m_noiseArea->GetClosestPointOnArea( m_noisePosition, &m_noisePosition );
@@ -118,7 +118,7 @@ void CCSBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnHEGrenadeDetonate( IGameEvent *event )
+void CFFBot::OnHEGrenadeDetonate( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -133,7 +133,7 @@ void CCSBot::OnHEGrenadeDetonate( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnFlashbangDetonate( IGameEvent *event )
+void CFFBot::OnFlashbangDetonate( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -148,7 +148,7 @@ void CCSBot::OnFlashbangDetonate( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnSmokeGrenadeDetonate( IGameEvent *event )
+void CFFBot::OnSmokeGrenadeDetonate( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -163,7 +163,7 @@ void CCSBot::OnSmokeGrenadeDetonate( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnGrenadeBounce( IGameEvent *event )
+void CFFBot::OnGrenadeBounce( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -178,7 +178,7 @@ void CCSBot::OnGrenadeBounce( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBulletImpact( IGameEvent *event )
+void CFFBot::OnBulletImpact( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -200,7 +200,7 @@ void CCSBot::OnBulletImpact( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBreakProp( IGameEvent *event )
+void CFFBot::OnBreakProp( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -215,7 +215,7 @@ void CCSBot::OnBreakProp( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnBreakBreakable( IGameEvent *event )
+void CFFBot::OnBreakBreakable( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -230,7 +230,7 @@ void CCSBot::OnBreakBreakable( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnDoorMoving( IGameEvent *event )
+void CFFBot::OnDoorMoving( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -245,7 +245,7 @@ void CCSBot::OnDoorMoving( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnHostageFollows( IGameEvent *event )
+void CFFBot::OnHostageFollows( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -283,7 +283,7 @@ void CCSBot::OnHostageFollows( IGameEvent *event )
 			// since we are guarding the hostages, presumably we know where they are
 			// if we're close enough to "hear" this event, either go to where the event occured,
 			// or head for an escape zone to head them off
-			if (GetTask() != CCSBot::GUARD_HOSTAGE_RESCUE_ZONE)
+			if (GetTask() != CFFBot::GUARD_HOSTAGE_RESCUE_ZONE)
 			{
 				//const float headOffChance = 33.3f;
 				if (true) // || RandomFloat( 0, 100 ) < headOffChance)
@@ -291,8 +291,8 @@ void CCSBot::OnHostageFollows( IGameEvent *event )
 					// head them off at a rescue zone
 					if (GuardRandomZone())
 					{
-						SetTask( CCSBot::GUARD_HOSTAGE_RESCUE_ZONE );
-						SetDisposition( CCSBot::OPPORTUNITY_FIRE );
+						SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE );
+						SetDisposition( CFFBot::OPPORTUNITY_FIRE );
 						PrintIfWatched( "Trying to beat them to an escape zone!\n" );
 					}
 				}
@@ -317,7 +317,7 @@ void CCSBot::OnHostageFollows( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnRoundEnd( IGameEvent *event )
+void CFFBot::OnRoundEnd( IGameEvent *event )
 {
 	// Morale adjustments happen even for dead players
 	int winner = event->GetInt( "winner" );
@@ -368,21 +368,21 @@ void CCSBot::OnRoundEnd( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnRoundStart( IGameEvent *event )
+void CFFBot::OnRoundStart( IGameEvent *event )
 {
 	m_gameState.OnRoundStart( event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnHostageRescuedAll( IGameEvent *event )
+void CFFBot::OnHostageRescuedAll( IGameEvent *event )
 {
 	m_gameState.OnHostageRescuedAll( event );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnNavBlocked( IGameEvent *event )
+void CFFBot::OnNavBlocked( IGameEvent *event )
 {
 	if ( event->GetBool( "blocked" ) )
 	{
@@ -408,7 +408,7 @@ void CCSBot::OnNavBlocked( IGameEvent *event )
 /**
  * Invoked when bot enters a nav area
  */
-void CCSBot::OnEnteredNavArea( CNavArea *newArea )
+void CFFBot::OnEnteredNavArea( CNavArea *newArea )
 {
 	// assume that we "clear" an area of enemies when we enter it
 	newArea->SetClearedTimestamp( GetTeamNumber()-1 );

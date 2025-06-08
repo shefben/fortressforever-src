@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), April 2005
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 #include "BasePropDoor.h"
 #include "doors.h"
 
@@ -21,7 +21,7 @@
  * Face the door and open it.
  * NOTE: This state assumes we are standing in range of the door to be opened, with no obstructions.
  */
-void OpenDoorState::OnEnter( CCSBot *me )
+void OpenDoorState::OnEnter( CFFBot *me )
 {
 	m_isDone = false;
 	m_timeout.Start( 1.0f );
@@ -48,7 +48,7 @@ void OpenDoorState::SetDoor( CBaseEntity *door )
 
 
 //-------------------------------------------------------------------------------------------------
-void OpenDoorState::OnUpdate( CCSBot *me )
+void OpenDoorState::OnUpdate( CFFBot *me )
 {
 	me->ResetStuckMonitor();
 
@@ -84,11 +84,8 @@ void OpenDoorState::OnUpdate( CCSBot *me )
 
 
 //-------------------------------------------------------------------------------------------------
-void OpenDoorState::OnExit( CCSBot *me )
+void OpenDoorState::OnExit( CFFBot *me )
 {
 	me->ClearLookAt();
 	me->ResetStuckMonitor();
 }
-
-
-

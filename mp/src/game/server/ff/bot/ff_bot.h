@@ -12,21 +12,21 @@
 // auto-generate documentation.  Visit www.doxygen.org to download the system for free.
 //
 
-#ifndef _CS_BOT_H_
-#define _CS_BOT_H_
+#ifndef _FF_BOT_H_
+#define _FF_BOT_H_
 
 #include "bot/bot.h"
-#include "bot/cs_bot_manager.h"
-#include "bot/cs_bot_chatter.h"
-#include "cs_gamestate.h"
-#include "cs_player.h"
-#include "weapon_csbase.h"
+#include "bot/ff_bot_manager.h"
+#include "bot/ff_bot_chatter.h"
+#include "ff_gamestate.h"
+#include "ff_player.h"
+#include "weapon_ffbase.h"
 #include "cs_nav_pathfind.h"
 #include "cs_nav_area.h"
 
 class CBaseDoor;
 class CBasePropDoor;
-class CCSBot;
+class CFFBot;
 class CPushAwayEnumerator;
 
 //--------------------------------------------------------------------------------------------------------------
@@ -51,9 +51,9 @@ enum InventorySlotType
 class BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot ) { }				///< when state is entered
-	virtual void OnUpdate( CCSBot *bot ) { }			///< state behavior
-	virtual void OnExit( CCSBot *bot ) { }				///< when state exited
+	virtual void OnEnter( CFFBot *bot ) { }				///< when state is entered
+	virtual void OnUpdate( CFFBot *bot ) { }			///< state behavior
+	virtual void OnExit( CFFBot *bot ) { }				///< when state exited
 	virtual const char *GetName( void ) const = 0;		///< return state name
 };
 
@@ -66,8 +66,8 @@ public:
 class IdleState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "Idle"; }
 };
 
@@ -79,9 +79,9 @@ public:
 class HuntState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "Hunt"; }
 
 	void ClearHuntArea( void )						{ m_huntArea = NULL; }
@@ -98,9 +98,9 @@ private:
 class AttackState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "Attack"; }
 	
 	void SetCrouchAndHold( bool crouch )			{ m_crouchAndHold = crouch; }
@@ -137,8 +137,8 @@ protected:
 	bool m_isCoward;											///< if true, we'll retreat if outnumbered during this fight
 	CountdownTimer m_retreatTimer;
 
-	void StopAttacking( CCSBot *bot );
-	void Dodge( CCSBot *bot );									///< do dodge behavior
+	void StopAttacking( CFFBot *bot );
+	void Dodge( CFFBot *bot );									///< do dodge behavior
 };
 
 
@@ -149,13 +149,13 @@ protected:
 class InvestigateNoiseState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "InvestigateNoise"; }
 
 private:
-	void AttendCurrentNoise( CCSBot *bot );						///< move towards currently heard noise
+	void AttendCurrentNoise( CFFBot *bot );						///< move towards currently heard noise
 	Vector m_checkNoisePosition;								///< the position of the noise we're investigating
 	CountdownTimer m_minTimer;									///< minimum time we will investigate our current noise
 };
@@ -168,9 +168,9 @@ private:
 class BuyState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "Buy"; }
 
 private:
@@ -194,9 +194,9 @@ private:
 class MoveToState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "MoveTo"; }
 	void SetGoalPosition( const Vector &pos )		{ m_goalPosition = pos; }
 	void SetRouteType( RouteType route )			{ m_routeType = route; }
@@ -216,8 +216,8 @@ private:
 class FetchBombState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
 	virtual const char *GetName( void ) const	{ return "FetchBomb"; }
 };
 
@@ -229,9 +229,9 @@ public:
 class PlantBombState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const	{ return "PlantBomb"; }
 };
 
@@ -243,9 +243,9 @@ public:
 class DefuseBombState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const	{ return "DefuseBomb"; }
 };
 
@@ -259,9 +259,9 @@ public:
 class HideState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const	{ return "Hide"; }
 
 	void SetHidingSpot( const Vector &pos )		{ m_hidingSpot = pos; }
@@ -316,9 +316,9 @@ private:
 class EscapeFromBombState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "EscapeFromBomb"; }
 };
 
@@ -330,15 +330,15 @@ public:
 class FollowState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "Follow"; }
 
-	void SetLeader( CCSPlayer *player )				{ m_leader = player; }
+	void SetLeader( CFFPlayer *player )				{ m_leader = player; }
 
 private:
-	CHandle< CCSPlayer > m_leader;								///< the player we are following
+	CHandle< CFFPlayer > m_leader;								///< the player we are following
 	Vector m_lastLeaderPos;										///< where the leader was when we computed our follow path
 	bool m_isStopped;
 	float m_stoppedTimestamp;
@@ -374,9 +374,9 @@ private:
 class UseEntityState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const			{ return "UseEntity"; }
 
 	void SetEntity( CBaseEntity *entity )				{ m_entity = entity; }
@@ -393,9 +393,9 @@ private:
 class OpenDoorState : public BotState
 {
 public:
-	virtual void OnEnter( CCSBot *bot );
-	virtual void OnUpdate( CCSBot *bot );
-	virtual void OnExit( CCSBot *bot );
+	virtual void OnEnter( CFFBot *bot );
+	virtual void OnUpdate( CFFBot *bot );
+	virtual void OnExit( CFFBot *bot );
 	virtual const char *GetName( void ) const		{ return "OpenDoor"; }
 
 	void SetDoor( CBaseEntity *door );
@@ -415,14 +415,14 @@ private:
 /**
  * The Counter-strike Bot
  */
-class CCSBot : public CBot< CCSPlayer >
+class CFFBot : public CBot< CFFPlayer >
 {
 public:
-	DECLARE_CLASS( CCSBot, CBot< CCSPlayer > );
+	DECLARE_CLASS( CFFBot, CBot< CFFPlayer > );
 	DECLARE_DATADESC();
 
-	CCSBot( void );												///< constructor initializes all values to zero
-	virtual ~CCSBot();
+	CFFBot( void );												///< constructor initializes all values to zero
+	virtual ~CFFBot();
 	virtual bool Initialize( const BotProfile *profile, int team );		///< (EXTEND) prepare bot for action
 
 	virtual void Spawn( void );									///< (EXTEND) spawn the bot into the game
@@ -474,7 +474,7 @@ public:
 	void Hunt( void );
 	bool IsHunting( void ) const;								///< returns true if bot is currently hunting
 
-	void Attack( CCSPlayer *victim );
+	void Attack( CFFPlayer *victim );
 	void FireWeaponAtEnemy( void );								///< fire our active weapon towards our current enemy
 	void StopAttacking( void );
 	bool IsAttacking( void ) const;								///< returns true if bot is currently engaging a target
@@ -512,11 +512,11 @@ public:
 
 	void TryToJoinTeam( int team );								///< try to join the given team
 
-	void Follow( CCSPlayer *player );							///< begin following given Player
+	void Follow( CFFPlayer *player );							///< begin following given Player
 	void ContinueFollowing( void );								///< continue following our leader after finishing what we were doing
 	void StopFollowing( void );									///< stop following
 	bool IsFollowing( void ) const;								///< return true if we are following someone (not necessarily in the follow state)
-	CCSPlayer *GetFollowLeader( void ) const;					///< return the leader we are following
+	CFFPlayer *GetFollowLeader( void ) const;					///< return the leader we are following
 	float GetFollowDuration( void ) const;						///< return how long we've been following our leader
 	bool CanAutoFollow( void ) const;							///< return true if we can auto-follow
 
@@ -531,8 +531,8 @@ public:
 	bool IsDoingScenario( void ) const;							///< return true if we will do scenario-related tasks
 
 	//- scenario / gamestate -----------------------------------------------------------------------------------------
-	CSGameState *GetGameState( void );							///< return an interface to this bot's gamestate
-	const CSGameState *GetGameState( void ) const;				///< return an interface to this bot's gamestate
+	FFGameState *GetGameState( void );							///< return an interface to this bot's gamestate
+	const FFGameState *GetGameState( void ) const;				///< return an interface to this bot's gamestate
 
 	bool IsAtBombsite( void );									///< return true if we are in a bomb planting zone
 	bool GuardRandomZone( float range = 500.0f );				///< pick a random zone and hide near it
@@ -624,36 +624,36 @@ public:
 	void SendRadioMessage( RadioType event );					///< send a radio message
 	void SpeakAudio( const char *voiceFilename, float duration, int pitch );	///< send voice chatter
 	BotChatterInterface *GetChatter( void );					///< return an interface to this bot's chatter system
-	bool RespondToHelpRequest( CCSPlayer *player, Place place, float maxRange = -1.0f );	///< decide if we should move to help the player, return true if we will
+	bool RespondToHelpRequest( CFFPlayer *player, Place place, float maxRange = -1.0f );	///< decide if we should move to help the player, return true if we will
 	bool IsUsingVoice() const;									///< new-style "voice" chatter gets voice feedback
 
 
 	//- enemies ------------------------------------------------------------------------------------------------------
 	// BOTPORT: GetEnemy() collides with GetEnemy() in CBaseEntity - need to use different nomenclature
-	void SetBotEnemy( CCSPlayer *enemy );						///< set given player as our current enemy
-	CCSPlayer *GetBotEnemy( void ) const;
+	void SetBotEnemy( CFFPlayer *enemy );						///< set given player as our current enemy
+	CFFPlayer *GetBotEnemy( void ) const;
 	int GetNearbyEnemyCount( void ) const;						///< return max number of nearby enemies we've seen recently
 	unsigned int GetEnemyPlace( void ) const;					///< return location where we see the majority of our enemies
 	bool CanSeeBomber( void ) const;							///< return true if we can see the bomb carrier
-	CCSPlayer *GetBomber( void ) const;
+	CFFPlayer *GetBomber( void ) const;
 
 	int GetNearbyFriendCount( void ) const;						///< return number of nearby teammates
-	CCSPlayer *GetClosestVisibleFriend( void ) const;			///< return the closest friend that we can see
-	CCSPlayer *GetClosestVisibleHumanFriend( void ) const;		///< return the closest human friend that we can see
+	CFFPlayer *GetClosestVisibleFriend( void ) const;			///< return the closest friend that we can see
+	CFFPlayer *GetClosestVisibleHumanFriend( void ) const;		///< return the closest human friend that we can see
 
 	bool IsOutnumbered( void ) const;							///< return true if we are outnumbered by enemies
 	int OutnumberedCount( void ) const;							///< return number of enemies we are outnumbered by
 
 	#define ONLY_VISIBLE_ENEMIES true
-	CCSPlayer *GetImportantEnemy( bool checkVisibility = false ) const;	///< return the closest "important" enemy for the given scenario (bomb carrier, VIP, hostage escorter)
+	CFFPlayer *GetImportantEnemy( bool checkVisibility = false ) const;	///< return the closest "important" enemy for the given scenario (bomb carrier, VIP, hostage escorter)
 
 	void UpdateReactionQueue( void );							///< update our reaction time queue
-	CCSPlayer *GetRecognizedEnemy( void );						///< return the most dangerous threat we are "conscious" of
+	CFFPlayer *GetRecognizedEnemy( void );						///< return the most dangerous threat we are "conscious" of
 	bool IsRecognizedEnemyReloading( void );					///< return true if the enemy we are "conscious" of is reloading
 	bool IsRecognizedEnemyProtectedByShield( void );			///< return true if the enemy we are "conscious" of is hiding behind a shield
 	float GetRangeToNearestRecognizedEnemy( void );				///< return distance to closest enemy we are "conscious" of
 
-	CCSPlayer *GetAttacker( void ) const;						///< return last enemy that hurt us
+	CFFPlayer *GetAttacker( void ) const;						///< return last enemy that hurt us
 	float GetTimeSinceAttacked( void ) const;					///< return duration since we were last injured by an attacker
 	float GetFirstSawEnemyTimestamp( void ) const;				///< time since we saw any enemies
 	float GetLastSawEnemyTimestamp( void ) const;
@@ -670,8 +670,8 @@ public:
 	bool CanSeeSniper( void ) const;							///< return true if we can see an enemy sniper
 	bool HasSeenSniperRecently( void ) const;					///< return true if we have seen a sniper recently
 
-	float GetTravelDistanceToPlayer( CCSPlayer *player ) const;	///< return shortest path travel distance to this player	
-	bool DidPlayerJustFireWeapon( const CCSPlayer *player ) const;	///< return true if the given player just fired their weapon
+	float GetTravelDistanceToPlayer( CFFPlayer *player ) const;	///< return shortest path travel distance to this player
+	bool DidPlayerJustFireWeapon( const CFFPlayer *player ) const;	///< return true if the given player just fired their weapon
 
 	//- navigation --------------------------------------------------------------------------------------------------
 	bool HasPath( void ) const;
@@ -764,18 +764,18 @@ public:
 
 	#define CHECK_FOV true
 	bool IsVisible( const Vector &pos, bool testFOV = false, const CBaseEntity *ignore = NULL ) const;	///< return true if we can see the point
-	bool IsVisible( CCSPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const;	///< return true if we can see any part of the player
+	bool IsVisible( CFFPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const;	///< return true if we can see any part of the player
 
-	bool IsNoticable( const CCSPlayer *player, unsigned char visibleParts ) const;	///< return true if we "notice" given player 
+	bool IsNoticable( const CFFPlayer *player, unsigned char visibleParts ) const;	///< return true if we "notice" given player
 
 	bool IsEnemyPartVisible( VisiblePartType part ) const;			///< if enemy is visible, return the part we see for our current enemy
-	const Vector &GetPartPosition( CCSPlayer *player, VisiblePartType part ) const;	///< return world space position of given part on player
+	const Vector &GetPartPosition( CFFPlayer *player, VisiblePartType part ) const;	///< return world space position of given part on player
 
 	float ComputeWeaponSightRange( void );							///< return line-of-sight distance to obstacle along weapon fire ray
 
 	bool IsAnyVisibleEnemyLookingAtMe( bool testFOV = false ) const;///< return true if any enemy I have LOS to is looking directly at me
 
-	bool IsSignificantlyCloser( const CCSPlayer *testPlayer, const CCSPlayer *referencePlayer ) const;	///< return true if testPlayer is significantly closer than referencePlayer
+	bool IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const;	///< return true if testPlayer is significantly closer than referencePlayer
 
 	//- approach points ---------------------------------------------------------------------------------------------
 	void ComputeApproachPoints( void );								///< determine the set of "approach points" representing where the enemy can enter this region
@@ -801,7 +801,7 @@ public:
 	bool IsUsingPistol( void ) const;								///< returns true if we have pistol equipped
 	bool IsUsingGrenade( void ) const;								///< returns true if we have grenade equipped
 	bool IsUsingSniperRifle( void ) const;							///< returns true if using a "sniper" rifle
-	bool IsUsing( CSWeaponID weapon ) const;						///< returns true if using the specific weapon
+	bool IsUsing( FFWeaponID weapon ) const;						///< returns true if using the specific weapon
 	bool IsSniper( void ) const;									///< return true if we have a sniper rifle in our inventory
 	bool IsSniping( void ) const;									///< return true if we are actively sniping (moving to sniper spot or settled in)
 	bool IsUsingShotgun( void ) const;								///< returns true if using a shotgun
@@ -813,7 +813,7 @@ public:
 	bool IsAvoidingGrenade( void ) const;							///< return true if we are in the act of avoiding a grenade
 	bool DoesActiveWeaponHaveSilencer( void ) const;				///< returns true if we are using a weapon with a removable silencer
 	bool CanActiveWeaponFire( void ) const;							///< returns true if our current weapon can attack
-	CWeaponCSBase *GetActiveCSWeapon( void ) const;					///< get our current Counter-Strike weapon
+	CFFWeaponBase *GetActiveCSWeapon( void ) const;					///< get our current Counter-Strike weapon
 
 	void GiveWeapon( const char *weaponAlias );						///< Debug command to give a named weapon
 
@@ -892,7 +892,7 @@ private:
 	void OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range, PriorityType priority, bool isHostile, bool isFootstep = false, const Vector *actualOrigin = NULL );	///< Checks if the bot can hear the event
 
 private:
-	friend class CCSBotManager;
+	friend class CFFBotManager;
 
 	/// @todo Get rid of these
 	friend class AttackState;
@@ -921,7 +921,7 @@ private:
 	CountdownTimer m_surpriseTimer;									///< when we were surprised
 
 	bool m_isFollowing;												///< true if we are following someone
-	CHandle< CCSPlayer > m_leader;									///< the ID of who we are following
+	CHandle< CFFPlayer > m_leader;									///< the ID of who we are following
 	float m_followTimestamp;										///< when we started following
 	float m_allowAutoFollowTime;									///< time when we can auto follow
 
@@ -1040,7 +1040,7 @@ private:
 	unsigned char m_travelDistancePhase;							///< a counter for optimizing when to compute travel distance
 
 	//- game scenario mechanisms -------------------------------------------------------------------------------------
-	CSGameState m_gameState;										///< our current knowledge about the state of the scenario
+	FFGameState m_gameState;										///< our current knowledge about the state of the scenario
 
 	byte m_hostageEscortCount;										///< the number of hostages we're currently escorting
 	void UpdateHostageEscortCount( void );							///< periodic check of hostage count in case we lost some
@@ -1161,12 +1161,12 @@ private:
 		int m_validFrame;											///< frame of last computation (for lazy evaluation)
 	};
 	static PartInfo m_partInfo[ MAX_PLAYERS ];						///< part positions for each player
-	void ComputePartPositions( CCSPlayer *player );					///< compute part positions from bone location
+	void ComputePartPositions( CFFPlayer *player );					///< compute part positions from bone location
 
 	//- attack state data --------------------------------------------------------------------------------------------
 	DispositionType m_disposition;									///< how we will react to enemies
 	CountdownTimer m_ignoreEnemiesTimer;							///< how long will we ignore enemies
-	mutable CHandle< CCSPlayer > m_enemy;							///< our current enemy
+	mutable CHandle< CFFPlayer > m_enemy;							///< our current enemy
 	bool m_isEnemyVisible;											///< result of last visibility test on enemy
 	unsigned char m_visibleEnemyParts;								///< which parts of the visible enemy do we see
 	Vector m_lastEnemyPosition;										///< last place we saw the enemy
@@ -1185,15 +1185,15 @@ private:
 		bool isEnemy;
 	}
 	m_watchInfo[ MAX_PLAYERS ];
-	mutable CHandle< CCSPlayer > m_bomber;							///< points to bomber if we can see him
+	mutable CHandle< CFFPlayer > m_bomber;							///< points to bomber if we can see him
 
 	int m_nearbyFriendCount;										///< number of nearby teammates
-	mutable CHandle< CCSPlayer > m_closestVisibleFriend;			///< the closest friend we can see
-	mutable CHandle< CCSPlayer > m_closestVisibleHumanFriend;		///< the closest human friend we can see
+	mutable CHandle< CFFPlayer > m_closestVisibleFriend;			///< the closest friend we can see
+	mutable CHandle< CFFPlayer > m_closestVisibleHumanFriend;		///< the closest human friend we can see
 
 	IntervalTimer m_attentionInterval;								///< time between attention checks
 
-	mutable CHandle< CCSPlayer > m_attacker;						///< last enemy that hurt us (may not be same as m_enemy)
+	mutable CHandle< CFFPlayer > m_attacker;						///< last enemy that hurt us (may not be same as m_enemy)
 	float m_attackedTimestamp;										///< when we were hurt by the m_attacker
 
 	int m_lastVictimID;												///< the entindex of the last victim we killed, or zero
@@ -1201,7 +1201,7 @@ private:
 	bool m_isRapidFiring;											///< if true, RunUpkeep() will toggle our primary attack as fast as it can
 	IntervalTimer m_equipTimer;										///< how long have we had our current weapon equipped
 	CountdownTimer m_zoomTimer;										///< for delaying firing immediately after zoom
-	bool DoEquip( CWeaponCSBase *gun );								///< equip the given item
+	bool DoEquip( CFFWeaponBase *gun );								///< equip the given item
 
 	void ReloadCheck( void );										///< reload our weapon if we must
 	void SilencerCheck( void );										///< use silencer
@@ -1216,7 +1216,7 @@ private:
 	struct ReactionState
 	{
 		// NOTE: player position & orientation is not currently stored separately
-		CHandle<CCSPlayer> player;
+		CHandle<CFFPlayer> player;
 		bool isReloading;
 		bool isProtectedByShield;
 	}
@@ -1225,7 +1225,7 @@ private:
 	byte m_enemyQueueCount;
 	byte m_enemyQueueAttendIndex;									///< index of the timeframe we are "conscious" of
 
-	CCSPlayer *FindMostDangerousThreat( void );						///< return most dangerous threat in my field of view (feeds into reaction time queue)
+	CFFPlayer *FindMostDangerousThreat( void );						///< return most dangerous threat in my field of view (feeds into reaction time queue)
 
 
 	//- stuck detection ---------------------------------------------------------------------------------------------
@@ -1246,7 +1246,7 @@ private:
 	RadioType m_lastRadioCommand;									///< last radio command we recieved
 	float m_lastRadioRecievedTimestamp;								///< time we recieved a radio message
 	float m_lastRadioSentTimestamp;									///< time when we send a radio message
-	CHandle< CCSPlayer > m_radioSubject;							///< who issued the radio message
+	CHandle< CFFPlayer > m_radioSubject;							///< who issued the radio message
 	Vector m_radioPosition;											///< position referred to in radio message
 	void RespondToRadioCommands( void );
 	bool IsRadioCommand( RadioType event ) const;					///< returns true if the radio message is an order to do something
@@ -1262,12 +1262,12 @@ private:
 // Inlines
 //
 
-inline float CCSBot::GetFeetZ( void ) const
+inline float CFFBot::GetFeetZ( void ) const
 {
 	return GetAbsOrigin().z;
 }
 
-inline const Vector *CCSBot::GetNoisePosition( void ) const
+inline const Vector *CFFBot::GetNoisePosition( void ) const
 {
 	if (m_noiseTimestamp > 0.0f)
 		return &m_noisePosition;
@@ -1275,7 +1275,7 @@ inline const Vector *CCSBot::GetNoisePosition( void ) const
 	return NULL;
 }
 
-inline bool CCSBot::IsAwareOfEnemyDeath( void ) const
+inline bool CFFBot::IsAwareOfEnemyDeath( void ) const
 {
 	if (GetEnemyDeathTimestamp() == 0.0f)
 		return false;
@@ -1289,7 +1289,7 @@ inline bool CCSBot::IsAwareOfEnemyDeath( void ) const
 	return false;
 }
 
-inline void CCSBot::Panic( void )
+inline void CFFBot::Panic( void )
 {
 	// we are stunned for a moment
 	Surprise( RandomFloat( 0.2f, 0.3f ) );
@@ -1303,170 +1303,170 @@ inline void CCSBot::Panic( void )
 	PrintIfWatched( "*** PANIC ***\n" );
 }
 
-inline bool CCSBot::IsPanicking( void ) const
+inline bool CFFBot::IsPanicking( void ) const
 {
 	return !m_panicTimer.IsElapsed();
 }
 
-inline void CCSBot::StopPanicking( void )
+inline void CFFBot::StopPanicking( void )
 {
 	m_panicTimer.Invalidate();
 }
 
-inline bool CCSBot::IsNotMoving( float minDuration ) const
+inline bool CFFBot::IsNotMoving( float minDuration ) const
 {
 	return (m_stillTimer.HasStarted() && m_stillTimer.GetElapsedTime() >= minDuration);
 }
 
-inline CWeaponCSBase *CCSBot::GetActiveCSWeapon( void ) const
+inline CFFWeaponBase *CFFBot::GetActiveCSWeapon( void ) const
 {
-	return reinterpret_cast<CWeaponCSBase *>( GetActiveWeapon() );
+	return reinterpret_cast<CFFWeaponBase *>( GetActiveWeapon() );
 }
 
 
-inline float CCSBot::GetCombatRange( void ) const
+inline float CFFBot::GetCombatRange( void ) const
 { 
 	return m_combatRange; 
 }
 
-inline void CCSBot::SetRogue( bool rogue )
+inline void CFFBot::SetRogue( bool rogue )
 { 
 	m_isRogue = rogue;
 }
 
-inline void CCSBot::Hurry( float duration )
+inline void CFFBot::Hurry( float duration )
 { 
 	m_hurryTimer.Start( duration ); 
 }
 
-inline float CCSBot::GetSafeTime( void ) const
+inline float CFFBot::GetSafeTime( void ) const
 {
 	return m_safeTime;
 }
 
-inline bool CCSBot::IsUnhealthy( void ) const
+inline bool CFFBot::IsUnhealthy( void ) const
 {
 	return (GetHealth() <= 40);
 }
 
-inline bool CCSBot::IsAlert( void ) const
+inline bool CFFBot::IsAlert( void ) const
 {
 	return !m_alertTimer.IsElapsed();
 }
 
-inline void CCSBot::BecomeAlert( void )
+inline void CFFBot::BecomeAlert( void )
 {
 	const float alertCooldownTime = 10.0f;
 	m_alertTimer.Start( alertCooldownTime );
 }
 
-inline bool CCSBot::IsSneaking( void ) const
+inline bool CFFBot::IsSneaking( void ) const
 {
 	return !m_sneakTimer.IsElapsed();
 }
 
-inline void CCSBot::Sneak( float duration )
+inline void CFFBot::Sneak( float duration )
 {
 	m_sneakTimer.Start( duration );
 }
 
-inline bool CCSBot::IsFollowing( void ) const
+inline bool CFFBot::IsFollowing( void ) const
 { 
 	return m_isFollowing;
 }
 
-inline CCSPlayer *CCSBot::GetFollowLeader( void ) const
+inline CFFPlayer *CFFBot::GetFollowLeader( void ) const
 { 
 	return m_leader;
 }
 
-inline float CCSBot::GetFollowDuration( void ) const
+inline float CFFBot::GetFollowDuration( void ) const
 {
 	return gpGlobals->curtime - m_followTimestamp;
 }
 
-inline bool CCSBot::CanAutoFollow( void ) const
+inline bool CFFBot::CanAutoFollow( void ) const
 { 
 	return (gpGlobals->curtime > m_allowAutoFollowTime);
 }
 
-inline void CCSBot::AimAtEnemy( void )
+inline void CFFBot::AimAtEnemy( void )
 { 
 	m_isAimingAtEnemy = true;
 }
 
-inline void CCSBot::StopAiming( void )
+inline void CFFBot::StopAiming( void )
 { 
 	m_isAimingAtEnemy = false;
 }
 
-inline bool CCSBot::IsAimingAtEnemy( void ) const
+inline bool CFFBot::IsAimingAtEnemy( void ) const
 {
 	return m_isAimingAtEnemy;
 }
 
-inline float CCSBot::GetStateTimestamp( void ) const
+inline float CFFBot::GetStateTimestamp( void ) const
 {
 	return m_stateTimestamp;
 }
 
-inline CSGameState *CCSBot::GetGameState( void )
+inline FFGameState *CFFBot::GetGameState( void )
 {
 	return &m_gameState;
 }
 
-inline const CSGameState *CCSBot::GetGameState( void ) const
+inline const FFGameState *CFFBot::GetGameState( void ) const
 {
 	return &m_gameState;
 }
 
-inline bool CCSBot::IsAtBombsite( void )
+inline bool CFFBot::IsAtBombsite( void )
 {
 	return m_bInBombZone;
 }
 
-inline void CCSBot::SetTask( TaskType task, CBaseEntity *entity )
+inline void CFFBot::SetTask( TaskType task, CBaseEntity *entity )
 {
 	m_task = task;
 	m_taskEntity = entity;
 }
 
-inline CCSBot::TaskType CCSBot::GetTask( void ) const
+inline CFFBot::TaskType CFFBot::GetTask( void ) const
 {
 	return m_task;
 }
 
-inline CBaseEntity *CCSBot::GetTaskEntity( void )
+inline CBaseEntity *CFFBot::GetTaskEntity( void )
 {
 	return static_cast<CBaseEntity *>( m_taskEntity );
 }
 
-inline CCSBot::MoraleType CCSBot::GetMorale( void ) const
+inline CFFBot::MoraleType CFFBot::GetMorale( void ) const
 {
 	return m_morale;
 }
 
-inline void CCSBot::Surprise( float duration )
+inline void CFFBot::Surprise( float duration )
 {
 	m_surpriseTimer.Start( duration );
 }
 
-inline bool CCSBot::IsSurprised( void ) const
+inline bool CFFBot::IsSurprised( void ) const
 {
 	return !m_surpriseTimer.IsElapsed();
 }
 
-inline CNavArea *CCSBot::GetNoiseArea( void ) const
+inline CNavArea *CFFBot::GetNoiseArea( void ) const
 {
 	return m_noiseArea;
 }
 
-inline void CCSBot::ForgetNoise( void )
+inline void CFFBot::ForgetNoise( void )
 {
 	m_noiseTimestamp = 0.0f;
 }
 
-inline float CCSBot::GetNoiseRange( void ) const
+inline float CFFBot::GetNoiseRange( void ) const
 {
 	if (IsNoiseHeard())
 		return m_noiseTravelDistance;
@@ -1474,112 +1474,112 @@ inline float CCSBot::GetNoiseRange( void ) const
 	return 999999999.9f;
 }
 
-inline PriorityType CCSBot::GetNoisePriority( void ) const
+inline PriorityType CFFBot::GetNoisePriority( void ) const
 { 
 	return m_noisePriority;
 }
 
-inline BotChatterInterface *CCSBot::GetChatter( void )
+inline BotChatterInterface *CFFBot::GetChatter( void )
 {
 	return &m_chatter;
 }
 
-inline CCSPlayer *CCSBot::GetBotEnemy( void ) const
+inline CFFPlayer *CFFBot::GetBotEnemy( void ) const
 {
 	return m_enemy;
 }
 
-inline int CCSBot::GetNearbyEnemyCount( void ) const
+inline int CFFBot::GetNearbyEnemyCount( void ) const
 { 
 	return MIN( GetEnemiesRemaining(), m_nearbyEnemyCount );
 }
 
-inline unsigned int CCSBot::GetEnemyPlace( void ) const
+inline unsigned int CFFBot::GetEnemyPlace( void ) const
 {
 	return m_enemyPlace;
 }
 
-inline bool CCSBot::CanSeeBomber( void ) const
+inline bool CFFBot::CanSeeBomber( void ) const
 {
 	return (m_bomber == NULL) ? false : true;
 }
 
-inline CCSPlayer *CCSBot::GetBomber( void ) const
+inline CFFPlayer *CFFBot::GetBomber( void ) const
 {
 	return m_bomber;
 }
 
-inline int CCSBot::GetNearbyFriendCount( void ) const
+inline int CFFBot::GetNearbyFriendCount( void ) const
 {
 	return MIN( GetFriendsRemaining(), m_nearbyFriendCount );
 }
 
-inline CCSPlayer *CCSBot::GetClosestVisibleFriend( void ) const
+inline CFFPlayer *CFFBot::GetClosestVisibleFriend( void ) const
 {
 	return m_closestVisibleFriend;
 }
 
-inline CCSPlayer *CCSBot::GetClosestVisibleHumanFriend( void ) const
+inline CFFPlayer *CFFBot::GetClosestVisibleHumanFriend( void ) const
 {
 	return m_closestVisibleHumanFriend;
 }
 
-inline float CCSBot::GetTimeSinceAttacked( void ) const
+inline float CFFBot::GetTimeSinceAttacked( void ) const
 {
 	return gpGlobals->curtime - m_attackedTimestamp;
 }
 
-inline float CCSBot::GetFirstSawEnemyTimestamp( void ) const
+inline float CFFBot::GetFirstSawEnemyTimestamp( void ) const
 {
 	return m_firstSawEnemyTimestamp;
 }
 
-inline float CCSBot::GetLastSawEnemyTimestamp( void ) const
+inline float CFFBot::GetLastSawEnemyTimestamp( void ) const
 {
 	return m_lastSawEnemyTimestamp;
 }
 
-inline float CCSBot::GetTimeSinceLastSawEnemy( void ) const
+inline float CFFBot::GetTimeSinceLastSawEnemy( void ) const
 {
 	return gpGlobals->curtime - m_lastSawEnemyTimestamp;
 }
 
-inline float CCSBot::GetTimeSinceAcquiredCurrentEnemy( void ) const
+inline float CFFBot::GetTimeSinceAcquiredCurrentEnemy( void ) const
 {
 	return gpGlobals->curtime - m_currentEnemyAcquireTimestamp;
 }
 
-inline const Vector &CCSBot::GetLastKnownEnemyPosition( void ) const
+inline const Vector &CFFBot::GetLastKnownEnemyPosition( void ) const
 {
 	return m_lastEnemyPosition;
 }
 
-inline bool CCSBot::IsEnemyVisible( void ) const			
+inline bool CFFBot::IsEnemyVisible( void ) const
 {
 	return m_isEnemyVisible;
 }
 
-inline float CCSBot::GetEnemyDeathTimestamp( void ) const	
+inline float CFFBot::GetEnemyDeathTimestamp( void ) const
 {
 	return m_enemyDeathTimestamp;
 }
 
-inline int CCSBot::GetLastVictimID( void ) const
+inline int CFFBot::GetLastVictimID( void ) const
 {
 	return m_lastVictimID;
 }
 
-inline bool CCSBot::CanSeeSniper( void ) const
+inline bool CFFBot::CanSeeSniper( void ) const
 {
 	return m_isEnemySniperVisible;
 }
 
-inline bool CCSBot::HasSeenSniperRecently( void ) const
+inline bool CFFBot::HasSeenSniperRecently( void ) const
 {
 	return !m_sawEnemySniperTimer.IsElapsed();
 }
 
-inline float CCSBot::GetTravelDistanceToPlayer( CCSPlayer *player ) const
+inline float CFFBot::GetTravelDistanceToPlayer( CFFPlayer *player ) const
 {
 	if (player == NULL)
 		return -1.0f;
@@ -1590,103 +1590,103 @@ inline float CCSBot::GetTravelDistanceToPlayer( CCSPlayer *player ) const
 	return m_playerTravelDistance[ player->entindex() % MAX_PLAYERS ];
 }
 
-inline bool CCSBot::HasPath( void ) const
+inline bool CFFBot::HasPath( void ) const
 {
 	return (m_pathLength) ? true : false;
 }
 
-inline void CCSBot::DestroyPath( void )		
+inline void CFFBot::DestroyPath( void )
 {
 	m_isStopping = false;
 	m_pathLength = 0;
 	m_pathLadder = NULL;
 }
 
-inline CNavArea *CCSBot::GetLastKnownArea( void ) const		
+inline CNavArea *CFFBot::GetLastKnownArea( void ) const
 {
 	return m_lastKnownArea;
 }
 
-inline const Vector &CCSBot::GetPathEndpoint( void ) const		
+inline const Vector &CFFBot::GetPathEndpoint( void ) const
 {
 	return m_path[ m_pathLength-1 ].pos;
 }
 
-inline const Vector &CCSBot::GetPathPosition( int index ) const
+inline const Vector &CFFBot::GetPathPosition( int index ) const
 {
 	return m_path[ index ].pos;
 }
 
-inline bool CCSBot::IsUsingLadder( void ) const	
+inline bool CFFBot::IsUsingLadder( void ) const
 {
 	return (m_pathLadder) ? true : false;
 }
 
-inline void CCSBot::SetGoalEntity( CBaseEntity *entity )	
+inline void CFFBot::SetGoalEntity( CBaseEntity *entity )
 {
 	m_goalEntity = entity;
 }
 
-inline CBaseEntity *CCSBot::GetGoalEntity( void )
+inline CBaseEntity *CFFBot::GetGoalEntity( void )
 {
 	return m_goalEntity;
 }
 
-inline void CCSBot::ForceRun( float duration )
+inline void CFFBot::ForceRun( float duration )
 {
 	Run();
 	m_mustRunTimer.Start( duration );
 }
 
-inline void CCSBot::Wait( float duration )			
+inline void CFFBot::Wait( float duration )
 {
 	m_waitTimer.Start( duration );
 }
 
-inline bool CCSBot::IsWaiting( void ) const		
+inline bool CFFBot::IsWaiting( void ) const
 {
 	return !m_waitTimer.IsElapsed();
 }
 
-inline void CCSBot::StopWaiting( void )			
+inline void CFFBot::StopWaiting( void )
 {
 	m_waitTimer.Invalidate();
 }
 
-inline bool CCSBot::HasVisitedEnemySpawn( void ) const		
+inline bool CFFBot::HasVisitedEnemySpawn( void ) const
 {
 	return m_hasVisitedEnemySpawn;
 }
 
-inline const Vector &CCSBot::EyePositionConst( void ) const		
+inline const Vector &CFFBot::EyePositionConst( void ) const
 {
 	return m_eyePosition;
 }
 	
-inline void CCSBot::SetLookAngles( float yaw, float pitch )
+inline void CFFBot::SetLookAngles( float yaw, float pitch )
 {
 	m_lookYaw = yaw;
 	m_lookPitch = pitch;
 }
 
-inline void CCSBot::SetForwardAngle( float angle ) 
+inline void CFFBot::SetForwardAngle( float angle )
 {
 	m_forwardAngle = angle;
 }
 
-inline void CCSBot::SetLookAheadAngle( float angle ) 
+inline void CFFBot::SetLookAheadAngle( float angle )
 {
 	m_lookAheadAngle = angle;
 }
 
-inline void CCSBot::ClearLookAt( void )
+inline void CFFBot::ClearLookAt( void )
 { 
 	//PrintIfWatched( "ClearLookAt()\n" );
 	m_lookAtSpotState = NOT_LOOKING_AT_SPOT; 
 	m_lookAtDesc = NULL; 
 }
 
-inline bool CCSBot::IsLookingAtSpot( PriorityType pri ) const
+inline bool CFFBot::IsLookingAtSpot( PriorityType pri ) const
 { 
 	if (m_lookAtSpotState != NOT_LOOKING_AT_SPOT && m_lookAtSpotPriority >= pri)
 		return true;
@@ -1694,7 +1694,7 @@ inline bool CCSBot::IsLookingAtSpot( PriorityType pri ) const
 	return false;
 }
 
-inline bool CCSBot::IsViewMoving( float angleVelThreshold ) const
+inline bool CFFBot::IsViewMoving( float angleVelThreshold ) const
 {
 	if (m_lookYawVel < angleVelThreshold && m_lookYawVel > -angleVelThreshold &&
 		m_lookPitchVel < angleVelThreshold && m_lookPitchVel > -angleVelThreshold)
@@ -1705,19 +1705,19 @@ inline bool CCSBot::IsViewMoving( float angleVelThreshold ) const
 	return true;
 }
 
-inline bool CCSBot::HasViewBeenSteady( float duration ) const
+inline bool CFFBot::HasViewBeenSteady( float duration ) const
 {
 	return (m_viewSteadyTimer.GetElapsedTime() > duration);
 }
 
-inline bool CCSBot::HasLookAtTarget( void ) const
+inline bool CFFBot::HasLookAtTarget( void ) const
 {
 	return (m_lookAtSpotState != NOT_LOOKING_AT_SPOT);
 }
 
-inline bool CCSBot::IsEnemyPartVisible( VisiblePartType part ) const
+inline bool CFFBot::IsEnemyPartVisible( VisiblePartType part ) const
 { 
-	VPROF_BUDGET( "CCSBot::IsEnemyPartVisible", VPROF_BUDGETGROUP_NPCS );
+	VPROF_BUDGET( "CFFBot::IsEnemyPartVisible", VPROF_BUDGETGROUP_NPCS );
 
 	if (!IsEnemyVisible())
 		return false;
@@ -1725,7 +1725,7 @@ inline bool CCSBot::IsEnemyPartVisible( VisiblePartType part ) const
 	return (m_visibleEnemyParts & part) ? true : false;
 }
 
-inline bool CCSBot::IsSignificantlyCloser( const CCSPlayer *testPlayer, const CCSPlayer *referencePlayer ) const
+inline bool CFFBot::IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const
 {
 	if ( !referencePlayer )
 		return true;
@@ -1743,32 +1743,32 @@ inline bool CCSBot::IsSignificantlyCloser( const CCSPlayer *testPlayer, const CC
 	return false;
 }
 
-inline void CCSBot::ClearApproachPoints( void )	
+inline void CFFBot::ClearApproachPoints( void )
 {
 	m_approachPointCount = 0;
 }
 
-inline const CNavArea *CCSBot::GetInitialEncounterArea( void ) const
+inline const CNavArea *CFFBot::GetInitialEncounterArea( void ) const
 {
 	return m_initialEncounterArea;
 }
 
-inline void CCSBot::SetInitialEncounterArea( const CNavArea *area )		
+inline void CFFBot::SetInitialEncounterArea( const CNavArea *area )
 {
 	m_initialEncounterArea = area;
 }
 
-inline bool CCSBot::IsThrowingGrenade( void ) const		
+inline bool CFFBot::IsThrowingGrenade( void ) const
 {
 	return m_grenadeTossState != NOT_THROWING;
 }
 
-inline bool CCSBot::IsAvoidingGrenade( void ) const
+inline bool CFFBot::IsAvoidingGrenade( void ) const
 {
 	return !m_isAvoidingGrenade.IsElapsed();
 }
 
-inline void CCSBot::PrimaryAttack( void )
+inline void CFFBot::PrimaryAttack( void )
 {
 	if ( IsUsingPistol() && !CanActiveWeaponFire() )
 		return;
@@ -1776,7 +1776,7 @@ inline void CCSBot::PrimaryAttack( void )
 	BaseClass::PrimaryAttack();
 }
 
-inline CCSBot::ZoomType CCSBot::GetZoomLevel( void )
+inline CFFBot::ZoomType CFFBot::GetZoomLevel( void )
 {
 	if (GetFOV() > 60.0f)
 		return NO_ZOOM;
@@ -1785,34 +1785,34 @@ inline CCSBot::ZoomType CCSBot::GetZoomLevel( void )
 	return HIGH_ZOOM;
 }
 
-inline bool CCSBot::IsWaitingForZoom( void ) const		
+inline bool CFFBot::IsWaitingForZoom( void ) const
 {
 	return !m_zoomTimer.IsElapsed();
 }
 
-inline int CCSBot::GetHostageEscortCount( void ) const		
+inline int CFFBot::GetHostageEscortCount( void ) const
 {
 	return m_hostageEscortCount;
 }
 
-inline void CCSBot::IncreaseHostageEscortCount( void )		
+inline void CFFBot::IncreaseHostageEscortCount( void )
 {
 	++m_hostageEscortCount;
 }
 
-inline void CCSBot::ResetWaitForHostagePatience( void )
+inline void CFFBot::ResetWaitForHostagePatience( void )
 {
 	m_isWaitingForHostage = false;
 	m_inhibitWaitingForHostageTimer.Invalidate();
 }
 
 
-inline bool CCSBot::IsUsingVoice() const
+inline bool CFFBot::IsUsingVoice() const
 {
 	return m_voiceEndTimestamp > gpGlobals->curtime; 
 }
 
-inline bool CCSBot::IsOpeningDoor( void ) const
+inline bool CFFBot::IsOpeningDoor( void ) const
 {
 	return m_isOpeningDoor;
 }
@@ -1822,7 +1822,7 @@ inline bool CCSBot::IsOpeningDoor( void ) const
 /**
  * Return true if the given weapon is a sniper rifle
  */
-inline bool IsSniperRifle( CWeaponCSBase *weapon )
+inline bool IsSniperRifle( CFFWeaponBase *weapon )
 {
 	if (weapon == NULL)
 		return false;
@@ -1838,7 +1838,7 @@ inline bool IsSniperRifle( CWeaponCSBase *weapon )
 class PathCost
 {
 public:
-	PathCost( CCSBot *bot, RouteType route = SAFEST_ROUTE )
+	PathCost( CFFBot *bot, RouteType route = SAFEST_ROUTE )
 	{
 		m_bot = bot;
 		m_route = route;
@@ -1986,7 +1986,7 @@ public:
 	}
 
 private:
-	CCSBot *m_bot;
+	CFFBot *m_bot;
 	RouteType m_route;
 };
 
@@ -1995,10 +1995,10 @@ private:
 //
 // Prototypes
 //
-extern int GetBotFollowCount( CCSPlayer *leader );
-extern const Vector *FindNearbyRetreatSpot( CCSBot *me, float maxRange = 250.0f );
+extern int GetBotFollowCount( CFFPlayer *leader );
+extern const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange = 250.0f );
 extern const HidingSpot *FindInitialEncounterSpot( CBaseEntity *me, const Vector &searchOrigin, float enemyArriveTime, float maxRange, bool isSniper );
 
 
-#endif	// _CS_BOT_H_
+#endif	// _FF_BOT_H_
 

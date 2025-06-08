@@ -7,8 +7,8 @@
 
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
-#ifndef CS_CONTROL_H
-#define CS_CONTROL_H
+#ifndef FF_BOT_MANAGER_H
+#define FF_BOT_MANAGER_H
 
 
 #include "bot_manager.h"
@@ -16,11 +16,11 @@
 #include "bot_util.h"
 #include "bot_profile.h"
 #include "cs_shareddefs.h"
-#include "cs_player.h"
+#include "ff_player.h"
 
 extern ConVar friendlyfire;
 
-class CBasePlayerWeapon;
+class CBasePlayerWeapon; // In Fortress Forever, weapons may not derive from CFFWeaponBase directly.
 
 /**
  * Given one team, return the other
@@ -30,12 +30,12 @@ inline int OtherTeam( int team )
 	return (team == TEAM_TERRORIST) ? TEAM_CT : TEAM_TERRORIST;
 }
 
-class CCSBotManager;
+class CFFBotManager;
 
-// accessor for CS-specific bots
-inline CCSBotManager *TheCSBots( void )
+// accessor for FF-specific bots
+inline CFFBotManager *TheFFBots( void )
 {
-	return reinterpret_cast< CCSBotManager * >( TheBots );
+	return reinterpret_cast< CFFBotManager * >( TheBots );
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ public:
 //--------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Macro to set up an OnEventClass() in TheCSBots.
+ * Macro to set up an OnEventClass() in TheFFBots.
  */
 #define DECLARE_BOTMANAGER_EVENT_LISTENER( BotManagerSingleton, EventClass, EventName ) \
 	public: \
@@ -89,21 +89,21 @@ public:
 
 
 //--------------------------------------------------------------------------------------------------------------
-#define DECLARE_CSBOTMANAGER_EVENT_LISTENER( EventClass, EventName ) DECLARE_BOTMANAGER_EVENT_LISTENER( TheCSBots, EventClass, EventName )
+#define DECLARE_FFBOTMANAGER_EVENT_LISTENER( EventClass, EventName ) DECLARE_BOTMANAGER_EVENT_LISTENER( TheFFBots, EventClass, EventName )
 
 
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Macro to propogate an event from the bot manager to all bots
  */
-#define CCSBOTMANAGER_ITERATE_BOTS( Callback, arg1 ) \
+#define CFFBOTMANAGER_ITERATE_BOTS( Callback, arg1 ) \
 	{ \
 		for ( int idx = 1; idx <= gpGlobals->maxClients; ++idx ) \
 		{ \
 			CBasePlayer *player = UTIL_PlayerByIndex( idx ); \
 			if (player == NULL) continue; \
 			if (!player->IsBot()) continue; \
-			CCSBot *bot = dynamic_cast< CCSBot * >(player); \
+			CFFBot *bot = dynamic_cast< CFFBot * >(player); \
 			if ( !bot ) continue; \
 			bot->Callback( arg1 ); \
 		} \
@@ -112,12 +112,12 @@ public:
 
 //--------------------------------------------------------------------------------------------------------------
 //
-// The manager for Counter-Strike specific bots
+// The manager for Fortress Forever specific bots
 //
-class CCSBotManager : public CBotManager
+class CFFBotManager : public CBotManager
 {
 public:
-	CCSBotManager();
+	CFFBotManager();
 
 	virtual CBasePlayer *AllocateBotEntity( void );			///< factory method to allocate the appropriate entity for the bot
 
@@ -133,7 +133,7 @@ public:
 	virtual void StartFrame( void );						///< (EXTEND) called each frame
 
 	virtual unsigned int GetPlayerPriority( CBasePlayer *player ) const;	///< return priority of player (0 = max pri)
-	virtual bool IsImportantPlayer( CCSPlayer *player ) const;				///< return true if player is important to scenario (VIP, bomb carrier, etc)
+	virtual bool IsImportantPlayer( CFFPlayer *player ) const;				///< return true if player is important to scenario (VIP, bomb carrier, etc)
 
 	void ExtractScenarioData( void );							///< search the map entities to determine the game scenario and define important zones
 
@@ -254,7 +254,7 @@ public:
 	bool IsBombPlanted( void ) const			{ return m_isBombPlanted; }			///< returns true if bomb has been planted
 	float GetBombPlantTimestamp( void ) const	{ return m_bombPlantTimestamp; }	///< return time bomb was planted
 	bool IsTimeToPlantBomb( void ) const;											///< return true if it's ok to try to plant bomb
-	CCSPlayer *GetBombDefuser( void ) const		{ return m_bombDefuser; }			///< return the player currently defusing the bomb, or NULL
+	CFFPlayer *GetBombDefuser( void ) const		{ return m_bombDefuser; }			///< return the player currently defusing the bomb, or NULL
 	float GetBombTimeLeft( void ) const;											///< get the time remaining before the planted bomb explodes
 	CBaseEntity *GetLooseBomb( void )			{ return m_looseBomb; }				///< return the bomb if it is loose on the ground
 	CNavArea *GetLooseBombArea( void ) const	{ return m_looseBombArea; }			///< return area that bomb is in/near
@@ -288,11 +288,11 @@ public:
 
 	bool AllowFriendlyFireDamage( void ) const		{ return friendlyfire.GetBool(); }
 
-	bool IsWeaponUseable( const CWeaponCSBase *weapon ) const;	///< return true if the bot can use this weapon
+	bool IsWeaponUseable( const CFFWeaponBase *weapon ) const;	///< return true if the bot can use this weapon
 
 	bool IsDefenseRushing( void ) const				{ return m_isDefenseRushing; }		///< returns true if defense team has "decided" to rush this round
-	bool IsOnDefense( const CCSPlayer *player ) const;		///< return true if this player is on "defense"
-	bool IsOnOffense( const CCSPlayer *player ) const;		///< return true if this player is on "offense"
+	bool IsOnDefense( const CFFPlayer *player ) const;		///< return true if this player is on "defense"
+	bool IsOnOffense( const CFFPlayer *player ) const;		///< return true if this player is on "offense"
 
 	bool IsRoundOver( void ) const					{ return m_isRoundOver; }		///< return true if the round has ended
 
@@ -315,7 +315,7 @@ private:
 	bool m_isBombPlanted;									///< true if bomb has been planted
 	float m_bombPlantTimestamp;								///< time bomb was planted
 	float m_earliestBombPlantTimestamp;						///< don't allow planting until after this time has elapsed
-	CCSPlayer *m_bombDefuser;								///< the player currently defusing a bomb
+	CFFPlayer *m_bombDefuser;								///< the player currently defusing a bomb
 	EHANDLE m_looseBomb;									///< will be non-NULL if bomb is loose on the ground
 	CNavArea *m_looseBombArea;								///< area that bomb is is/near
 
@@ -331,63 +331,63 @@ private:
 	bool m_isDefenseRushing;								///< whether defensive team is rushing this round or not
 
 	// Event Handlers --------------------------------------------------------------------------------------------
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombPickedUp,			bomb_pickup )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombPlanted,			bomb_planted )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombBeep,				bomb_beep )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefuseBegin,		bomb_begindefuse )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefused,			bomb_defused )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombDefuseAbort,		bomb_abortdefuse )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BombExploded,			bomb_exploded )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombPickedUp,			bomb_pickup )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombPlanted,			bomb_planted )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombBeep,				bomb_beep )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombDefuseBegin,		bomb_begindefuse )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombDefused,			bomb_defused )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombDefuseAbort,		bomb_abortdefuse )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BombExploded,			bomb_exploded )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundStart,			round_start )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( RoundFreezeEnd,		round_freeze_end )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundStart,			round_start )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundFreezeEnd,		round_freeze_end )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( DoorMoving,			door_moving )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DoorMoving,			door_moving )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HostageFollows,		hostage_follows )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HostageRescuedAll,		hostage_rescued_all )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HostageFollows,		hostage_follows )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HostageRescuedAll,		hostage_rescued_all )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponFire,			weapon_fire )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponFireOnEmpty,		weapon_fire_on_empty )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponReload,			weapon_reload )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( WeaponZoom,			weapon_zoom )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFire,			weapon_fire )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFireOnEmpty,		weapon_fire_on_empty )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponReload,			weapon_reload )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponZoom,			weapon_zoom )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( FlashbangDetonate,		flashbang_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( SmokeGrenadeDetonate,	smokegrenade_detonate )
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FlashbangDetonate,		flashbang_detonate )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SmokeGrenadeDetonate,	smokegrenade_detonate )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
 
-	DECLARE_CSBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
 
 	CUtlVector< BotEventInterface * > m_commonEventListeners;	// These event listeners fire often, and can be disabled for performance gains when no bots are present.
 	bool m_eventListenersEnabled;
 	void EnableEventListeners( bool enable );
 };
 
-inline CBasePlayer *CCSBotManager::AllocateBotEntity( void )
+inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )
 {
-	return static_cast<CBasePlayer *>( CreateEntityByName( "cs_bot" ) );
+	return static_cast<CBasePlayer *>( CreateEntityByName( "ff_bot" ) ); // Changed cs_bot to ff_bot
 }
 
-inline bool CCSBotManager::IsTimeToPlantBomb( void ) const
+inline bool CFFBotManager::IsTimeToPlantBomb( void ) const
 {
 	return (gpGlobals->curtime >= m_earliestBombPlantTimestamp);
 }
 
-inline const CCSBotManager::Zone *CCSBotManager::GetClosestZone( const CBaseEntity *entity ) const
+inline const CFFBotManager::Zone *CFFBotManager::GetClosestZone( const CBaseEntity *entity ) const
 {
 	if (entity == NULL)
 		return NULL;
@@ -397,4 +397,4 @@ inline const CCSBotManager::Zone *CCSBotManager::GetClosestZone( const CBaseEnti
 	return GetClosestZone( centroid );
 }
 
-#endif
+#endif // FF_BOT_MANAGER_H

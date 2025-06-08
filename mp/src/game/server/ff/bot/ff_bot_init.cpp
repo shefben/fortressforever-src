@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 #include "cs_shareddefs.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -32,7 +32,7 @@ static void PrefixChanged( IConVar *c, const char *oldPrefix, float flOldValue )
 			if ( !player->IsBot() || !IsEntityValid( player ) )
 				continue;
 
-			CCSBot *bot = dynamic_cast< CCSBot * >( player );
+			CFFBot *bot = dynamic_cast< CFFBot * >( player );
 
 			if ( !bot )
 				continue;
@@ -81,7 +81,7 @@ ConVar cv_bot_auto_follow( "bot_auto_follow", "0", FCVAR_REPLICATED, "If nonzero
 ConVar cv_bot_flipout( "bot_flipout", "0", FCVAR_REPLICATED | FCVAR_CHEAT, "If nonzero, bots use no CPU for AI. Instead, they run around randomly." );
 
 
-extern void FinishClientPutInServer( CCSPlayer *pPlayer );
+extern void FinishClientPutInServer( CFFPlayer *pPlayer );
 
 
 //--------------------------------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ void Bot_ServerCommand( void )
 /**
  * Constructor
  */
-CCSBot::CCSBot( void ) : m_chatter( this ), m_gameState( this )
+CFFBot::CFFBot( void ) : m_chatter( this ), m_gameState( this )
 {
 	m_hasJoined = false;
 }
@@ -106,7 +106,7 @@ CCSBot::CCSBot( void ) : m_chatter( this ), m_gameState( this )
 /**
  * Destructor
  */
-CCSBot::~CCSBot()
+CFFBot::~CFFBot()
 {
 }
 
@@ -115,7 +115,7 @@ CCSBot::~CCSBot()
 /**
  * Prepare bot for action
  */
-bool CCSBot::Initialize( const BotProfile *profile, int team )
+bool CFFBot::Initialize( const BotProfile *profile, int team )
 {
 	// extend
 	BaseClass::Initialize( profile, team );
@@ -158,7 +158,7 @@ bool CCSBot::Initialize( const BotProfile *profile, int team )
 /**
  * Reset internal data to initial state
  */
-void CCSBot::ResetValues( void )
+void CFFBot::ResetValues( void )
 {
 	m_chatter.Reset();
 	m_gameState.Reset();
@@ -345,7 +345,7 @@ void CCSBot::ResetValues( void )
  * Called when bot is placed in map, and when bots are reset after a round ends.
  * NOTE: For some reason, this can be called twice when a bot is added.
  */
-void CCSBot::Spawn( void )
+void CFFBot::Spawn( void )
 {
 	// do the normal player spawn process
 	BaseClass::Spawn();
@@ -356,4 +356,3 @@ void CCSBot::Spawn( void )
 
 	Buy();
 }
-

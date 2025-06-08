@@ -9,15 +9,15 @@
 
 #include "cbase.h"
 #include "cs_gamerules.h"
-#include "cs_player.h"
+#include "ff_player.h"
 #include "shared_util.h"
 #include "engine/IEngineSound.h"
 #include "KeyValues.h"
 
 #include "bot.h"
 #include "bot_util.h"
-#include "cs_bot.h"
-#include "cs_bot_chatter.h"
+#include "ff_bot.h"
+#include "ff_bot_chatter.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -59,7 +59,7 @@ const Vector *GetRandomSpotAtPlace( Place place )
 /**
  * Transmit meme to other bots
  */
-void BotMeme::Transmit( CCSBot *sender ) const
+void BotMeme::Transmit( CFFBot *sender ) const
 {
 	for( int i = 1; i <= gpGlobals->maxClients; i++ )
 	{
@@ -90,7 +90,7 @@ void BotMeme::Transmit( CCSBot *sender ) const
 		if (!player->IsBot())
 			continue;
 
-		CCSBot *bot = dynamic_cast<CCSBot *>( player );
+		CFFBot *bot = dynamic_cast<CFFBot *>( player );
 
 		if ( !bot )
 			continue;
@@ -104,7 +104,7 @@ void BotMeme::Transmit( CCSBot *sender ) const
 /**
  * A teammate called for help - respond
  */
-void BotHelpMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotHelpMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	const float maxHelpRange = 3000.0f;		// 2000
 	receiver->RespondToHelpRequest( sender, m_place, maxHelpRange );
@@ -114,7 +114,7 @@ void BotHelpMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate reported information about a bombsite
  */
-void BotBombsiteStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotBombsiteStatusMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	// remember this bombsite's status
 	if (m_status == CLEAR)
@@ -126,7 +126,7 @@ void BotBombsiteStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 	// if our target bombsite wasn't cleared, will will continue going to it, 
 	// because GetNextBombsiteToSearch() will return the same zone (since its not cleared)
 	// if the bomb was planted, we will head to that bombsite
-	if (receiver->GetTask() == CCSBot::FIND_TICKING_BOMB)
+	if (receiver->GetTask() == CFFBot::FIND_TICKING_BOMB)
 	{
 		receiver->Idle();
 		receiver->GetChatter()->Affirmative();
@@ -137,12 +137,12 @@ void BotBombsiteStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate reported information about the bomb
  */
-void BotBombStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotBombStatusMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	// update our gamestate based on teammate's report
 	switch( m_state )
 	{
-		case CSGameState::MOVING:
+		case FFGameState::MOVING:
 			receiver->GetGameState()->UpdateBomber( m_pos );
 
 			// if we are hunting and see no enemies, respond
@@ -151,10 +151,10 @@ void BotBombStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 
 			break;
 
-		case CSGameState::LOOSE:
+		case FFGameState::LOOSE:
 			receiver->GetGameState()->UpdateLooseBomb( m_pos );
 
-			if (receiver->GetTask() == CCSBot::GUARD_BOMB_ZONE)
+			if (receiver->GetTask() == CFFBot::GUARD_BOMB_ZONE)
 			{
 				receiver->Idle();
 				receiver->GetChatter()->Affirmative();		
@@ -167,7 +167,7 @@ void BotBombStatusMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate has asked that we follow him
  */
-void BotFollowMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotFollowMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	if (receiver->IsRogue())
 		return;
@@ -201,7 +201,7 @@ void BotFollowMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate has asked us to defend a place
  */
-void BotDefendHereMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotDefendHereMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	if (receiver->IsRogue())
 		return;
@@ -217,14 +217,14 @@ void BotDefendHereMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 		const Vector *spot = FindRandomHidingSpot( receiver, place, receiver->IsSniper() );
 		if (spot)
 		{
-			receiver->SetTask( CCSBot::HOLD_POSITION );
+			receiver->SetTask( CFFBot::HOLD_POSITION );
 			receiver->Hide( *spot );
 			return;
 		}
 	}
 
 	// hide nearby
-	receiver->SetTask( CCSBot::HOLD_POSITION );
+	receiver->SetTask( CFFBot::HOLD_POSITION );
 	receiver->Hide( TheNavMesh->GetNearestNavArea( m_pos ) );
 
 	// acknowledge
@@ -235,11 +235,11 @@ void BotDefendHereMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate has asked where the bomb is planted
  */
-void BotWhereBombMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotWhereBombMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	int zone = receiver->GetGameState()->GetPlantedBombsite();
 
-	if (zone != CSGameState::UNKNOWN)
+	if (zone != FFGameState::UNKNOWN)
 		receiver->GetChatter()->FoundPlantedBomb( zone );
 }
 
@@ -247,7 +247,7 @@ void BotWhereBombMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate has asked us to report in
  */
-void BotRequestReportMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotRequestReportMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	receiver->GetChatter()->ReportingIn();
 }
@@ -257,7 +257,7 @@ void BotRequestReportMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate told us all the hostages are gone
  */
-void BotAllHostagesGoneMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotAllHostagesGoneMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	receiver->GetGameState()->AllHostagesGone();
 
@@ -270,7 +270,7 @@ void BotAllHostagesGoneMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate told us a CT is talking to a hostage
  */
-void BotHostageBeingTakenMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotHostageBeingTakenMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	receiver->GetGameState()->HostageWasTaken();
 
@@ -289,7 +289,7 @@ void BotHostageBeingTakenMeme::Interpret( CCSBot *sender, CCSBot *receiver ) con
 /**
  * A teammate heard a noise, so we shouldn't report noises for a while
  */
-void BotHeardNoiseMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotHeardNoiseMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	receiver->GetChatter()->FriendHeardNoise();
 }
@@ -299,7 +299,7 @@ void BotHeardNoiseMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
 /**
  * A teammate warned about snipers, so we shouldn't warn again for awhile
  */
-void BotWarnSniperMeme::Interpret( CCSBot *sender, CCSBot *receiver ) const
+void BotWarnSniperMeme::Interpret( CFFBot *sender, CFFBot *receiver ) const
 {
 	receiver->GetChatter()->FriendSpottedSniper();
 }
@@ -909,7 +909,7 @@ BotStatement::~BotStatement()
 
 
 //---------------------------------------------------------------------------------------------------------------
-CCSBot *BotStatement::GetOwner( void ) const
+CFFBot *BotStatement::GetOwner( void ) const
 { 
 	return m_chatter->GetOwner(); 
 }
@@ -1120,7 +1120,7 @@ void BotStatement::AppendPhrase( ContextType contextPhrase )
  */
 bool BotStatement::Update( void )
 {
-	CCSBot *me = GetOwner();
+	CFFBot *me = GetOwner();
 
 	// if all of our teammates are dead, the only non-redundant statements are emotes
 	if (me->GetFriendsRemaining() == 0 && GetType() != REPORT_EMOTE)
@@ -1366,7 +1366,7 @@ enum PitchHack
 
 static int nextPitch = P_HI;
 
-BotChatterInterface::BotChatterInterface( CCSBot *me )
+BotChatterInterface::BotChatterInterface( CFFBot *me )
 {
 	m_me = me;
 	m_statementList = NULL;
@@ -1727,7 +1727,7 @@ BotStatement *BotChatterInterface::GetActiveStatement( void )
 		if (!m_me->InSameTeam( player ))
 			continue;
 
-		CCSBot *bot = dynamic_cast<CCSBot *>(player);
+		CFFBot *bot = dynamic_cast<CFFBot *>(player);
 
 		// if not a bot, fail the test
 		/// @todo Check if human is currently talking
@@ -1787,7 +1787,7 @@ void BotChatterInterface::ResetRadioSilenceDuration( void )
 
 
 //---------------------------------------------------------------------------------------------------------------
-inline const BotPhrase *GetPlacePhrase( CCSBot *me )
+inline const BotPhrase *GetPlacePhrase( CFFBot *me )
 {
 	Place place = me->GetPlace();
 	if (place != UNDEFINED_PLACE)
@@ -1900,52 +1900,52 @@ void BotChatterInterface::ReportingIn( void )
 	// what are we doing
 	switch( m_me->GetTask() )
 	{
-		case CCSBot::PLANT_BOMB:
+		case CFFBot::PLANT_BOMB:
 		{
 			m_me->GetChatter()->GoingToPlantTheBomb( UNDEFINED_PLACE );
 			break;
 		}
 
-		case CCSBot::DEFUSE_BOMB:
+		case CFFBot::DEFUSE_BOMB:
 		{
 			m_me->GetChatter()->Say( "DefusingBomb" );
 			break;
 		}
 
-		case CCSBot::GUARD_LOOSE_BOMB:
+		case CFFBot::GUARD_LOOSE_BOMB:
 		{
 			if (TheCSBots()->GetLooseBomb())
 			{
 				say->AppendPhrase( TheBotPhrases->GetPhrase( "GuardingLooseBomb" ) );
-				say->AttachMeme( new BotBombStatusMeme( CSGameState::LOOSE, TheCSBots()->GetLooseBomb()->GetAbsOrigin() ) );
+				say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, TheCSBots()->GetLooseBomb()->GetAbsOrigin() ) );
 			}
 			break;
 		}
 
-		case CCSBot::GUARD_HOSTAGES:
+		case CFFBot::GUARD_HOSTAGES:
 		{
 			m_me->GetChatter()->GuardingHostages( UNDEFINED_PLACE, !m_me->IsAtHidingSpot() );
 			break;
 		}
 
-		case CCSBot::GUARD_HOSTAGE_RESCUE_ZONE:
+		case CFFBot::GUARD_HOSTAGE_RESCUE_ZONE:
 		{
 			m_me->GetChatter()->GuardingHostageEscapeZone( !m_me->IsAtHidingSpot() );
 			break;
 		}
 
-		case CCSBot::COLLECT_HOSTAGES:
+		case CFFBot::COLLECT_HOSTAGES:
 		{
 			break;
 		}
 
-		case CCSBot::RESCUE_HOSTAGES:
+		case CFFBot::RESCUE_HOSTAGES:
 		{
 			m_me->GetChatter()->EscortingHostages();
 			break;
 		}
 
-		case CCSBot::GUARD_VIP_ESCAPE_ZONE:
+		case CFFBot::GUARD_VIP_ESCAPE_ZONE:
 		{
 			break;
 		}
@@ -2195,7 +2195,7 @@ void BotChatterInterface::TheyPickedUpTheBomb( void )
 
 	say->AppendPhrase( TheBotPhrases->GetPhrase( "TheyPickedUpTheBomb" ) );
 
-	say->AttachMeme( new BotBombStatusMeme( CSGameState::MOVING, myOrigin ) ); 
+	say->AttachMeme( new BotBombStatusMeme( FFGameState::MOVING, myOrigin ) );
 
 	AddStatement( say );
 }
@@ -2229,7 +2229,7 @@ void BotChatterInterface::SpottedBomber( CBasePlayer *bomber )
 	say->SetSubject( bomber->entindex() );
 
 	//say->AttachMeme( new BotHelpMeme( place ) );
-	say->AttachMeme( new BotBombStatusMeme( CSGameState::MOVING, bomberOrigin ) ); 
+	say->AttachMeme( new BotBombStatusMeme( FFGameState::MOVING, bomberOrigin ) );
 
 	AddStatement( say );
 }
@@ -2262,7 +2262,7 @@ void BotChatterInterface::SpottedLooseBomb( CBaseEntity *bomb )
 		say->AppendPhrase( TheBotPhrases->GetPhrase( "SpottedLooseBomb" ) );
 
 		if (TheCSBots()->GetLooseBomb())
-			say->AttachMeme( new BotBombStatusMeme( CSGameState::LOOSE, bomb->GetAbsOrigin() ) );
+			say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, bomb->GetAbsOrigin() ) );
 
 		AddStatement( say );
 	}
@@ -2297,7 +2297,7 @@ void BotChatterInterface::GuardingLooseBomb( CBaseEntity *bomb )
 	say->AppendPhrase( TheBotPhrases->GetPhrase( "GuardingLooseBomb" ) );
 
 	if (TheCSBots()->GetLooseBomb())
-		say->AttachMeme( new BotBombStatusMeme( CSGameState::LOOSE, bomb->GetAbsOrigin() ) );
+		say->AttachMeme( new BotBombStatusMeme( FFGameState::LOOSE, bomb->GetAbsOrigin() ) );
 
 	AddStatement( say );
 }
@@ -2324,7 +2324,7 @@ void BotChatterInterface::RequestBombLocation( void )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::BombsiteClear( int zoneIndex )
 {
-	const CCSBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
+	const CFFBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
 	if (zone == NULL)
 		return;
 
@@ -2341,7 +2341,7 @@ void BotChatterInterface::BombsiteClear( int zoneIndex )
 //---------------------------------------------------------------------------------------------------------------
 void BotChatterInterface::FoundPlantedBomb( int zoneIndex )
 {
-	const CCSBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
+	const CFFBotManager::Zone *zone = TheCSBots()->GetZone( zoneIndex );
 	if (zone == NULL)
 		return;
 
@@ -2578,5 +2578,3 @@ void BotChatterInterface::FriendlyFire( void )
 
 	AddStatement( say );
 }
-
-

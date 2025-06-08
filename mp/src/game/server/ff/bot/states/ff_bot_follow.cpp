@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -17,7 +17,7 @@
 /**
  * Follow our leader
  */
-void FollowState::OnEnter( CCSBot *me )
+void FollowState::OnEnter( CFFBot *me )
 {
 	me->StandUp();
 	me->Run();
@@ -169,7 +169,7 @@ public:
  * Follow our leader
  * @todo Clean up this nasty mess
  */
-void FollowState::OnUpdate( CCSBot *me )
+void FollowState::OnUpdate( CFFBot *me )
 {
 	// if we lost our leader, give up
 	if (m_leader == NULL || !m_leader->IsAlive())
@@ -182,7 +182,7 @@ void FollowState::OnUpdate( CCSBot *me )
 	if (me->HasC4() && me->IsAtBombsite())
 	{
 		// plant it
-		me->SetTask( CCSBot::PLANT_BOMB );
+		me->SetTask( CFFBot::PLANT_BOMB );
 		me->PlantBomb();
 
 		// radio to the team
@@ -286,7 +286,7 @@ void FollowState::OnUpdate( CCSBot *me )
 	}
 
 	// move along our path
-	if (me->UpdatePathMovement( NO_SPEED_CHANGE ) != CCSBot::PROGRESSING)
+	if (me->UpdatePathMovement( NO_SPEED_CHANGE ) != CFFBot::PROGRESSING)
 	{
 		me->DestroyPath();
 	}
@@ -361,6 +361,6 @@ void FollowState::OnUpdate( CCSBot *me )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void FollowState::OnExit( CCSBot *me )
+void FollowState::OnExit( CFFBot *me )
 {
 }

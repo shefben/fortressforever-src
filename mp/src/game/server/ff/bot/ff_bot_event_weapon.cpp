@@ -11,13 +11,13 @@
 #include "cs_gamerules.h"
 #include "KeyValues.h"
 
-#include "cs_bot.h"
+#include "ff_bot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnWeaponFire( IGameEvent *event )
+void CFFBot::OnWeaponFire( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -41,7 +41,7 @@ void CCSBot::OnWeaponFire( IGameEvent *event )
 
 	/// @todo Check weapon type (knives are pretty quiet)
 	/// @todo Use actual volume, account for silencers, etc.
-	CWeaponCSBase *weapon = (CWeaponCSBase *)((player)?player->GetActiveWeapon():NULL);
+	CFFWeaponBase *weapon = (CFFWeaponBase *)((player)?player->GetActiveWeapon():NULL);
 
 	if (weapon == NULL)
 		return;
@@ -106,7 +106,7 @@ void CCSBot::OnWeaponFire( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnWeaponFireOnEmpty( IGameEvent *event )
+void CFFBot::OnWeaponFireOnEmpty( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -128,7 +128,7 @@ void CCSBot::OnWeaponFireOnEmpty( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnWeaponReload( IGameEvent *event )
+void CFFBot::OnWeaponReload( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -150,7 +150,7 @@ void CCSBot::OnWeaponReload( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::OnWeaponZoom( IGameEvent *event )
+void CFFBot::OnWeaponZoom( IGameEvent *event )
 {
 	if ( !IsAlive() )
 		return;
@@ -162,6 +162,3 @@ void CCSBot::OnWeaponZoom( IGameEvent *event )
 
 	OnAudibleEvent( event, player, 1100.0f, PRIORITY_LOW, false ); // weapon_zoom
 }
-
-
-
