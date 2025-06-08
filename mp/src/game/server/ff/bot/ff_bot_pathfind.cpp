@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h" // Changed from cs_bot.h
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -47,7 +47,7 @@ static bool FindDescendingLadderApproachPoint( const CNavLadder *ladder, const C
 /**
  * Determine actual path positions bot will move between along the path
  */
-bool CCSBot::ComputePathPositions( void )
+bool CFFBot::ComputePathPositions( void )
 {
 	if (m_pathLength == 0)
 		return false;
@@ -171,7 +171,7 @@ bool CCSBot::ComputePathPositions( void )
 /**
  * If next step of path uses a ladder, prepare to traverse it
  */
-void CCSBot::SetupLadderMovement( void )
+void CFFBot::SetupLadderMovement( void )
 {
 	if (m_pathIndex < 1 || m_pathLength == 0)
 		return;
@@ -224,7 +224,7 @@ void CCSBot::SetupLadderMovement( void )
 
 //--------------------------------------------------------------------------------------------------------------
 /// @todo What about ladders whose top AND bottom are messed up?
-void CCSBot::ComputeLadderEndpoint( bool isAscending )
+void CFFBot::ComputeLadderEndpoint( bool isAscending )
 {
 	trace_t result;
 	Vector from, to;
@@ -259,7 +259,7 @@ void CCSBot::ComputeLadderEndpoint( bool isAscending )
  * Navigate our current ladder. Return true if we are doing ladder navigation.
  * @todo Need Push() and Pop() for run/walk context to keep ladder speed contained.
  */
-bool CCSBot::UpdateLadderMovement( void )
+bool CFFBot::UpdateLadderMovement( void )
 {
 	if (m_pathLadder == NULL)
 		return false;
@@ -678,7 +678,7 @@ bool CCSBot::UpdateLadderMovement( void )
  * Compute closest point on path to given point
  * NOTE: This does not do line-of-sight tests, so closest point may be thru the floor, etc
  */
-bool CCSBot::FindClosestPointOnPath( const Vector &worldPos, int startIndex, int endIndex, Vector *close ) const
+bool CFFBot::FindClosestPointOnPath( const Vector &worldPos, int startIndex, int endIndex, Vector *close ) const
 {
 	if (!HasPath() || close == NULL)
 		return false;
@@ -734,7 +734,7 @@ bool CCSBot::FindClosestPointOnPath( const Vector &worldPos, int startIndex, int
  * Return the closest point to our current position on our current path
  * If "local" is true, only check the portion of the path surrounding m_pathIndex.
  */
-int CCSBot::FindOurPositionOnPath( Vector *close, bool local ) const
+int CFFBot::FindOurPositionOnPath( Vector *close, bool local ) const
 {
 	if (!HasPath())
 		return -1;
@@ -821,7 +821,7 @@ int CCSBot::FindOurPositionOnPath( Vector *close, bool local ) const
 /**
  * Test for un-jumpable height change, or unrecoverable fall
  */
-bool CCSBot::IsStraightLinePathWalkable( const Vector &goal ) const
+bool CFFBot::IsStraightLinePathWalkable( const Vector &goal ) const
 {
 // this is causing hang-up problems when crawling thru ducts/windows that drop off into rooms (they fail the "falling" check)
 return true;
@@ -879,7 +879,7 @@ return true;
  * Compute a point a fixed distance ahead along our path.
  * Returns path index just after point.
  */
-int CCSBot::FindPathPoint( float aheadRange, Vector *point, int *prevIndex )
+int CFFBot::FindPathPoint( float aheadRange, Vector *point, int *prevIndex )
 {
 	Vector myOrigin = GetCentroid( this );
 
@@ -1124,7 +1124,7 @@ int CCSBot::FindPathPoint( float aheadRange, Vector *point, int *prevIndex )
 /**
  * Set the current index along the path
  */
-void CCSBot::SetPathIndex( int newIndex )
+void CFFBot::SetPathIndex( int newIndex )
 {
 	m_pathIndex = MIN( newIndex, m_pathLength-1 );
 	m_areaEnteredTimestamp = gpGlobals->curtime;
@@ -1149,7 +1149,7 @@ void CCSBot::SetPathIndex( int newIndex )
 /**
  * Return true if nearing a jump in the path
  */
-bool CCSBot::IsNearJump( void ) const
+bool CFFBot::IsNearJump( void ) const
 {
 	if (m_pathIndex == 0 || m_pathIndex >= m_pathLength)
 		return false;
@@ -1172,7 +1172,7 @@ bool CCSBot::IsNearJump( void ) const
 /**
  * Return approximately how much damage will will take from the given fall height
  */
-float CCSBot::GetApproximateFallDamage( float height ) const
+float CFFBot::GetApproximateFallDamage( float height ) const
 {
 	// empirically discovered height values
 	const float slope = 0.2178f;
@@ -1190,7 +1190,7 @@ float CCSBot::GetApproximateFallDamage( float height ) const
 /**
  * Return true if a friend is between us and the given position
  */
-bool CCSBot::IsFriendInTheWay( const Vector &goalPos )
+bool CFFBot::IsFriendInTheWay( const Vector &goalPos )
 {
 	// do this check less often to ease CPU burden
 	if (!m_avoidFriendTimer.IsElapsed())
@@ -1213,7 +1213,7 @@ bool CCSBot::IsFriendInTheWay( const Vector &goalPos )
 	// check if any friends are overlapping this linear path
 	for( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CCSPlayer *player = static_cast<CCSPlayer *>( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *player = static_cast<CFFPlayer *>( UTIL_PlayerByIndex( i ) );
 
 		if (player == NULL)
 			continue;
@@ -1267,7 +1267,7 @@ bool CCSBot::IsFriendInTheWay( const Vector &goalPos )
 /**
  * Do reflex avoidance movements if our "feelers" are touched
  */
-void CCSBot::FeelerReflexAdjustment( Vector *goalPosition )
+void CFFBot::FeelerReflexAdjustment( Vector *goalPosition )
 {
 	// if we are in a "precise" area, do not do feeler adjustments
 	if (m_lastKnownArea && m_lastKnownArea->GetAttributes() & NAV_MESH_PRECISE)
@@ -1373,7 +1373,7 @@ void CCSBot::FeelerReflexAdjustment( Vector *goalPosition )
 /**
  * Allows the current nav area to make us run/walk without messing with our state
  */
-bool CCSBot::IsRunning( void ) const
+bool CFFBot::IsRunning( void ) const
 {
 	// if we've forced running, go with it
 	if ( !m_mustRunTimer.IsElapsed() )
@@ -1398,9 +1398,9 @@ bool CCSBot::IsRunning( void ) const
 /**
  * Move along the path. Return false if end of path reached.
  */
-CCSBot::PathResult CCSBot::UpdatePathMovement( bool allowSpeedChange )
+CFFBot::PathResult CFFBot::UpdatePathMovement( bool allowSpeedChange )
 {
-	VPROF_BUDGET( "CCSBot::UpdatePathMovement", VPROF_BUDGETGROUP_NPCS );
+	VPROF_BUDGET( "CFFBot::UpdatePathMovement", VPROF_BUDGETGROUP_NPCS );
 
 	if (m_pathLength == 0)
 		return PATH_FAILURE;
@@ -1842,7 +1842,7 @@ CCSBot::PathResult CCSBot::UpdatePathMovement( bool allowSpeedChange )
 /**
  * Build trivial path to goal, assuming we are already in the same area
  */
-void CCSBot::BuildTrivialPath( const Vector &goal )
+void CFFBot::BuildTrivialPath( const Vector &goal )
 {
 	Vector myOrigin = GetCentroid( this );
 
@@ -1874,9 +1874,9 @@ void CCSBot::BuildTrivialPath( const Vector &goal )
  * Compute shortest path to goal position via A* algorithm
  * If 'goalArea' is NULL, path will get as close as it can.
  */
-bool CCSBot::ComputePath( const Vector &goal, RouteType route )
+bool CFFBot::ComputePath( const Vector &goal, RouteType route )
 {
-	VPROF_BUDGET( "CCSBot::ComputePath", VPROF_BUDGETGROUP_NPCS );
+	VPROF_BUDGET( "CFFBot::ComputePath", VPROF_BUDGETGROUP_NPCS );
 
 	//
 	// Throttle re-pathing
@@ -1906,7 +1906,9 @@ bool CCSBot::ComputePath( const Vector &goal, RouteType route )
 	{
 		// we can't reach our last known area - find nearest area to us
 		PrintIfWatched( "Last known area is above my head - resetting to nearest area.\n" );
-		m_lastKnownArea = (CCSNavArea*)TheNavMesh->GetNearestNavArea( GetAbsOrigin(), false, 500.0f, true );
+		// CNavArea * is the type of m_lastKnownArea in ff_bot.h.
+		// Casting to CFFNavArea* if FF-specific features of the nav area are expected to be used via m_lastKnownArea.
+		m_lastKnownArea = static_cast<CFFNavArea*>(TheNavMesh->GetNearestNavArea( GetAbsOrigin(), false, 500.0f, true ));
 		if (m_lastKnownArea == NULL)
 		{
 			return false;
@@ -2031,7 +2033,7 @@ bool CCSBot::ComputePath( const Vector &goal, RouteType route )
 /**
  * Return estimated distance left to travel along path
  */
-float CCSBot::GetPathDistanceRemaining( void ) const
+float CFFBot::GetPathDistanceRemaining( void ) const
 {
 	if (!HasPath())
 		return -1.0f;
@@ -2054,7 +2056,7 @@ float CCSBot::GetPathDistanceRemaining( void ) const
 /**
  * Draw a portion of our current path for debugging.
  */
-void CCSBot::DrawPath( void )
+void CFFBot::DrawPath( void )
 {
 	if (!HasPath())
 		return;
@@ -2073,3 +2075,57 @@ void CCSBot::DrawPath( void )
 	}
 }
 
+//--------------------------------------------------------------------------------------------------------------
+float CFFBot::GetTravelDistanceToPoint(const Vector &targetPos, RouteType route) const
+{
+    if (!TheNavMesh() || !TheNavMesh()->IsLoaded()) // Ensure nav mesh is available & called as a function
+    {
+        return FLT_MAX;
+    }
+
+    CNavArea *startArea = GetLastKnownArea();
+    if (!startArea)
+    {
+        // Try to get current area if last known is null
+        startArea = TheNavMesh()->GetNearestNavArea(GetAbsOrigin(), true, 200.0f); // Called as a function
+        if (!startArea)
+        {
+            return FLT_MAX; // Cannot determine start area
+        }
+    }
+
+    CNavArea *goalArea = TheNavMesh()->GetNearestNavArea(targetPos, true, 200.0f); // Called as a function
+    if (!goalArea)
+    {
+        return FLT_MAX; // Cannot determine goal area
+    }
+
+    if (startArea == goalArea)
+    {
+        return (targetPos - GetAbsOrigin()).Length(); // Straight line if in the same area
+    }
+
+    PathCost cost(const_cast<CFFBot*>(this), route); // PathCost constructor might not be const-correct for 'this'
+    float travelDistance = NavAreaTravelDistance(startArea, goalArea, cost); // Use global helper
+
+    if (travelDistance <= 0.0f) // GetTravelDistance returns 0 or -1 for failure (or very small positive for error)
+    {
+        // Check direct path if areas are not connected by nav mesh path but might be by a jump or direct line
+        // This is a fallback, actual jump paths are more complex.
+        // For now, if GetTravelDistance fails, consider it unreachable by standard pathing.
+        return FLT_MAX;
+    }
+
+    // Add distance from current bot position to startArea center, and from goalArea center to targetPos
+    // This gives a more accurate estimate than just area-to-area travel.
+    // However, GetTravelDistance is already area-to-area. A more precise calculation would involve
+    // pathing from exact start to exact end, which NavAreaBuildPath does but is heavier.
+    // For a quick cost, area-to-area is often sufficient.
+    // If more accuracy is needed, one might add:
+    // travelDistance += (startArea->GetCenter() - GetAbsOrigin()).Length();
+    // travelDistance += (goalArea->GetCenter() - targetPos).Length();
+    // But this can overestimate if areas are large.
+    // The current 'travelDistance' from GetTravelDistance is generally a good heuristic.
+
+    return travelDistance;
+}

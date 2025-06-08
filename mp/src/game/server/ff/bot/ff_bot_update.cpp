@@ -8,15 +8,15 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_gamerules.h"
-#include "cs_bot.h"
+#include "../../ff_gamerules.h" // Replaced cs_gamerules.h
+#include "ff_bot.h" // Replaced cs_bot.h
 #include "fmtstr.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 //-----------------------------------------------------------------------------------------------------------
-float CCSBot::GetMoveSpeed( void )
+float CFFBot::GetMoveSpeed( void )
 {
 	return 250.0f;
 }
@@ -25,9 +25,9 @@ float CCSBot::GetMoveSpeed( void )
 /**
  * Lightweight maintenance, invoked frequently
  */
-void CCSBot::Upkeep( void )
+void CFFBot::Upkeep( void )
 {
-	VPROF_BUDGET( "CCSBot::Upkeep", VPROF_BUDGETGROUP_NPCS );
+	VPROF_BUDGET( "CFFBot::Upkeep", VPROF_BUDGETGROUP_NPCS );
 
 	if (TheNavMesh->IsGenerating() || !IsAlive())
 		return;
@@ -87,7 +87,8 @@ void CCSBot::Upkeep( void )
 					// spray the big machinegun at the enemy's gut
 					aimAtPart = GUT;
 				}
-				else if (IsUsing( WEAPON_AWP ) || IsUsingShotgun())
+				// FF_TODO_WEAPON: Replaced WEAPON_AWP with IsUsingSniperRifle()
+				else if (IsUsingSniperRifle() || IsUsingShotgun())
 				{
 					// these weapons are best aimed at the chest
 					aimAtPart = GUT;
@@ -237,9 +238,9 @@ void CCSBot::Upkeep( void )
 /**
  * Heavyweight processing, invoked less often
  */
-void CCSBot::Update( void )
+void CFFBot::Update( void )
 {
-	VPROF_BUDGET( "CCSBot::Update", VPROF_BUDGETGROUP_NPCS );
+	VPROF_BUDGET( "CFFBot::Update", VPROF_BUDGETGROUP_NPCS );
 
 	// If bot_flipout is on, then we only do stuff in Upkeep().
 	if ( cv_bot_flipout.GetBool() )
@@ -251,16 +252,19 @@ void CCSBot::Update( void )
 	if (GetTeamNumber() == 0)
 	{
 		HandleCommand_JoinTeam( m_desiredTeam );
-		int desiredClass = GetProfile()->GetSkin();
-		if ( m_desiredTeam == TEAM_CT && desiredClass )
-		{
-			desiredClass = FIRST_CT_CLASS + desiredClass - 1;
-		}
-		else if ( m_desiredTeam == TEAM_TERRORIST && desiredClass )
-		{
-			desiredClass = FIRST_T_CLASS + desiredClass - 1;
-		}
-		HandleCommand_JoinClass( desiredClass );
+		// FF_TODO_CLASS: Adapt class selection if FF has a different skin/class mapping.
+		// Original CS logic for class selection based on team and skin:
+		// int desiredClass = GetProfile()->GetSkin();
+		// if ( m_desiredTeam == TEAM_CT && desiredClass )
+		// {
+		// 	desiredClass = FIRST_CT_CLASS + desiredClass - 1;
+		// }
+		// else if ( m_desiredTeam == TEAM_TERRORIST && desiredClass )
+		// {
+		// 	desiredClass = FIRST_T_CLASS + desiredClass - 1;
+		// }
+		// For FF, GetProfile()->GetSkin() likely directly returns the class ID (1-10).
+		HandleCommand_JoinClass( GetProfile()->GetSkin() );
 		return;
 	}
 
@@ -316,7 +320,7 @@ void CCSBot::Update( void )
 	// where are we
 	if (!m_currentArea || !m_currentArea->Contains( myOrigin ))
 	{
-		m_currentArea = (CCSNavArea *)TheNavMesh->GetNavArea( myOrigin );
+		m_currentArea = static_cast<CFFNavArea *>(const_cast<CNavArea *>(TheNavMesh->GetNavArea( myOrigin ))); // Changed cast
 	}
 
 	// track the last known area we were in
@@ -357,7 +361,7 @@ void CCSBot::Update( void )
 	UpdateReactionQueue();
 
 	// "threat" may be the same as our current enemy
-	CCSPlayer *threat = GetRecognizedEnemy();
+	CFFPlayer *threat = GetRecognizedEnemy(); // Changed CCSPlayer to CFFPlayer
 	if (threat)
 	{
 		Vector threatOrigin = GetCentroid( threat );
@@ -464,7 +468,7 @@ void CCSBot::Update( void )
 			m_isEnemyVisible = true;
 		}
 
-		TheCSBots()->SetLastSeenEnemyTimestamp();
+		TheFFBots()->SetLastSeenEnemyTimestamp(); // Changed TheCSBots to TheFFBots
 	}
 
 	//
@@ -558,7 +562,8 @@ void CCSBot::Update( void )
 	}
 
 	/// @todo This doesn't work if we are restricted to just knives and sniper rifles because we cant use the rifle at close range
-	if (!IsSafe() && !IsUsingGrenade() && IsUsingKnife() && !IsEscapingFromBomb())
+	// FF_TODO_SCENARIO: Removed IsEscapingFromBomb() (CS specific)
+	if (!IsSafe() && !IsUsingGrenade() && IsUsingKnife() /*&& !IsEscapingFromBomb()*/ )
 	{
 		EquipBestWeapon();
 	}
@@ -575,7 +580,7 @@ void CCSBot::Update( void )
 	ReloadCheck();
 
 	// equip silencer
-	SilencerCheck();
+	// SilencerCheck(); // FF_TODO_WEAPON: FF doesn't have silencers generally
 
 	// listen to the radio
 	RespondToRadioCommands();
@@ -617,64 +622,75 @@ void CCSBot::Update( void )
 		if (m_bomber != NULL)
 			GetChatter()->SpottedBomber( GetBomber() );
 
-		if (CanSeeLooseBomb())
-			GetChatter()->SpottedLooseBomb( TheCSBots()->GetLooseBomb() );
+		if (CanSeeLooseBomb()) // FF No Bomb
+			GetChatter()->SpottedLooseBomb( TheFFBots()->GetLooseBomb() ); // Changed TheCSBots
 	}
 
 	//
 	// Scenario interrupts
 	//
-	switch (TheCSBots()->GetScenario())
+	// FF_TODO_SCENARIO: This entire block needs to be FF specific. The CS logic is commented out.
+	/*
+	switch (TheFFBots()->GetScenario())
 	{
-		case CCSBotManager::SCENARIO_DEFUSE_BOMB:
+		case CFFBotManager::SCENARIO_STANDARD_FF: // Was SCENARIO_DEFUSE_BOMB. Example for FF.
 		{
+			// FF_TODO_SCENARIO: Implement FF specific logic if needed for standard game modes
+			// Example: if a flag needs returning, or a point is being capped.
+			// The CS defuse bomb logic is below for reference but is commented out.
+			/*
 			// flee if the bomb is ready to blow and we aren't defusing it or attacking and we know where the bomb is
 			// (aggressive players wait until its almost too late)
 			float gonnaBlowTime = 8.0f - (2.0f * GetProfile()->GetAggression());
 
 			// if we have a defuse kit, can wait longer
-			if (m_bHasDefuser)
-				gonnaBlowTime *= 0.66f;
+			// if (m_bHasDefuser) // FF No Defuser / CS Specific variable
+			//	gonnaBlowTime *= 0.66f;
 
-			if (!IsEscapingFromBomb() &&								// we aren't already escaping the bomb
-				TheCSBots()->IsBombPlanted() &&							// is the bomb planted
-				GetGameState()->IsPlantedBombLocationKnown() &&			// we know where the bomb is
-				TheCSBots()->GetBombTimeLeft() < gonnaBlowTime &&		// is the bomb about to explode
-				!IsDefusingBomb() &&									// we aren't defusing the bomb
-				!IsAttacking())											// we aren't in the midst of a firefight
+			if (!IsEscapingFromBomb() && // CS Specific State
+				TheFFBots()->IsBombPlanted() && // CS Specific State
+				GetGameState()->IsPlantedBombLocationKnown() && // CS Specific State
+				TheFFBots()->GetBombTimeLeft() < gonnaBlowTime && // CS Specific State
+				!IsDefusingBomb() && // CS Specific State
+				!IsAttacking())
 			{
-				EscapeFromBomb();
+				// EscapeFromBomb(); // CS Specific Behavior
 				break;
 			}
+			*/
+	//		break;
+	//	}
 
-			break;
-		}
-
-		case CCSBotManager::SCENARIO_RESCUE_HOSTAGES:
-		{
-			if (GetTeamNumber() == TEAM_CT)
-			{
-				UpdateHostageEscortCount();
-			}
-			else
-			{
+		// case CFFBotManager::SCENARIO_STANDARD_FF: // Was SCENARIO_RESCUE_HOSTAGES. Example for FF.
+		// {
+			// FF_TODO_SCENARIO: Implement FF specific logic if needed.
+			// The CS hostage logic is below for reference but is commented out.
+			/*
+			// if (GetTeamNumber() == FF_TEAM_BLUE) // Example for FF teams (was TEAM_CT)
+			// {
+			// 	// UpdateHostageEscortCount(); // CS Specific Behavior
+			// }
+			// else
+			// {
 				// Terrorists have imperfect information on status of hostages
-				unsigned char status = GetGameState()->ValidateHostagePositions();
+				// unsigned char status = GetGameState()->ValidateHostagePositions(); // CS Specific State
 
-				if (status & CSGameState::HOSTAGES_ALL_GONE)
-				{
-					GetChatter()->HostagesTaken();
-					Idle();
-				}
-				else if (status & CSGameState::HOSTAGE_GONE)
-				{
-					GetGameState()->HostageWasTaken();
-					Idle();
-				}
-			}
-			break;
-		}
-	}
+				// if (status & CSGameState::HOSTAGES_ALL_GONE) // CS Specific State
+				// {
+				// 	GetChatter()->HostagesTaken(); // CS Specific Chatter
+				// 	Idle();
+				// }
+				// else if (status & CSGameState::HOSTAGE_GONE) // CS Specific State
+				// {
+				// 	GetGameState()->HostageWasTaken(); // CS Specific State
+				// 	Idle();
+				// }
+			// }
+			*/
+	//		break;
+	//	}
+	// }
+	// */
 
 
 	//
@@ -684,20 +700,21 @@ void CCSBot::Update( void )
 	//
 	const float earliestAutoFollowTime = 5.0f;
 	const float minAutoFollowTeamwork = 0.4f;
-	if (cv_bot_auto_follow.GetBool() &&
-		TheCSBots()->GetElapsedRoundTime() > earliestAutoFollowTime &&
+	if (cv_bot_auto_follow.GetBool() && // FF_TODO_CVAR: Ensure this cvar is what FF uses
+		TheFFBots()->GetElapsedRoundTime() > earliestAutoFollowTime &&
 		GetProfile()->GetTeamwork() > minAutoFollowTeamwork && 
 		CanAutoFollow() &&
 		!IsBusy() && 
 		!IsFollowing() && 
 		!IsBlind() && 
-		!GetGameState()->IsAtPlantedBombsite())
+		// !GetGameState()->IsAtPlantedBombsite()) // CS Specific (Bomb)
+		GetTask() != CAPTURE_LUA_OBJECTIVE && GetTask() != DEFEND_LUA_OBJECTIVE ) // FF: Don't auto-follow if doing specific FF objectives
 	{
 
 		// chance of following is proportional to teamwork attribute
 		if (GetProfile()->GetTeamwork() > RandomFloat( 0.0f, 1.0f ))
 		{
-			CCSPlayer *leader = GetClosestVisibleHumanFriend();
+			CFFPlayer *leader = GetClosestVisibleHumanFriend();
 			if (leader && leader->IsAutoFollowAllowed())
 			{
 				// count how many bots are already following this player
@@ -719,14 +736,15 @@ void CCSBot::Update( void )
 								Follow( leader );
 								PrintIfWatched( "Auto-Following %s\n", leader->GetPlayerName() );
 
-								if (CSGameRules()->IsCareer())
-								{
-									GetChatter()->Say( "FollowingCommander", 10.0f );
-								}
-								else
-								{
-									GetChatter()->Say( "FollowingSir", 10.0f );
-								}
+								// FF_TODO_GAMERULES: FF has no career mode
+								// if (FFGameRules()->IsCareer())
+								// {
+								// 	GetChatter()->Say( "FollowingCommander", 10.0f );
+								// }
+								// else
+								// {
+									GetChatter()->Say( "FollowingSir", 10.0f ); // FF_TODO_CHATTER: Ensure "FollowingSir" exists or use FF equivalent
+								// }
 							}
 						}
 					}
@@ -804,6 +822,8 @@ void CCSBot::Update( void )
 	}
 
 	// if we get too far ahead of the hostages we are escorting, wait for them
+	// FF_TODO_SCENARIO: Hostage logic removed
+	/*
 	if (!IsAttacking() && m_inhibitWaitingForHostageTimer.IsElapsed())
 	{
 		const float waitForHostageRange = 500.0f;
@@ -833,6 +853,213 @@ void CCSBot::Update( void )
 			}
 		}
 	}
+	*/
+
+	// remember our prior safe time status
+	m_wasSafe = IsSafe();
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+class DrawTravelTime
+{
+public:
+	DrawTravelTime( const CFFBot *me )
+	{
+		m_me = me;
+	}
+
+	bool operator() ( CBasePlayer *player )
+	{
+		if (player->IsAlive() && !m_me->InSameTeam( player ))
+		{
+			CFmtStr msg;
+			// Ensure CFFPlayer cast for GetTravelDistanceToPlayer if its signature expects CFFPlayer
+			player->EntityText(	0,
+								msg.sprintf( "%3.0f", m_me->GetTravelDistanceToPlayer( static_cast<CFFPlayer *>(player) ) ),
+								0.1f );
+
+
+			if (m_me->DidPlayerJustFireWeapon( static_cast<const CFFPlayer *>(player) )) // Changed ToFFPlayer to static_cast
+			{
+				player->EntityText( 1, "BANG!", 0.1f );
+			}
+		}
+
+		return true;
+	}
+
+	const CFFBot *m_me;
+};
+
+
+//--------------------------------------------------------------------------------------------------------------
+/**
+ * Render bot debug info
+ */
+void CFFBot::DebugDisplay( void ) const // Changed CCSBot to CFFBot
+{
+	const float duration = 0.15f;
+	CFmtStr msg;
+
+	NDebugOverlay::ScreenText( 0.5f, 0.34f, msg.sprintf( "Skill: %d%%", (int)(100.0f * GetProfile()->GetSkill()) ), 255, 255, 255, 150, duration );
+
+	if ( m_pathLadder )
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.36f, msg.sprintf( "Ladder: %d", m_pathLadder->GetID() ), 255, 255, 255, 150, duration );
+	}
+
+	// show safe time
+	float safeTime = GetSafeTimeRemaining();
+	if (safeTime > 0.0f)
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.38f, msg.sprintf( "SafeTime: %3.2f", safeTime ), 255, 255, 255, 150, duration );
+	}
+
+	// show if blind
+	if (IsBlind())
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.38f, msg.sprintf( "<<< BLIND >>>" ), 255, 255, 255, 255, duration );
+	}
+
+	// show if alert
+	if (IsAlert())
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.38f, msg.sprintf( "ALERT" ), 255, 0, 0, 255, duration );
+	}
+
+	// show if panicked
+	if (IsPanicking())
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.36f, msg.sprintf( "PANIC" ), 255, 255, 0, 255, duration );
+	}
+
+	// show behavior variables
+	if (m_isAttacking)
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.4f, msg.sprintf( "ATTACKING: %s", GetBotEnemy()->GetPlayerName() ), 255, 0, 0, 255, duration );
+	}
+	else
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.4f, msg.sprintf( "State: %s", m_state->GetName() ), 255, 255, 0, 255, duration );
+		NDebugOverlay::ScreenText( 0.5f, 0.42f, msg.sprintf( "Task: %s", GetTaskName() ), 0, 255, 0, 255, duration );
+		NDebugOverlay::ScreenText( 0.5f, 0.44f, msg.sprintf( "Disposition: %s", GetDispositionName() ), 100, 100, 255, 255, duration );
+		NDebugOverlay::ScreenText( 0.5f, 0.46f, msg.sprintf( "Morale: %s", GetMoraleName() ), 0, 200, 200, 255, duration );
+	}
+
+	// show look at status
+	if (m_lookAtSpotState != NOT_LOOKING_AT_SPOT)
+	{
+		const char *string = msg.sprintf( "LookAt: %s (%s)", m_lookAtDesc, (m_lookAtSpotState == LOOK_TOWARDS_SPOT) ? "LOOK_TOWARDS_SPOT" : "LOOK_AT_SPOT" );
+
+		NDebugOverlay::ScreenText( 0.5f, 0.60f, string, 255, 255, 0, 150, duration );
+	}
+
+	NDebugOverlay::ScreenText( 0.5f, 0.62f, msg.sprintf( "Steady view = %s", HasViewBeenSteady( 0.2f ) ? "YES" : "NO" ), 255, 255, 0, 150, duration );
+
+
+	// show friend/foes I know of
+	NDebugOverlay::ScreenText( 0.5f, 0.64f, msg.sprintf( "Nearby friends = %d", m_nearbyFriendCount ), 100, 255, 100, 150, duration );
+	NDebugOverlay::ScreenText( 0.5f, 0.66f, msg.sprintf( "Nearby enemies = %d", m_nearbyEnemyCount ), 255, 100, 100, 150, duration );
+
+	if ( m_lastNavArea )
+	{
+		NDebugOverlay::ScreenText( 0.5f, 0.68f, msg.sprintf( "Nav Area: %d (%s)", m_lastNavArea->GetID(), m_szLastPlaceName.Get() ), 255, 255, 255, 150, duration );
+		/*
+		if ( cv_bot_traceview.GetBool() )
+		{
+			if ( m_currentArea )
+			{
+				NDebugOverlay::Line( GetAbsOrigin(), m_currentArea->GetCenter(), 0, 255, 0, true, 0.1f );
+			}
+			else if ( m_lastKnownArea )
+			{
+				NDebugOverlay::Line( GetAbsOrigin(), m_lastKnownArea->GetCenter(), 255, 0, 0, true, 0.1f );
+			}
+			else if ( m_lastNavArea )
+			{
+				NDebugOverlay::Line( GetAbsOrigin(), m_lastNavArea->GetCenter(), 0, 0, 255, true, 0.1f );
+			}
+		}
+		*/
+	}
+
+	// show debug message history
+	float y = 0.8f;
+	const float lineHeight = 0.02f;
+	const float fadeAge = 7.0f;
+	const float maxAge = 10.0f;
+	for( int i=0; i<TheBots->GetDebugMessageCount(); ++i )
+	{
+		const CBotManager::DebugMessage *msg = TheBots->GetDebugMessage( i );
+
+		if (msg->m_age.GetElapsedTime() < maxAge)
+		{
+			int alpha = 255;
+
+			if (msg->m_age.GetElapsedTime() > fadeAge)
+			{
+				alpha *= (1.0f - (msg->m_age.GetElapsedTime() - fadeAge) / (maxAge - fadeAge));
+			}
+
+			NDebugOverlay::ScreenText( 0.5f, y, msg->m_string, 255, 255, 255, alpha, duration );
+			y += lineHeight;
+		}
+	}
+
+	// show noises
+	const Vector *noisePos = GetNoisePosition();
+	if (noisePos)
+	{
+		const float size = 25.0f;
+		NDebugOverlay::VertArrow( *noisePos + Vector( 0, 0, size ), *noisePos, size/4.0f, 255, 255, 0, 0, true, duration );
+	}
+
+	// show aim spot
+	if (IsAimingAtEnemy())
+	{
+		NDebugOverlay::Cross3D( m_aimSpot, 5.0f, 255, 0, 0, true, duration );
+	}
+
+
+
+	if (IsHiding())
+	{
+		// show approach points
+		DrawApproachPoints();
+	}
+	else
+	{
+		// show encounter spot data
+		if (false && m_spotEncounter)
+		{
+			NDebugOverlay::Line( m_spotEncounter->path.from, m_spotEncounter->path.to, 0, 150, 150, true, 0.1f );
+
+			Vector dir = m_spotEncounter->path.to - m_spotEncounter->path.from;
+			float length = dir.NormalizeInPlace();
+
+			const SpotOrder *order;
+			Vector along;
+
+			FOR_EACH_VEC( m_spotEncounter->spots, it )
+			{
+				order = &m_spotEncounter->spots[ it ];
+
+				// ignore spots the enemy could not have possibly reached yet
+				if (order->spot->GetArea())
+				{
+					if (TheFFBots()->GetElapsedRoundTime() < order->spot->GetArea()->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) )) // Changed TheCSBots
+					{
+						continue;
+					}
+				}
+
+				along = m_spotEncounter->path.from + order->t * length * dir;
+
+				NDebugOverlay::Line( along, order->spot->GetPosition(), 0, 255, 255, true, 0.1f );
+			}
+		}
+	}
 
 	// remember our prior safe time status
 	m_wasSafe = IsSafe();
@@ -843,7 +1070,7 @@ void CCSBot::Update( void )
 class DrawTravelTime 
 {
 public:
-	DrawTravelTime( const CCSBot *me )
+	DrawTravelTime( const CFFBot *me ) // Changed CCSBot to CFFBot
 	{
 		m_me = me;
 	}
@@ -854,11 +1081,11 @@ public:
 		{
 			CFmtStr msg;
 			player->EntityText(	0,
-								msg.sprintf( "%3.0f", m_me->GetTravelDistanceToPlayer( (CCSPlayer *)player ) ),
+								msg.sprintf( "%3.0f", m_me->GetTravelDistanceToPlayer( static_cast<CFFPlayer *>(player) ) ), // Changed cast CCSPlayer to CFFPlayer
 								0.1f );
 
 
-			if (m_me->DidPlayerJustFireWeapon( ToCSPlayer( player ) ))
+			if (m_me->DidPlayerJustFireWeapon( ToFFPlayer( player ) )) // Changed ToCSPlayer to ToFFPlayer
 			{
 				player->EntityText( 1, "BANG!", 0.1f );
 			}
@@ -867,7 +1094,7 @@ public:
 		return true;
 	}
 
-	const CCSBot *m_me;
+	const CFFBot *m_me; // Changed CCSBot to CFFBot
 };
 
 
@@ -875,7 +1102,7 @@ public:
 /**
  * Render bot debug info
  */
-void CCSBot::DebugDisplay( void ) const
+void CFFBot::DebugDisplay( void ) const // Changed CCSBot to CFFBot
 {
 	const float duration = 0.15f;
 	CFmtStr msg;
@@ -1026,7 +1253,7 @@ void CCSBot::DebugDisplay( void ) const
 				// ignore spots the enemy could not have possibly reached yet
 				if (order->spot->GetArea())
 				{
-					if (TheCSBots()->GetElapsedRoundTime() < order->spot->GetArea()->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) ))
+					if (TheFFBots()->GetElapsedRoundTime() < order->spot->GetArea()->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) )) // Changed TheCSBots
 					{
 						continue;
 					}
@@ -1042,11 +1269,11 @@ void CCSBot::DebugDisplay( void ) const
 	// show aim targets
 	if (false)
 	{
-		CStudioHdr *pStudioHdr = const_cast< CCSBot *>( this )->GetModelPtr();
+		CStudioHdr *pStudioHdr = const_cast< CFFBot *>( this )->GetModelPtr(); // Changed CCSBot to CFFBot
 		if ( !pStudioHdr )
 			return;
 
-		mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( const_cast< CCSBot *>( this )->GetHitboxSet() );
+		mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( const_cast< CFFBot *>( this )->GetHitboxSet() ); // Changed CCSBot to CFFBot
 		if ( !set )
 			return;
 
@@ -1058,7 +1285,7 @@ void CCSBot::DebugDisplay( void ) const
 		{
 			mstudiobbox_t *pbox = set->pHitbox( i );
 
-			const_cast< CCSBot *>( this )->GetBonePosition( pbox->bone, position, angles );
+			const_cast< CFFBot *>( this )->GetBonePosition( pbox->bone, position, angles ); // Changed CCSBot to CFFBot
 		
 			AngleVectors( angles, &forward, &right, &up );
 
@@ -1083,7 +1310,7 @@ void CCSBot::DebugDisplay( void ) const
 
 
 	/*
-	const QAngle &angles = const_cast< CCSBot *>( this )->GetPunchAngle();
+	const QAngle &angles = const_cast< CFFBot *>( this )->GetPunchAngle(); // Changed CCSBot to CFFBot
 	NDebugOverlay::ScreenText( 0.3f, 0.66f, msg.sprintf( "Punch angle pitch = %3.2f", angles.x ), 255, 255, 0, 150, duration );
 	*/
 
@@ -1130,7 +1357,7 @@ void CCSBot::DebugDisplay( void ) const
 	if (IsAttacking())
 	{
 		const float crossSize = 2.0f;
-		CCSPlayer *enemy = GetBotEnemy();
+		CFFPlayer *enemy = GetBotEnemy(); // Changed CCSPlayer to CFFPlayer
 		if (enemy)
 		{
 			NDebugOverlay::Cross3D( GetPartPosition( enemy, GUT ), crossSize, 0, 255, 0, true, 0.1f );
@@ -1148,7 +1375,7 @@ void CCSBot::DebugDisplay( void ) const
  * Periodically compute shortest path distance to each player.
  * NOTE: Travel distance is NOT symmetric between players A and B.  Each much be computed separately.
  */
-void CCSBot::UpdateTravelDistanceToAllPlayers( void )
+void CFFBot::UpdateTravelDistanceToAllPlayers( void ) // Changed CCSBot to CFFBot
 {
 	const unsigned char numPhases = 3;
 
@@ -1158,7 +1385,7 @@ void CCSBot::UpdateTravelDistanceToAllPlayers( void )
 
 		for( int i=1; i<=gpGlobals->maxClients; ++i )
 		{
-			CCSPlayer *player = static_cast< CCSPlayer * >( UTIL_PlayerByIndex( i ) );
+			CFFPlayer *player = static_cast< CFFPlayer * >( UTIL_PlayerByIndex( i ) ); // Changed CCSPlayer to CFFPlayer
 
 			if (player == NULL)
 				continue;

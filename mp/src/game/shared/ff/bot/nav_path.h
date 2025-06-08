@@ -12,7 +12,7 @@
 #ifndef _NAV_PATH_H_
 #define _NAV_PATH_H_
 
-#include "cs_nav_area.h"
+#include "nav_area.h"
 #include "bot_util.h"
 
 class CImprovLocomotor;

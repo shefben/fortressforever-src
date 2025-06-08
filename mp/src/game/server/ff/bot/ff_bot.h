@@ -21,8 +21,8 @@
 #include "ff_gamestate.h"  // Changed from cs_gamestate.h
 #include "ff_player.h"     // Changed from cs_player.h
 #include "ff_weapon_base.h" // FF_TODO_WEAPON_STATS: Added for CFFWeaponBase and FFWeaponID
-#include "ff_nav_pathfind.h" // Changed from cs_nav_pathfind.h (assuming exists)
-#include "ff_nav_area.h"     // Changed from cs_nav_area.h (assuming CNavArea or a CFFNavArea will be used)
+#include "../../nav_pathfind.h" // Changed from ff_nav_pathfind.h
+#include "../../nav_area.h"     // Changed from ff_nav_area.h
 #include "shareddefs.h"      // For ENT_FLAG_FIRST_USER
 #include "states/ff_bot_carry_flag.h" // For m_carryFlagState member instance
 #include "states/ff_bot_defend_objective.h" // For m_defendObjectiveState member instance
@@ -753,6 +753,11 @@ public:
 	CNavArea *GetLastKnownArea( void ) const;						///< return the last area we know we were inside of // Changed CCSNavArea to CNavArea (or CFFNavArea if exists)
 	const Vector &GetPathEndpoint( void ) const;					///< return final position of our current path
 	float GetPathDistanceRemaining( void ) const;					///< return estimated distance left to travel along path
+
+	/// Calculate path distance (cost) to a target position without storing the full path.
+	/// Returns a large value if unreachable.
+	float GetTravelDistanceToPoint(const Vector &targetPos, RouteType route = SAFEST_ROUTE) const;
+
 	void ResetStuckMonitor( void );
 	bool IsAreaVisible( const CNavArea *area ) const;				///< is any portion of the area visible to this bot // Changed CCSNavArea to CNavArea
 	const Vector &GetPathPosition( int index ) const;

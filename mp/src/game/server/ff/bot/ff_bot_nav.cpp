@@ -8,7 +8,7 @@
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 
 #include "cbase.h"
-#include "cs_bot.h"
+#include "ff_bot.h" // Changed from cs_bot.h
 #include "obstacle_pushaway.h"
 #include "fmtstr.h"
 
@@ -74,7 +74,7 @@ CBaseEntity * CheckForEntitiesAlongSegment( const Vector &start, const Vector &e
 /**
  * Look up to 'distance' units ahead on the bot's path for entities.  Returns the closest one.
  */
-CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *enumerator, bool checkStuck )
+CBaseEntity * CFFBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *enumerator, bool checkStuck )
 {
 	Vector goal;
 
@@ -199,7 +199,7 @@ CBaseEntity * CCSBot::FindEntitiesOnPath( float distance, CPushAwayEnumerator *e
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::PushawayTouch( CBaseEntity *pOther )
+void CFFBot::PushawayTouch( CBaseEntity *pOther )
 {
 #if DEBUG_BREAKABLES
 	NDebugOverlay::EntityBounds( pOther, 255, 0, 0, 127, 0.1f );
@@ -229,7 +229,7 @@ void CCSBot::PushawayTouch( CBaseEntity *pOther )
  * looking ahead like this lets us anticipate when we'll need to break something, and do it before being
  * stopped by it.
  */
-void CCSBot::BreakablesCheck( void )
+void CFFBot::BreakablesCheck( void )
 {
 #if DEBUG_BREAKABLES
 	/*
@@ -366,7 +366,7 @@ void CCSBot::BreakablesCheck( void )
 /**
  * Check for doors that need +use to open.
  */
-void CCSBot::DoorCheck( void )
+void CFFBot::DoorCheck( void )
 {
 	if ( IsAttacking() && !IsUsingKnife() )
 	{
@@ -401,7 +401,7 @@ void CCSBot::DoorCheck( void )
 /**
  * Reset the stuck-checker.
  */
-void CCSBot::ResetStuckMonitor( void )
+void CFFBot::ResetStuckMonitor( void )
 {
 	if (m_isStuck)
 	{
@@ -426,7 +426,7 @@ void CCSBot::ResetStuckMonitor( void )
 /**
  * Test if we have become stuck
  */
-void CCSBot::StuckCheck( void )
+void CFFBot::StuckCheck( void )
 {
 	if (m_isStuck)
 	{
@@ -507,7 +507,7 @@ void CCSBot::StuckCheck( void )
 /**
  * Check if we need to jump due to height change
  */
-bool CCSBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
+bool CFFBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
 {
 	// Don't try to jump if in the air.
 	if( !(GetFlags() & FL_ONGROUND) )
@@ -540,7 +540,7 @@ bool CCSBot::DiscontinuityJump( float ground, bool onlyJumpDown, bool mustJump )
 /**
  * Find "simple" ground height, treating current nav area as part of the floor
  */
-bool CCSBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, Vector *normal )
+bool CFFBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, Vector *normal )
 {
 	if (TheNavMesh->GetSimpleGroundHeight( pos, height, normal ))
 	{
@@ -558,7 +558,7 @@ bool CCSBot::GetSimpleGroundHeightWithFloor( const Vector &pos, float *height, V
 /**
  * Get our current radio chatter place
  */
-Place CCSBot::GetPlace( void ) const
+Place CFFBot::GetPlace( void ) const
 {
 	if (m_lastKnownArea)
 		return m_lastKnownArea->GetPlace();
@@ -570,7 +570,7 @@ Place CCSBot::GetPlace( void ) const
 /**
  * Move towards position, independant of view angle
  */
-void CCSBot::MoveTowardsPosition( const Vector &pos )
+void CFFBot::MoveTowardsPosition( const Vector &pos )
 {
 	Vector myOrigin = GetCentroid( this );
 
@@ -668,7 +668,7 @@ void CCSBot::MoveTowardsPosition( const Vector &pos )
 /**
  * Move away from position, independant of view angle
  */
-void CCSBot::MoveAwayFromPosition( const Vector &pos )
+void CFFBot::MoveAwayFromPosition( const Vector &pos )
 {
 	// compute our current forward and lateral vectors
 	float angle = EyeAngles().y;
@@ -700,7 +700,7 @@ void CCSBot::MoveAwayFromPosition( const Vector &pos )
 /**
  * Strafe (sidestep) away from position, independant of view angle
  */
-void CCSBot::StrafeAwayFromPosition( const Vector &pos )
+void CFFBot::StrafeAwayFromPosition( const Vector &pos )
 {
 	// compute our current forward and lateral vectors
 	float angle = EyeAngles().y;
@@ -724,7 +724,7 @@ void CCSBot::StrafeAwayFromPosition( const Vector &pos )
 /**
  * For getting un-stuck
  */
-void CCSBot::Wiggle( void )
+void CFFBot::Wiggle( void )
 {
 	if (IsCrouching())
 	{
@@ -820,7 +820,7 @@ void CCSBot::Wiggle( void )
 /**
  * Determine approach points from eye position and approach areas of current area
  */
-void CCSBot::ComputeApproachPoints( void )
+void CFFBot::ComputeApproachPoints( void )
 {
 	m_approachPointCount = 0;
 
@@ -836,7 +836,8 @@ void CCSBot::ComputeApproachPoints( void )
 	float halfWidth;
 	for( int i=0; i<m_lastKnownArea->GetApproachInfoCount() && m_approachPointCount < MAX_APPROACH_POINTS; ++i )
 	{
-		const CCSNavArea::ApproachInfo *info = m_lastKnownArea->GetApproachInfo( i );
+		// Assuming CFFNavArea is defined in ff_nav_area.h and has ApproachInfo
+		const CFFNavArea::ApproachInfo *info = static_cast<const CFFNavArea*>(m_lastKnownArea)->GetApproachInfo( i );
 
 		if (info->here.area == NULL || info->prev.area == NULL)
 		{
@@ -873,11 +874,12 @@ void CCSBot::ComputeApproachPoints( void )
 }
 
 //--------------------------------------------------------------------------------------------------------------
-void CCSBot::DrawApproachPoints( void ) const
+void CFFBot::DrawApproachPoints( void ) const
 {
 	for( int i=0; i<m_approachPointCount; ++i )
 	{
-		if (TheCSBots()->GetElapsedRoundTime() >= m_approachPoint[i].m_area->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) ))
+		// FF_TODO_TEAMS: Ensure OtherTeam() and GetTeamNumber() are appropriate for FF's team logic
+		if (TheFFBots()->GetElapsedRoundTime() >= m_approachPoint[i].m_area->GetEarliestOccupyTime( OtherTeam( GetTeamNumber() ) ))
 			NDebugOverlay::Cross3D( m_approachPoint[i].m_pos, 10.0f, 255, 0, 255, true, 0.1f );
 		else
 			NDebugOverlay::Cross3D( m_approachPoint[i].m_pos, 10.0f, 100, 100, 100, true, 0.1f );
@@ -888,7 +890,7 @@ void CCSBot::DrawApproachPoints( void ) const
 /**
  * Find the approach point that is nearest to our current path, ahead of us
  */
-bool CCSBot::FindApproachPointNearestPath( Vector *pos )
+bool CFFBot::FindApproachPointNearestPath( Vector *pos )
 {
 	if (!HasPath())
 		return false;
@@ -943,8 +945,9 @@ bool CCSBot::FindApproachPointNearestPath( Vector *pos )
 /**
  * Return true if we are at the/an enemy spawn right now
  */
-bool CCSBot::IsAtEnemySpawn( void ) const
+bool CFFBot::IsAtEnemySpawn( void ) const
 {
+	// FF_TODO_TEAMS: Replace TEAM_TERRORIST and spawn point names with FF equivalents.
 	CBaseEntity *spot;
 	const char *spawnName = (GetTeamNumber() == TEAM_TERRORIST) ? "info_player_counterterrorist" : "info_player_terrorist";
 
