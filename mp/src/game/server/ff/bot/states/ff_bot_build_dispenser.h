@@ -39,6 +39,7 @@ private:
 
 	CountdownTimer m_buildProgressTimer;  // Timer to simulate initial build duration
 	CountdownTimer m_repathTimer;         // Timer to periodically check path if stuck
+	CountdownTimer m_waitForBlueprintTimer; // Timer to wait for blueprint to spawn after command
 
 	// Upgrade phase members
 	bool m_isUpgrading;                   // True if currently in the upgrading phase

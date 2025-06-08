@@ -22,7 +22,7 @@
  */
 void HuntState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	// FF_TODO: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly
+	// FF_TODO_AI_BEHAVIOR: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly
 	if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
 		me->Walk();
 	else
@@ -50,7 +50,7 @@ void HuntState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		return;
 	}
 
-	// FF_TODO: Scenario logic needs complete overhaul for FF objectives.
+	// FF_TODO_GAME_MECHANIC: Scenario logic needs complete overhaul for FF objectives.
 	// The CS bomb/hostage logic below is commented out.
 	/*
 	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB) // Example: This would be an FF scenario type
@@ -118,7 +118,7 @@ void HuntState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		const float earlyGameTime = 45.0f;
 		if (TheFFBots()->GetElapsedRoundTime() < earlyGameTime && !me->HasVisitedEnemySpawn())
 		{
-			// FF_TODO: Ensure OtherTeam and GetRandomSpawn work with FF team definitions correctly.
+			// FF_TODO_AI_BEHAVIOR: Ensure OtherTeam and GetRandomSpawn work with FF team definitions correctly.
 			// TheFFBots()->GetRandomSpawn might return NULL if no spawns for that team are found.
 			CBaseEntity *enemySpawn = TheFFBots()->GetRandomSpawn( OtherTeam( me->GetTeamNumber() ) );
 			if ( enemySpawn )

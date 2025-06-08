@@ -17,6 +17,8 @@
 #include "bot_profile.h"
 #include "ff_shareddefs.h"
 #include "ff_player.h"
+#include "ff_bot.h" // For CFFBot::BuildableType
+#include "util_player_by_index.h" // For UTIL_PlayerByIndex used in macros
 
 //=============================================================================
 // FF Team Definitions (Assumed values - replace with actual engine/game definitions if available)
@@ -54,11 +56,13 @@ enum FFGameScenarioType
 
 
 class CFFBotManager;
+extern CFFBotManager g_FFBotManager; // Global instance
 
 // accessor for FF-specific bots
 inline CFFBotManager *TheFFBots( void )
 {
-	return reinterpret_cast< CFFBotManager * >( TheBots );
+	// return reinterpret_cast< CFFBotManager * >( TheBots ); // Old way
+	return &g_FFBotManager; // New way, directly access the global instance
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -75,78 +79,6 @@ inline int OtherTeam( int team )
 
 
 //--------------------------------------------------------------------------------------------------------------
-class BotEventInterface : public IGameEventListener2
-{
-public:
-	virtual const char *GetEventName( void ) const = 0;
-};
-
-//--------------------------------------------------------------------------------------------------------------
-//--------------------------------------------------------------------------------------------------------------
-/**
- * Macro to set up an OnEventClass() in TheFFBots.
- */
-#define DECLARE_BOTMANAGER_EVENT_LISTENER( BotManagerSingleton, EventClass, EventName ) \
-	public: \
-	virtual void On##EventClass( IGameEvent *data ); \
-	private: \
-	class EventClass##Event : public BotEventInterface \
-	{ \
-		bool m_enabled; \
-	public: \
-		EventClass##Event( void ) \
-		{ \
-			gameeventmanager->AddListener( this, #EventName, true ); \
-			m_enabled = true; \
-		} \
-		~EventClass##Event( void ) \
-		{ \
-			if ( m_enabled ) gameeventmanager->RemoveListener( this ); \
-		} \
-		virtual const char *GetEventName( void ) const \
-		{ \
-			return #EventName; \
-		} \
-		void Enable( bool enable ) \
-		{ \
-			m_enabled = enable; \
-			if ( enable ) \
-				gameeventmanager->AddListener( this, #EventName, true ); \
-			else \
-				gameeventmanager->RemoveListener( this ); \
-		} \
-		bool IsEnabled( void ) const { return m_enabled; } \
-		void FireGameEvent( IGameEvent *event ) \
-		{ \
-			BotManagerSingleton()->On##EventClass( event ); \
-		} \
-	}; \
-	EventClass##Event m_##EventClass##Event;
-
-
-//--------------------------------------------------------------------------------------------------------------
-#define DECLARE_FFBOTMANAGER_EVENT_LISTENER( EventClass, EventName ) DECLARE_BOTMANAGER_EVENT_LISTENER( TheFFBots, EventClass, EventName )
-
-
-//--------------------------------------------------------------------------------------------------------------
-/**
- * Macro to propogate an event from the bot manager to all bots
- */
-#define CFFBOTMANAGER_ITERATE_BOTS( Callback, arg1 ) \
-	{ \
-		for ( int idx = 1; idx <= gpGlobals->maxClients; ++idx ) \
-		{ \
-			CBasePlayer *player = UTIL_PlayerByIndex( idx ); \
-			if (player == NULL) continue; \
-			if (!player->IsBot()) continue; \
-			CFFBot *bot = dynamic_cast< CFFBot * >(player); \
-			if ( !bot ) continue; \
-			bot->Callback( arg1 ); \
-		} \
-	}
-
-
-//--------------------------------------------------------------------------------------------------------------
 //
 // The manager for Fortress Forever specific bots
 //
@@ -154,6 +86,7 @@ class CFFBotManager : public CBotManager
 {
 public:
 	CFFBotManager();
+	virtual ~CFFBotManager(); // Added Destructor
 
 	virtual CBasePlayer *AllocateBotEntity( void );			///< factory method to allocate the appropriate entity for the bot
 
@@ -285,22 +218,32 @@ public:
 	float GetRoundStartTime( void ) const			{ return m_roundStartTimestamp; }
 	float GetElapsedRoundTime( void ) const			{ return gpGlobals->curtime - m_roundStartTimestamp; }
 
-	// FF_TODO_WEAPONS: Consider adding AllowPistols, AllowShotguns etc. if FF bots need ConVar checks for weapon categories
-	// bool AllowPistols( void ) const				{ return cv_bot_allow_pistols.GetBool(); }
-	// bool AllowShotguns( void ) const				{ return cv_bot_allow_shotguns.GetBool(); }
-	// etc.
-
 	bool AllowFriendlyFireDamage( void ) const		{ return friendlyfire.GetBool(); }
 
-	bool IsWeaponUseable( const CBasePlayerWeapon *weapon ) const;	// In CS, this checks weapon allowance ConVars. Adapt for FF if needed.
+	bool IsWeaponUseable( const CBasePlayerWeapon *weapon ) const;
 
 	bool IsRoundOver( void ) const					{ return m_isRoundOver; }
 
 	#define FROM_CONSOLE true
-	// FF_TODO_WEAPONS: weaponType parameter might be better as FFWeaponID or similar if specific weapon spawning is desired for bots.
 	bool BotAddCommand( int team, bool isFromConsole = false, const char *profileName = NULL, int weaponType = 0, BotDifficultyType difficulty = NUM_DIFFICULTY_LEVELS );
 
 private:
+	// Event listener management
+	class BotEventListener : public IGameEventListener2
+	{
+	public:
+		BotEventListener(CFFBotManager *manager) : m_pManager(manager) {}
+		virtual void FireGameEvent(IGameEvent *event) { m_pManager->OnGameEvent(event); }
+		virtual int GetEventDebugID(void) { return EVENT_DEBUG_ID_INIT; } // Required by IGameEventListener2
+	protected:
+		CFFBotManager *m_pManager;
+	};
+	BotEventListener m_gameEventListener;
+	void OnGameEvent(IGameEvent *event); // Centralized event handler
+	void RegisterGameEventListeners();
+	void UnregisterGameEventListeners();
+
+
 	enum SkillType { LOW, AVERAGE, HIGH, RANDOM };
 
 	void MaintainBotQuota( void );
@@ -313,15 +256,6 @@ private:
 	Zone m_zone[ MAX_ZONES ];
 	int m_zoneCount;
 
-	// CS-specific members removed:
-	// bool m_isBombPlanted;
-	// float m_bombPlantTimestamp;
-	// float m_earliestBombPlantTimestamp;
-	// CFFPlayer *m_bombDefuser; // Was CCSPlayer
-	// EHANDLE m_looseBomb;
-	// CNavArea *m_looseBombArea;
-	// bool m_isDefenseRushing;
-
 	bool m_isRoundOver;
 
 	CountdownTimer m_checkTransientAreasTimer;
@@ -331,79 +265,13 @@ private:
 	float m_lastSeenEnemyTimestamp;
 	float m_roundStartTimestamp;
 
-	// Event Handlers --------------------------------------------------------------------------------------------
-	// Generic events likely still relevant for FF
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DoorMoving,			door_moving )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakProp,				break_prop )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BreakBreakable,		break_breakable )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFire,			weapon_fire )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponFireOnEmpty,		weapon_fire_on_empty )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( WeaponReload,			weapon_reload )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BulletImpact,			bullet_impact )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( HEGrenadeDetonate,		hegrenade_detonate )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
-
-	// Round events - ff_restartround might be more specific
-	// FF_TODO_EVENTS: Verify if round_start, round_end, round_freeze_end are directly used or if ff_restartround covers all needs.
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundStart,			round_start )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundFreezeEnd,		round_freeze_end ) // If FF has freeze period, keep this
-
-	// FF Specific event listeners
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FFRestartRound,		ff_restartround ) // Specific FF event for round restarts
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerChangeClass,		player_changeclass )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerChangeTeam,		player_changeteam ) // Added: useful for bot team balancing/management
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DisguiseLost,			disguise_lost ) // Spy related
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( CloakLost,			    cloak_lost )    // Spy related
-
-	// Buildable events (These seem comprehensive for FF)
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildDispenser,		build_dispenser )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildSentryGun,		build_sentrygun )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildDetpack,		    build_detpack )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildManCannon,		build_mancannon )
-
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserKilled,		dispenser_killed )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserDismantled,	dispenser_dismantled )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserDetonated,	dispenser_detonated )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DispenserSabotaged,	dispenser_sabotaged ) // Engineer building sabotaged by Spy
-
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunKilled,		sentrygun_killed )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunDismantled,	sentrygun_dismantled ) // Corrected from sentry_dismantled
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunDetonated,	sentrygun_detonated )  // Corrected from sentry_detonated
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunUpgraded,		sentrygun_upgraded )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( SentryGunSabotaged,	sentrygun_sabotaged )  // Engineer building sabotaged by Spy
-
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( DetpackDetonated,	    detpack_detonated )
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ManCannonDetonated,	mancannon_detonated )
-
-	// FF_TODO_EVENTS: Consider other game events like flag_captured, flag_dropped, point_captured, etc.
-	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( FlagCaptured,          item_captured ) // Example, verify actual event name
-	// DECLARE_FFBOTMANAGER_EVENT_LISTENER( CapturePointCaptured,  point_captured ) // Example, verify actual event name
-
-	// FF_TODO_SAPPERS: If a 'buildable_sapped' or 'obj_sapped' game event exists, create a listener for it.
-	// The handler should identify the sapped buildable and the Engineer owner(s).
-	// Affected Engineer bots should be immediately notified and potentially forced
-	// into RepairBuildableState (or a dedicated AntiSapperState) for that buildable.
-	// Example: DECLARE_FFBOTMANAGER_EVENT_LISTENER( BuildableSapped, buildable_sapped )
-
-
-	CUtlVector< BotEventInterface * > m_commonEventListeners;
-	bool m_eventListenersEnabled;
-	void EnableEventListeners( bool enable );
-
-	// FF_LUA_INTEGRATION: Placeholder structures for Lua-defined objective data
+	// FF_TODO_LUA: Placeholder structures for Lua-defined objective data
 	struct LuaObjectivePoint
 	{
 		char name[MAX_PATH];
 		Vector position;
 		int teamAffiliation;      // e.g., FF_TEAM_RED, FF_TEAM_BLUE, FF_TEAM_NEUTRAL, or specific team if it's a capture point for one team.
-		int type;                 // FF_LUA_TODO: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture, 4=PayloadCheckpoint, 5=PayloadGoal
+		int type;                 // FF_TODO_LUA: Define enum: e.g., 0=Generic, 1=ControlPoint, 2=FlagSpawn, 3=FlagCapture, 4=PayloadCheckpoint, 5=PayloadGoal. Conceptual mapping from Omnibot::GoalType: 0=Generic/Unknown, 1=FlagGoal(CapturePoint/OmniCapPoint), 2=Item_Flag(OmniFlag), 3=PayloadCheckpoint, 4=PayloadGoal, 5=BombTarget, 6=RescueZone etc.
 		float radius;             // Radius for proximity checks.
 		bool isActive;            // Is the objective currently active/relevant?
 		int currentOwnerTeam;     // For capturable points, which team currently owns it.
@@ -423,10 +291,10 @@ private:
 		LuaPathPoint() : position(vec3_origin), order(0), waitTime(0.0f), pathID(0) { name[0] = '\0'; }
 	};
 	CUtlVector<LuaPathPoint> m_luaPathPoints;
-	// Add more structures as needed for different types of Lua-driven game elements relevant to bots
+	// FF_TODO_LUA: Add more structures as needed for different types of Lua-driven game elements relevant to bots
 
 public:
-	// FF_LUA_INTEGRATION: Accessors for Lua-defined objective data
+	// FF_TODO_LUA: Accessors for Lua-defined objective data
 	const CUtlVector<LuaObjectivePoint>& GetAllLuaObjectivePoints() const;
 	int GetLuaObjectivePointCount() const;
 	const LuaObjectivePoint* GetLuaObjectivePoint(int index) const;
@@ -434,6 +302,53 @@ public:
 	const CUtlVector<LuaPathPoint>& GetAllLuaPathPoints() const;
 	int GetLuaPathPointCount() const;
 	const LuaPathPoint* GetLuaPathPoint(int index) const;
+
+	// Helper to get BuildableType from an entity
+	static CFFBot::BuildableType GetBuildableTypeFromEntity( CBaseEntity *pBuildable );
+
+
+	// Event Handlers - These will be called by OnGameEvent
+	void OnPlayerDeath( IGameEvent *data );
+	void OnPlayerFootstep( IGameEvent *data );
+	void OnPlayerRadio( IGameEvent *data );
+	void OnPlayerFallDamage( IGameEvent *data );
+	void OnDoorMoving( IGameEvent *data );
+	void OnBreakProp( IGameEvent *data );
+	void OnBreakBreakable( IGameEvent *data );
+	void OnWeaponFire( IGameEvent *data );
+	void OnWeaponFireOnEmpty( IGameEvent *data );
+	void OnWeaponReload( IGameEvent *data );
+	void OnBulletImpact( IGameEvent *data );
+	void OnHEGrenadeDetonate( IGameEvent *data );
+	void OnGrenadeBounce( IGameEvent *data );
+	void OnNavBlocked( IGameEvent *data );
+	void OnServerShutdown( IGameEvent *data );
+	void OnRoundStart( IGameEvent *data );
+	void OnRoundEnd( IGameEvent *data );
+	void OnRoundFreezeEnd( IGameEvent *data );
+	void OnFFRestartRound( IGameEvent *data );
+	void OnPlayerChangeClass( IGameEvent *data );
+	void OnPlayerChangeTeam( IGameEvent *data );
+	void OnDisguiseLost( IGameEvent *data );
+	void OnCloakLost( IGameEvent *data );
+	void OnBuildDispenser( IGameEvent *data );
+	void OnBuildSentryGun( IGameEvent *data );
+	void OnBuildDetpack( IGameEvent *data );
+	void OnBuildManCannon( IGameEvent *data );
+	void OnBuildableBuilt( IGameEvent *data );
+	void OnDispenserKilled( IGameEvent *data );
+	void OnDispenserDismantled( IGameEvent *data );
+	void OnDispenserDetonated( IGameEvent *data );
+	void OnDispenserSabotaged( IGameEvent *data );
+	void OnBuildableSapperRemoved( IGameEvent *data );
+	void OnSentryGunKilled( IGameEvent *data );
+	void OnSentryGunDismantled( IGameEvent *data );
+	void OnSentryGunDetonated( IGameEvent *data );
+	void OnSentryGunUpgraded( IGameEvent *data );
+	void OnSentryGunSabotaged( IGameEvent *data );
+	void OnDetpackDetonated( IGameEvent *data );
+	void OnManCannonDetonated( IGameEvent *data );
+
 };
 
 inline CBasePlayer *CFFBotManager::AllocateBotEntity( void )

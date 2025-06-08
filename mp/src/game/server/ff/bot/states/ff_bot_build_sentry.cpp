@@ -32,6 +32,7 @@ BuildSentryState::BuildSentryState(void)
 	m_sentryBeingBuilt = NULL;
 	m_buildProgressTimer.Invalidate();
 	m_repathTimer.Invalidate();
+	m_waitForBlueprintTimer.Invalidate();
 
 	m_isUpgrading = false;
 	m_targetUpgradeLevel = DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL;
@@ -57,10 +58,12 @@ void BuildSentryState::SetBuildLocation(const Vector &location)
  */
 void BuildSentryState::OnEnter( CFFBot *me )
 {
+	me->SelectSpecificBuildable(CFFBot::BUILDABLE_SENTRY); // Ensure correct blueprint is selected
 	me->PrintIfWatched( "BuildSentryState: Entering state.\n" );
 	m_isBuilding = false;
 	m_isAtBuildLocation = false;
 	m_sentryBeingBuilt = NULL;
+	m_waitForBlueprintTimer.Invalidate();
 	m_isUpgrading = false;
 	m_currentUpgradeLevel = 1; // Assume starts at level 1 after blueprint
 	m_targetUpgradeLevel = DEFAULT_TARGET_SENTRY_UPGRADE_LEVEL; // Default target
@@ -142,10 +145,23 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 
 		// Simulate selecting Sentry from build menu (e.g., press Attack2)
 		// This is highly game-dependent. For now, a placeholder.
-		// FF_TODO_BUILDING: Simulate selecting Sentry (e.g., me->PressButton(IN_ATTACK2) once if it cycles, or specific command "build 2" for sentry)
-		// me->HandleCommand("build 2"); // Example of a command to select/place sentry.
+		// FF_TODO_BUILDING: If me->GetSelectedBuildable() is not what this state specifically wants (e.g., in BuildSentryState but BUILDABLE_DISPENSER is selected), call me->CycleSelectedBuildable() N times until the correct one is selected or log an error if it cannot be selected.
+		// For this subtask, assume SelectSpecificBuildable in OnEnter correctly sets it and no cycling is needed here yet.
+		// me->PrimaryAttack(); // This was to "place" the blueprint, now handled by SelectSpecificBuildable (via command) in OnEnter.
 
-		// After conceptual placement via command, try to find the placed sentry.
+		// Start a short timer to wait for the blueprint entity to spawn after the command.
+		if (!m_waitForBlueprintTimer.HasStarted())
+		{
+			m_waitForBlueprintTimer.Start(0.2f); // Short delay (e.g., 200ms)
+		}
+
+		// Only try to find the blueprint after the timer has elapsed
+		if (!m_waitForBlueprintTimer.IsElapsed())
+		{
+			return; // Wait for blueprint to spawn
+		}
+
+		// After conceptual placement via command (in OnEnter), try to find the placed sentry.
 		// This assumes the game has spawned an "obj_sentrygun" (or similar) entity nearby.
 		// The actual classname for FF sentries needs to be verified.
 		float searchRadius = 150.0f;
@@ -166,14 +182,37 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 			}
 		}
 
-		if (!m_sentryBeingBuilt.Get())
+		// This search is now inside the IsElapsed() check for m_waitForBlueprintTimer
+		if (!m_sentryBeingBuilt.Get()) // Only search if we haven't found it yet
 		{
-			me->PrintIfWatched("BuildSentryState: Failed to find placed sentry blueprint nearby. Idling.\n");
+			float searchRadius = 150.0f;
+			CBaseEntity *pEntity = NULL;
+			while ((pEntity = gEntList.FindEntityInSphere(pEntity, m_buildLocation, searchRadius)) != NULL)
+			{
+				// FF_TODO_BUILDING: Verify actual sentry classname "obj_sentrygun_blueprint" or "obj_sentrygun" in initial state.
+				if (FClassnameIs(pEntity, "obj_sentrygun"))
+				{
+					CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(pEntity);
+					// Check if it's ours and if it's in a building phase
+					if (pBuildable && pBuildable->GetBuilder() == me && pBuildable->IsBuilding())
+					{
+						m_sentryBeingBuilt = pBuildable;
+						me->PrintIfWatched("BuildSentryState: Found placed sentry blueprint: %s\n", pBuildable->GetClassname());
+						break;
+					}
+				}
+			}
+		}
+
+		if (!m_sentryBeingBuilt.Get()) // Check again after attempting to find it
+		{
+			me->PrintIfWatched("BuildSentryState: Failed to find placed sentry blueprint nearby after waiting. Idling.\n");
 			// Potentially try placing again after a delay, or give up.
 			me->Idle();
 			return;
 		}
 
+		// Blueprint found, proceed with building logic.
 		// Simulate starting to build
 		// Resource Check for initial build
 		if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_COST_CELLS)
@@ -218,10 +257,11 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 
 			if (m_sentryBeingBuilt.Get()) // Check if we still have a valid sentry
 			{
-				// FF_TODO_BUILDING: Check actual sentry level from m_sentryBeingBuilt->GetLevel() if available.
-				// For now, we assume it's level 1.
-				m_currentUpgradeLevel = 1;
-				if (m_currentUpgradeLevel < m_targetUpgradeLevel)
+				// Sync currentUpgradeLevel with the bot's knowledge, which should be set by NotifyBuildingBuilt
+				m_currentUpgradeLevel = me->m_sentryLevel; // Should be 1 after initial build
+				// FF_TODO_BUILDING: Ideally, CFFBuildableObject::GetLevel() should be used if available and reliable here.
+
+				if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure level is valid before upgrading
 				{
 					// Resource Check for upgrade
 					if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_UPGRADE_COST_CELLS)
@@ -275,12 +315,14 @@ void BuildSentryState::OnUpdate( CFFBot *me )
 
 		// FF_TODO_BUILDING: Ideally, check m_sentryBeingBuilt->GetLevel() to see if it actually leveled up.
 		// For simulation, we rely on the timer.
+		// The actual level increment should be handled by CFFBot::NotifyBuildingUpgraded
 		if (m_upgradeProgressTimer.IsElapsed())
 		{
-			m_currentUpgradeLevel++;
-			me->PrintIfWatched("BuildSentryState: Sentry upgraded to level %d.\n", m_currentUpgradeLevel);
+			// Sync with the bot's knowledge of the sentry level, which should have been updated by an event
+			m_currentUpgradeLevel = me->m_sentryLevel;
+			me->PrintIfWatched("BuildSentryState: Sentry upgrade timer elapsed. Current known level: %d.\n", m_currentUpgradeLevel);
 
-			if (m_currentUpgradeLevel < m_targetUpgradeLevel)
+			if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure valid level
 			{
 				// Resource Check for next upgrade level
 				if (me->GetAmmoCount(AMMO_CELLS) < SENTRY_UPGRADE_COST_CELLS)

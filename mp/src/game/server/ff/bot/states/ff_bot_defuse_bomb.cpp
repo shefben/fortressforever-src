@@ -16,24 +16,24 @@
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Begin defusing the bomb - FF: This state is CS-specific and needs to be re-evaluated for FF objectives.
+ * Begin defusing the bomb - FF_TODO_GAME_MECHANIC: This state is CS-specific and needs to be re-evaluated for FF objectives, or removed.
  */
 void DefuseBombState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: DefuseBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: DefuseBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
 	// me->Crouch();
 	// me->SetDisposition( CFFBot::SELF_DEFENSE ); // Changed CCSBot to CFFBot
-	// me->GetChatter()->Say( "DefusingBomb" ); // FF_TODO: FF Chatter equivalent
+	// me->GetChatter()->Say( "DefusingBomb" ); // FF_TODO_AI_BEHAVIOR: FF Chatter equivalent
 	me->Idle(); // Default to idle as defusal is not applicable
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Defuse the bomb - FF: This state is CS-specific.
+ * Defuse the bomb - FF_TODO_GAME_MECHANIC: This state is CS-specific.
  */
 void DefuseBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: DefuseBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: DefuseBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
 	// const Vector *bombPos = me->GetGameState()->GetBombPosition(); // GetBombPosition is CS-specific
 
 	// if (bombPos == NULL)
@@ -73,7 +73,7 @@ void DefuseBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 //--------------------------------------------------------------------------------------------------------------
 void DefuseBombState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: DefuseBombState::OnExit - CS-specific logic reviewed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: DefuseBombState::OnExit - CS-specific logic reviewed.\n" );
 	me->StandUp();
 	me->ResetStuckMonitor();
 	// me->SetTask( CFFBot::SEEK_AND_DESTROY ); // SEEK_AND_DESTROY is a generic task

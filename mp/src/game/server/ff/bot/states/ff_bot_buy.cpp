@@ -20,7 +20,7 @@
 
 //--------------------------------------------------------------------------------------------------------------
 ConVar bot_loadout( "bot_loadout", "", FCVAR_CHEAT, "bots are given these items at round start" );
-ConVar bot_randombuy( "bot_randombuy", "0", FCVAR_CHEAT, "should bots ignore their prefered weapons and just buy weapons at random?" ); // FF_TODO: Review if this makes sense for FF
+ConVar bot_randombuy( "bot_randombuy", "0", FCVAR_CHEAT, "should bots ignore their prefered weapons and just buy weapons at random?" ); // FF_TODO_AI_BEHAVIOR: Review if this makes sense for FF
 
 //--------------------------------------------------------------------------------------------------------------
 // CFFBot::GiveWeapon is defined in ff_bot.cpp
@@ -35,7 +35,7 @@ void BuyState::OnEnter( CFFBot *me )
 	m_isInitialDelay = true;
 	m_doneBuying = false;
 
-	// FF_TODO_ECONOMY: cv_bot_eco_limit is CS-specific. Removed direct usage.
+	// FF_TODO_GAME_MECHANIC: cv_bot_eco_limit is CS-specific. Removed direct usage.
 	// If FF had an economy, logic to check funds would go here.
 
 	// EquipBestWeapon will be called in OnExit or when m_doneBuying is true.
@@ -88,7 +88,7 @@ void BuyState::OnUpdate( CFFBot *me )
 		for ( int i=0; i<loadoutItems.Count(); ++i )
 		{
 			const char *item = loadoutItems[i];
-			// FF_TODO_ITEMS: More robust item type detection (armor, specific ammo packs beyond prim/sec)
+			// FF_TODO_GAME_MECHANIC: More robust item type detection (armor, specific ammo packs beyond prim/sec)
 			if ( FStrEq( item, "primammo" ) )
 			{
 				// Give a large amount, CFFPlayer::GiveAmmo will cap it based on weapon's max carry
@@ -107,7 +107,7 @@ void BuyState::OnUpdate( CFFBot *me )
 			else if ( FStrEq( item, "shells" ) ) me->GiveAmmo(999, AMMO_SHELLS);
 			else if ( FStrEq( item, "nails" ) ) me->GiveAmmo(999, AMMO_NAILS);
 			else if ( FStrEq( item, "rockets" ) ) me->GiveAmmo(999, AMMO_ROCKETS);
-			// FF_TODO_ITEMS: Add actual armor entity names for FF if they exist
+			// FF_TODO_GAME_MECHANIC: Add actual armor entity names for FF if they exist
 			// else if ( FStrEq( item, "vest" ) ) me->GiveNamedItem( "item_armor_ff_light" );
 			// else if ( FStrEq( item, "vesthelm" ) ) me->GiveNamedItem( "item_armor_ff_heavy" );
 			else

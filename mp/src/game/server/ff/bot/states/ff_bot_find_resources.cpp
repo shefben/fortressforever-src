@@ -63,7 +63,7 @@ void FindResourcesState::OnEnter( CFFBot *me )
 //--------------------------------------------------------------------------------------------------------------
 void FindResourcesState::OnUpdate( CFFBot *me )
 {
-	// FF_TODO_RESOURCES: Define what "full" means. Could be GetMaxAmmoCount(AMMO_CELLS) or a gameplay defined max.
+	// FF_TODO_CLASS_ENGINEER: Define what "full" means for cells. Could be GetMaxAmmoCount(AMMO_CELLS) or a gameplay defined max.
 	const int MAX_CELLS_DESIRED = 200; // Example
 	if (me->GetAmmoCount(AMMO_CELLS) >= MAX_CELLS_DESIRED)
 	{
@@ -132,21 +132,33 @@ void FindResourcesState::OnUpdate( CFFBot *me )
 		if (distToTargetSq < interactRadiusSq)
 		{
 			me->Stop();
-			me->PrintIfWatched("FindResourcesState: Near resource target %s. Waiting for resources.\n", m_resourceTarget->GetClassname());
-			// FF_TODO_RESOURCES: Actual resource gain is passive (dispenser) or via Touch() (ammo pack).
-			// If it's a pack that needs 'use', bot might need to press IN_USE.
-			// For now, assume passive gain or Touch pickup.
-			// If it was an ammo pack, it should be picked up and m_resourceTarget might become NULL via game logic.
-			// If it's a dispenser, bot will just stay here until full or new orders.
-			// Re-scan for a *better* or *different* source if this one seems slow or depleted (advanced)
-			if(m_searchTimer.IsElapsed()) // Periodically check if there's a better source or if this one is gone
-			{
-			    if (hadTarget && m_resourceTarget.Get() && m_resourceTarget.Get()->IsMarkedForDeletion()) {
-			        m_resourceTarget = NULL; // Force re-evaluation
-			    }
-				m_searchTimer.Start(RandomFloat(3.0f, 5.0f));
-			}
+			me->PrintIfWatched("FindResourcesState: Near resource target %s.\n", m_resourceTarget->GetClassname());
 
+			// If it's an ammo pack, assume it's picked up by proximity/touch.
+			// Then, clear the target and force a re-scan soon to see if more resources are needed or to find new source.
+			if (FClassnameIs(m_resourceTarget.Get(), "item_ammopack_medium") || FClassnameIs(m_resourceTarget.Get(), "item_ammopack_full"))
+			{
+				me->PrintIfWatched("FindResourcesState: Collecting ammo pack %s.\n", m_resourceTarget->GetClassname());
+				// FF_TODO_GAME_MECHANIC: Game ideally handles ammo pack removal and ammo update on Touch.
+				// Bot simulates consumption by invalidating target and quickly looking for more or deciding it's full.
+				m_resourceTarget = NULL;
+				m_searchTimer.Start(0.1f); // Trigger re-evaluation very soon
+				return; // Exit update for this frame
+			}
+			// If it's a dispenser, bot will just stay here until full or new orders.
+			// Periodically re-evaluate if this dispenser is still the best option or if it's gone.
+			else if (FClassnameIs(m_resourceTarget.Get(), "obj_dispenser"))
+			{
+				me->PrintIfWatched("FindResourcesState: Waiting for resources from dispenser %s.\n", m_resourceTarget->GetClassname());
+				// Passive gain assumed. Check if it got destroyed or we should look for alternatives.
+				if(m_searchTimer.IsElapsed())
+				{
+					if (m_resourceTarget.Get() && (m_resourceTarget.Get()->IsMarkedForDeletion() || !m_resourceTarget.Get()->IsAlive())) {
+						m_resourceTarget = NULL; // Force re-evaluation
+					}
+					m_searchTimer.Start(RandomFloat(3.0f, 5.0f)); // Check for other sources periodically
+				}
+			}
 		}
 		else // Not close enough, keep moving
 		{

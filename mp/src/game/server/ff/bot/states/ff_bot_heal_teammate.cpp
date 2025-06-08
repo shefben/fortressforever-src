@@ -172,7 +172,7 @@ void HealTeammateState::OnUpdate( CFFBot *me )
 	}
 
 	// Handle enemies
-	// FF_TODO_MEDIC_COMBAT: More sophisticated Medic combat/flee logic
+	// FF_TODO_CLASS_MEDIC: More sophisticated Medic combat/flee logic
 	if ( me->GetBotEnemy() != NULL && me->IsEnemyVisible() )
 	{
 		me->PrintIfWatched( "HealTeammateState: Enemy sighted while trying to heal. Switching to Attack.\n" );
@@ -181,7 +181,7 @@ void HealTeammateState::OnUpdate( CFFBot *me )
 	}
 
 	// Path to target if not in range
-	// FF_TODO_WEAPONS: Get actual Medigun range
+	// FF_TODO_WEAPON_STATS: Get actual Medigun range
 	const float MEDIGUN_RANGE = 400.0f; // Estimate
 	float distToTargetSq = me->GetAbsOrigin().DistToSqr( m_healTarget->GetAbsOrigin() );
 

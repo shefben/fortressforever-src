@@ -39,7 +39,7 @@ void IdleState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 	m_spyInfiltrateScanTimer.Start(RandomFloat(3.0f, 6.0f)); // Initialize spy scan timer
 
 
-	// FF_TODO: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly for FF item/weapon logic
+	// FF_TODO_WEAPON_STATS: Review if IsUsingKnife, IsWellPastSafe, IsHurrying concepts translate directly for FF item/weapon logic
 	// if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
 	// 	me->Walk();
 
@@ -68,7 +68,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// Engineer Behavior: Periodically consider building a sentry
 	if (me->IsEngineer() && !me->HasSentry() && m_engineerSentryScanTimer.IsElapsed()) // Renamed timer
 	{
-		// FF_TODO_ENGINEER: Add more sophisticated logic for when/where to build sentries.
+		// FF_TODO_CLASS_ENGINEER: Add more sophisticated logic for when/where to build sentries.
 		// For now, if near a friendly Lua objective that the bot's team owns, try to build there.
 		const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), me->GetTeamNumber());
 		if (obj && obj->currentOwnerTeam == me->GetTeamNumber() && (me->GetAbsOrigin() - obj->position).IsLengthLessThan(750.0f))
@@ -84,7 +84,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// Engineer Behavior: Periodically consider building a dispenser
 	if (me->IsEngineer() && !me->HasDispenser() && m_engineerDispenserScanTimer.IsElapsed())
 	{
-		// FF_TODO_ENGINEER: Add more sophisticated logic for when/where to build dispensers.
+		// FF_TODO_CLASS_ENGINEER: Add more sophisticated logic for when/where to build dispensers.
 		// Example: Build near a cluster of teammates or a chokepoint/defensive position.
 		// For now, if near a (possibly different) friendly Lua objective.
 		const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), me->GetTeamNumber());
@@ -148,13 +148,28 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	if (me->GetLastKnownArea() == NULL && me->StayOnNavMesh() == false)
 		return;
 
+	// If bot is stuck, jump
+	// This was missing from the previous merge, re-adding it here.
+	// Standard behavior for any bot that's stuck.
+	if (me->IsStuck())
+	{
+		me->Jump(); // Standard jump first
+
+		// If Scout and stuck, try a double jump as well
+		if (me->IsScout())
+		{
+			// FF_TODO_CLASS_SCOUT: More advanced logic would be to check if the target is on a higher ledge that a double jump might reach.
+			me->TryDoubleJump();
+		}
+	}
+
 	if (cv_bot_zombie.GetBool())
 	{
 		me->ResetStuckMonitor();
 		return;
 	}
 
-	// FF_TODO: "Safe time" weapon equip logic needs FF item/weapon specifics
+	// FF_TODO_WEAPON_STATS: "Safe time" weapon equip logic needs FF item/weapon specifics
 	// if (me->IsSafe())
 	// {
 	// 	if (!me->EquipGrenade()) // EquipGrenade needs FF logic
@@ -168,7 +183,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 	if (me->GetGameState()->IsRoundOver())
 	{
-		// FF_TODO: Logic for end-of-round objectives if any (e.g. last flag cap attempt)
+		// FF_TODO_AI_BEHAVIOR: Logic for end-of-round objectives if any (e.g. last flag cap attempt)
 		// if (me->GetHostageEscortCount()) // FF No Hostages
 		// {
 		// }
@@ -176,8 +191,8 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		return;
 	}
 
-	// const float defenseSniperCampChance = 75.0f; // FF_TODO: Tune for FF balance
-	// const float offenseSniperCampChance = 10.0f; // FF_TODO: Tune for FF balance
+	// const float defenseSniperCampChance = 75.0f; // FF_TODO_AI_BEHAVIOR: Tune for FF balance
+	// const float offenseSniperCampChance = 10.0f; // FF_TODO_AI_BEHAVIOR: Tune for FF balance
 
 	if (me->IsFollowing())
 	{
@@ -185,7 +200,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		return;
 	}
 
-	// FF_TODO: Major scenario logic overhaul needed here.
+	// FF_TODO_GAME_MECHANIC: Major scenario logic overhaul needed here.
 	// The entire switch statement below is CS-specific and has been commented out.
 	// FF bots will need to check FFGameRules and CFFBotManager for scenario state
 	// (e.g., flag status, control point status, payload progress) and decide actions.
@@ -215,7 +230,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 		default:	// Handles SCENARIO_FF_UNKNOWN, SCENARIO_FF_ITEM_SCRIPT, SCENARIO_FF_MINECART, SCENARIO_FF_MIXED
 		{
-			// FF_TODO: Implement logic for FF's actual game modes.
+			// FF_TODO_AI_BEHAVIOR: Implement logic for FF's actual game modes.
 			// This might involve:
 			// - Checking if a flag needs to be captured or returned.
 			// - Checking if a control point needs to be captured or defended.
@@ -261,7 +276,7 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		const float earlyGameTime = 45.0f; // This can be tuned for FF
 		if (TheFFBots()->GetElapsedRoundTime() < earlyGameTime && !me->HasVisitedEnemySpawn())
 		{
-			// FF_TODO: Ensure OtherTeam and GetRandomSpawn work with FF team definitions correctly.
+			// FF_TODO_AI_BEHAVIOR: Ensure OtherTeam and GetRandomSpawn work with FF team definitions correctly.
 			CBaseEntity *enemySpawn = TheFFBots()->GetRandomSpawn( OtherTeam( me->GetTeamNumber() ) );
 			if ( enemySpawn )
 			{
@@ -303,40 +318,75 @@ void IdleState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// If all else fails and bot is just idle without a path, make it hunt.
 	if(!me->HasPath())
 	{
-		// FF_LUA_INTEGRATION_TODO: Prioritize Lua objectives before generic hunting
+		// FF_TODO_LUA: Prioritize Lua objectives before generic hunting
 		if (me->GetLuaObjectivePointCount() > 0)
 		{
-			// Example: Try to find a neutral or own-team objective first.
-			// More complex logic would involve checking objective type, status, bot's current task, etc.
-			int desiredTeamAffiliation = me->GetTeamNumber();
-			if (desiredTeamAffiliation < FF_TEAM_RED) // If bot is unassigned or spectator, look for neutral
-			    desiredTeamAffiliation = FF_TEAM_NEUTRAL;
+			const CFFBotManager::LuaObjectivePoint* pBestObjective = NULL;
+			float flBestObjectiveDistSq = FLT_MAX;
 
-			const CFFBotManager::LuaObjectivePoint* obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), desiredTeamAffiliation);
-			if (!obj && desiredTeamAffiliation != FF_TEAM_NEUTRAL) // If no team objective, try neutral
+			const CUtlVector<CFFBotManager::LuaObjectivePoint>& objectives = me->GetAllLuaObjectivePoints();
+			for (int i = 0; i < objectives.Count(); ++i)
 			{
-				obj = me->GetClosestLuaObjectivePoint(me->GetAbsOrigin(), FF_TEAM_NEUTRAL);
-			}
-            // FF_TODO: Could also check for objectives specifically for the "other" team if the bot's role is to attack.
+				const CFFBotManager::LuaObjectivePoint& point = objectives[i];
 
-			if (obj)
-			{
-				// Use Msg for general server console, PrintIfWatched for bot-specific debug target
-				Msg("[FF_BOT_IDLE] Bot %s found Lua objective: %s at (%.f, %.f, %.f), Team: %d\n",
-					me->GetPlayerName(), obj->name, obj->position.x, obj->position.y, obj->position.z, obj->teamAffiliation);
-				me->PrintIfWatched("Found Lua objective: %s at (%.f, %.f, %.f), Team: %d\n",
-					obj->name, obj->position.x, obj->position.y, obj->position.z, obj->teamAffiliation);
+				if (!point.isActive)
+					continue;
 
-				// FF_TODO_OBJECTIVES: This is where a bot would decide to move to an objective,
-				// potentially transitioning to a new state like "CaptureObjectiveState" or "MoveToObjectiveState".
-				// For now, just demonstrating data access. If we MoveTo, it might spam.
+				// Decision to Capture: Type 1 (ControlPoint/FlagGoal)
+				if (point.type == 1) // Conceptual type for capturable static points
+				{
+					bool bTargetObjective = false;
+					if (me->IsScout())
+					{
+						// Scouts are more aggressive and will go for neutral or enemy-controlled points.
+						if (point.currentOwnerTeam != me->GetTeamNumber())
+						{
+							bTargetObjective = true;
+						}
+					}
+					else // Other classes might be more conservative (e.g., only go if enemy-controlled, or different logic)
+					{
+						if (point.currentOwnerTeam != me->GetTeamNumber() && point.currentOwnerTeam != FF_TEAM_NEUTRAL) // Example: Non-scouts might only go for clearly enemy points
+						{
+							bTargetObjective = true;
+						}
+						// FF_TODO_AI_BEHAVIOR: More sophisticated "should I capture this now?" logic for non-Scouts.
+					}
+
+					if (bTargetObjective)
+					{
+						float distSq = (point.position - me->GetAbsOrigin()).LengthSqr();
+						// FF_TODO_AI_BEHAVIOR: Add more advanced prioritization (e.g., fewer defenders, importance) for all classes.
+						if (distSq < flBestObjectiveDistSq)
+						{
+							pBestObjective = &point;
+							flBestObjectiveDistSq = distSq;
+						}
+					}
+				}
+				// FF_TODO_LUA: Add logic for flag pickup if point.type == 2 (Item_Flag) and it's the enemy flag,
+				// or own flag dropped and needs returning. This would likely involve checking currentOwnerTeam,
+				// if it's carriable, who is carrying it, etc.
 				// Example:
-				me->CaptureObjective(obj); // FF_LUA_OBJECTIVES: Transition to CaptureObjectiveState
+				// else if (point.type == 2) // Item_Flag
+				// {
+				//    // if (point.teamAffiliation != me->GetTeamNumber() && point.currentOwnerTeam == FF_TEAM_NEUTRAL) // Enemy flag at its base or dropped
+				//    // { // Go capture it }
+				//    // else if (point.teamAffiliation == me->GetTeamNumber() && point.currentOwnerTeam != me->GetTeamNumber() && point.currentOwnerTeam != FF_TEAM_NEUTRAL) // Our flag, carried by enemy
+				//    // { // Go retrieve it (might involve attacking carrier first) }
+				// }
+			}
+
+			if (pBestObjective)
+			{
+				me->PrintIfWatched("IdleState: Found active, capturable Lua objective: %s (type %d) at (%.f, %.f, %.f), Owner: %d. Moving to capture.\n",
+					pBestObjective->name, pBestObjective->type, pBestObjective->position.x, pBestObjective->position.y, pBestObjective->position.z, pBestObjective->currentOwnerTeam);
+				me->CaptureObjective(pBestObjective);
 				return; // Exit IdleState once an objective is chosen
 			}
 			else
 			{
-				me->PrintIfWatched("No suitable Lua objectives found nearby or for my team.\n");
+				me->PrintIfWatched("IdleState: No suitable active, capturable Lua objectives found.\n");
 			}
 		}
 		me->Hunt();

@@ -38,18 +38,15 @@ void CaptureObjectiveState::OnEnter( CFFBot *me )
 		return;
 	}
 
-	me->PrintIfWatched("CaptureObjectiveState: Moving to capture/evaluate objective '%s' at (%.f, %.f, %.f)\n",
-		m_targetObjective->name, m_targetObjective->position.x, m_targetObjective->position.y, m_targetObjective->position.z);
+	me->PrintIfWatched("CaptureObjectiveState: Moving to capture/evaluate objective '%s' (type %d) at (%.f, %.f, %.f)\n",
+		m_targetObjective->name, m_targetObjective->type, m_targetObjective->position.x, m_targetObjective->position.y, m_targetObjective->position.z);
 
 	me->MoveTo(m_targetObjective->position, SAFEST_ROUTE); // Or FASTEST_ROUTE depending on bot personality/situation
-	// Task will be set based on objective status once reached (CAPTURE_LUA_OBJECTIVE or DEFEND_LUA_OBJECTIVE)
-	// me->SetTask(CFFBot::TaskType::CAPTURE_FLAG); // Commented out: FF_TODO_TASKS: Create a more generic CAPTURE_OBJECTIVE_LUA task
 
 	m_isAtObjective = false;
-	m_isDefending = false;
-	// m_captureTimer.Invalidate(); // REMOVED: Will start when at objective
-	m_checkObjectiveStatusTimer.Start(0.1f); // Check status quickly upon arrival or first update
-	m_repathTimer.Start(RandomFloat(2.0f, 3.0f)); // Check path periodically
+	// m_isDefending = false; // This will be determined by currentOwnerTeam in OnUpdate
+	m_checkObjectiveStatusTimer.Start(0.1f);
+	m_repathTimer.Start(RandomFloat(2.0f, 3.0f));
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -60,17 +57,25 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 {
 	if (!m_targetObjective)
 	{
-		me->PrintIfWatched("CaptureObjectiveState: Target objective became NULL!\n");
+		me->PrintIfWatched("CaptureObjectiveState: Target objective became NULL! Idling.\n");
 		me->Idle();
 		return;
 	}
 
-	// FF_TODO_GAME_LOGIC: Check if objective is still valid/active/not captured by own team already
-	// if (TheFFBots()->IsObjectiveCaptured(m_targetObjective, me->GetTeamNumber())) { me->Idle(); return; }
+	// Check if objective became inactive
+	if (!m_targetObjective->isActive)
+	{
+		me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is no longer active. Idling.\n", m_targetObjective->name);
+		me->Idle();
+		return;
+	}
+
+	// FF_TODO_LUA: Potentially add a direct check here if TheFFBots() could quickly verify currentOwnerTeam
+	// if it's faster than waiting for m_checkObjectiveStatusTimer for critical changes.
 
 	if (me->IsStuck())
 	{
-		me->PrintIfWatched("CaptureObjectiveState: Stuck while trying to reach objective '%s'. Re-evaluating.\n", m_targetObjective->name);
+		me->PrintIfWatched("CaptureObjectiveState: Stuck while trying to reach objective '%s'. Idling.\n", m_targetObjective->name);
 		me->Idle(); // Simple handling for now
 		return;
 	}
@@ -86,12 +91,12 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 			me->Stop(); // Stop moving
 			me->PrintIfWatched("CaptureObjectiveState: Arrived at objective '%s'. Evaluating status.\n", m_targetObjective->name);
 
-			// FF_TODO_GAME_LOGIC: Actual capture time should come from objective data or game rules // REMOVED CAPTURE TIMER START
+			// FF_TODO_GAME_MECHANIC: Actual capture time should come from objective data or game rules // REMOVED CAPTURE TIMER START
 			// const float captureDuration = 5.0f; // Placeholder capture time // REMOVED
 			// m_captureTimer.Start(captureDuration); // REMOVED
 			m_checkObjectiveStatusTimer.Start(0.1f); // Force immediate status check
 
-			// FF_TODO_ANIMATION: Play capturing animation or gesture
+			// FF_TODO_AI_BEHAVIOR: Play capturing animation or gesture
 			me->SetLookAt("Objective Area", m_targetObjective->position, PRIORITY_MEDIUM); // Changed from "Capturing Objective" and PRIORITY_HIGH
 		}
 		else
@@ -100,6 +105,7 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 			if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
 			{
 				// Path failed or completed but not at objective (should be caught by radius check)
+				// FF_TODO_SCOUT: If pathing to m_targetObjective and IsStuck() or path fails, a Scout could TryDoubleJump() to see if it overcomes a small obstacle or gap towards the objective.
 				if (m_repathTimer.IsElapsed())
 				{
 					me->PrintIfWatched("CaptureObjectiveState: Path failed or ended prematurely for '%s'. Retrying path.\n", m_targetObjective->name);
@@ -111,19 +117,15 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 	}
 	// m_isAtObjective is true if we've reached this point in OnUpdate due to the return statement in the if block above.
 
-	// Check for enemies first, even if at objective. This was moved up from the old else block.
-	// It's already present before the `if (!m_isAtObjective)` block, so this is effectively a no-op here,
-	// but the old else block is being entirely replaced. The new logic for m_isAtObjective true follows.
-
-	if( m_isAtObjective ) // This 'if' is effectively the 'else' from before, ensuring we are at the point.
+	if( m_isAtObjective )
 	{
-		me->SetLookAt("Objective Area", m_targetObjective->position, PRIORITY_MEDIUM); // Look at the objective area
-
+		// Primary action when at the objective: check status and react.
 		if (m_checkObjectiveStatusTimer.IsElapsed())
 		{
+			// Re-check isActive, as it might change while on point
 			if (!m_targetObjective->isActive)
 			{
-				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is no longer active. Returning to Idle.\n", m_targetObjective->name);
+				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' became inactive while at point. Idling.\n", m_targetObjective->name);
 				me->Idle();
 				return;
 			}
@@ -131,49 +133,45 @@ void CaptureObjectiveState::OnUpdate( CFFBot *me )
 			int currentOwner = m_targetObjective->currentOwnerTeam;
 			if (currentOwner == me->GetTeamNumber())
 			{
-				if (!m_isDefending)
-				{
-					me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is held by our team. Defending.\n", m_targetObjective->name);
-					m_isDefending = true;
-					me->SetTask(CFFBot::TaskType::DEFEND_LUA_OBJECTIVE, m_targetObjective);
-
-					// Engineer behavior: If defending, consider building a sentry
-					if (me->IsEngineer() && !me->HasSentry())
-					{
-						// Build near the objective. Find a slightly offset position.
-						// TODO: More sophisticated placement logic needed (e.g., check LoS, valid nav, etc.)
-						Vector buildPos = m_targetObjective->position + Vector(RandomFloat(-150, 150), RandomFloat(-150,150), 0);
-						me->PrintIfWatched("Engineer in CaptureObjectiveState: Decided to build sentry near friendly objective '%s'.\n", m_targetObjective->name);
-						me->TryToBuildSentry(&buildPos);
-						return; // Transitioned to BuildSentryState
-					}
+				me->PrintIfWatched("CaptureObjectiveState: Objective '%s' is now controlled by our team. Holding briefly.\n", m_targetObjective->name);
+				me->SetTask(CFFBot::TaskType::DEFEND_LUA_OBJECTIVE, m_targetObjective);
+				// FF_TODO_AI_BEHAVIOR: Transition to a dedicated DefendObjectiveState or implement more robust holding behavior.
+				// For now, just wait a bit then Idle. This makes m_isDefending member less critical.
+				m_checkObjectiveStatusTimer.Start(RandomFloat(3.0f, 5.0f)); // Hold for a few seconds
+				if (m_checkObjectiveStatusTimer.GetElapsedTime() > 0.1f) { // Ensure it's not the first frame of holding
+					me->Idle(); // After holding, go idle to re-evaluate overall situation.
+					return;
 				}
-				// Bot will stay in this state to defend. Could add logic to roam around point, look for enemies etc.
-				// For now, it just stays and re-checks status.
 			}
 			else // Objective is neutral or enemy controlled
 			{
-				if (m_isDefending) // It was ours, but now it's not
-				{
-					me->PrintIfWatched("CaptureObjectiveState: Objective '%s' lost to team %d!\n", m_targetObjective->name, currentOwner);
-					m_isDefending = false;
-				}
-
-				if (currentOwner == FF_TEAM_NEUTRAL)
-				{
-					me->PrintIfWatched("CaptureObjectiveState: Attempting to capture neutral objective '%s'.\n", m_targetObjective->name);
-				}
-				else
-				{
-					me->PrintIfWatched("CaptureObjectiveState: Attempting to capture objective '%s' from enemy team %d.\n", m_targetObjective->name, currentOwner);
-				}
+				me->PrintIfWatched("CaptureObjectiveState: Attempting to capture/contest '%s' (type %d) currently owned by team %d.\n",
+					m_targetObjective->name, m_targetObjective->type, currentOwner);
 				me->SetTask(CFFBot::TaskType::CAPTURE_LUA_OBJECTIVE, m_targetObjective);
-				// FF_TODO_GAME_LOGIC: Here, the bot would need to "interact" or "stand on point"
-				// for a duration to cause currentOwnerTeam to change in the Lua environment.
-				// Since we are just reading placeholder data, this state will persist until
-				// the Lua data is externally changed, an enemy appears, or objective becomes inactive.
+
+				// Bot remains on point, game logic handles actual capture.
+				// FF_TODO_LUA: Ensure Lua side updates currentOwnerTeam based on game events/triggers.
+				// FF_TODO_GAME_MECHANIC: Define how capturing actually works (e.g. simple timer on point, or needs 'use' key).
+				// Bot should look around for threats.
+				me->SetLookAt("Objective Area", m_targetObjective->position, PRIORITY_MEDIUM, 0.5f, true);
 			}
-			m_checkObjectiveStatusTimer.Start(1.0f); // Check again in 1 second
+			m_checkObjectiveStatusTimer.Start(1.0f); // Re-check status in 1 second
+		}
+
+		// Engineer behavior: If defending (already confirmed it's ours), consider building.
+		// This is a secondary action after status check.
+		if (m_targetObjective->currentOwnerTeam == me->GetTeamNumber() && me->IsEngineer() && !me->HasSentry())
+		{
+			// Check if enough time has passed since last build attempt or if conditions are right
+			// This is a simplified check; more advanced logic would be in Idle or a dedicated Engineer state.
+			if (me->GetStateTime() > 5.0f) // Example: Been in this state trying to cap/defend for 5s
+			{
+				Vector buildPos = m_targetObjective->position + Vector(RandomFloat(-150, 150), RandomFloat(-150,150), 0);
+				me->PrintIfWatched("Engineer in CaptureObjectiveState: Decided to build sentry near friendly objective '%s'.\n", m_targetObjective->name);
+				me->TryToBuildSentry(&buildPos);
+				// TryToBuildSentry will change state if successful
+				return;
+			}
 		}
 	}
 }
@@ -190,7 +188,7 @@ void CaptureObjectiveState::OnExit( CFFBot *me )
 	m_isDefending = false;
 	me->Stop(); // Ensure bot stops moving if it was
 	me->ClearLookAt();
-	// FF_TODO_ANIMATION: Stop capturing animation
+	// FF_TODO_AI_BEHAVIOR: Stop capturing animation
 }
 
 [end of mp/src/game/server/ff/bot/states/ff_bot_capture_objective.cpp]

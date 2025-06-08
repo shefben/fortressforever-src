@@ -75,6 +75,7 @@ void HideState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 	if (!me->IsReloading())
 	{
+		// FF_TODO_AI_BEHAVIOR: This following logic might need review for robustness, especially if leader moves erratically.
 		if (me->IsFollowing())
 		{
 			CFFPlayer *leader = me->GetFollowLeader(); // GetFollowLeader returns CFFPlayer*
@@ -96,7 +97,7 @@ void HideState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 			}
 		}
 
-		// FF_TODO: Scenario logic needs complete overhaul for FF objectives.
+		// FF_TODO_GAME_MECHANIC: Scenario logic needs complete overhaul for FF objectives.
 		// The CS bomb/hostage logic below is commented out.
 		/*
 		switch( TheFFBots()->GetScenario() ) // Changed TheCSBots to TheFFBots
@@ -159,7 +160,7 @@ void HideState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 		if (m_hideTimer.IsElapsed())
 		{
-			// FF_TODO: Adapt task continuation logic for FF objectives
+			// FF_TODO_AI_BEHAVIOR: Adapt task continuation logic for FF objectives
 			// Example: if guarding a flag spawn, pick a new spot near it.
 			// if (me->GetTask() == CFFBot::GUARD_FLAG_SPAWN) { ... me->Hide(newSpot); return; }
 			me->Idle();
@@ -172,7 +173,7 @@ void HideState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 			me->Idle();
 			return;
 		}
-		// FF_TODO: Human player encouragement logic might be different or not needed.
+		// FF_TODO_AI_BEHAVIOR: Human player encouragement logic might be different or not needed.
 	}
 	else
 	{
@@ -214,10 +215,10 @@ void HideState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		{
 			m_isAtSpot = true; m_hideTimer.Start( m_duration );
 			me->ComputeApproachPoints(); me->ClearLookAt();
-			me->EquipBestWeapon( me->IsUsingGrenade() ); // EquipBestWeapon and IsUsingGrenade need FF logic
+			me->EquipBestWeapon( me->IsUsingGrenade() ); // FF_TODO_WEAPON_STATS: EquipBestWeapon and IsUsingGrenade need FF logic
 			me->SetDisposition( CFFBot::OPPORTUNITY_FIRE ); // Changed CCSBot to CFFBot
 
-			// FF_TODO: Adapt task update for FF (e.g. if it was MOVE_TO_DEFEND_POINT, change to DEFENDING_POINT)
+			// FF_TODO_AI_BEHAVIOR: Adapt task update for FF (e.g. if it was MOVE_TO_DEFEND_POINT, change to DEFENDING_POINT)
 			// if (me->GetTask() == CFFBot::MOVE_TO_SNIPER_SPOT) me->SetTask( CFFBot::SNIPING );
 
 			trace_t result; float outAngle = 0.0f; float outAngleRange = 0.0f;
@@ -247,5 +248,5 @@ void HideState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 	me->StandUp();
 	me->ResetStuckMonitor();
 	me->ClearApproachPoints();
-	// FF_TODO: Shield logic removed
+	// FF_TODO_GAME_MECHANIC: Shield logic removed
 }

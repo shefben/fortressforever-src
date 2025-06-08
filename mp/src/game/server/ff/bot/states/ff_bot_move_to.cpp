@@ -24,7 +24,7 @@
  */
 void MoveToState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	// FF_TODO: Review IsUsingKnife, IsWellPastSafe, IsHurrying for FF item/weapon logic
+	// FF_TODO_WEAPON_STATS: Review IsUsingKnife, IsWellPastSafe, IsHurrying for FF item/weapon logic
 	// if (me->IsUsingKnife() && me->IsWellPastSafe() && !me->IsHurrying())
 	// {
 	// 	me->Walk();
@@ -35,7 +35,7 @@ void MoveToState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 	// }
 
 	RouteType route;
-	// FF_TODO: Determine appropriate RouteType based on FF tasks
+	// FF_TODO_AI_BEHAVIOR: Determine appropriate RouteType based on FF tasks
 	// Original CS logic for bomb/defuse related tasks is removed here.
 	// MOVE_TO_LAST_KNOWN_ENEMY_POSITION is a generic task that can remain.
 	if (me->GetTask() == CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION)
@@ -74,7 +74,7 @@ void MoveToState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 	me->UpdateLookAround();
 
-	// FF_TODO: Scenario logic needs complete overhaul for FF objectives.
+	// FF_TODO_GAME_MECHANIC: Scenario logic needs complete overhaul for FF objectives.
 	// The entire CS-specific switch statement is commented out.
 	/*
 	switch (TheFFBots()->GetScenario()) // Changed TheCSBots to TheFFBots
@@ -95,7 +95,7 @@ void MoveToState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	if (me->UpdatePathMovement() != CFFBot::PROGRESSING) // Changed CCSBot to CFFBot
 	{
 		// reached destination
-		// FF_TODO: Adapt task completion logic for FF objectives
+		// FF_TODO_AI_BEHAVIOR: Adapt task completion logic for FF objectives
 		/*
 		switch( me->GetTask() )
 		{
@@ -112,7 +112,7 @@ void MoveToState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 				CFFPlayer *victim = static_cast<CFFPlayer *>( me->GetTaskEntity() ); // Changed
 				if (victim && victim->IsAlive())
 				{
-					// FF_TODO: Adapt chatter
+					// FF_TODO_AI_BEHAVIOR: Adapt chatter
 					// BotStatement *say = new BotStatement( me->GetChatter(), REPORT_ENEMY_LOST, 8.0f );
 					// say->AppendPhrase( TheBotPhrases->GetPhrase( "LostEnemy" ) );
 					// say->SetStartTime( gpGlobals->curtime + RandomFloat( 3.0f, 5.0f ) );

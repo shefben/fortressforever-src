@@ -15,12 +15,12 @@
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Plant the bomb. - FF: This state is CS-specific and needs to be re-evaluated or removed.
+ * Plant the bomb. - FF_TODO_GAME_MECHANIC: This state is CS-specific and needs to be re-evaluated or removed.
  * Could be adapted for FF objectives like capturing a point or planting a device if one exists.
  */
 void PlantBombState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: PlantBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: PlantBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
 	// me->Crouch();
 	// me->SetDisposition( CFFBot::SELF_DEFENSE ); // Changed CCSBot to CFFBot
 
@@ -34,16 +34,16 @@ void PlantBombState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Plant the bomb. - FF: This state is CS-specific.
+ * Plant the bomb. - FF_TODO_GAME_MECHANIC: This state is CS-specific.
  */
 void PlantBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: PlantBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: PlantBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
 	// CBasePlayerWeapon *gun = me->GetActiveWeapon(); // Use CBasePlayerWeapon
 	// bool holdingC4 = false; // C4 is CS-specific
 	// if (gun)
 	// {
-	// 	// FF_TODO: Replace "weapon_c4" with an FF equivalent if a bot needs to hold a specific item for an objective
+	// 	// FF_TODO_WEAPON_STATS: Replace "weapon_c4" with an FF equivalent if a bot needs to hold a specific item for an objective
 	// 	// if (FStrEq( gun->GetClassname(), "weapon_c4" ))
 	// 	//	holdingC4 = true;
 	// }
@@ -55,7 +55,7 @@ void PlantBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 	// if (!me->HasC4()) // HasC4 is CS-specific
 	// {
-	// 	// FF_TODO: Adapt task for FF objective, e.g., GUARD_CAPTURED_POINT
+	// 	// FF_TODO_AI_BEHAVIOR: Adapt task for FF objective, e.g., GUARD_CAPTURED_POINT
 	// 	// me->SetTask( CFFBot::GUARD_TICKING_BOMB ); // GUARD_TICKING_BOMB is CS-specific
 	// 	me->Hide();
 	// }
@@ -69,7 +69,7 @@ void PlantBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 //--------------------------------------------------------------------------------------------------------------
 void PlantBombState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: PlantBombState::OnExit - CS-specific logic reviewed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: PlantBombState::OnExit - CS-specific logic reviewed.\n" );
 	// me->EquipBestWeapon(); // EquipBestWeapon needs FF logic
 	// me->StandUp();
 	// me->ResetStuckMonitor();

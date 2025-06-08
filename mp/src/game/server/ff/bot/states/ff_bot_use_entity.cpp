@@ -51,7 +51,7 @@ void UseEntityState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// if we are looking at the entity, "use" it and exit
 	if (me->IsLookingAtPosition( pos ))
 	{
-		// FF_TODO_LOGIC: If FF has specific logic tied to using certain entities (like info_ff_script for flags),
+		// FF_TODO_GAME_MECHANIC: If FF has specific logic tied to using certain entities (like info_ff_script for flags),
 		// that logic might go here, or be handled by the Lua scripts themselves when the 'use' occurs.
 		// The CS-specific hostage collection check has been removed.
 		/*

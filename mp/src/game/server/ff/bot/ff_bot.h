@@ -20,7 +20,7 @@
 #include "bot/ff_bot_chatter.h" // Changed from cs_bot_chatter.h
 #include "ff_gamestate.h"  // Changed from cs_gamestate.h
 #include "ff_player.h"     // Changed from cs_player.h
-#include "ff_weapon_base.h" // FF_WEAPONS: Added for CFFWeaponBase and FFWeaponID
+#include "ff_weapon_base.h" // FF_TODO_WEAPON_STATS: Added for CFFWeaponBase and FFWeaponID
 #include "ff_nav_pathfind.h" // Changed from cs_nav_pathfind.h (assuming exists)
 #include "ff_nav_area.h"     // Changed from cs_nav_area.h (assuming CNavArea or a CFFNavArea will be used)
 
@@ -138,7 +138,12 @@ protected:
 	float m_nextDodgeStateTimestamp;
 
 	CountdownTimer m_repathTimer;
-	float m_scopeTimestamp; // May not be relevant for all FF weapons
+	float m_scopeTimestamp; // FF_TODO_WEAPON_STATS: May not be relevant for all FF weapons or may need adjustment
+
+	// Evasion
+	CountdownTimer m_evasiveActionTimer;
+	Vector m_evadeToSpot;
+	bool m_isEvading;
 
 	bool m_haveSeenEnemy;										///< false if we haven't yet seen the enemy since we started this attack (told by a friend, etc)
 	bool m_isEnemyHidden;										///< true we if we have lost line-of-sight to our enemy
@@ -200,11 +205,11 @@ private:
 
 	int m_retries;
 	bool m_doneBuying;
-	// FF Specific buy logic needed here
+	// FF_TODO_GAME_MECHANIC: FF Specific buy logic needed here
 	// bool m_buyDefuseKit; // FF no bomb
 	bool m_buyGrenade;
 	// bool m_buyShield; // FF no shield
-	bool m_buyPistol; // FF weapon categories might differ
+	bool m_buyPistol; // FF_TODO_WEAPON_STATS: FF weapon categories might differ
 };
 
 
@@ -397,9 +402,11 @@ public:
 	virtual void Spawn( void );									///< (EXTEND) spawn the bot into the game
 	virtual void Touch( CBaseEntity *other );					///< (EXTEND) when touched by another entity
 
+	virtual void BotThink( void );								///< (EXTEND) replacement for Upkeep/Update, called by CBasePlayerBot::BotThink
 	// virtual void Upkeep( void );								///< lightweight maintenance, invoked frequently - Now in CBasePlayerBot
 	// virtual void Update( void );								///< heavyweight algorithms, invoked less often - Now in CBasePlayerBot
 	virtual void BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwardmove, float sidemove, float upmove, int buttons, byte impulse );
+	virtual float GetMaxSpeed( void ) const;					///< (OVERRIDE) Gets the max speed of the bot (Scout has higher speed)
 	virtual float GetMoveSpeed( void );							///< returns current movement speed (for walk/run)
 
 	virtual void Walk( void );
@@ -416,7 +423,7 @@ public:
 	bool IsEndOfSafeTime( void ) const;							///< return true if we were in the safe time last update, but not now
 	float GetSafeTimeRemaining( void ) const;					///< return the amount of "safe time" we have left
 	float GetSafeTime( void ) const;							///< return what we think the total "safe time" for this map is
-	virtual void Blind( float holdTime, float fadeTime, float startingAlpha = 255 );	// player blinded by a flashbang - FF might have different status effects
+	virtual void Blind( float holdTime, float fadeTime, float startingAlpha = 255 );	// player blinded by a flashbang - FF_TODO_GAME_MECHANIC: FF might have different status effects
 	bool IsUnhealthy( void ) const;								///< returns true if bot is low on health
 	
 	bool IsAlert( void ) const;									///< return true if bot is in heightened "alert" mode
@@ -451,7 +458,7 @@ public:
 	void MoveTo( const Vector &pos, RouteType route = SAFEST_ROUTE );	///< move to potentially distant position
 	bool IsMovingTo( void ) const;								///< return true if we are in the MoveTo state
 
-	// FF Objective states (examples, to be defined)
+	// FF_TODO_AI_BEHAVIOR: FF Objective states (examples, to be defined)
 	// void CaptureFlag( void );
 	// void DefendPoint( void );
 	// void PushCart( void );
@@ -465,7 +472,7 @@ public:
 	void OpenDoor( CBaseEntity *door );							///< open the door (assumes we are right in front of it)
 	bool IsOpeningDoor( void ) const;							///< return true if we are in the process of opening a door
 
-	void Buy( void );											///< enter the buy state - FF buy system
+	void Buy( void );											///< enter the buy state - FF_TODO_GAME_MECHANIC: FF buy system
 	bool IsBuying( void ) const;
 
 	void Panic( void );											///< look around in panic
@@ -491,19 +498,19 @@ public:
 
 	float GetStateTimestamp( void ) const;						///< get time current state was entered
 
-	bool IsDoingScenario( void ) const;							///< return true if we will do scenario-related tasks - FF specific scenarios
+	bool IsDoingScenario( void ) const;							///< return true if we will do scenario-related tasks - FF_TODO_GAME_MECHANIC: FF specific scenarios
 
 	//- scenario / gamestate -----------------------------------------------------------------------------------------
 	CFFBotGameState *GetGameState( void );							///< return an interface to this bot's gamestate // Changed
 	const CFFBotGameState *GetGameState( void ) const;				///< return an interface to this bot's gamestate // Changed
 
 	// bool IsAtBombsite( void );									///< return true if we are in a bomb planting zone - FF no bomb
-	bool GuardRandomZone( float range = 500.0f );				///< pick a random zone and hide near it - FF zones
+	bool GuardRandomZone( float range = 500.0f );				///< pick a random zone and hide near it - FF_TODO_AI_BEHAVIOR: FF zones
 
 	bool IsBusy( void ) const;									///< return true if we are busy doing something important
 
 	//- high-level tasks ---------------------------------------------------------------------------------------------
-	// FF TaskTypes will be different
+	// FF_TODO_AI_BEHAVIOR: FF TaskTypes will be different
 	enum TaskType
 	{
 		SEEK_AND_DESTROY,
@@ -514,10 +521,10 @@ public:
 		// GUARD_BOMB_DEFUSER, // CS
 		// GUARD_LOOSE_BOMB, // CS
 		// GUARD_BOMB_ZONE, // CS
-		CAPTURE_FLAG, // FF example
-		DEFEND_POINT, // FF example
-		PUSH_CART,    // FF example
-		GUARD_OBJECTIVE, // FF generic
+		CAPTURE_FLAG, // FF_TODO_AI_BEHAVIOR: FF example
+		DEFEND_POINT, // FF_TODO_AI_BEHAVIOR: FF example
+		PUSH_CART,    // FF_TODO_AI_BEHAVIOR: FF example
+		GUARD_OBJECTIVE, // FF_TODO_AI_BEHAVIOR: FF generic
 		GUARD_INITIAL_ENCOUNTER,
 		// ESCAPE_FROM_BOMB, // CS
 		HOLD_POSITION,
@@ -531,13 +538,13 @@ public:
 		MOVE_TO_LAST_KNOWN_ENEMY_POSITION,
 		MOVE_TO_SNIPER_SPOT,
 		SNIPING,
-		CAPTURE_LUA_OBJECTIVE, // For Lua-defined objectives
-		DEFEND_LUA_OBJECTIVE,  // For Lua-defined objectives
+		CAPTURE_LUA_OBJECTIVE, // FF_TODO_LUA: For Lua-defined objectives
+		DEFEND_LUA_OBJECTIVE,  // FF_TODO_LUA: For Lua-defined objectives
 
 		NUM_TASKS // This needs to be last
 	};
 	void SetTask( TaskType task, CBaseEntity *entity = NULL );	///< set our current "task"
-	void SetTask( TaskType task, const CFFBotManager::LuaObjectivePoint *objectiveTarget ); ///< Overload for Lua objectives
+	void SetTask( TaskType task, const CFFBotManager::LuaObjectivePoint *objectiveTarget ); ///< FF_TODO_LUA: Overload for Lua objectives
 	TaskType GetTask( void ) const;
 	CBaseEntity *GetTaskEntity( void );
 	const char *GetTaskName( void ) const;						///< return string describing current task
@@ -558,7 +565,7 @@ public:
 
 	void IgnoreEnemies( float duration );					///< ignore enemies for a short duration
 
-	enum MoraleType // This might be generic enough
+	enum MoraleType // FF_TODO_AI_BEHAVIOR: This might be generic enough or need FF specific values
 	{
 		TERRIBLE = -3,
 		BAD = -2,
@@ -602,8 +609,10 @@ public:
 	//- enemies ------------------------------------------------------------------------------------------------------
 	void SetBotEnemy( CFFPlayer *enemy );						///< set given player as our current enemy // Changed
 	CFFPlayer *GetBotEnemy( void ) const; // Changed
+	// FF_TODO_GAME_MECHANIC: CFFPlayer::IsAttacking() or similar (checking if IN_ATTACK is held) would improve IsEnemyAimingAtMe accuracy.
+	bool IsEnemyAimingAtMe( CFFPlayer *pEnemy ) const;			///< returns true if pEnemy is aiming at this bot
 	int GetNearbyEnemyCount( void ) const;						///< return max number of nearby enemies we've seen recently
-	// unsigned int GetEnemyPlace( void ) const;					///< return location where we see the majority of our enemies - FF Place
+	// unsigned int GetEnemyPlace( void ) const;					///< return location where we see the majority of our enemies - FF_TODO_GAME_MECHANIC: FF Place definition
 	// bool CanSeeBomber( void ) const;							///< return true if we can see the bomb carrier - FF No Bomb
 	// CFFPlayer *GetBomber( void ) const; // Changed
 
@@ -620,7 +629,7 @@ public:
 	void UpdateReactionQueue( void );							///< update our reaction time queue
 	CFFPlayer *GetRecognizedEnemy( void );						///< return the most dangerous threat we are "conscious" of // Changed
 	bool IsRecognizedEnemyReloading( void );					///< return true if the enemy we are "conscious" of is reloading
-	// bool IsRecognizedEnemyProtectedByShield( void );			///< return true if the enemy we are "conscious" of is hiding behind a shield - FF No Shield
+	// bool IsRecognizedEnemyProtectedByShield( void );			///< return true if the enemy we are "conscious" of is hiding behind a shield - FF_TODO_GAME_MECHANIC: FF No Shield
 	float GetRangeToNearestRecognizedEnemy( void );				///< return distance to closest enemy we are "conscious" of
 
 	CFFPlayer *GetAttacker( void ) const;						///< return last enemy that hurt us // Changed
@@ -672,7 +681,7 @@ public:
 
 	virtual void PushawayTouch( CBaseEntity *pOther );
 
-	Place GetPlace( void ) const;									///< get our current radio chatter place - FF Place
+	Place GetPlace( void ) const;									///< get our current radio chatter place - FF_TODO_GAME_MECHANIC: FF Place definition
 
 	bool IsUsingLadder( void ) const;								///< returns true if we are in the process of negotiating a ladder
 	void GetOffLadder( void );										///< immediately jump off of our ladder, if we're on one
@@ -761,29 +770,29 @@ public:
 	#define DONT_USE_SMOKE_GRENADE true
 	bool EquipGrenade( bool noSmoke = false );						///< equip a grenade, return false if we cant
 
-	bool IsUsingKnife( void ) const;								///< returns true if we have knife equipped - FF specific
-	bool IsUsingPistol( void ) const;								///< returns true if we have pistol equipped - FF specific
+	bool IsUsingKnife( void ) const;								///< returns true if we have knife equipped - FF_TODO_WEAPON_STATS: FF specific
+	bool IsUsingPistol( void ) const;								///< returns true if we have pistol equipped - FF_TODO_WEAPON_STATS: FF specific
 	bool IsUsingGrenade( void ) const;								///< returns true if we have grenade equipped
-	bool IsUsingSniperRifle( void ) const;							///< returns true if using a "sniper" rifle - FF specific
-	// bool IsUsing( FFWeaponID weapon ) const;						///< returns true if using the specific weapon - FF_WEAPONS: Changed CSWeaponID
-	bool IsSniper( void ) const;									///< return true if we have a sniper rifle in our inventory - FF specific
+	bool IsUsingSniperRifle( void ) const;							///< returns true if using a "sniper" rifle - FF_TODO_WEAPON_STATS: FF specific
+	// bool IsUsing( FFWeaponID weapon ) const;						///< returns true if using the specific weapon - FF_TODO_WEAPON_STATS: Changed CSWeaponID
+	bool IsSniper( void ) const;									///< return true if we have a sniper rifle in our inventory - FF_TODO_WEAPON_STATS: FF specific
 	bool IsSniping( void ) const;									///< return true if we are actively sniping (moving to sniper spot or settled in)
-	bool IsUsingShotgun( void ) const;								///< returns true if using a shotgun - FF specific
-	bool IsUsingMachinegun( void ) const;							///< returns true if using the big 'ol machinegun - FF specific
+	bool IsUsingShotgun( void ) const;								///< returns true if using a shotgun - FF_TODO_WEAPON_STATS: FF specific
+	bool IsUsingMachinegun( void ) const;							///< returns true if using the big 'ol machinegun - FF_TODO_WEAPON_STATS: FF specific
 	void ThrowGrenade( const Vector &target );						///< begin the process of throwing the grenade
 	bool IsThrowingGrenade( void ) const;							///< return true if we are in the process of throwing a grenade
 	bool HasGrenade( void ) const;									///< return true if we have a grenade in our inventory
 	void AvoidEnemyGrenades( void );								///< react to enemy grenades we see
 	bool IsAvoidingGrenade( void ) const;							///< return true if we are in the act of avoiding a grenade
-	// bool DoesActiveWeaponHaveSilencer( void ) const;				// FF_TODO_WEAPONS: CS-specific, remove or adapt if FF has silencers
+	// bool DoesActiveWeaponHaveSilencer( void ) const;				// FF_TODO_WEAPON_STATS: CS-specific, remove or adapt if FF has silencers
 	bool CanActiveWeaponFire( void ) const;							///< returns true if our current weapon can attack
-	CFFWeaponBase *GetActiveFFWeapon( void ) const;					///< get our current Fortress Forever weapon // FF_WEAPONS: Changed return type from CBasePlayerWeapon
+	CFFWeaponBase *GetActiveFFWeapon( void ) const;					///< get our current Fortress Forever weapon // FF_TODO_WEAPON_STATS: Changed return type from CBasePlayerWeapon
 
 	void GiveWeapon( const char *weaponAlias );						///< Debug command to give a named weapon
 
 	virtual void PrimaryAttack( void );
 
-	enum ZoomType { NO_ZOOM, LOW_ZOOM, HIGH_ZOOM }; // May need FF specific zoom levels
+	enum ZoomType { NO_ZOOM, LOW_ZOOM, HIGH_ZOOM }; // FF_TODO_WEAPON_STATS: May need FF specific zoom levels
 	ZoomType GetZoomLevel( void );
 
 	bool AdjustZoom( float range );
@@ -805,7 +814,7 @@ public:
 
 	virtual void Event_Killed( const CTakeDamageInfo &info );
 
-	virtual bool BumpWeapon( CFFWeaponBase *pWeapon ); // FF_WEAPONS: Changed CBaseCombatWeapon to CFFWeaponBase
+	virtual bool BumpWeapon( CFFWeaponBase *pWeapon ); // FF_TODO_WEAPON_STATS: Changed CBaseCombatWeapon to CFFWeaponBase
 
 
 	// FF Specific Event Handlers (already declared in ff_bot_manager.h, mirrored here)
@@ -844,8 +853,8 @@ public:
 	// void OnWeaponZoom( IGameEvent *event ); // FF Specific
 	void OnBulletImpact( IGameEvent *event );
 	void OnHEGrenadeDetonate( IGameEvent *event );
-	// void OnFlashbangDetonate( IGameEvent *event ); // FF Specific
-	// void OnSmokeGrenadeDetonate( IGameEvent *event ); // FF Specific
+	// void OnFlashbangDetonate( IGameEvent *event ); // FF_TODO_GAME_MECHANIC: FF Specific
+	// void OnSmokeGrenadeDetonate( IGameEvent *event ); // FF_TODO_GAME_MECHANIC: FF Specific
 	void OnGrenadeBounce( IGameEvent *event );
 	void OnNavBlocked( IGameEvent *event );
 
@@ -886,7 +895,7 @@ private:
 	CHandle< CFFPlayer > m_leader;									///< the ID of who we are following // Changed
 	float m_followTimestamp;
 	float m_allowAutoFollowTime;
-	// FF_TODO_WEAPONS: CS specific weapon states, remove or adapt
+	// FF_TODO_WEAPON_STATS: CS specific weapon states, remove or adapt
 	// bool m_hasPrimaryWeapon;
 	// bool m_hasSecondaryWeapon;
 	// bool m_hasBomb;
@@ -908,12 +917,12 @@ private:
 	BuyState				m_buyState; // FF BuyState
 	MoveToState				m_moveToState;
 	// CS States removed: FetchBombState, PlantBombState, DefuseBombState, EscapeFromBombState
-	// FF Objective States to be added here
+	// FF_TODO_AI_BEHAVIOR: FF Objective States to be added here
 	HideState				m_hideState;
 	FollowState				m_followState;
 	UseEntityState			m_useEntityState;
 	OpenDoorState			m_openDoorState;
-	class CaptureObjectiveState m_captureObjectiveState; // FF_LUA_OBJECTIVES: Added state instance
+	class CaptureObjectiveState m_captureObjectiveState; // FF_TODO_LUA: Added state instance
 	HealTeammateState		m_healTeammateState;     // Medic healing state
 	BuildSentryState		m_buildSentryState;      // Engineer building state
 	BuildDispenserState		m_buildDispenserState;   // Engineer building dispenser state
@@ -921,6 +930,12 @@ private:
 	FindResourcesState		m_findResourcesState;    // Engineer finding resources state
 	GuardSentryState		m_guardSentryState;      // Engineer guarding sentry state
 	InfiltrateState			m_infiltrateState;       // Spy infiltration state
+	class RetreatState		m_retreatState;          // State for retreating
+
+	// Engineer buildable selection
+	enum BuildableType { BUILDABLE_NONE, BUILDABLE_SENTRY, BUILDABLE_DISPENSER /*, BUILDABLE_TELE_ENTRANCE, BUILDABLE_TELE_EXIT */ };
+	BuildableType m_selectedBuildableType;
+	CountdownTimer m_cycleBuildableCooldown;
 
 	void SetState( BotState *state );
 	BotState *m_state;
@@ -928,7 +943,7 @@ private:
 	bool m_isAttacking;
 	bool m_isOpeningDoor;
 
-public: // FF_LUA_OBJECTIVES: Made public to be callable from IdleState etc.
+public: // FF_TODO_LUA: Made public to be callable from IdleState etc.
 	void CaptureObjective(const CFFBotManager::LuaObjectivePoint* objective);
 
 	// Medic behavior
@@ -946,16 +961,81 @@ public: // FF_LUA_OBJECTIVES: Made public to be callable from IdleState etc.
 	void TryToRepairBuildable(CBaseEntity* targetBuildable = NULL);
 	CBaseEntity* FindResourceSource(float maxRange = 2000.0f);
 	void TryToFindResources();
-	void TryToGuardSentry();
+	bool TryToGuardSentry( CBaseEntity *sentryToGuard = NULL );		// tell an Engineer bot to guard its sentry (or a specified one)
+
+	// Engineer buildable selection methods
+	void CycleSelectedBuildable();
+	void SelectSpecificBuildable(BuildableType type);
+	BuildableType GetSelectedBuildable() const;
+	const char* GetSelectedBuildableName() const; // For logging
 
 	// Spy behavior
 	bool IsSpy() const;
 	CBaseEntity* FindSpyTarget(float maxRange = 3000.0f); // Can target buildings or players
 	void TryToInfiltrate();
 	bool IsBehind(const CBaseEntity* target) const; // Conceptual check if bot is behind target
+	void StartSabotaging(CBaseEntity* pBuilding); // Conceptual: Bot initiates sabotage C++ call
 
-	static const int ENGINEER_LOW_CELL_THRESHOLD = 50;
-	static const int ENGINEER_MAX_CELLS = 200; // Max desired cells for an Engineer bot
+	// Scout behavior
+	bool IsScout(void) const;
+	void TryDoubleJump(void);
+
+	// Retreat behavior
+	void TryToRetreat(const CTakeDamageInfo *info = NULL);
+	bool IsRetreating(void) const;
+
+
+	// Notification methods called by CFFBotManager (or states)
+public:
+	void NotifyBuildingSapped(CBaseEntity *sappedBuilding, bool isSapped);
+	void NotifyBuildingUpgraded(CBaseEntity *building, int newLevel);    // Game event must pass new level
+	void NotifyBuildingDestroyed(CBaseEntity *building);
+	void NotifyBuildingBuilt(CBaseEntity* newBuilding, BuildableType type);     // Called when construction is complete by game event
+	void NotifyBuildingPlacementStarted(BuildableType type); // Called by bot when it initiates blueprint placement
+
+	// Engineer buildable status helpers
+	void SetBuildingLevel(CBaseEntity* pBuilding, int level); // Sets bot's belief of level
+	// bool IsOwnBuildingInProgress(BuildableType type) const; // To be removed, direct check on entity preferred.
+
+
+private: // Moved scout members here to group with other private bot logic
+	CountdownTimer m_doubleJumpCooldown;
+	bool m_isAttemptingDoubleJump;
+	int  m_doubleJumpPhase; // 0 = ready, 1 = first jump pressed, 2 = first jump released, 3 = second jump pressed
+	CountdownTimer m_doubleJumpPhaseTimer;
+
+	// Pyro specific
+	CountdownTimer m_airblastCooldown; // Already present from previous Pyro work
+	CountdownTimer m_projectileScanTimer; // For ScanForNearbyProjectiles
+
+	// Persistent handles to own buildables & their status
+	CHandle<CBaseEntity> m_sentryGun;    // Using CBaseEntity, cast to CFFSentryGun if needed
+	CHandle<CBaseEntity> m_dispenser;  // Using CBaseEntity, cast to CFFDispenser if needed
+	// CHandle<CBaseEntity> m_teleEntrance; // FF_TODO_CLASS_ENGINEER: Teleporter buildable handling
+	// CHandle<CBaseEntity> m_teleExit;     // FF_TODO_CLASS_ENGINEER: Teleporter buildable handling
+	int m_sentryLevel;    // Bot's belief of its sentry's level, updated by events
+	int m_dispenserLevel; // Bot's belief of its dispenser's level, updated by events
+	// bool m_sentryIsBuilding;    // Removed: States will check entity->IsBuilt() or equivalent
+	// bool m_dispenserIsBuilding; // Removed: States will check entity->IsBuilt() or equivalent
+
+	CHandle<CBaseEntity> m_sappedBuildingHandle; // Which of my buildings is currently known to be sapped
+	bool m_hasSappedBuilding;              // True if any of my buildings are known to be sapped, updated by events
+
+	CountdownTimer m_weaponSwitchCheckTimer; // Timer for periodic weapon selection checks
+
+public: // Re-declare static consts as public if they were meant to be, or move to .cpp if private
+	static const int ENGINEER_LOW_CELL_THRESHOLD = 50; // FF_TODO_CLASS_ENGINEER: Verify game value
+	static const int ENGINEER_MAX_CELLS = 200; // Max desired cells for an Engineer bot - FF_TODO_CLASS_ENGINEER: Verify game value
+	static const float FLAMETHROWER_EFFECTIVE_RANGE = 350.0f; // FF_TODO_WEAPON_STATS: Verify game value
+	static const float MINIGUN_SPINUP_TIME = 0.87f; // FF_TODO_WEAPON_STATS: Verify game value
+	static const float MINIGUN_EFFECTIVE_RANGE = 1200.0f; // FF_TODO_WEAPON_STATS: Verify game value
+	static const float MINIGUN_SPINDOWN_DELAY = 3.0f; // FF_TODO_CLASS_HEAVY: This might be replaced by MINIGUN_SUSTAINED_FIRE_LOST_SIGHT_DURATION logic or other game mechanic
+	static const float SCOUT_MAX_SPEED = 400.0f; // FF_TODO_CLASS_SCOUT: Verify game value
+	static const float HEAVY_MAX_SPEED = 230.0f; // FF_TODO_CLASS_HEAVY: Verify actual Heavy speed
+	static const float HEAVY_SPUNUP_MAX_SPEED = 110.0f; // FF_TODO_CLASS_HEAVY: Verify actual spun-up Heavy speed
+	static const float RETREAT_HEALTH_THRESHOLD_PERCENT = 0.3f; // Retreat if health is below 30% - FF_TODO_AI_BEHAVIOR: Tune this value
+	static const float MELEE_COMBAT_RANGE = 100.0f;      // Range for preferring melee - FF_TODO_WEAPON_STATS: Tune this value
+	static const float LONG_COMBAT_RANGE = 1500.0f;     // Range for preferring long-range weapons (like sniper rifle) - FF_TODO_WEAPON_STATS: Tune this value
 
 
 private:
@@ -1182,8 +1262,8 @@ private:
 	float m_friendDeathTimestamp;
 	bool m_isLastEnemyDead;
 	int m_nearbyEnemyCount;
-	// unsigned int m_enemyPlace;										///< the location where we saw most of our enemies - FF Place
-	Place m_enemyPlace; // Keep Place for now, will need FF specific definition
+	// unsigned int m_enemyPlace;										///< the location where we saw most of our enemies - FF_TODO_GAME_MECHANIC: FF Place definition
+	Place m_enemyPlace; // Keep Place for now, will need FF_TODO_GAME_MECHANIC: FF specific definition
 
 	struct WatchInfo
 	{
@@ -1207,10 +1287,10 @@ private:
 	bool m_isRapidFiring;
 	IntervalTimer m_equipTimer;
 	CountdownTimer m_zoomTimer;
-	bool DoEquip( CFFWeaponBase *gun );								///< equip the given item // FF_WEAPONS: Changed CBasePlayerWeapon to CFFWeaponBase
+	bool DoEquip( CFFWeaponBase *gun );								///< equip the given item // FF_TODO_WEAPON_STATS: Changed CBasePlayerWeapon to CFFWeaponBase
 
 	void ReloadCheck( void );
-	// void SilencerCheck( void );										// FF_TODO_WEAPONS: CS specific, remove or adapt
+	// void SilencerCheck( void );										// FF_TODO_WEAPON_STATS: CS specific, remove or adapt
 
 	float m_fireWeaponTimestamp;
 
@@ -1272,13 +1352,21 @@ private:
 	float m_voiceEndTimestamp;
 
 	FFBotChatter m_chatter;									///< chatter mechanism // Changed
+
+public:
+	// Weapon selection
+	CFFWeaponBase* SelectBestWeaponForSituation(CFFPlayer* pEnemy = NULL, float flEnemyDist = -1.0f);
+
+	// Pyro Airblast
+	void ScanForNearbyProjectiles();
+	void TryToAirblast(CBaseEntity* pTargetProjectile = NULL); // Modified signature
 };
 
 
 //
 // Inlines
 //
-// FF_WEAPONS: Changed return type to CFFWeaponBase
+// FF_TODO_WEAPON_STATS: Changed return type to CFFWeaponBase
 inline CFFWeaponBase *CFFBot::GetEquippedWeapon( void ) const // Changed CCSBot to CFFBot
 {
 	return static_cast<CFFWeaponBase *>( GetActiveWeapon() );

@@ -39,7 +39,7 @@ private:
 	bool m_isAtTarget;              // True if bot has reached the target's vicinity
 
 	// Constants for behavior
-	const float SAP_DURATION = 2.0f;
+	const float SAP_DURATION = 3.1f; // Time until bot considers sabotage complete or re-evaluates
 	const float BACKSTAB_DURATION = 1.0f; // Time to "complete" a backstab attempt
 	const float CLOAK_UNCLOAK_TIME = 1.0f; // Time it takes to cloak/uncloak
 	const float TARGET_REACQUIRE_TIME = 5.0f; // How often to re-evaluate target if current one is lost/invalid

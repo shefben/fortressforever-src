@@ -35,9 +35,9 @@ void InvestigateNoiseState::AttendCurrentNoise( CFFBot *me ) // Changed CCSBot t
 	m_checkNoisePosition = *me->GetNoisePosition();
 
 	// tell our teammates (unless the noise is obvious, like gunfire)
-	// FF_TODO: IsWellPastSafe and HasNotSeenEnemyForLongTime might need FF tuning for timings
+	// FF_TODO_AI_BEHAVIOR: IsWellPastSafe and HasNotSeenEnemyForLongTime might need FF tuning for timings
 	if (me->IsWellPastSafe() && me->HasNotSeenEnemyForLongTime() && me->GetNoisePriority() != PRIORITY_HIGH)
-		me->GetChatter()->HeardNoise( *me->GetNoisePosition() ); // FF_TODO: FF Chatter equivalent for HeardNoise
+		me->GetChatter()->HeardNoise( *me->GetNoisePosition() ); // FF_TODO_AI_BEHAVIOR: FF Chatter equivalent for HeardNoise
 
 	// figure out how to get to the noise		
 	me->PrintIfWatched( "Attending to noise...\n" );
@@ -83,7 +83,7 @@ void InvestigateNoiseState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	me->UpdateLookAround();
 	float range = me->GetPathDistanceRemaining();
 
-	// FF_TODO: IsUsingKnife() needs to be FF specific if this logic is to be kept.
+	// FF_TODO_WEAPON_STATS: IsUsingKnife() needs to be FF specific if this logic is to be kept.
 	// if (me->IsUsingKnife())
 	// {
 	// 	if (me->IsHurrying()) me->Run();

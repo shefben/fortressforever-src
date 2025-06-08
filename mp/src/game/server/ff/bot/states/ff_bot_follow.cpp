@@ -168,7 +168,7 @@ void FollowState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		return;
 	}
 
-	// FF_TODO: Remove or adapt CS-specific objective interactions
+	// FF_TODO_GAME_MECHANIC: Remove or adapt CS-specific objective interactions
 	// if (me->HasC4() && me->IsAtBombsite()) // HasC4 and IsAtBombsite are CS-specific
 	// {
 	// 	me->SetTask( CFFBot::PLANT_BOMB ); // PLANT_BOMB is CS-specific task

@@ -4,11 +4,20 @@
 //
 //=============================================================================//
 
+// FF_CRITICAL_TODO_SPY: Sapping Mechanics Clarification Needed:
+// 1. Is FF_WEAPON_SAPPER a dedicated equippable weapon? What is its actual FFWeaponID enum value?
+// 2. If FF_WEAPON_SAPPER exists, is IN_ATTACK the correct input to apply it?
+// 3. If no dedicated Sapper weapon, how is sapping performed?
+//    - Contextual action (IN_USE) when near a buildable with a specific weapon (e.g., Knife) active?
+//    - Alt-fire (IN_ATTACK2) of a specific weapon (e.g., Knife) when near a buildable?
+// 4. Should bots ever directly call a C++ function like SpyStartSabotaging() (less likely for input-driven AI but possible)?
+// This implementation attempts a dedicated Sapper first, then a contextual Knife alt-fire as a fallback.
+
 #include "cbase.h"
 #include "ff_bot_infiltrate.h"
 #include "../ff_bot_manager.h"
 #include "../ff_player.h"
-#include "../ff_weapon_base.h"  // For FF_WEAPON_KNIFE, FF_WEAPON_SPANNER (conceptual sapper)
+#include "../ff_weapon_base.h"  // For FF_WEAPON_KNIFE, and assumed FF_WEAPON_SAPPER
 #include "nav_area.h"
 #include "ff_buildableobject.h" // For CFFSentryGun, CFFDispenser
 
@@ -41,7 +50,7 @@ void InfiltrateState::SelectNewSpyTarget(CFFBot *me)
 	m_targetEnemyPlayer = NULL;
 	m_isAtTarget = false;
 
-	CBaseEntity *target = me->FindSpyTarget(); // This method needs to be implemented in CFFBot
+	CBaseEntity *target = me->FindSpyTarget();
 	if (target)
 	{
 		if (target->IsPlayer())
@@ -55,14 +64,14 @@ void InfiltrateState::SelectNewSpyTarget(CFFBot *me)
 			me->PrintIfWatched("InfiltrateState: New building target: %s\n", m_targetEnemyBuilding->GetClassname());
 		}
 
-		if (me->MoveTo(target->GetAbsOrigin(), SAFEST_ROUTE)) // Spies should probably use SAFEST until near target
+		if (me->MoveTo(target->GetAbsOrigin(), SAFEST_ROUTE))
 		{
-			m_repathTimer.Start(BUILD_REPATH_TIME); // Use existing constant for now
+			m_repathTimer.Start(BUILD_REPATH_TIME);
 		}
 		else
 		{
 			me->PrintIfWatched("InfiltrateState: Unable to path to new target. Idling.\n");
-			me->Idle(); // Can't path, give up for now
+			me->Idle();
 		}
 	}
 	else
@@ -70,7 +79,7 @@ void InfiltrateState::SelectNewSpyTarget(CFFBot *me)
 		me->PrintIfWatched("InfiltrateState: No spy targets found. Idling.\n");
 		me->Idle();
 	}
-	m_actionTimer.Start(TARGET_REACQUIRE_TIME); // Time before trying to find a new target if this one fails/completes
+	m_actionTimer.Start(TARGET_REACQUIRE_TIME);
 }
 
 
@@ -78,22 +87,20 @@ void InfiltrateState::SelectNewSpyTarget(CFFBot *me)
 void InfiltrateState::OnEnter( CFFBot *me )
 {
 	me->PrintIfWatched( "InfiltrateState: Entering state.\n" );
-	m_isCloaked = false; // Assume starts uncloaked or cloak status is unknown
+	m_isCloaked = me->IsCloaked(); // Sync with actual player cloak status
 	m_isAtTarget = false;
 
 	SelectNewSpyTarget(me);
-	if (me->GetState() != this) return; // Target selection might have immediately changed state to Idle
+	if (me->GetState() != this) return;
 
-	// Attempt to cloak immediately if has a target and not already cloaked
-	// CFFPlayer::IsCloaked() should be used if available. For now, rely on m_isCloaked.
 	if ((m_targetEnemyBuilding.Get() || m_targetEnemyPlayer.Get()) && !m_isCloaked)
 	{
 		me->PrintIfWatched("InfiltrateState: Attempting initial cloak.\n");
-		me->PressButton(IN_ATTACK2); // Assumes IN_ATTACK2 is cloak for Spy
-		// me->ReleaseButton(IN_ATTACK2); // Some cloaks might be toggle, others hold? Assume toggle for now.
+		// Using CFFPlayer's Command_SpyCloak or Command_SpySmartCloak might be more robust
+		// For now, direct button press assuming it's a toggle.
+		me->HandleCommand("cloak"); // Assumes "cloak" is the command for spy cloaking
 		m_isCloaked = true;
-		// Add a short delay for cloak to activate before moving, if necessary
-		// m_actionTimer.Start(CLOAK_UNCLOAK_TIME);
+		// m_actionTimer.Start(CLOAK_UNCLOAK_TIME); // Optional: if cloak takes time and blocks other actions
 	}
 }
 
@@ -101,26 +108,26 @@ void InfiltrateState::OnEnter( CFFBot *me )
 void InfiltrateState::OnUpdate( CFFBot *me )
 {
 	CBaseEntity* currentTarget = m_targetEnemyBuilding.Get() ? m_targetEnemyBuilding.Get() : m_targetEnemyPlayer.Get();
+	m_isCloaked = me->IsCloaked(); // Continuously update cloak status from player
 
 	// Target validation or re-acquisition
 	if (!currentTarget || !currentTarget->IsAlive() || m_actionTimer.IsElapsed())
 	{
 		SelectNewSpyTarget(me);
-		if (me->GetState() != this) return; // Target selection might have changed state
+		if (me->GetState() != this) return;
 		currentTarget = m_targetEnemyBuilding.Get() ? m_targetEnemyBuilding.Get() : m_targetEnemyPlayer.Get();
-		if (!currentTarget) return; // Still no target, Idle handled in SelectNewSpyTarget
+		if (!currentTarget) return;
 	}
 
-	// Enemy handling - Spies are generally stealthy but might need to fight if discovered
+	// Enemy handling
 	if (me->GetBotEnemy() != NULL && me->IsEnemyVisible())
 	{
-		if (m_isCloaked) // Uncloak if enemy is too close or attacking
+		if (m_isCloaked)
 		{
 			me->PrintIfWatched("InfiltrateState: Enemy visible! Uncloaking to defend.\n");
-			me->PressButton(IN_ATTACK2); // Uncloak
-			m_isCloaked = false;
+			me->HandleCommand("cloak"); // Uncloak
+			m_isCloaked = false; // Assumes command toggles it
 		}
-		// FF_TODO_SPY: More sophisticated Spy combat logic (e.g., use Revolver, or try to flee and re-cloak)
 		me->Attack(me->GetBotEnemy());
 		return;
 	}
@@ -131,7 +138,7 @@ void InfiltrateState::OnUpdate( CFFBot *me )
 	if (!m_isAtTarget && distToTargetSq > Square(MOVEMENT_CLOAK_DIST_THRESHOLD) && !m_isCloaked)
 	{
 		me->PrintIfWatched("InfiltrateState: Moving to target, cloaking.\n");
-		me->PressButton(IN_ATTACK2); // Cloak
+		me->HandleCommand("cloak"); // Cloak
 		m_isCloaked = true;
 	}
 
@@ -142,8 +149,8 @@ void InfiltrateState::OnUpdate( CFFBot *me )
 		{
 			m_isAtTarget = true;
 			me->Stop();
-			me->PrintIfWatched("InfiltrateState: Arrived at target %s.\n", currentTarget->GetClassname()); // or GetPlayerName
-			m_actionTimer.Start(0.5f); // Short delay before "acting"
+			me->PrintIfWatched("InfiltrateState: Arrived at target %s.\n", currentTarget->IsPlayer() ? ToFFPlayer(currentTarget)->GetPlayerName() : currentTarget->GetClassname());
+			m_actionTimer.Start(0.5f);
 		}
 		else
 		{
@@ -151,70 +158,150 @@ void InfiltrateState::OnUpdate( CFFBot *me )
 			{
 				if (!me->MoveTo(currentTarget->GetAbsOrigin(), SAFEST_ROUTE))
 				{
-					SelectNewSpyTarget(me); // Give up on this target
+					SelectNewSpyTarget(me);
 					return;
 				}
 				m_repathTimer.Start(BUILD_REPATH_TIME);
 			}
-			return; // Still moving
+			return;
 		}
 	}
 
 	// At target, perform action
-	if (m_isAtTarget && m_actionTimer.IsElapsed()) // Ensure action timer has elapsed for any previous action like cloaking
+	if (m_isAtTarget && m_actionTimer.IsElapsed())
 	{
-		if (m_isCloaked) // Need to uncloak to sap or backstab
+		if (m_isCloaked)
 		{
 			me->PrintIfWatched("InfiltrateState: Uncloaking to act on target.\n");
-			me->PressButton(IN_ATTACK2); // Uncloak
+			me->HandleCommand("cloak"); // Uncloak
 			m_isCloaked = false;
-			m_actionTimer.Start(CLOAK_UNCLOAK_TIME); // Give time to uncloak
-			return; // Wait for uncloak to complete
+			m_actionTimer.Start(CLOAK_UNCLOAK_TIME);
+			return;
 		}
 
 		// Target is a Building
 		if (m_targetEnemyBuilding.Get())
 		{
 			CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(m_targetEnemyBuilding.Get());
-			if (pBuildable && !pBuildable->IsSapped()) // Don't sap an already sapped building (or handle differently)
+			if (pBuildable && !pBuildable->IsSapped())
 			{
-				// FF_TODO_SPY: Equip Sapper if it's a distinct weapon, otherwise Spanner might be used conceptually.
-				// For now, assume Spanner is used or sapping is a special action.
-				me->EquipWeapon(me->GetWeaponByID(FF_WEAPON_SPANNER)); // Placeholder for sapper action
-				me->PrintIfWatched("InfiltrateState: Conceptually sapping %s.\n", pBuildable->GetClassname());
-				// me->PressButton(IN_USE); // Or some other button for sapping
-				m_actionTimer.Start(SAP_DURATION); // Time it takes to sap / time before next action
-				// After sapping, logic should make the bot flee or find new target. For now, SelectNewSpyTarget will handle.
-				// To ensure it picks a new target next time:
-                m_targetEnemyBuilding = NULL; // Mark as "handled"
+				if ( (pBuildable->GetAbsOrigin() - me->GetAbsOrigin()).IsLengthLessThan(INTERACTION_RANGE * 0.9f) )
+				{
+					// Attempt 1: Dedicated Sapper Weapon
+					CFFWeaponBase *sapperWeapon = me->GetWeaponByID(FF_WEAPON_SAPPER); // FF_CRITICAL_TODO_SPY: Verify this ID
+					if (sapperWeapon)
+					{
+						if (me->GetActiveFFWeapon() != sapperWeapon)
+						{
+							me->EquipWeapon(sapperWeapon);
+							me->PrintIfWatched("InfiltrateState: Spy equipping dedicated Sapper for %s.\n", pBuildable->GetClassname());
+							m_actionTimer.Start(0.35f); // Slightly longer for weapon switch + aim
+							return;
+						}
+
+						// Sapper is active
+						me->PrintIfWatched("InfiltrateState: Spy attempting to apply dedicated Sapper to %s with IN_ATTACK.\n", pBuildable->GetClassname());
+						me->SetLookAt("Sapping Target", m_targetEnemyBuilding->WorldSpaceCenter(), PRIORITY_HIGH);
+						me->PressButton(IN_ATTACK); // FF_CRITICAL_TODO: Verify IN_ATTACK is correct for Sapper
+						me->ReleaseButton(IN_ATTACK);
+						m_actionTimer.Start(SAP_DURATION);
+						// SelectNewSpyTarget(me); // Optionally pick new target immediately
+						return; // Sapping action taken
+					}
+					else
+					{
+						me->PrintIfWatched("InfiltrateState: Spy: FF_WEAPON_SAPPER not found in inventory.\n");
+					}
+
+					// Attempt 2: Contextual Action (e.g., Knife Alt-Fire) - This block executes if dedicated sapper logic didn't 'return'
+					me->PrintIfWatched("InfiltrateState: Spy attempting contextual sap with Knife for %s.\n", pBuildable->GetClassname());
+					CFFWeaponBase *knifeWeapon = me->GetWeaponByID(FF_WEAPON_KNIFE); // FF_CRITICAL_TODO_SPY: Verify this ID
+					if (knifeWeapon)
+					{
+						if (me->GetActiveFFWeapon() != knifeWeapon)
+						{
+							me->EquipWeapon(knifeWeapon);
+							me->PrintIfWatched("InfiltrateState: Spy equipping Knife for contextual sap attempt on %s.\n", pBuildable->GetClassname());
+							m_actionTimer.Start(0.35f); // Wait for weapon switch + aim
+							return;
+						}
+
+						// Knife is active for contextual sap
+						me->PrintIfWatched("InfiltrateState: Spy attempting contextual sap (IN_ATTACK2 with Knife) on %s.\n", pBuildable->GetClassname());
+						me->SetLookAt("Sapping Target (Contextual)", m_targetEnemyBuilding->WorldSpaceCenter(), PRIORITY_HIGH);
+						// FF_CRITICAL_TODO: Verify IN_ATTACK2 is the correct contextual sap input. Could also be IN_USE.
+						me->PressButton(IN_ATTACK2);
+						me->ReleaseButton(IN_ATTACK2);
+						m_actionTimer.Start(SAP_DURATION);
+						// SelectNewSpyTarget(me); // Optionally pick new target immediately
+						return; // Sapping action taken
+					}
+					else
+					{
+						me->PrintIfWatched("InfiltrateState: Spy: FF_WEAPON_KNIFE not found for contextual sap attempt.\n");
+						SelectNewSpyTarget(me); // No way to sap, find new target
+						return;
+					}
+				}
+				else
+				{
+					me->PrintIfWatched("InfiltrateState: Too far to start sapping %s. Re-evaluating.\n", pBuildable->GetClassname());
+					SelectNewSpyTarget(me);
+				}
 				return;
 			}
-			else { SelectNewSpyTarget(me); return; } // Sapped already or invalid, find new target
+			else
+			{
+				me->PrintIfWatched("InfiltrateState: Target building %s already sapped or invalid. Selecting new target.\n", pBuildable ? pBuildable->GetClassname() : "NULL");
+				SelectNewSpyTarget(me);
+				return;
+			}
 		}
 		// Target is a Player
 		else if (m_targetEnemyPlayer.Get())
 		{
-			if (me->IsBehind(m_targetEnemyPlayer.Get()))
+			CFFWeaponBase *knife = me->GetWeaponByID(FF_WEAPON_KNIFE);
+			if (!knife)
 			{
-				me->EquipWeapon(me->GetWeaponByID(FF_WEAPON_KNIFE));
-				me->PrintIfWatched("InfiltrateState: Conceptually backstabbing %s.\n", m_targetEnemyPlayer->GetPlayerName());
-				// me->PressButton(IN_ATTACK); // Primary fire for backstab
-				m_actionTimer.Start(BACKSTAB_DURATION);
-                m_targetEnemyPlayer = NULL; // Mark as "handled"
+				me->PrintIfWatched("InfiltrateState: Spy has no Knife to backstab/attack! Idling.\n");
+				me->Idle();
 				return;
 			}
-			else // Not behind, or regular attack
-			{
-				// FF_TODO_SPY: Equip primary weapon (Revolver/Tranq?)
-				CFFWeaponBase* spyPrimary = me->GetWeaponByID(FF_WEAPON_TRANQUILISER); // Placeholder, might be a revolver
-				if (spyPrimary) me->EquipWeapon(spyPrimary);
 
-				me->PrintIfWatched("InfiltrateState: Engaging %s with primary weapon.\n", m_targetEnemyPlayer->GetPlayerName());
+			if (me->GetActiveFFWeapon() != knife)
+			{
+				me->EquipWeapon(knife);
+				me->PrintIfWatched("InfiltrateState: Switching to Knife for %s...\n", m_targetEnemyPlayer->GetPlayerName());
+				m_actionTimer.Start(0.3f); // Wait for weapon switch
+				return;
+			}
+			// Now Knife is active
+
+			if (me->IsBehind(m_targetEnemyPlayer.Get()))
+			{
+				me->PrintIfWatched("InfiltrateState: Attempting backstab on %s.\n", m_targetEnemyPlayer->GetPlayerName());
+				me->PressButton(IN_ATTACK);
+				me->ReleaseButton(IN_ATTACK);
+				// FF_TODO_CLASS_SPY: Confirm if a single attack is enough or if it needs to be held or timed for backstab. Assuming single IN_ATTACK for now.
+				// The actual backstab (crit damage) is handled by game logic.
+				m_actionTimer.Start(BACKSTAB_DURATION);
+                m_targetEnemyPlayer = NULL;
+				return;
+			}
+			else
+			{
+				CFFWeaponBase* spyPrimary = me->GetWeaponByID(FF_WEAPON_TRANQUILISER);
+				if (spyPrimary && me->GetActiveFFWeapon() != spyPrimary)
+				{
+					me->EquipWeapon(spyPrimary);
+					m_actionTimer.Start(0.3f); // Wait for weapon switch
+					return;
+				}
+				// Now primary should be active (or Knife if no primary)
+				me->PrintIfWatched("InfiltrateState: Engaging %s with current weapon.\n", m_targetEnemyPlayer->GetPlayerName());
 				me->SetLookAt("Spy Target", m_targetEnemyPlayer->GetCentroid(), PRIORITY_HIGH);
-				me->PressButton(IN_ATTACK); // Fire primary
-				// Let normal combat logic take over if needed, or make Spy flee after a shot
-				m_actionTimer.Start(1.0f); // Brief pause before re-evaluating
-                // Don't nullify target here, might still be a threat. Re-evaluation will happen.
+				me->PressButton(IN_ATTACK);
+				m_actionTimer.Start(1.0f);
 				return;
 			}
 		}
@@ -225,12 +312,11 @@ void InfiltrateState::OnUpdate( CFFBot *me )
 void InfiltrateState::OnExit( CFFBot *me )
 {
 	me->PrintIfWatched( "InfiltrateState: Exiting state.\n" );
-	if (m_isCloaked)
+	if (me->IsCloaked()) // Use player's IsCloaked()
 	{
-		me->PressButton(IN_ATTACK2); // Ensure uncloaked
-		m_isCloaked = false;
+		me->HandleCommand("cloak"); // Ensure uncloaked
 	}
-	me->ReleaseButton(IN_ATTACK); // Ensure attack buttons aren't stuck
+	me->ReleaseButton(IN_ATTACK);
 	me->ClearLookAt();
 	m_targetEnemyBuilding = NULL;
 	m_targetEnemyPlayer = NULL;

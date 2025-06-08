@@ -37,6 +37,7 @@ BuildDispenserState::BuildDispenserState(void)
 	m_dispenserBeingBuilt = NULL;
 	m_buildProgressTimer.Invalidate();
 	m_repathTimer.Invalidate();
+	m_waitForBlueprintTimer.Invalidate();
 
 	m_isUpgrading = false;
 	m_targetUpgradeLevel = DEFAULT_TARGET_DISPENSER_UPGRADE_LEVEL;
@@ -59,10 +60,12 @@ void BuildDispenserState::SetBuildLocation(const Vector &location)
 //--------------------------------------------------------------------------------------------------------------
 void BuildDispenserState::OnEnter( CFFBot *me )
 {
+	me->SelectSpecificBuildable(CFFBot::BUILDABLE_DISPENSER); // Ensure correct blueprint is selected
 	me->PrintIfWatched( "BuildDispenserState: Entering state.\n" );
 	m_isBuilding = false;
 	m_isAtBuildLocation = false;
 	m_dispenserBeingBuilt = NULL;
+	m_waitForBlueprintTimer.Invalidate();
 	m_isUpgrading = false;
 	m_currentUpgradeLevel = 1; // Assume starts at level 1 after blueprint
 	m_targetUpgradeLevel = DEFAULT_TARGET_DISPENSER_UPGRADE_LEVEL; // Default target
@@ -139,9 +142,22 @@ void BuildDispenserState::OnUpdate( CFFBot *me )
 		else { me->PrintIfWatched("BuildDispenserState: Engineer has no spanner!\n"); me->Idle(); return; }
 
 		// FF_TODO_BUILDING: Simulate selecting/placing Dispenser blueprint.
-		// This would involve the bot executing a game command like "build 1" (if 1 is dispenser).
-		// me->HandleCommand("builddispenser"); // Or "build 1" etc.
+		// FF_TODO_BUILDING: If me->GetSelectedBuildable() is not what this state specifically wants (e.g., in BuildDispenserState but BUILDABLE_SENTRY is selected), call me->CycleSelectedBuildable() N times until the correct one is selected or log an error if it cannot be selected.
+		// For this subtask, assume SelectSpecificBuildable in OnEnter correctly sets it and no cycling is needed here yet.
+		// me->PrimaryAttack(); // This was to "place" the blueprint, now handled by SelectSpecificBuildable (via command) in OnEnter.
 		// The game should then spawn an "obj_dispenser" entity in its initial building state.
+
+		// Start a short timer to wait for the blueprint entity to spawn after the command.
+		if (!m_waitForBlueprintTimer.HasStarted())
+		{
+			m_waitForBlueprintTimer.Start(0.2f); // Short delay (e.g., 200ms)
+		}
+
+		// Only try to find the blueprint after the timer has elapsed
+		if (!m_waitForBlueprintTimer.IsElapsed())
+		{
+			return; // Wait for blueprint to spawn
+		}
 
 		// After conceptual placement, search for the dispenser.
 		// FF_TODO_BUILDING: Verify actual dispenser classname "obj_dispenser_blueprint" or "obj_dispenser".
@@ -161,13 +177,34 @@ void BuildDispenserState::OnUpdate( CFFBot *me )
 			}
 		}
 
-		if (!m_dispenserBeingBuilt.Get())
+		// This search is now inside the IsElapsed() check for m_waitForBlueprintTimer
+		if (!m_dispenserBeingBuilt.Get()) // Only search if we haven't found it yet
 		{
-			me->PrintIfWatched("BuildDispenserState: Failed to find placed dispenser blueprint nearby. Idling.\n");
+			float searchRadius = 150.0f;
+			CBaseEntity *pEntity = NULL;
+			while ((pEntity = gEntList.FindEntityInSphere(pEntity, m_buildLocation, searchRadius)) != NULL)
+			{
+				if (FClassnameIs(pEntity, "obj_dispenser"))
+				{
+					CFFBuildableObject *pBuildable = dynamic_cast<CFFBuildableObject *>(pEntity);
+					if (pBuildable && pBuildable->GetBuilder() == me && pBuildable->IsBuilding())
+					{
+						m_dispenserBeingBuilt = pBuildable;
+						me->PrintIfWatched("BuildDispenserState: Found placed dispenser blueprint: %s\n", pBuildable->GetClassname());
+						break;
+					}
+				}
+			}
+		}
+
+		if (!m_dispenserBeingBuilt.Get()) // Check again after attempting to find it
+		{
+			me->PrintIfWatched("BuildDispenserState: Failed to find placed dispenser blueprint nearby after waiting. Idling.\n");
 			me->Idle();
 			return;
 		}
 
+		// Blueprint found, proceed with building logic.
 		// Resource Check for initial build
 		if (me->GetAmmoCount(AMMO_CELLS) < DISPENSER_COST_CELLS)
 		{
@@ -209,9 +246,11 @@ void BuildDispenserState::OnUpdate( CFFBot *me )
 
 			if (m_dispenserBeingBuilt.Get())
 			{
-				// FF_TODO_BUILDING: Check actual dispenser level from m_dispenserBeingBuilt->GetLevel() if available.
-				m_currentUpgradeLevel = 1;
-				if (m_currentUpgradeLevel < m_targetUpgradeLevel)
+				// Sync currentUpgradeLevel with the bot's knowledge, which should be set by NotifyBuildingBuilt
+				m_currentUpgradeLevel = me->m_dispenserLevel; // Should be 1 after initial build
+				// FF_TODO_BUILDING: Ideally, CFFBuildableObject::GetLevel() should be used if available and reliable here.
+
+				if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure level is valid before upgrading
 				{
 					// Resource Check for upgrade
 					if (me->GetAmmoCount(AMMO_CELLS) < DISPENSER_UPGRADE_COST_CELLS)
@@ -263,12 +302,14 @@ void BuildDispenserState::OnUpdate( CFFBot *me )
 		me->PressButton(IN_ATTACK); // Keep hitting to upgrade
 
 		// FF_TODO_BUILDING: Ideally, check m_dispenserBeingBuilt->GetLevel() to see if it actually leveled up.
+		// The actual level increment should be handled by CFFBot::NotifyBuildingUpgraded
 		if (m_upgradeProgressTimer.IsElapsed())
 		{
-			m_currentUpgradeLevel++;
-			me->PrintIfWatched("BuildDispenserState: Dispenser upgraded to level %d.\n", m_currentUpgradeLevel);
+			// Sync with the bot's knowledge of the dispenser level
+			m_currentUpgradeLevel = me->m_dispenserLevel;
+			me->PrintIfWatched("BuildDispenserState: Dispenser upgrade timer elapsed. Current known level: %d.\n", m_currentUpgradeLevel);
 
-			if (m_currentUpgradeLevel < m_targetUpgradeLevel)
+			if (m_currentUpgradeLevel < m_targetUpgradeLevel && m_currentUpgradeLevel > 0) // Ensure valid level
 			{
 				// Resource Check for next upgrade level
 				if (me->GetAmmoCount(AMMO_CELLS) < DISPENSER_UPGRADE_COST_CELLS)

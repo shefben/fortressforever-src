@@ -158,7 +158,7 @@ void RepairBuildableState::OnUpdate( CFFBot *me )
 		me->SetLookAt("Repairing Buildable", pBuildable->WorldSpaceCenter(), PRIORITY_HIGH);
 		me->PressButton(IN_ATTACK); // Hold primary fire to hit/repair
 
-		// FF_TODO_BUILDING: Check resource cost for repairing if applicable in FF.
+		// FF_TODO_CLASS_ENGINEER: Check resource cost for repairing if applicable in FF.
 		// (e.g., if (me->GetAmmoCount(AMMO_CELLS) < REPAIR_TICK_COST) { me->ReleaseButton(IN_ATTACK); me->Idle(); return; })
 
 		if (m_checkRepairTimer.IsElapsed())

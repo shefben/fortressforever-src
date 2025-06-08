@@ -23,6 +23,26 @@ void AttackState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer, GetBotEnemy returns CFFPlayer*
 
+	// Select best weapon for the situation first
+	if (enemy)
+	{
+		float flDist = me->GetRangeTo(enemy);
+		CFFWeaponBase* pBestWeapon = me->SelectBestWeaponForSituation(enemy, flDist);
+		if (pBestWeapon && me->GetActiveFFWeapon() != pBestWeapon)
+		{
+			me->EquipWeapon(pBestWeapon);
+		}
+	}
+	else
+	{
+		// No specific enemy, perhaps select a generally good weapon or based on no enemy
+		CFFWeaponBase* pBestGeneralWeapon = me->SelectBestWeaponForSituation(NULL, -1.0f);
+		if (pBestGeneralWeapon && me->GetActiveFFWeapon() != pBestGeneralWeapon)
+		{
+			me->EquipWeapon(pBestGeneralWeapon);
+		}
+	}
+
 	me->PushPostureContext();
 	me->DestroyPath();
 
@@ -46,11 +66,11 @@ void AttackState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 	// m_shieldToggleTimestamp = gpGlobals->curtime + RandomFloat( 2.0f, 10.0f ); // FF No Shield
 	// m_shieldForceOpen = false; // FF No Shield
 
-	// FF_TODO: Adapt if FF has a similar concept to "escaping from bomb" that requires re-equipping
+	// FF_TODO_AI_BEHAVIOR: Adapt if FF has a similar concept to "escaping from bomb" that requires re-equipping
 	// if (me->IsEscapingFromBomb()) // CS Specific
 	//	me->EquipBestWeapon();
 
-	if (me->IsUsingKnife()) // FF_TODO: Adapt for FF melee weapon
+	if (me->IsUsingKnife()) // FF_TODO_WEAPON_STATS: Adapt for FF melee weapon
 	{
 		m_crouchAndHold = false;
 		me->StandUp();
@@ -69,7 +89,7 @@ void AttackState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 				const float crouchFarRange = 750.0f;
 				float crouchChance;
 
-				if (me->IsUsingSniperRifle()) // FF_TODO: Adapt for FF sniper rifle
+				if (me->IsUsingSniperRifle()) // FF_TODO_WEAPON_STATS: Adapt for FF sniper rifle
 					crouchChance = 50.0f;
 				else if ((GetCentroid( me ) - GetCentroid( enemy )).IsLengthGreaterThan( crouchFarRange ))
 					crouchChance = 50.0f;
@@ -115,7 +135,7 @@ void AttackState::StopAttacking( CFFBot *me ) // Changed CCSBot to CFFBot
 //--------------------------------------------------------------------------------------------------------------
 void AttackState::Dodge( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	if (m_shouldDodge && !me->IsUsingSniperRifle() && !m_crouchAndHold) // FF_TODO: Adapt IsUsingSniperRifle
+	if (m_shouldDodge && !me->IsUsingSniperRifle() && !m_crouchAndHold) // FF_TODO_WEAPON_STATS: Adapt IsUsingSniperRifle
 	{
 		CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 		if (enemy == NULL) return;
@@ -126,7 +146,7 @@ void AttackState::Dodge( CFFBot *me ) // Changed CCSBot to CFFBot
 		float minRange = me->GetCombatRange() - hysterisRange;
 		float maxRange = me->GetCombatRange() + hysterisRange;
 
-		if (me->IsUsingKnife()) { maxRange = 999999.9f; } // FF_TODO: Adapt IsUsingKnife
+		if (me->IsUsingKnife()) { maxRange = 999999.9f; } // FF_TODO_WEAPON_STATS: Adapt IsUsingKnife
 
 		if (me->GetProfile()->GetSkill() < 0.66f || !me->IsEnemyVisible())
 		{
@@ -180,10 +200,10 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
 	me->ResetStuckMonitor();
 
-	CFFWeaponBase *weapon = me->GetActiveFFWeapon(); // FF_WEAPONS: Changed from CBasePlayerWeapon
+	CFFWeaponBase *weapon = me->GetActiveFFWeapon(); // FF_TODO_WEAPON_STATS: Changed from CBasePlayerWeapon
 	if (weapon)
 	{
-		// FF_TODO_WEAPONS: Replace with FF specific weapon checks if needed. This was for CS C4/grenades.
+		// FF_TODO_WEAPON_STATS: Replace with FF specific weapon checks if needed. This was for CS C4/grenades.
 		// Example: if ( weapon->GetWeaponID() == FF_WEAPON_PIPELAUNCHER && me->IsReloading() ) me->EquipBestWeapon();
 		// For now, ensure no direct use of CS Weapon IDs.
 		// FFWeaponID currentID = weapon->GetWeaponID();
@@ -196,6 +216,18 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 
 	CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 	if (enemy == NULL) { StopAttacking( me ); return; }
+
+	// If health is low, consider retreating
+	// Use the constant defined in CFFBot for the threshold
+	if (me->IsAlive() && (me->GetHealth() * 1.0f / me->GetMaxHealth()) < CFFBot::RETREAT_HEALTH_THRESHOLD_PERCENT)
+	{
+		me->PrintIfWatched("AttackState: Health low (%.1f%%), attempting to retreat.\n", (me->GetHealth() * 100.0f) / me->GetMaxHealth());
+		me->TryToRetreat(); // Pass NULL for info, or more context if TryToRetreat is enhanced
+		if (me->IsRetreating()) // Check if retreat was successful (e.g. not overridden by other conditions)
+		{
+			return; // Exit AttackState, RetreatState will take over
+		}
+	}
 
 	Vector myOrigin = GetCentroid( me ); Vector enemyOrigin = GetCentroid( enemy );
 	if (!m_haveSeenEnemy) m_haveSeenEnemy = me->IsEnemyVisible();
@@ -216,7 +248,7 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		}
 	}
 
-	if (me->IsUsingKnife()) // FF_TODO: Adapt for FF melee
+	if (me->IsUsingKnife()) // FF_TODO_WEAPON_STATS: Adapt for FF melee
 	{
 		m_crouchAndHold = false; me->StandUp();
 		if (me->IsPlayerFacingMe( enemy )) { me->ForceRun( 5.0f ); me->Hurry( 10.0f ); } // IsPlayerFacingMe takes CFFPlayer
@@ -232,21 +264,21 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 		} return;
 	}
 
-	// FF_TODO: Remove shield logic if not applicable
+	// FF_TODO_GAME_MECHANIC: Remove shield logic if not applicable
 	// if (me->HasShield()) { ... }
 
-	if (me->IsUsingSniperRifle()) // FF_TODO: Adapt for FF sniper
+	if (me->IsUsingSniperRifle()) // FF_TODO_WEAPON_STATS: Adapt for FF sniper
 	{
 		const float sniperMinRange = 160.0f;
-		if ((enemyOrigin - myOrigin).IsLengthLessThan( sniperMinRange )) me->EquipPistol(); // FF_TODO: Adapt EquipPistol
+		if ((enemyOrigin - myOrigin).IsLengthLessThan( sniperMinRange )) me->EquipPistol(); // FF_TODO_WEAPON_STATS: Adapt EquipPistol
 	}
-	else if (me->IsUsingShotgun()) // FF_TODO: Adapt for FF shotgun
+	else if (me->IsUsingShotgun()) // FF_TODO_WEAPON_STATS: Adapt for FF shotgun
 	{
 		const float shotgunMaxRange = 600.0f;
-		if ((enemyOrigin - myOrigin).IsLengthGreaterThan( shotgunMaxRange )) me->EquipPistol(); // FF_TODO: Adapt EquipPistol
+		if ((enemyOrigin - myOrigin).IsLengthGreaterThan( shotgunMaxRange )) me->EquipPistol(); // FF_TODO_WEAPON_STATS: Adapt EquipPistol
 	}
 
-	if (me->IsUsingSniperRifle()) // FF_TODO: Adapt for FF sniper
+	if (me->IsUsingSniperRifle()) // FF_TODO_WEAPON_STATS: Adapt for FF sniper
 	{
 		if (me->m_bResumeZoom) { m_scopeTimestamp = gpGlobals->curtime; return; } // m_bResumeZoom might be CFFPlayer member
 		Vector toAimSpot3D = me->m_aimSpot - myOrigin; float targetRange = toAimSpot3D.Length();
@@ -295,7 +327,7 @@ void AttackState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	} else { m_didAmbushCheck = false; if (m_isEnemyHidden) { m_reacquireTimestamp = gpGlobals->curtime + me->GetProfile()->GetReactionTime(); m_isEnemyHidden = false; } }
 
 	float chaseTime = 2.0f + 2.0f * (1.0f - me->GetProfile()->GetAggression());
-	if (me->IsUsingSniperRifle()) chaseTime += 3.0f; // FF_TODO: Adapt IsUsingSniperRifle
+	if (me->IsUsingSniperRifle()) chaseTime += 3.0f; // FF_TODO_WEAPON_STATS: Adapt IsUsingSniperRifle
 	else if (me->IsCrouching()) chaseTime += 1.0f;
 
 	if (!me->IsEnemyVisible() && (notSeenEnemyTime > chaseTime || !m_haveSeenEnemy))
@@ -323,6 +355,6 @@ void AttackState::OnExit( CFFBot *me ) // Changed CCSBot to CFFBot
 	me->ForgetNoise();
 	me->ResetStuckMonitor();
 	me->PopPostureContext();
-	// FF_TODO: Remove shield logic if not applicable
+	// FF_TODO_GAME_MECHANIC: Remove shield logic if not applicable
 	// if (me->IsProtectedByShield()) me->SecondaryAttack();
 }

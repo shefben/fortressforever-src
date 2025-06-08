@@ -17,27 +17,27 @@
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Move to the bomb on the floor and pick it up - FF: This state is CS-specific and needs to be re-evaluated or removed.
+ * Move to the bomb on the floor and pick it up - FF_TODO_GAME_MECHANIC: This state is CS-specific and needs to be re-evaluated or removed.
  * Could be adapted for "fetch flag" or other FF item pickup scenarios.
  */
 void FetchBombState::OnEnter( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: FetchBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: FetchBombState::OnEnter - CS-specific logic removed/stubbed.\n" );
 	// me->DestroyPath();
-	// FF_TODO: If adapting for a flag, bot might need to equip a certain weapon or change speed.
+	// FF_TODO_AI_BEHAVIOR: If adapting for a flag, bot might need to equip a certain weapon or change speed.
 	me->Idle(); // Default to idle as fetching bomb is not applicable
 }
 
 //--------------------------------------------------------------------------------------------------------------
 /**
- * Move to the bomb on the floor and pick it up - FF: This state is CS-specific.
+ * Move to the bomb on the floor and pick it up - FF_TODO_GAME_MECHANIC: This state is CS-specific.
  */
 void FetchBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 {
-	me->PrintIfWatched( "FF_TODO: FetchBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
+	me->PrintIfWatched( "FF_TODO_GAME_MECHANIC: FetchBombState::OnUpdate - CS-specific logic removed/stubbed.\n" );
 	// if (me->HasC4()) // HasC4 is CS-specific
 	// {
-	// 	me->PrintIfWatched( "I picked up the bomb\n" ); // FF_TODO: Adapt for FF item
+	// 	me->PrintIfWatched( "I picked up the bomb\n" ); // FF_TODO_AI_BEHAVIOR: Adapt for FF item
 	// 	me->Idle();
 	// 	return;
 	// }
@@ -49,7 +49,7 @@ void FetchBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// 	{
 	// 		if (me->ComputePath( bomb->GetAbsOrigin() ) == false)
 	// 		{
-	// 			me->PrintIfWatched( "Fetch bomb pathfind failed\n" ); // FF_TODO: Adapt for FF item
+	// 			me->PrintIfWatched( "Fetch bomb pathfind failed\n" ); // FF_TODO_AI_BEHAVIOR: Adapt for FF item
 	// 			me->Hunt(); // Fallback to Hunt
 	// 			return;
 	// 		}
@@ -57,7 +57,7 @@ void FetchBombState::OnUpdate( CFFBot *me ) // Changed CCSBot to CFFBot
 	// }
 	// else
 	// {
-	// 	me->PrintIfWatched( "Someone else picked up the bomb.\n" ); // FF_TODO: Adapt for FF item
+	// 	me->PrintIfWatched( "Someone else picked up the bomb.\n" ); // FF_TODO_AI_BEHAVIOR: Adapt for FF item
 	// 	me->Idle();
 	// 	return;
 	// }
