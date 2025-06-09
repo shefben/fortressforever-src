@@ -1,5 +1,7 @@
 -- base_cp.lua
 
+IncludeScript("bot_interface"); -- Added for C++ bot integration
+
 -- if you want base cp with the default setup, 
 -- include base_cp_default.lua in your map's lua file 
 -- and then include base_cp.lua
@@ -1618,3 +1620,5 @@ red_teleporter_cp4 = cp_team2_teleporter_cp4
 red_teleporter_cp5 = cp_team2_teleporter_cp5
 
 
+
+[end of lua/includes/base_cp.lua]

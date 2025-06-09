@@ -463,6 +463,24 @@ bool CFFBot::IsDoingScenario( void ) const
 // bool CFFBot::CanSeeLooseBomb( void ) const { ... }
 // bool CFFBot::CanSeePlantedBomb( void ) const { ... }
 
+
+//--------------------------------------------------------------------------------------------------------------
+/**
+ * Transition to the CapturePointState to capture/defend the given control point.
+ */
+void CFFBot::CapturePoint( CBaseEntity *cpEntity )
+{
+	if (!cpEntity)
+	{
+		Warning("CFFBot::CapturePoint: cpEntity is NULL. Going Idle.\n");
+		Idle();
+		return;
+	}
+	PrintIfWatched( "Player %s capturing/defending point %s\n", GetPlayerName(), STRING(cpEntity->GetEntityName()) );
+	SetTaskEntity( cpEntity );
+	SetState( &m_capturePointState );
+}
+
 //--------------------------------------------------------------------------------------------------------------
 /**
  * Return last enemy that hurt us

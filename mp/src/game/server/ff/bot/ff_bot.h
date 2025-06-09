@@ -45,8 +45,10 @@
 
 #include "states/ff_bot_state_use_entity.h"
 #include "states/ff_bot_state_open_door.h"
+#include "states/ff_bot_state_capture_point.h" // Added CapturePointState include
 
 // Forward declarations for engine/game classes
+class CapturePointState; // Added forward declaration
 class CBaseDoor;
 class CBasePropDoor;
 class CPushAwayEnumerator; // Likely from obstacle_pushaway.h or similar
@@ -173,22 +175,22 @@ public:
 	bool IsMovingTo( void ) const;
 
 	// TODO: Bomb-specific methods, adapt for FF objectives
-	void PlantBomb( void );
-	void FetchBomb( void );
-	bool NoticeLooseBomb( void ) const;
-	bool CanSeeLooseBomb( void ) const;
-	void DefuseBomb( void );
-	bool IsDefusingBomb( void ) const;
-	bool CanSeePlantedBomb( void ) const;
-	void EscapeFromBomb( void );
-	bool IsEscapingFromBomb( void ) const;
+	// void PlantBomb( void ); // CS Specific
+	// void FetchBomb( void ); // CS Specific
+	// bool NoticeLooseBomb( void ) const; // CS Specific
+	// bool CanSeeLooseBomb( void ) const; // CS Specific
+	// void DefuseBomb( void ); // CS Specific
+	// bool IsDefusingBomb( void ) const; // CS Specific
+	// bool CanSeePlantedBomb( void ) const; // CS Specific
+	// void EscapeFromBomb( void ); // CS Specific
+	// bool IsEscapingFromBomb( void ) const; // CS Specific
 
 	// TODO: Hostage-specific methods, adapt or remove for FF
-	void RescueHostages( void );
+	// void RescueHostages( void ); // CS Specific
 
 	void UseEntity( CBaseEntity *entity );
-
 	void OpenDoor( CBaseEntity *door );
+	void CapturePoint( CBaseEntity *cpEntity ); // Added for new state
 	bool IsOpeningDoor( void ) const;
 
 	void Buy( void );
@@ -550,11 +552,9 @@ private:
 	// Friend declarations for states are fine as states are tightly coupled with the bot.
 	friend class IdleState; friend class HuntState; friend class AttackState;
 	friend class InvestigateNoiseState; friend class BuyState; friend class MoveToState;
-	// Removed friend declarations for CS-specific bomb states
-	// friend class FetchBombState; friend class PlantBombState; friend class DefuseBombState;
-	// friend class EscapeFromBombState;
 	friend class HideState; friend class FollowState;
 	friend class UseEntityState; friend class OpenDoorState;
+	friend class CapturePointState; // Added friend class for CapturePointState
 
 
 	Vector m_eyePosition; // BOTPORT: Remove this vile hack if possible
@@ -603,6 +603,7 @@ private:
 	FollowState				m_followState;
 	UseEntityState			m_useEntityState;
 	OpenDoorState			m_openDoorState;
+	CapturePointState		m_capturePointState; // Added member for CapturePointState
 
 	void SetState( BotState *state );
 	BotState *m_state;
