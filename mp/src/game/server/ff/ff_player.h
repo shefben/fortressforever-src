@@ -814,6 +814,9 @@ public:
 	// and also force spawning after joining a map for the first time
 	//float m_flNextSpawnDelay;
 
+    CFFPlayerClassInfo *m_pPlayerClassInfo; // Added for bot weapon selection
+    const CFFPlayerClassInfo* GetPlayerClassInfo() const { return m_pPlayerClassInfo; }
+
 	virtual int TakeEmp();
 	virtual void Ignite( bool bNPCOnly, float flSize, bool bCalledByLevelDesigner, float flameLifetime );
 	virtual void Ignite( bool bNPCOnly, float flSize, bool bCalledByLevelDesigner );

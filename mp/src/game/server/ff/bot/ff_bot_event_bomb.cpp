@@ -9,14 +9,14 @@
 
 #include "cbase.h"
 #include "ff_bot.h"
-#include "ff_bot_manager.h" // For TheFFBots()
-#include "../ff_player.h"     // For CFFPlayer
-#include "../../shared/ff/ff_gamerules.h" // For FFGameRules() and team/scenario defines
-#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
-// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-#include "ff_gamestate.h"   // For FFGameState
-#include "nav_mesh.h"       // For CNavArea (potentially, though not directly used here, often via manager)
-#include "bot_constants.h"  // For TEAM_CT etc. (assuming this is where they are defined)
+#include "ff_bot_manager.h"
+#include "../ff_player.h"
+#include "../../shared/ff/ff_gamerules.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+// #include "../../shared/ff/weapons/ff_weapon_parse.h"
+#include "ff_gamestate.h"
+#include "nav_mesh.h"
+#include "bot_constants.h"
 #include "KeyValues.h"      // Already included, seems fine
 
 
@@ -34,26 +34,26 @@ void CFFBot::OnBombPickedUp( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	// TODO: Update for FF teams if necessary
-	if (GetTeamNumber() == TEAM_CT && player)
-	{
-		// check if we're close enough to hear it
-		const float bombPickupHearRangeSq = 1000.0f * 1000.0f;
-		Vector myOrigin = GetCentroid( this );
-
-		if ((myOrigin - player->GetAbsOrigin()).LengthSqr() < bombPickupHearRangeSq)
-		{
-			GetChatter()->TheyPickedUpTheBomb();
-			GetGameState()->UpdateBomber( player->GetAbsOrigin() );
-		}
-	}
+	// TODO_FF: This entire function is CS bomb logic.
+	// If FF has a similar "item carrier" mechanic (like a flag), this could be adapted.
+	// For now, ensure CFFPlayer cast if GetGameState()->UpdateBomber expects CFFPlayer.
+	// if (GetTeamNumber() == TEAM_DEFENDERS_FF && player)  // Example FF Team
+	// {
+	// 	const float objectivePickupHearRangeSq = 1000.0f * 1000.0f;
+	// 	Vector myOrigin = GetCentroid( this );
+	// 	if ((myOrigin - player->GetAbsOrigin()).LengthSqr() < objectivePickupHearRangeSq)
+	// 	{
+	// 		// GetChatter()->TheyPickedUpTheObjective(); // Chatter system removed
+	// 		// GetGameState()->UpdateObjectiveCarrier( static_cast<CFFPlayer*>(player), player->GetAbsOrigin() ); // Example
+	// 	}
+	// }
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::OnBombPlanted( IGameEvent *event )
+void CFFBot::OnBombPlanted( IGameEvent *event ) // TODO_FF: Rename to OnObjectiveActivated or similar for FF
 {
-	m_gameState.OnBombPlanted( event );
+	// m_gameState.OnObjectiveActivated( event ); // Example for FF
 
 	if ( !IsAlive() )
 		return;
@@ -63,12 +63,11 @@ void CFFBot::OnBombPlanted( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	// if we're a TEAM_CT, forget what we're doing and go after the bomb
-	// TODO: Update for FF teams if necessary
-	if (GetTeamNumber() == TEAM_CT)
-	{
-		Idle();
-	}
+	// TODO_FF: CS-specific team logic (TEAM_CT). Adapt for FF defender team.
+	// if (GetTeamNumber() == TEAM_DEFENDERS_FF)
+	// {
+	// 	Idle();
+	// }
 
 	// if we are following someone, stop following
 	if (IsFollowing())
@@ -92,38 +91,36 @@ void CFFBot::OnBombBeep( IGameEvent *event )
 	Vector myOrigin = GetCentroid( this );
 
 	// if we don't know where the bomb is, but heard it beep, we've discovered it
-	if (GetGameState()->IsPlantedBombLocationKnown() == false && entity)
-	{
-		// check if we're close enough to hear it
-		const float bombBeepHearRangeSq = 1500.0f * 1500.0f;
-		if ((myOrigin - entity->GetAbsOrigin()).LengthSqr() < bombBeepHearRangeSq)
-		{
-			// radio the news to our team
-			// TODO: Update for FF teams if necessary
-			if (GetTeamNumber() == TEAM_CT && GetGameState()->GetPlantedBombsite() == FFGameState::UNKNOWN)
-			{
-				const CFFBotManager::Zone *zone = TheFFBots()->GetZone( entity->GetAbsOrigin() ); // Changed TheCSBots to TheFFBots
-				if (zone)
-					GetChatter()->FoundPlantedBomb( zone->m_index );
-			}
-
-			// remember where the bomb is
-			GetGameState()->UpdatePlantedBomb( entity->GetAbsOrigin() );
-		}
-	}
+	// TODO_FF: This is CS bomb beep logic. Adapt for FF objectives (e.g., flag capture sound, point ticking).
+	// if (GetGameState()->IsObjectiveLocationKnown() == false && entity)
+	// {
+	// 	const float objectiveSoundHearRangeSq = 1500.0f * 1500.0f;
+	// 	if ((myOrigin - entity->GetAbsOrigin()).LengthSqr() < objectiveSoundHearRangeSq)
+	// 	{
+	// 		// TODO_FF: Update for FF teams and chatter.
+	// 		// if (GetTeamNumber() == TEAM_DEFENDERS_FF && GetGameState()->GetActiveObjectiveZone() == FFGameState::UNKNOWN_ZONE_FF)
+	// 		// {
+	// 		// 	const CFFBotManager::Zone *zone = TheFFBots()->GetZone( entity->GetAbsOrigin() );
+	// 		// 	if (zone)
+	// 		// 		// GetChatter()->FoundActiveObjective( zone->m_index ); // Chatter system removed
+	// 		// }
+	// 		// GetGameState()->UpdateActiveObjective( entity->GetAbsOrigin() ); // Example
+	// 	}
+	// }
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::OnBombDefuseBegin( IGameEvent *event )
+void CFFBot::OnBombDefuseBegin( IGameEvent *event ) // TODO_FF: Rename to OnObjectiveInteractionBegin or similar
 {
+	// TODO_FF: Logic for FF objective interaction start.
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::OnBombDefused( IGameEvent *event )
+void CFFBot::OnBombDefused( IGameEvent *event ) // TODO_FF: Rename to OnObjectiveCompleted or similar
 {
-	m_gameState.OnBombDefused( event );
+	// m_gameState.OnObjectiveCompleted( event ); // Example
 
 	if ( !IsAlive() )
 		return;
@@ -133,18 +130,17 @@ void CFFBot::OnBombDefused( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	// TODO: Update for FF teams if necessary
-	if (GetTeamNumber() == TEAM_CT)
-	{
-		// TODO: Update for FF if bomb timer works differently
-		if (TheFFBots()->GetBombTimeLeft() < 2.0f) // Changed TheCSBots to TheFFBots
-			GetChatter()->Say( "BarelyDefused" );
-	}
+	// TODO_FF: Update for FF teams and objective logic. Chatter system removed.
+	// if (GetTeamNumber() == TEAM_DEFENDERS_FF)
+	// {
+	// 	if (TheFFBots()->GetObjectiveTimeLeft() < 2.0f)
+	// 		// GetChatter()->Say( "BarelyCompletedObjective" ); // Chatter system removed
+	// }
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::OnBombDefuseAbort( IGameEvent *event )
+void CFFBot::OnBombDefuseAbort( IGameEvent *event ) // TODO_FF: Rename to OnObjectiveInteractionAbort or similar
 {
 	if ( !IsAlive() )
 		return;
@@ -154,12 +150,12 @@ void CFFBot::OnBombDefuseAbort( IGameEvent *event )
 	if ( player == this )
 		return;
 
-	PrintIfWatched( "BOMB DEFUSE ABORTED\n" );
+	PrintIfWatched( "OBJECTIVE INTERACTION ABORTED\n" ); // Example FF message
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void CFFBot::OnBombExploded( IGameEvent *event )
+void CFFBot::OnBombExploded( IGameEvent *event ) // TODO_FF: Rename to OnObjectiveFailed or similar
 {
-	m_gameState.OnBombExploded( event );
+	// m_gameState.OnObjectiveFailed( event ); // Example
 }

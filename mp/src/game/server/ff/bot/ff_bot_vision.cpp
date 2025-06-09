@@ -253,7 +253,7 @@ void CFFBot::UpdatePeripheralVision() { /* ... (CS specific SpotEncounter logic 
 void CFFBot::UpdateLookAround( bool updateNow ) { /* ... (logic as before, uses PrintIfWatched, TheFFBots, OtherTeam, HalfHumanHeight, GetProfile, IsUsingSniperRifle, AdjustZoom, SetLookAt) ... */ }
 bool CFFBot::BendLineOfSight( const Vector &eye, const Vector &target, Vector *bend, float angleLimit ) const { /* ... (logic as before) ... */ return false; }
 bool CFFBot::IsNoticable( const CFFPlayer *player, unsigned char visParts ) const { /* ... (logic as before, uses GetProfile) ... */ return false; }
-CFFPlayer *CFFBot::FindMostDangerousThreat( void ) { /* ... (logic as before, uses IsSniperRifle, GetActiveCSWeapon (needs GetActiveFFWeapon), IsPlayerLookingAtMe, IsSignificantlyCloser, TheNavMesh) ... */ return NULL; }
+CFFPlayer *CFFBot::FindMostDangerousThreat( void ) { /* ... (logic as before, uses IsSniperRifle, GetActiveFFWeapon (), IsPlayerLookingAtMe, IsSignificantlyCloser, TheNavMesh) ... */ return NULL; }
 void CFFBot::UpdateReactionQueue( void ) { /* ... (logic as before, uses GetProfile) ... */ }
 CFFPlayer *CFFBot::GetRecognizedEnemy( void ) { /* ... (logic as before) ... */ return NULL; }
 bool CFFBot::IsRecognizedEnemyReloading( void ) { /* ... */ return false; }

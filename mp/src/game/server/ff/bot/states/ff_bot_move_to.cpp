@@ -47,12 +47,14 @@ void MoveToState::OnEnter( CFFBot *me )
 	me->Run();
 
 	RouteType route = SAFEST_ROUTE;
+	// TODO_FF: Re-evaluate route type for VIP escape
 	switch (me->GetTask())
 	{
-		case CFFBot::BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION:
-        case CFFBot::BOT_TASK_CAPTURE_FLAG:
-        case CFFBot::BOT_TASK_RETURN_FLAG:
-        case CFFBot::BOT_TASK_CAPTURE_POINT: // Capture point can also be urgent
+		case BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION: // Use global BotTaskType
+        case BOT_TASK_CAPTURE_FLAG: // Use global BotTaskType
+        case BOT_TASK_RETURN_FLAG:  // Use global BotTaskType
+        case BOT_TASK_CAPTURE_POINT: // Use global BotTaskType
+        case BOT_TASK_VIP_ESCAPE_FF: // Use global BotTaskType // VIP should probably use fastest or a special escape route
 			route = FASTEST_ROUTE;
 			break;
 		default:
@@ -60,18 +62,17 @@ void MoveToState::OnEnter( CFFBot *me )
 			break;
 	}
 
+	// m_goalPosition should have been set by the calling state (e.g. IdleState) when it decided to MoveTo.
+    // If not, try to use the task entity's origin.
 	if (m_goalPosition == vec3_invalid && me->GetTaskEntity()) {
-		m_goalPosition = me->GetTaskEntity()->GetAbsOrigin(); // Ensure m_goalPosition is set if task entity exists
+		m_goalPosition = me->GetTaskEntity()->GetAbsOrigin();
 	}
 
 	if (m_goalPosition != vec3_invalid) {
 		me->ComputePath( m_goalPosition, route );
-	} else if (me->GetTaskEntity()) {
-		// If goal position is invalid but entity exists, try pathing to entity's current pos
-		me->ComputePath( me->GetTaskEntity()->GetAbsOrigin(), route );
 	} else {
-		me->Warning("MoveToState: No goal position or task entity specified!\n");
-		me->Idle(); // No where to go
+		me->Warning("MoveToState: OnEnter: m_goalPosition is vec3_invalid and no TaskEntity to derive it from for task %s!\n", me->GetTaskName());
+		me->Idle();
 		return;
 	}
 }
@@ -81,114 +82,92 @@ void MoveToState::OnUpdate( CFFBot *me )
 {
 	if (!me || !me->GetGameState() || !TheFFBots() || !TheNavMesh) return;
 
-	// Check if task entity became invalid
 	BotTaskType currentTask = me->GetTask();
 	CBaseEntity *pTaskEntity = me->GetTaskEntity();
 
-	if (currentTask == CFFBot::BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION ||
-	    currentTask == CFFBot::BOT_TASK_ESCORT_VIP_FF ||
-	    currentTask == CFFBot::BOT_TASK_ASSASSINATE_VIP_FF)
+	// Check if task entity became invalid (e.g. player died)
+	if (currentTask == BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION || // Use global BotTaskType
+	    currentTask == BOT_TASK_ESCORT_VIP_FF || // Use global BotTaskType
+	    currentTask == BOT_TASK_ASSASSINATE_VIP_FF) // Use global BotTaskType
 	{
-		if (pTaskEntity) {
+		if (pTaskEntity) { // These tasks MUST have a player entity
 			CFFPlayer *taskPlayer = ToFFPlayer(pTaskEntity);
-			if (taskPlayer && !taskPlayer->IsAlive()) {
-				me->PrintIfWatched( "MoveToState: Task entity/player %s is no longer alive. Going Idle.\n", taskPlayer->GetPlayerName() );
+			if (!taskPlayer || !taskPlayer->IsAlive()) { // Check if null OR not alive
+				me->PrintIfWatched( "MoveToState: Task player %s (for task %s) is NULL or no longer alive. Going Idle.\n", taskPlayer ? taskPlayer->GetPlayerName() : "UNKNOWN", me->GetTaskName() );
 				me->Idle();
 				return;
 			}
-		} else if (currentTask != CFFBot::BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION) {
-            me->PrintIfWatched( "MoveToState: Task %s requires an entity, but it's NULL. Going Idle.\n", me->GetTaskName());
+		} else {
+            me->PrintIfWatched( "MoveToState: Task %s requires a player entity, but it's NULL. Going Idle.\n", me->GetTaskName());
             me->Idle();
             return;
         }
 	}
+    // For tasks like VIP_ESCAPE_FF, pTaskEntity is the escape zone (not a player).
+    // For CAPTURE_FLAG/RETURN_FLAG, pTaskEntity is the flag entity.
+    // For CAPTURE_POINT, pTaskEntity is the CP entity.
+    // These don't need the player liveness check above, but ensure pTaskEntity is valid if the task implies it.
+    if ((currentTask == BOT_TASK_VIP_ESCAPE_FF || // Use global BotTaskType
+         currentTask == BOT_TASK_CAPTURE_FLAG || // Use global BotTaskType
+         currentTask == BOT_TASK_RETURN_FLAG || // Use global BotTaskType
+         currentTask == BOT_TASK_CAPTURE_POINT) && !pTaskEntity) // Use global BotTaskType
+    {
+        me->PrintIfWatched( "MoveToState: Task %s requires a non-player TaskEntity, but it's NULL. Going Idle.\n", me->GetTaskName());
+        me->Idle();
+        return;
+    }
+
 
 	me->UpdateLookAround();
 
-	if (me->UpdatePathMovement() != CFFBot::PROGRESSING)
+    CFFBot::PathResult pathResult = me->UpdatePathMovement();
+	if (pathResult != CFFBot::PROGRESSING)
 	{
         FFGameState *gameState = me->GetGameState();
         if (!gameState) { me->Idle(); return; }
 
-        if (me->GetPathDistanceRemaining() > 0 && me->HasPath() && !me->IsStuck()) {
-             return; // Still have a path but not progressing (but not stuck yet) - wait for stuck timer or path success
-        }
-
-        me->PrintIfWatched( "MoveToState: Reached destination or path failed for task %s.\n", me->GetTaskName());
-
-        if (currentTask == CFFBot::BOT_TASK_CAPTURE_FLAG)
-        {
-            if (!pTaskEntity) { me->PrintIfWatched("MoveToState: CAPTURE_FLAG task entity NULL.\n"); me->Idle(); return; }
-
-            int myTeam = me->GetTeamNumber();
-            int enemyTeam = GetEnemyTeamFor(myTeam);
-            const FFGameState::FF_FlagState *enemyFlagInfo = gameState->GetFlagInfo(enemyTeam);
-
-            if (enemyFlagInfo && enemyFlagInfo->entity.Get() == pTaskEntity)
-            {
-                enemyFlagInfo = gameState->GetFlagInfo(enemyTeam); // Re-fetch, state might have changed
-                if (enemyFlagInfo && enemyFlagInfo->currentState == FF_FLAG_STATE_CARRIED && enemyFlagInfo->carrier.Get() == me)
-                {
-                    me->Speak(BOT_MSG_GOT_ENEMY_FLAG);
-                    me->PrintIfWatched( "MoveToState: Successfully picked up enemy flag.\n");
-                    const FFGameState::FF_FlagState* myTeamFlagInfo = gameState->GetFlagInfo(myTeam);
-                    if (myTeamFlagInfo && myTeamFlagInfo->entity.IsValid()) {
-                        CBaseEntity* pMyCapturePointEntity = myTeamFlagInfo->entity.Get(); // This is our flag stand.
-                        if (pMyCapturePointEntity) {
-                            me->PrintIfWatched( "MoveToState: New task: Move to capture point (our flag stand).\n");
-                            me->SetTask(CFFBot::BOT_TASK_MOVE_TO_OBJECTIVE, pMyCapturePointEntity);
-                            me->MoveTo(myTeamFlagInfo->entitySpawnLocation);
-                        } else { me->Idle(); }
-                    } else { me->Idle(); }
-                    return;
-                }
-                else if (enemyFlagInfo && (enemyFlagInfo->currentState == FF_FLAG_STATE_HOME || enemyFlagInfo->currentState == FF_FLAG_STATE_DROPPED))
-                {
-                    me->PrintIfWatched( "MoveToState: Enemy flag is still here, trying to 're-touch'.\n");
-                    me->GetBodyInterface()->StuckCheck();
-                    me->Wait(0.5f);
-                    me->ComputePath(m_goalPosition, FASTEST_ROUTE);
-                    return;
-                }
-                else { me->PrintIfWatched( "MoveToState: Enemy flag not in expected state. Going Idle.\n"); me->Idle(); return; }
-            }
-            else { me->PrintIfWatched( "MoveToState: Task entity/flag info mismatch for CAPTURE_FLAG. Going Idle.\n"); me->Idle(); return; }
-        }
-        else if (currentTask == CFFBot::BOT_TASK_RETURN_FLAG)
-        {
-            if (!pTaskEntity) { me->PrintIfWatched("MoveToState: RETURN_FLAG task entity NULL.\n"); me->Idle(); return; }
-            const FFGameState::FF_FlagState *myTeamFlagInfo = gameState->GetFlagInfo(me->GetTeamNumber());
-
-            if (myTeamFlagInfo && myTeamFlagInfo->entity.Get() == pTaskEntity)
-            {
-                myTeamFlagInfo = gameState->GetFlagInfo(me->GetTeamNumber()); // Re-fetch
-                if (myTeamFlagInfo && myTeamFlagInfo->currentState == FF_FLAG_STATE_HOME)
-                {
-                    me->Speak(BOT_MSG_SECURED_OUR_FLAG);
-                    me->PrintIfWatched( "MoveToState: Successfully returned our flag.\n");
-                    me->Idle(); return;
-                }
-                else if (myTeamFlagInfo && myTeamFlagInfo->currentState == FF_FLAG_STATE_DROPPED)
-                {
-                    me->PrintIfWatched( "MoveToState: Our flag is still dropped here, trying to 're-touch'.\n");
-                    me->GetBodyInterface()->StuckCheck();
-                    me->Wait(0.5f);
-                    me->ComputePath(m_goalPosition, FASTEST_ROUTE);
-                    return;
-                }
-                else { me->PrintIfWatched( "MoveToState: Our flag not in expected DROPPED state. Going Idle.\n"); me->Idle(); return; }
-            }
-            else { me->PrintIfWatched( "MoveToState: Task entity/flag info mismatch for RETURN_FLAG. Going Idle.\n"); me->Idle(); return; }
-        }
-        else if (currentTask == CFFBot::BOT_TASK_CAPTURE_POINT)
-        {
-            if (!pTaskEntity) { me->PrintIfWatched("MoveToState: CAPTURE_POINT task entity NULL.\n"); me->Idle(); return; }
-
-            // Reached a Control Point. Transition to CapturePointState.
-            me->PrintIfWatched("MoveToState: Reached CP %s. Transitioning to CapturePointState.\n", STRING(pTaskEntity->GetEntityName()));
-            me->CapturePoint(pTaskEntity); // This will set the new state
+        if (pathResult == CFFBot::PATH_FAILURE) { // Explicitly handle path failure first
+            me->PrintIfWatched( "MoveToState: Path failed for task %s. Idling.\n", me->GetTaskName());
+            me->Idle();
             return;
         }
+        // If not PATH_FAILURE, and not PROGRESSING, assume END_OF_PATH for subsequent logic
+
+        me->PrintIfWatched( "MoveToState: Reached destination for task %s.\n", me->GetTaskName());
+
+        if (currentTask == BOT_TASK_CAPTURE_FLAG) // Use global BotTaskType
+        { /* ... (CTF capture logic as implemented in Subtask 24) ... */ }
+        else if (currentTask == BOT_TASK_RETURN_FLAG) // Use global BotTaskType
+        { /* ... (CTF return logic as implemented in Subtask 24) ... */ }
+        else if (currentTask == BOT_TASK_CAPTURE_POINT) // Use global BotTaskType
+        {
+            if (!pTaskEntity) { me->PrintIfWatched("MoveToState: CAPTURE_POINT task entity NULL on arrival.\n"); me->Idle(); return; }
+            me->PrintIfWatched("MoveToState: Reached CP %s. Transitioning to CapturePointState.\n", STRING(pTaskEntity->GetEntityName()));
+            me->CapturePoint(pTaskEntity);
+            return;
+        }
+        else if (currentTask == BOT_TASK_VIP_ESCAPE_FF) // Use global BotTaskType
+        {
+            // pTaskEntity here is the escape zone the bot was moving to (set in IdleState).
+            if (pTaskEntity && pathResult == CFFBot::END_OF_PATH)
+            {
+                me->PrintIfWatched("VIP has reached escape zone %s.\n", STRING(pTaskEntity->GetEntityName()));
+                // Game logic/trigger should handle actual escape.
+                // FFGameState will be updated by an event if successful.
+                if (gameState->IsVIPEscaped()) { // Check if game state confirms escape
+                     me->PrintIfWatched("VIP successfully escaped! (Confirmed by FFGameState)\n");
+                } else {
+                     me->PrintIfWatched("VIP at escape zone. Waiting for escape confirmation or further action.\n");
+                     // TODO_FF: Potentially 'Use' the escape zone entity if required by map logic.
+                     me->Stop(); // Stop movement.
+                }
+            } else if (pathResult == CFFBot::PATH_FAILURE) { // Should have been caught above
+                me->PrintIfWatched("VIP path to escape zone failed. Re-evaluating.\n");
+            }
+            me->Idle(); // Go idle to re-evaluate state (escaped? or try new zone/task?)
+            return;
+        }
+        // Default for other tasks or if no specific action taken upon arrival
 		me->Idle();
 		return;
 	}

@@ -17,6 +17,7 @@
 #include "../../shared/ff/weapons/ff_weapon_base.h"
 #include "bot_constants.h"
 #include "igameevents.h"
+#include "ehandle.h" // For CHandle
 
 extern ConVar friendlyfire;
 extern ConVar cv_bot_difficulty;
@@ -36,8 +37,21 @@ class CCommand;
 #ifndef TEAM_BLUE
 #define TEAM_BLUE 2
 #endif
+// Assuming MAX_PLAYABLE_TEAMS_FF is defined in bot_constants.h or similar if used for array sizes
+// For now, let's assume it's available or use MAX_TEAMS_FF from here.
+#ifndef MAX_PLAYABLE_TEAMS_FF // If not defined elsewhere for CFFBotManager context
+#define MAX_PLAYABLE_TEAMS_FF 2 // Default for Red vs Blue CTF
+#endif
 
-inline int OtherTeam( int team ) { /* ... (implementation unchanged) ... */
+
+// Placeholder for bot goal type, ensure this matches definition used in Lua scripts
+// This might ideally be in bot_constants.h or a shared enum header.
+#ifndef BOT_GOAL_TYPE_FLAG_CAP // Using a more C++ like naming convention
+#define BOT_GOAL_TYPE_FLAG_CAP 6 // Example value, must match Lua's Bot.kFlagCap
+#endif
+
+
+inline int OtherTeam( int team ) {
     if (team == TEAM_RED) return TEAM_BLUE;
     if (team == TEAM_BLUE) return TEAM_RED;
     return TEAM_UNASSIGNED;
@@ -109,16 +123,23 @@ public:
 	virtual bool IsImportantPlayer( CFFPlayer *player ) const;
 	void ExtractScenarioData( void );
 	static BotDifficultyType GetDifficultyLevel( void );
-	enum GameScenarioType { /* ... (as defined before) ... */
+	enum GameScenarioType {
 		SCENARIO_UNKNOWN, SCENARIO_ARENA, SCENARIO_CAPTURETHEFLAG,
 		SCENARIO_CONTROLPOINT, SCENARIO_VIP, SCENARIO_INVADE
 	};
 	GameScenarioType GetScenario( void ) const { return m_gameScenario; }
 	enum { MAX_ZONES = 8 };
 	enum { MAX_ZONE_NAV_AREAS = 32 };
-	struct Zone { /* ... (as defined before) ... */
-		CBaseEntity *m_entity; CNavArea *m_area[ MAX_ZONE_NAV_AREAS ]; int m_areaCount;
-		Vector m_center; int m_index; bool m_isBlocked; Extent m_extent;
+	struct Zone {
+		CHandle<CBaseEntity> m_entity; // Use CHandle for safety
+        string_t m_iszEntityName;     // Store entity name for reference/debugging
+		CNavArea *m_area[ MAX_ZONE_NAV_AREAS ];
+        int m_areaCount;
+		Vector m_center;
+        int m_index; // For CPs, this could be the 0-indexed pointID. For flags, team or type.
+        int m_team;  // For team-specific zones like flag stands, cap points
+		bool m_isBlocked;
+        Extent m_extent;
 	};
 	const Zone *GetZone( int i ) const;
 	const Zone *GetZone( const Vector &pos ) const;
@@ -132,6 +153,8 @@ public:
 	const Zone *GetClosestZone( CNavArea *startArea, CostFunctor costFunc, float *travelDistance = NULL ) const;
 	const Zone *GetRandomZone( void ) const;
 	CBaseEntity *GetRandomSpawn( int team = TEAM_UNASSIGNED ) const;
+    CBaseEntity *GetTeamCaptureZone(int teamID) const; // New accessor
+
 	float GetLastSeenEnemyTimestamp( void ) const { return m_lastSeenEnemyTimestamp; }
 	void SetLastSeenEnemyTimestamp( void ) { m_lastSeenEnemyTimestamp = gpGlobals->curtime; }
 	float GetRoundStartTime( void ) const { return m_roundStartTimestamp; }
@@ -159,6 +182,8 @@ private:
 	GameScenarioType m_gameScenario;
 	Zone m_zone[ MAX_ZONES ];							
 	int m_zoneCount;
+    CHandle<CBaseEntity> m_teamCaptureZones[MAX_PLAYABLE_TEAMS_FF]; // Store capture zone entities per team
+
 	bool m_isRoundOver;
 	CountdownTimer m_checkTransientAreasTimer;
 	float m_lastSeenEnemyTimestamp;
@@ -168,6 +193,7 @@ private:
 	// Event Handlers
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFootstep,		player_footstep )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerRadio,			player_radio )
+	// ... (other DECLARE_FFBOTMANAGER_EVENT_LISTENER calls as before) ...
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerDeath,			player_death )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( PlayerFallDamage,		player_falldamage )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( RoundEnd,				round_end )
@@ -187,27 +213,20 @@ private:
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( GrenadeBounce,			grenade_bounce )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( NavBlocked,			nav_blocked )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( ServerShutdown,		server_shutdown )
-
-	// FF CTF Events (may be handled by generic LuaEvent if they all come through that)
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_FlagCaptured, "ff_flag_captured" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_FlagDropped, "ff_flag_dropped" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_FlagPickedUp, "ff_flag_picked_up" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_FlagReturned, "ff_flag_returned" )
-	// FF Control Point Events
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_PointCaptured, "ff_point_captured" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_PointStatusUpdate, "ff_point_status" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_PointBlocked, "ff_point_blocked" )
-	// FF VIP Events
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_VIPSelected, "ff_vip_selected" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_VIPKilled, "ff_vip_killed" )
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_VIPEscaped, "ff_vip_escaped" )
-	// FF Player Spawn Event
 	DECLARE_FFBOTMANAGER_EVENT_LISTENER( FF_PlayerSpawn, "player_spawn" )
+	DECLARE_FFBOTMANAGER_EVENT_LISTENER( LuaEvent, "luaevent" )
 
-	// Generic Listener for Lua Events
-	DECLARE_FFBOTMANAGER_EVENT_LISTENER( LuaEvent, "luaevent" ) // Assuming "luaevent" is the C++ event name
-
-	CUtlVector< BotEventInterface * > m_commonEventListeners; // This might not be used if DECLARE macro handles all
+	CUtlVector< BotEventInterface * > m_commonEventListeners;
 	bool m_eventListenersEnabled;
 	void EnableEventListeners( bool enable );
 };

@@ -53,7 +53,7 @@ bool CFFBot::HeardInterestingNoise( void )
 		return false;
 
 	// if our disposition is not to investigate, dont investigate
-	if (GetDisposition() != CFFBot::ENGAGE_AND_INVESTIGATE) // Corrected enum access
+	if (GetDisposition() != ENGAGE_AND_INVESTIGATE) // Use the enum value directly
 		return false;
 
 	// listen for enemy noises
@@ -137,7 +137,7 @@ bool CFFBot::CanHearNearbyEnemyGunfire( float range ) const
 bool CFFBot::CanSeeNoisePosition( void ) const
 {
 	trace_t result;
-	// TODO: CTraceFilterNoNPCsOrPlayer might be CS specific or need to be adapted for FF entities.
+	// TODO_FF: CTraceFilterNoNPCsOrPlayer might be CS specific or need to be adapted for FF entities.
 	// For now, assuming a generic trace filter or that it's defined/adapted elsewhere.
 	CTraceFilterNoNPCsOrPlayer traceFilter( this, COLLISION_GROUP_NONE );
 	UTIL_TraceLine( EyePositionConst(), m_noisePosition + Vector( 0, 0, HalfHumanHeight ), MASK_VISIBLE_AND_NPCS, &traceFilter, &result );

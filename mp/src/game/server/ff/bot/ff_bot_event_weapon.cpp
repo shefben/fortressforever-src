@@ -9,13 +9,13 @@
 
 #include "cbase.h"
 #include "ff_bot.h"
-#include "ff_bot_manager.h" // For TheFFBots()
-#include "../ff_player.h"     // For CFFPlayer
-#include "../../shared/ff/ff_gamerules.h" // For FFGameRules()
-#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase, FFWeaponID
-// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-#include "ff_gamestate.h"   // For FFGameState
-#include "bot_constants.h"  // For PriorityType, etc.
+#include "ff_bot_manager.h"
+#include "../ff_player.h"
+#include "../../shared/ff/ff_gamerules.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+// #include "../../shared/ff/weapons/ff_weapon_parse.h"
+#include "ff_gamestate.h"
+#include "bot_constants.h"
 
 #include "KeyValues.h"      // Already included, seems fine
 
@@ -48,16 +48,20 @@ void CFFBot::OnWeaponFire( IGameEvent *event )
 
 	/// @todo Check weapon type (knives are pretty quiet)
 	/// @todo Use actual volume, account for silencers, etc.
-	CFFWeaponBase *weapon = (CFFWeaponBase *)((player)?player->GetActiveWeapon():NULL);
+	CFFWeaponBase *weapon = dynamic_cast<CFFWeaponBase *>((player)?player->GetActiveWeapon():NULL); // Use dynamic_cast
 
 	if (weapon == NULL)
 		return;
 
-	// TODO: Update all WEAPON_ enums to FFWeaponID equivalents for Fortress Forever
-	switch( weapon->GetWeaponID() )
+	// TODO_FF: Update all WEAPON_ enums to FFWeaponID equivalents for Fortress Forever
+	// The GetWeaponID() method should return an FFWeaponID enum value.
+	// The case statements here are CS-specific and will need to be updated for FF weapons.
+	// For this refactoring, the main goal is ensuring GetWeaponID() is called on CFFWeaponBase.
+	// Actual weapon IDs and their properties will be handled in FF-specific logic later.
+	switch( weapon->GetWeaponID() ) // Assuming GetWeaponID() returns FFWeaponID
 	{
 		// silent "firing"
-		// case FF_WEAPON_GRENADE_HE: // Example for FF
+		// case FF_WEAPON_GRENADE_CONC: // Example for FF
 		// case FF_WEAPON_GRENADE_SMOKE: // Example for FF
 		// case FF_WEAPON_GRENADE_FLASH: // Example for FF
 		// case FF_WEAPON_SHIELDGUN: // If FF has a shield gun

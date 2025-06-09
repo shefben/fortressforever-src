@@ -19,7 +19,7 @@
  */
 void AttackState::OnEnter( CFFBot *me )
 {
-	CBasePlayer *enemy = me->GetBotEnemy();
+	CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 
 	// store our posture when the attack began
 	me->PushPostureContext();
@@ -48,7 +48,7 @@ void AttackState::OnEnter( CFFBot *me )
 	m_shieldForceOpen = false;
 
 	// if we encountered someone while escaping, grab our weapon and fight!
-	if (me->IsEscapingFromBomb())
+	if (me->IsEscapingFromBomb()) // TODO_FF: CS-specific (IsEscapingFromBomb)
 		me->EquipBestWeapon();
 
 	if (me->IsUsingKnife())
@@ -74,7 +74,7 @@ void AttackState::OnEnter( CFFBot *me )
 				float crouchChance;
 				
 				// more likely to crouch if using sniper rifle or if enemy is far away
-				if (me->IsUsingSniperRifle())
+				if (me->IsUsingSniperRifle()) // TODO_FF: CS-specific (IsUsingSniperRifle)
 					crouchChance = 50.0f;
 				else if ((GetCentroid( me ) - GetCentroid( enemy )).IsLengthGreaterThan( crouchFarRange ))
 					crouchChance = 50.0f;
@@ -137,7 +137,7 @@ void AttackState::OnEnter( CFFBot *me )
  */
 void AttackState::StopAttacking( CFFBot *me )
 {
-	if (me->GetTask() == CFFBot::SNIPING)
+	if (me->GetTask() == BOT_TASK_SNIPING) // Use global BotTaskType // TODO_FF: CS-specific (SNIPING task)
 	{
 		// stay in our hiding spot
 		me->Hide( me->GetLastKnownArea(), -1.0f, 50.0f );
@@ -158,9 +158,9 @@ void AttackState::Dodge( CFFBot *me )
 	// Dodge.
 	// If sniping or crouching, stand still.
 	//
-	if (m_shouldDodge && !me->IsUsingSniperRifle() && !m_crouchAndHold)
+	if (m_shouldDodge && !me->IsUsingSniperRifle() && !m_crouchAndHold) // TODO_FF: CS-specific (IsUsingSniperRifle)
 	{
-		CBasePlayer *enemy = me->GetBotEnemy();
+		CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 		if (enemy == NULL)
 		{
 			return;
@@ -300,19 +300,23 @@ void AttackState::OnUpdate( CFFBot *me )
 	me->ResetStuckMonitor();
 
 	// if we somehow ended up with the C4 or a grenade in our hands, grab our weapon!
-	CFFWeaponBase *weapon = me->GetActiveCSWeapon();
+	CFFWeaponBase *weapon = me->GetActiveFFWeapon(); // Changed GetActiveCSWeapon to GetActiveFFWeapon
 	if (weapon)
 	{
-		if (weapon->GetWeaponID() == WEAPON_C4 || 
-			weapon->GetWeaponID() == WEAPON_HEGRENADE || 
-			weapon->GetWeaponID() == WEAPON_FLASHBANG ||
-			weapon->GetWeaponID() == WEAPON_SMOKEGRENADE)
+		// TODO_FF: Replace CSWeaponID enums with FFWeaponID equivalents
+		// WEAPON_C4, WEAPON_HEGRENADE etc. are CS specific.
+		// Example: if (weapon->GetWeaponID() == FF_WEAPON_PIPEBOMB || ... )
+		CSWeaponID weaponID = weapon->GetWeaponID(); // Store to avoid multiple calls if GetWeaponID() is expensive
+		if (weaponID == WEAPON_C4 || // TODO_FF: CS Specific weapon ID
+			weaponID == WEAPON_HEGRENADE || // TODO_FF: CS Specific weapon ID
+			weaponID == WEAPON_FLASHBANG || // TODO_FF: CS Specific weapon ID
+			weaponID == WEAPON_SMOKEGRENADE) // TODO_FF: CS Specific weapon ID
 		{
 			me->EquipBestWeapon();
 		}
 	}
 
-	CBasePlayer *enemy = me->GetBotEnemy();
+	CFFPlayer *enemy = me->GetBotEnemy(); // Changed CBasePlayer to CFFPlayer
 	if (enemy == NULL)
 	{
 		StopAttacking( me );
@@ -336,23 +340,23 @@ void AttackState::OnUpdate( CFFBot *me )
 		// If we've been fighting this battle for awhile, we're "pinned down" and
 		// need to do something else.
 		// If we are outnumbered, retreat.
-		// If we see a sniper and we aren't a sniper, retreat.
+	// If we see a sniper and we aren't a sniper, retreat. // TODO_FF: CS-specific (CanSeeSniper, IsSniper)
 
 		bool isPinnedDown = (gpGlobals->curtime > m_pinnedDownTimestamp);
 
 		if (isPinnedDown || 
-			(me->CanSeeSniper() && !me->IsSniper()) ||
+		(me->CanSeeSniper() && !me->IsSniper()) || // TODO_FF: CS-specific
 			(me->IsOutnumbered() && m_isCoward) || 
 			(me->OutnumberedCount() >= 2 && me->GetProfile()->GetAggression() < 1.0f))
 		{
 			// only retreat if at least one of them is aiming at me
-			if (me->IsAnyVisibleEnemyLookingAtMe( CHECK_FOV ))
+		if (me->IsAnyVisibleEnemyLookingAtMe( CHECK_FOV )) // CHECK_FOV from bot_constants.h
 			{
 				// tell our teammates our plight
-				if (isPinnedDown)
-					me->GetChatter()->PinnedDown();
-				else if (!me->CanSeeSniper())
-					me->GetChatter()->Scared();
+			// if (isPinnedDown) // Chatter system removed
+			// 	me->GetChatter()->PinnedDown();
+			// else if (!me->CanSeeSniper()) // Chatter system removed
+			// 	me->GetChatter()->Scared();
 
 				m_retreatTimer.Start( RandomFloat( 3.0f, 15.0f ) );
 
@@ -360,6 +364,7 @@ void AttackState::OnUpdate( CFFBot *me )
 				if (me->TryToRetreat())
 				{
 					// if we are a sniper, equip our pistol so we can fire while retreating
+				// TODO_FF: CS-specific (IsUsingSniperRifle)
 					/*
 					if (me->IsUsingSniperRifle())
 					{
@@ -370,10 +375,10 @@ void AttackState::OnUpdate( CFFBot *me )
 					*/
 
 					// request backup if outnumbered
-					if (me->IsOutnumbered())
-					{
-						me->GetChatter()->NeedBackup();
-					}
+				// if (me->IsOutnumbered()) // Chatter system removed
+				// {
+				// 	me->GetChatter()->NeedBackup();
+				// }
 				}
 				else	
 				{
@@ -497,10 +502,10 @@ void AttackState::OnUpdate( CFFBot *me )
 	}
 
 	// if we're sniping, look through the scope - need to do this here in case a reload resets our scope
-	if (me->IsUsingSniperRifle())
+	if (me->IsUsingSniperRifle()) // TODO_FF: CS-specific (IsUsingSniperRifle)
 	{
 		// for Scouts and AWPs, we need to wait for zoom to resume
-		if (me->m_bResumeZoom)
+		if (me->m_bResumeZoom) // m_bResumeZoom needs to be member of CFFBot if this logic is kept
 		{
 			m_scopeTimestamp = gpGlobals->curtime;
 			return;
@@ -510,7 +515,7 @@ void AttackState::OnUpdate( CFFBot *me )
 		float targetRange = toAimSpot3D.Length();
 
 		// dont adjust zoom level if we're already zoomed in - just fire
-		if (me->GetZoomLevel() == CFFBot::NO_ZOOM && me->AdjustZoom( targetRange ))
+		if (me->GetZoomLevel() == CFFBot::NO_ZOOM && me->AdjustZoom( targetRange )) // CFFBot::NO_ZOOM needs to be defined
 			m_scopeTimestamp = gpGlobals->curtime;
 	
 		const float waitScopeTime = 0.3f + me->GetProfile()->GetReactionTime();
@@ -527,10 +532,10 @@ void AttackState::OnUpdate( CFFBot *me )
 		// let team know if we killed the last enemy
 		if (me->GetLastVictimID() == enemy->entindex() && me->GetNearbyEnemyCount() <= 1)
 		{
-			me->GetChatter()->KilledMyEnemy( enemy->entindex() );
+			// me->GetChatter()->KilledMyEnemy( enemy->entindex() ); // Chatter system removed
 
 			// if there are other enemies left, wait a moment - they usually come in groups
-			if (me->GetEnemiesRemaining())
+			if (me->GetEnemiesRemaining()) // GetEnemiesRemaining needs to be defined for FF
 			{
 				me->Wait( RandomFloat( 1.0f, 3.0f ) );
 			}
@@ -634,7 +639,7 @@ void AttackState::OnUpdate( CFFBot *me )
 	if (!me->IsEnemyVisible() && (notSeenEnemyTime > chaseTime || !m_haveSeenEnemy))
 	{
 		// snipers don't chase their prey - they wait for their prey to come to them
-		if (me->GetTask() == CFFBot::SNIPING)
+		if (me->GetTask() == BOT_TASK_SNIPING) // Use global BotTaskType // TODO_FF: CS-specific (SNIPING task)
 		{
 			StopAttacking( me );
 			return;
@@ -642,7 +647,7 @@ void AttackState::OnUpdate( CFFBot *me )
 		else
 		{
 			// move to last known position of enemy
-			me->SetTask( CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION, enemy );
+			me->SetTask( BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION, enemy ); // Use global BotTaskType
 			me->MoveTo( me->GetLastKnownEnemyPosition() );
 			return;
 		}
@@ -652,22 +657,23 @@ void AttackState::OnUpdate( CFFBot *me )
 	// if we can't see our enemy at the moment, and were shot by
 	// a different visible enemy, engage them instead
 	const float hurtRecentlyTime = 3.0f;
+	CFFPlayer* attacker = me->GetAttacker(); // Store attacker
 	if (!me->IsEnemyVisible() &&
 		me->GetTimeSinceAttacked() < hurtRecentlyTime &&
-		me->GetAttacker() &&
-		me->GetAttacker() != me->GetBotEnemy())
+		attacker && // Use stored attacker
+		attacker != me->GetBotEnemy())
 	{
 		// if we can see them, attack, otherwise panic
-		if (me->IsVisible( me->GetAttacker(), CHECK_FOV ))
+		if (me->IsVisible( attacker, CHECK_FOV )) // CHECK_FOV from bot_constants.h
 		{
-			me->Attack( me->GetAttacker() );
+			me->Attack( attacker ); // Pass CFFPlayer
 			me->PrintIfWatched( "Switching targets to retaliate against new attacker!\n" );
 		}
 		/*
 		 * Rethink this
 		else
 		{
-			me->Panic( me->GetAttacker() );
+			me->Panic( attacker ); // Pass CFFPlayer
 			me->PrintIfWatched( "Panicking from crossfire while attacking!\n" );
 		}
 		*/
@@ -675,7 +681,7 @@ void AttackState::OnUpdate( CFFBot *me )
 		return;
 	}
 
-	if (true || gpGlobals->curtime > m_reacquireTimestamp)
+	if (true || gpGlobals->curtime > m_reacquireTimestamp) // TODO: This 'true ||' condition seems odd, review logic if keeping.
 		me->FireWeaponAtEnemy();
 
 
@@ -689,6 +695,7 @@ void AttackState::OnUpdate( CFFBot *me )
  */
 void AttackState::OnExit( CFFBot *me )
 {
+	if (!me) return; // Added null check
 	me->PrintIfWatched( "AttackState:OnExit()\n" );
 
 	m_crouchAndHold = false;
@@ -701,7 +708,7 @@ void AttackState::OnExit( CFFBot *me )
 	me->PopPostureContext();
 
 	// put shield away
-	if (me->IsProtectedByShield())
+	if (me->IsProtectedByShield()) // TODO_FF: CS-specific (shield)
 		me->SecondaryAttack();
 
 

@@ -9,14 +9,14 @@
 
 #include "cbase.h"
 #include "ff_bot.h"
-#include "ff_bot_manager.h" // For TheFFBots()
-#include "../ff_player.h"     // For CFFPlayer
-#include "../../shared/ff/ff_gamerules.h" // For FFGameRules(), WINNER_TER, WINNER_CT etc.
-#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
-// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-#include "ff_gamestate.h"   // For FFGameState
-#include "nav_mesh.h"       // For TheNavMesh, CNavArea
-#include "bot_constants.h"  // For PriorityType, etc.
+#include "ff_bot_manager.h"
+#include "../ff_player.h"
+#include "../../shared/ff/ff_gamerules.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+// #include "../../shared/ff/weapons/ff_weapon_parse.h"
+#include "ff_gamestate.h"
+#include "nav_mesh.h"
+#include "bot_constants.h"
 #include "KeyValues.h"      // Already included, seems fine
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -33,7 +33,7 @@ void CFFBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 		return;
 
 	// don't pay attention to noise that friends make
-	if (!IsEnemy( player ))
+	if (!IsEnemy( player )) // IsEnemy takes CBaseEntity*, player is CBasePlayer* here, should be fine
 		return;
 
 	Vector playerOrigin = GetCentroid( player );
@@ -106,7 +106,7 @@ void CFFBot::OnAudibleEvent( IGameEvent *event, CBasePlayer *player, float range
 		m_noisePosition.y = newNoisePosition->y + RandomFloat( -errorRadius, errorRadius );
 
 		// note the *travel distance* to the noise
-		m_noiseTravelDistance = GetTravelDistanceToPlayer( (CFFPlayer *)player );
+		m_noiseTravelDistance = GetTravelDistanceToPlayer( static_cast<CFFPlayer *>(player) ); // Cast CBasePlayer to CFFPlayer
 
 		// make sure noise position remains in the same area
 		m_noiseArea->GetClosestPointOnArea( m_noisePosition, &m_noisePosition );
@@ -275,51 +275,31 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 	Vector myOrigin = GetCentroid( this );
 	const float range = 1200.0f;
 
-	// this is here so T's not only act on the noise, but look at it, too
-	if (GetTeamNumber() == TEAM_TERRORIST) // TODO: Update for FF Teams
-	{
-		// make sure we can hear the noise
-		if ((playerOrigin - myOrigin).IsLengthGreaterThan( range ))
-			return;
+	// TODO_FF: Hostage logic is CS-specific. The following block will need review for FF.
+	// For now, class name changes are the priority. Chatter system is removed.
+	// Team enums (TEAM_TERRORIST), GameState methods (GetNearestVisibleFreeHostage),
+	// and BotTasks (GUARD_HOSTAGE_RESCUE_ZONE, SEEK_AND_DESTROY) are CS-specific.
+	// if (GetTeamNumber() == TEAM_TERRORIST_FF) // Example FF team
+	// {
+	// 	// make sure we can hear the noise
+	// 	if ((playerOrigin - myOrigin).IsLengthGreaterThan( range ))
+	// 		return;
+	// 	// GetChatter()->HostagesBeingTaken(); // Chatter system removed
+	// 	// if (GetGameState()->GetNearestVisibleFreeObjectiveItem() == NULL) // Example FF objective
+	// 	// {
+	// 	// 	if (GetTask() != BOT_TASK_GUARD_OBJECTIVE_ZONE_FF) // Example FF task
+	// 	// 	{
+	// 	// 		// ... logic ...
+	// 	// 	}
+	// 	// }
+	// }
+	// else
+	// {
+	// 	// CT's don't care about this noise
+	// 	return;
+	// }
 
-		// tell our teammates that the hostages are being taken
-		GetChatter()->HostagesBeingTaken();
-
-		// only move if we hear them being rescued and can't see any hostages
-		if (GetGameState()->GetNearestVisibleFreeHostage() == NULL) // TODO: Update for FF if hostages are different
-		{			
-			// since we are guarding the hostages, presumably we know where they are
-			// if we're close enough to "hear" this event, either go to where the event occured,
-			// or head for an escape zone to head them off
-			if (GetTask() != CFFBot::GUARD_HOSTAGE_RESCUE_ZONE) // TODO: Update for FF Tasks
-			{
-				if (true)
-				{
-					// head them off at a rescue zone
-					if (GuardRandomZone())
-					{
-						SetTask( CFFBot::GUARD_HOSTAGE_RESCUE_ZONE ); // TODO: Update for FF Tasks
-						SetDisposition( CFFBot::OPPORTUNITY_FIRE );
-						PrintIfWatched( "Trying to beat them to an escape zone!\n" );
-					}
-				}
-				else
-				{
-					SetTask( CFFBot::SEEK_AND_DESTROY ); // TODO: Update for FF Tasks
-					StandUp();
-					Run();
-					MoveTo( playerOrigin, FASTEST_ROUTE );
-				}
-			}
-		}
-	}
-	else
-	{
-		// CT's don't care about this noise
-		return;
-	}
-
-	OnAudibleEvent( event, player, range, PRIORITY_MEDIUM, false ); // hostage_follows // TODO: Update event name for FF
+	OnAudibleEvent( event, player, range, PRIORITY_MEDIUM, false ); // hostage_follows // TODO_FF: Update event name for FF if different
 }
 
 
@@ -327,51 +307,71 @@ void CFFBot::OnHostageFollows( IGameEvent *event )
 void CFFBot::OnRoundEnd( IGameEvent *event )
 {
 	// Morale adjustments happen even for dead players
-	// TODO: Update WINNER_TER, WINNER_CT for FF teams/win conditions
-	int winner = event->GetInt( "winner" );
-	switch ( winner )
-	{
-	case WINNER_TER: // CS Specific
-		if (GetTeamNumber() == TEAM_CT) // CS Specific
-		{
-			DecreaseMorale();
-		}
-		else
-		{
-			IncreaseMorale();
-		}
-		break;
+	// TODO_FF: Update WINNER_TER, WINNER_CT for FF teams/win conditions (e.g. TEAM_RED_FF, TEAM_BLUE_FF using game rules)
+	int winnerTeamID = event->GetInt( "winner" );
 
-	case WINNER_CT: // CS Specific
-		if (GetTeamNumber() == TEAM_CT) // CS Specific
+	// Example FF logic (assumes FFGameRules() and proper team ID definitions):
+	// CFFGameRules *pRules = FFGameRules();
+	// if (pRules) {
+	// 	if (pRules->IsTeamValid(winnerTeamID)) {
+	// 		if (GetTeamNumber() == winnerTeamID) {
+	// 			IncreaseMorale();
+	// 		} else if (pRules->IsTeamValid(GetTeamNumber())) { // Ensure bot is on a valid team before decreasing morale
+	// 			DecreaseMorale();
+	// 		}
+	// 	}
+	// } else
+	{ // Fallback to CS-style logic if FFGameRules() is not available or doesn't handle it
+		switch ( winnerTeamID )
 		{
-			IncreaseMorale();
-		}
-		else
-		{
-			DecreaseMorale();
-		}
-		break;
+		case WINNER_TER: // CS Specific
+			if (GetTeamNumber() == TEAM_CT) // CS Specific team check
+			{
+				DecreaseMorale();
+			}
+			else if (GetTeamNumber() == TEAM_TERRORIST) // CS Specific team check
+			{
+				IncreaseMorale();
+			}
+			break;
 
-	default:
-		break;
+		case WINNER_CT: // CS Specific
+			if (GetTeamNumber() == TEAM_CT) // CS Specific team check
+			{
+				IncreaseMorale();
+			}
+			else if (GetTeamNumber() == TEAM_TERRORIST) // CS Specific team check
+			{
+				DecreaseMorale();
+			}
+			break;
+
+		default:
+			break;
+		}
 	}
+
 
 	m_gameState.OnRoundEnd( event );
 
 	if ( !IsAlive() )
 		return;
 
-	// TODO: Update WINNER_TER, WINNER_CT for FF teams/win conditions
+	// TODO_FF: Update WINNER_TER, WINNER_CT for FF teams/win conditions. Chatter system is removed.
+	// Example FF logic:
+	// CFFGameRules *pRules = FFGameRules();
+	// if (pRules && pRules->IsTeamValid(winnerTeamID) && GetTeamNumber() == winnerTeamID)
+	// {
+	// 	// GetChatter()->CelebrateWin(); // Chatter system removed
+	// }
+	// Fallback CS-style logic:
 	if ( event->GetInt( "winner" ) == WINNER_TER ) // CS Specific
 	{
-		if (GetTeamNumber() == TEAM_TERRORIST) // CS Specific
-			GetChatter()->CelebrateWin();
+		// if (GetTeamNumber() == TEAM_TERRORIST_FF) GetChatter()->CelebrateWin(); // Chatter system removed
 	}
 	else if ( event->GetInt( "winner" ) == WINNER_CT ) // CS Specific
 	{
-		if (GetTeamNumber() == TEAM_CT) // CS Specific
-			GetChatter()->CelebrateWin();
+		// if (GetTeamNumber() == TEAM_CT_FF) GetChatter()->CelebrateWin(); // Chatter system removed
 	}
 }
 
@@ -384,10 +384,10 @@ void CFFBot::OnRoundStart( IGameEvent *event )
 
 
 //--------------------------------------------------------------------------------------------------------------
-// TODO: Hostage logic is CS-specific and needs to be adapted or removed for FF.
+// TODO_FF: Hostage logic is CS-specific and needs to be adapted or removed for FF.
 void CFFBot::OnHostageRescuedAll( IGameEvent *event )
 {
-	m_gameState.OnHostageRescuedAll( event );
+	// m_gameState.OnObjectiveCompletedAll( event ); // Example for FF, if applicable
 }
 
 

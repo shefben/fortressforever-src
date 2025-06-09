@@ -58,10 +58,12 @@ enum BotTaskType
     BOT_TASK_CAPTURE_FLAG,        // Example for CTF
     BOT_TASK_RETURN_FLAG,         // Example for CTF
     BOT_TASK_DEFEND_FLAG_STAND,   // Example for CTF
+    BOT_TASK_CARRY_FLAG_TO_CAP,   // New task for carrying flag to capture point
     BOT_TASK_CAPTURE_POINT,       // Example for CP
     BOT_TASK_DEFEND_POINT,        // Example for CP
-    // BOT_TASK_ESCORT_VIP_FF,    // Example for FF VIP (if different from CS)
-    // BOT_TASK_ASSASSINATE_VIP_FF, // Example for FF VIP (if different from CS)
+    BOT_TASK_ESCORT_VIP_FF,       // Example for FF VIP (if different from CS) - uncomment if used
+    BOT_TASK_ASSASSINATE_VIP_FF,  // Example for FF VIP (if different from CS) - uncomment if used
+    BOT_TASK_VIP_ESCAPE_FF,       // Example for FF VIP (already used in IdleState)
 
     NUM_BOT_TASKS // Must be last
 };
@@ -83,20 +85,49 @@ enum RouteType
     FASTEST_ROUTE
 };
 
-// Navigation-related constants (if not defined in nav_mesh or similar)
-// Example:
-// const float HalfHumanWidth = 16.0f; // This might be game-specific rather than bot-specific
-// const float StepHeight = 18.0f;     // Typically game-specific
-// const float JumpHeight = 56.0f;     // Typically game-specific
+// --- Weapon Scoring Constants for EquipBestWeapon ---
+const float SCORE_BASE = 100.0f;
+const float SCORE_CLASS_WEAPON_BONUS = 500.0f;
+const float SCORE_AMMO_FULL_CLIP_BONUS = 50.0f;
+const float SCORE_AMMO_LOW_PENALTY_FACTOR = -200.0f; // Multiplied by (1 - ammo_ratio)
+const float SCORE_NO_RESERVE_AMMO_PENALTY = -10000.0f;
+const float SCORE_MELEE_CLOSE_BONUS = 300.0f;
+const float SCORE_SHOTGUN_CLOSE_BONUS = 400.0f;
+const float SCORE_SNIPER_AT_RANGE_BONUS = 450.0f;
+const float SCORE_SNIPER_VERY_FAR_BONUS = 300.0f;
+const float SCORE_SNIPER_TOO_CLOSE_PENALTY = -8000.0f;
+const float SCORE_ROCKET_OPTIMAL_RANGE_BONUS = 350.0f;
+const float SCORE_ROCKET_TOO_CLOSE_PENALTY = -7000.0f;
+const float SCORE_GENERIC_OUT_OF_RANGE_PENALTY = -500.0f;
+const float SCORE_TASK_SNIPING_BONUS = 10000.0f;
+// Task-specific bonuses/penalties
+const float SCORE_FLAG_CARRIER_BONUS = 200.0f;          // Bonus for good flag carrying weapons (shotgun, nailgun)
+const float SCORE_FLAG_CARRIER_PENALTY = -300.0f;       // Penalty for bad flag carrying weapons (sniper)
+const float SCORE_DEFENSE_BONUS = 250.0f;               // Bonus for defensive weapons (rockets, pipes, AC)
+const float SCORE_DEFENSE_MELEE_PENALTY = -400.0f;      // Penalty for melee on defense
+const float SCORE_ASSASSIN_BONUS = 300.0f;              // Bonus for good assassination weapons
+const float SCORE_BODYGUARD_BONUS = 200.0f;             // Bonus for good bodyguard weapons
+// Special class item bonuses (base values, can be modified by context)
+const float SCORE_MEDKIT_BASE_BONUS = 50.0f;
+const float SCORE_SPANNER_BASE_BONUS = 50.0f;
+const float SCORE_RAILGUN_ENGINEER_COMBAT_BONUS = 100.0f;
 
-// Other bot-specific constants
-// Example:
-// const int MAX_BOT_ARG_LENGTH = 128;
 
-// TODO_FF: Add any other enums or constants that were used by the CS bot code
-// and are not defined elsewhere in FF's headers or more appropriate shared locations.
-// For example, weapon class types if the original bot profile used them,
-// but CFFWeaponInfo and ff_bot_weapon_id.h/cpp now handle this for FF.
-// Radio event enums (RADIO_AFFIRMATIVE, etc.) should also be here if not defined globally for the game.
+// --- Distance Thresholds for Weapon Scoring ---
+const float DIST_MELEE_MAX_EFFECTIVE_RANGE_FACTOR = 1.5f; // Multiplier for weaponInfo.m_flRange
+const float DIST_CLOSE_COMBAT = 400.0f;
+const float DIST_SNIPER_MIN = 250.0f;
+const float DIST_SNIPER_OPTIMAL_MIN = 1000.0f;
+const float DIST_SNIPER_OPTIMAL_MAX = 4000.0f;
+const float DIST_ROCKET_MIN = 200.0f; // Min safety distance for splash
+const float DIST_ROCKET_OPTIMAL_MAX = 2000.0f;
+const float DIST_GENERIC_EFFECTIVE_RANGE_FACTOR = 1.2f; // Multiplier for weaponInfo.m_flRange
+
+
+// Team definition for VIP mode (Hunted)
+// Ensure TEAM_ID_BLUE is defined in an included header (e.g. ff_shareddefs.h or similar)
+// For example, if TEAM_BLUE is 2 in the game's enum: #define FF_HUNTED_TEAM 2
+// Using the placeholder from ff_gamestate.h style:
+#define FF_HUNTED_TEAM TEAM_ID_BLUE // Placeholder, ensure TEAM_ID_BLUE is correctly defined and accessible
 
 #endif // FF_BOT_CONSTANTS_H

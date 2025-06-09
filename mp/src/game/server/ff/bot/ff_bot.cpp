@@ -10,7 +10,7 @@
 #include "cbase.h"
 #include "ff_bot.h"
 #include "ff_bot_manager.h"
-// #include "ff_bot_chatter.h" // Removed CS-specific chatter
+// #include "ff_bot_chatter.h" // Removed FF-specific chatter
 #include "ff_gamestate.h"
 #include "../ff_player.h"
 #include "../../shared/ff/weapons/ff_weapon_base.h"
@@ -39,7 +39,7 @@
 #include "states/ff_bot_state_open_door.h"
 
 // Other specific includes
-#include "cs_simple_hostage.h" // TODO: Check if FF equivalent exists or if shared
+#include "cs_simple_hostage.h" // TODO_FF: Check if FF equivalent exists or if shared, CS-specific
 #include "func_breakablesurf.h" // Assumed engine/shared
 #include "obstacle_pushaway.h" // Assumed engine/shared
 #include "nav_mesh.h" // For TheNavMesh, CNavArea
@@ -141,36 +141,36 @@ int CFFBot::OnTakeDamage( const CTakeDamageInfo &info )
 	StopWaiting();
 
 	// if we were attacked by a teammate, rebuke
-	if (attacker && attacker->IsPlayer()) // Added null check for attacker
+	if (attacker && attacker->IsPlayer())
 	{
-		CFFPlayer *player = static_cast<CFFPlayer *>( attacker );
+		CFFPlayer *playerAttacker = static_cast<CFFPlayer *>( attacker ); // Renamed to avoid conflict
 		
-		if (player && InSameTeam( player ) && !player->IsBot()) // Added null check for player
+		if (playerAttacker && InSameTeam( playerAttacker ) && !playerAttacker->IsBot())
 		{
-			// GetChatter()->FriendlyFire(); // Removed CS-specific chatter
+			// GetChatter()->FriendlyFire(); // Removed FF-specific chatter
 			// TODO_FF: Consider alternative feedback for friendly fire if needed
 		}
 	}
 
-	if (attacker && attacker->IsPlayer() && IsEnemy( attacker )) // Added null check for attacker
+	if (attacker && attacker->IsPlayer() && IsEnemy( attacker ))
 	{
 		// Track previous attacker so we don't try to panic multiple times for a shotgun blast
-		CFFPlayer *lastAttacker = m_attacker;
+		CFFPlayer *lastAttacker = m_attacker.Get(); // Use .Get() for CHandle comparison
 		float lastAttackedTimestamp = m_attackedTimestamp;
 
 		// keep track of our last attacker
-		m_attacker = reinterpret_cast<CFFPlayer *>( attacker );
+		m_attacker = static_cast<CFFPlayer *>( attacker ); // CHandle will manage this assignment
 		m_attackedTimestamp = gpGlobals->curtime;
 
 		// no longer safe
 		AdjustSafeTime();
 
-		if ( !IsSurprised() && (m_attacker != lastAttacker || m_attackedTimestamp != lastAttackedTimestamp) )
+		if ( !IsSurprised() && (m_attacker.Get() != lastAttacker || m_attackedTimestamp != lastAttackedTimestamp) ) // Use .Get()
 		{
 			CFFPlayer *enemy = static_cast<CFFPlayer *>( attacker );
 
 			// being hurt by an enemy we can't see causes panic
-			if (enemy && !IsVisible( enemy, CHECK_FOV )) // Added null check for enemy
+			if (enemy && !IsVisible( enemy, CHECK_FOV ))
 			{
 				// if not attacking anything, look around to try to find attacker
 				if (!IsAttacking())
@@ -292,18 +292,18 @@ void CFFBot::Touch( CBaseEntity *other )
 	if (other->IsPlayer())
 	{
 		// if we are defusing a bomb, don't move
-		if (IsDefusingBomb()) // TODO: CS-specific
+		if (IsDefusingBomb()) // TODO_FF: CS-specific, remove or adapt
 			return;
 
 		// if we are on a ladder, don't move
 		if (IsUsingLadder())
 			return;
 
-		CFFPlayer *player = static_cast<CFFPlayer *>( other );
-		if (!player || !TheFFBots()) return; // Null checks
+		CFFPlayer *otherPlayer = static_cast<CFFPlayer *>( other ); // Renamed to avoid conflict
+		if (!otherPlayer || !TheFFBots()) return;
 
 		// get priority of other player
-		unsigned int otherPri = TheFFBots()->GetPlayerPriority( player );
+		unsigned int otherPri = TheFFBots()->GetPlayerPriority( otherPlayer );
 
 		// get our priority
 		unsigned int myPri = TheFFBots()->GetPlayerPriority( this );
@@ -313,9 +313,9 @@ void CFFBot::Touch( CBaseEntity *other )
 			return;
 
 		// they are higher priority - make way, unless we're already making way for someone more important
-		if (m_avoid != NULL)
+		if (m_avoid.Get() != NULL) // Use .Get() for CHandle
 		{
-			CBasePlayer* avoidPlayer = static_cast<CBasePlayer *>( static_cast<CBaseEntity *>( m_avoid.Get() ) ); // Use .Get()
+			CFFPlayer* avoidPlayer = dynamic_cast<CFFPlayer *>( m_avoid.Get() ); // Use dynamic_cast for safety
 			if (avoidPlayer)
 			{
 				unsigned int avoidPri = TheFFBots()->GetPlayerPriority( avoidPlayer );
@@ -327,7 +327,7 @@ void CFFBot::Touch( CBaseEntity *other )
 			}
 		}
 
-		m_avoid = other;
+		m_avoid = otherPlayer; // CHandle assignment
 		m_avoidTimestamp = gpGlobals->curtime;
 	}
 
@@ -350,13 +350,14 @@ void CFFBot::Touch( CBaseEntity *other )
  */
 bool CFFBot::IsBusy( void ) const
 {
-	// TODO: Update TaskType enums for FF (PLANT_BOMB, RESCUE_HOSTAGES)
+	// TODO_FF: Update TaskType enums for FF (BOT_TASK_PLANT_BOMB, BOT_TASK_RESCUE_HOSTAGES are CS-specific)
+	// Ensure GetTask() returns BotTaskType from bot_constants.h
 	if (IsAttacking() || 
 		IsBuying() ||
-		IsDefusingBomb() || // CS-specific
-		GetTask() == PLANT_BOMB ||
-		GetTask() == RESCUE_HOSTAGES ||
-		IsSniping()) // CS-specific
+		IsDefusingBomb() || // TODO_FF: CS-specific, remove or adapt
+		GetTask() == BOT_TASK_PLANT_BOMB || // TODO_FF: CS-specific, remove or adapt
+		GetTask() == BOT_TASK_RESCUE_HOSTAGES || // TODO_FF: CS-specific, remove or adapt
+		IsSniping()) // TODO_FF: CS-specific, remove or adapt
 	{
 		return true;
 	}
@@ -386,12 +387,12 @@ void CFFBot::TryToJoinTeam( int team )
  */
 void CFFBot::SetBotEnemy( CFFPlayer *enemy )
 {
-	if (m_enemy != enemy)
+	if (m_enemy.Get() != enemy) // Use .Get() for CHandle comparison
 	{
-		m_enemy = enemy; 
+		m_enemy = enemy; // CHandle assignment
 		m_currentEnemyAcquireTimestamp = gpGlobals->curtime;
 
-		PrintIfWatched(this, "SetBotEnemy: %s\n", (enemy) ? enemy->GetPlayerName() : "(NULL)" ); // Updated PrintIfWatched
+		PrintIfWatched(this, "SetBotEnemy: %s\n", (enemy) ? enemy->GetPlayerName() : "(NULL)" );
 	}
 }
 
@@ -445,8 +446,8 @@ bool CFFBot::IsDoingScenario( void ) const
 {
 	if (cv_bot_defer_to_human.GetBool())
 	{
-		// TODO: Update ALIVE enum for FF if different
-		if (UTIL_HumansOnTeam( GetTeamNumber(), ALIVE ))
+	// TODO_FF: Update ALIVE enum for FF if different, or use game-specific player state check
+	if (UTIL_HumansOnTeam( GetTeamNumber(), ALIVE )) // ALIVE might need to be PlayerState::ALIVE or similar
 			return false;
 	}
 	return true;
@@ -457,8 +458,7 @@ bool CFFBot::IsDoingScenario( void ) const
 /**
  * Return true if we noticed the bomb on the ground or on the radar (for T's only)
  */
-// TODO: Bomb logic for FF
-// TODO_FF: CS Bomb-specific methods below are removed.
+// TODO_FF: Bomb logic for FF. CS Bomb-specific methods below are removed.
 // bool CFFBot::NoticeLooseBomb( void ) const { ... }
 // bool CFFBot::CanSeeLooseBomb( void ) const { ... }
 // bool CFFBot::CanSeePlantedBomb( void ) const { ... }
@@ -476,9 +476,25 @@ void CFFBot::CapturePoint( CBaseEntity *cpEntity )
 		Idle();
 		return;
 	}
-	PrintIfWatched( "Player %s capturing/defending point %s\n", GetPlayerName(), STRING(cpEntity->GetEntityName()) );
+	PrintIfWatched( "Player %s capturing/defending point %s\n", GetPlayerName(), STRING(cpEntity->GetEntityName()) ); // GetEntityName() for string_t
 	SetTaskEntity( cpEntity );
 	SetState( &m_capturePointState );
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+/**
+ * Transition to the CarryFlagState, typically after picking up the enemy flag.
+ */
+void CFFBot::CarryEnemyFlag( void )
+{
+	// The CarryFlagState's OnEnter will determine the capture point entity.
+	// Task entity here could remain the enemy flag we are carrying, or be null if not needed by CarryFlagState directly.
+	// For now, let's assume the primary "objective" is implicit in the state.
+	// SetTaskEntity( NULL ); // Or keep it as the flag entity if CarryFlagState uses it.
+	PrintIfWatched( "Player %s is now carrying the enemy flag. Transitioning to CarryFlagState.\n", GetPlayerName() );
+	SetTask( BOT_TASK_CARRY_FLAG_TO_CAP ); // Ensure this BotTaskType is defined
+	SetState( &m_carryFlagState );
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -487,8 +503,8 @@ void CFFBot::CapturePoint( CBaseEntity *cpEntity )
  */
 CFFPlayer *CFFBot::GetAttacker( void ) const
 {
-	if (m_attacker.IsValid() && m_attacker->IsAlive()) // Use .IsValid() for EHANDLE
-		return m_attacker.Get(); // Use .Get() for EHANDLE
+	if (m_attacker.IsValid() && m_attacker->IsAlive())
+		return m_attacker.Get();
 	return NULL;
 }
 
@@ -499,8 +515,8 @@ CFFPlayer *CFFBot::GetAttacker( void ) const
  */
 CFFWeaponBase *CFFBot::GetActiveFFWeapon() const
 {
-    CBaseCombatWeapon *pCombatWeapon = GetActiveWeapon(); // Inherited from CBasePlayer
-    return dynamic_cast<CFFWeaponBase *>(pCombatWeapon);
+    CBaseCombatWeapon *pCombatWeapon = GetActiveWeapon();
+    return dynamic_cast<CFFWeaponBase *>(pCombatWeapon); // Changed CWeaponCSBase to CFFWeaponBase
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -574,7 +590,7 @@ void CFFBot::SetHidingSpotCheckTimestamp( HidingSpot *spot )
 // TODO_FF: Hostage logic is CS-specific. Removed.
 void CFFBot::UpdateHostageEscortCount( void )
 {
-	// CS Hostage logic removed
+	// FF Hostage logic removed (if any was planned here)
 }
 
 //--------------------------------------------------------------------------------------------------------------
@@ -686,7 +702,7 @@ bool CFFBot::IsRogue( void ) const
 	{
 		m_rogueTimer.Start( RandomFloat( 10.0f, 30.0f ) );
 		if (GetProfile()) m_isRogue = (RandomFloat( 0, 100 ) < (100.0f * (1.0f - GetProfile()->GetTeamwork())));
-		else m_isRogue = false;
+		else m_isRogue = false; // Default if no profile
 	}
 	return m_isRogue; 
 }
@@ -700,9 +716,11 @@ bool CFFBot::IsHurrying( void ) const
 {
 	if (!m_hurryTimer.IsElapsed()) return true;
 	if (!TheFFBots() || !GetGameState()) return false;
-	// TODO: Update for FF Scenarios and Teams
-	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && TheFFBots()->IsBombPlanted()) return true;
-	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES && GetTeamNumber() == TEAM_TERRORIST && GetGameState()->AreAllHostagesBeingRescued()) return true;
+	// TODO_FF: Update for FF Scenarios and Teams (SCENARIO_DEFUSE_BOMB, IsBombPlanted, SCENARIO_RESCUE_HOSTAGES, TEAM_TERRORIST, AreAllHostagesBeingRescued are CS-specific)
+	// Example: if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_CAPTURETHEFLAG && GetGameState()->IsOurFlagStolen()) return true;
+	// For now, these CS conditions will likely evaluate to false or be benign.
+	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_DEFUSE_BOMB && TheFFBots()->IsBombPlanted()) return true;  // TODO_FF: CS Specific
+	if (TheFFBots()->GetScenario() == CFFBotManager::SCENARIO_RESCUE_HOSTAGES && GetTeamNumber() == TEAM_TERRORIST && GetGameState()->AreAllHostagesBeingRescued()) return true; // TODO_FF: CS Specific
 	return false;
 }
 
@@ -807,10 +825,24 @@ bool CFFBot::GuardRandomZone( float range )
  */
 const char *CFFBot::GetTaskName( void ) const
 {
-	// This static array should be updated with FF TaskType names from bot_constants.h
-	static const char *name[] = { "SEEK_AND_DESTROY", /* ... other task names ... */ "NUM_TASKS_INVALID" };
-	if (GetTask() < 0 || GetTask() >= NUM_BOT_TASKS) return "INVALID_TASK"; // Use NUM_BOT_TASKS from bot_constants.h
-	return name[ (int)GetTask() ];
+	// This static array should be updated with FF BotTaskType names from bot_constants.h
+	// Ensure this array matches the order and content of BotTaskType enum.
+	// This is brittle; a better approach might be a function in bot_constants.cpp or a map.
+	static const char *name[] = {
+		"SEEK_AND_DESTROY",
+		"PLANT_BOMB", "FIND_TICKING_BOMB", "DEFUSE_BOMB", "GUARD_TICKING_BOMB",
+		"GUARD_BOMB_DEFUSER", "GUARD_LOOSE_BOMB", "GUARD_BOMB_ZONE", "ESCAPE_FROM_BOMB",
+		"GUARD_INITIAL_ENCOUNTER", "HOLD_POSITION", "FOLLOW",
+		"VIP_ESCAPE", "GUARD_VIP_ESCAPE_ZONE",
+		"COLLECT_HOSTAGES", "RESCUE_HOSTAGES", "GUARD_HOSTAGES", "GUARD_HOSTAGE_RESCUE_ZONE",
+		"MOVE_TO_LAST_KNOWN_ENEMY_POSITION", "MOVE_TO_SNIPER_SPOT", "SNIPING",
+		"CAPTURE_FLAG", "RETURN_FLAG", "DEFEND_FLAG_STAND", "CARRY_FLAG_TO_CAP",
+		"CAPTURE_POINT", "DEFEND_POINT",
+		"ESCORT_VIP_FF", "ASSASSINATE_VIP_FF", "VIP_ESCAPE_FF",
+		"NUM_TASKS_INVALID" // Should correspond to NUM_BOT_TASKS
+	};
+	if (GetTask() < 0 || GetTask() >= NUM_BOT_TASKS) return "INVALID_TASK";
+	return name[ (int)GetTask() ]; // GetTask() now returns BotTaskType
 }
 
 
@@ -869,3 +901,51 @@ void CFFBot::BuildUserCmd( CUserCmd& cmd, const QAngle& viewangles, float forwar
 // State logic (IdleState::OnEnter etc.) is in the state files (e.g. states/ff_bot_state_idle.cpp).
 // State transition wrappers (CFFBot::Idle(), CFFBot::Attack()) are in ff_bot_statemachine.cpp.
 // This ensures a cleaner separation of concerns.
+
+
+//--------------------------------------------------------------------------------------------------------------
+/**
+ * Find the closest escape zone for a VIP.
+ */
+CBaseEntity* CFFBot::GetClosestEscapeZone() const
+{
+    if (!TheFFBots() || TheFFBots()->GetScenario() != CFFBotManager::SCENARIO_VIP) {
+        return NULL;
+    }
+
+    CBaseEntity* pClosestZoneEntity = NULL;
+    float flMinDistSq = FLT_MAX;
+    const Vector &myOrigin = GetAbsOrigin();
+
+    for (int i = 0; i < TheFFBots()->GetZoneCount(); ++i) {
+        const CFFBotManager::Zone *pZone = TheFFBots()->GetZone(i);
+
+        // TODO_FF: Add a definitive way to check if a Zone is an VIP escape zone.
+        // This could be a specific BotGoalType on the entity, a flag in the Zone struct,
+        // or matching entity classname/targetname.
+        // For now, in SCENARIO_VIP, we assume all registered zones are escape zones.
+        // This assumption should be refined based on how CFFBotManager::ExtractScenarioData populates zones for VIP mode.
+        // If ExtractScenarioData only adds VIP escape zones to m_zone[] when in SCENARIO_VIP, this is okay.
+        // Otherwise, a more specific check is needed here.
+        // Example based on a hypothetical BotGoalType check on the zone's entity:
+        // CScriptObject *pLuaObj = dynamic_cast<CScriptObject *>(pZone->m_entity);
+        // if (pZone && pZone->m_entity && pLuaObj && pLuaObj->GetBotGoalType() == BOT_GOAL_TYPE_VIP_ESCAPE_ZONE) {
+
+        if (pZone && pZone->m_entity) { // Assuming all zones in VIP mode are escape zones for now
+            float flDistSq = (myOrigin - pZone->m_center).LengthSqr();
+            if (flDistSq < flMinDistSq) {
+                // TODO_FF: Add path distance check here instead of straight line distance
+                // if ( PathDistance( me, myOrigin, pZone->m_center ) < closestPathDistance ) ...
+                flMinDistSq = flDistSq;
+                pClosestZoneEntity = pZone->m_entity;
+            }
+        }
+    }
+
+    if (pClosestZoneEntity) {
+        PrintIfWatched("Closest escape zone found: %s\n", pClosestZoneEntity->GetDebugName());
+    } else {
+        PrintIfWatched("No escape zones found for VIP!\n");
+    }
+    return pClosestZoneEntity;
+}

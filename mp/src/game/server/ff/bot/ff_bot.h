@@ -8,24 +8,24 @@
 //
 // Author: Michael S. Booth (mike@turtlerockstudios.com), 2003
 //
-// NOTE: The CS Bot code uses Doxygen-style comments. If you run Doxygen over this code, it will 
+// NOTE: The Fortress Forever Bot code uses Doxygen-style comments. If you run Doxygen over this code, it will
 // auto-generate documentation.  Visit www.doxygen.org to download the system for free.
 //
 
 #ifndef _FF_BOT_H_
 #define _FF_BOT_H_
 
-#include "../../shared/bot/bot.h" // Changed path
+#include "../../shared/bot/bot.h"
 #include "ff_bot_manager.h"
-// #include "ff_bot_chatter.h" // Removed CS-specific chatter
+// #include "ff_bot_chatter.h" // Removed FF-specific chatter
 #include "ff_gamestate.h"
-#include "../ff_player.h"                     // Changed path
-#include "../../shared/ff/weapons/ff_weapon_base.h" // Changed path
-#include "nav_area.h"                       // Changed from cs_nav_area.h
+#include "../ff_player.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+#include "nav_area.h"
 // TODO: cs_nav_pathfind.h was included. If CFFNavPath is a direct replacement, include "ff_nav_path.h".
 // Otherwise, nav_pathfind.h or nav_mesh.h might provide CNavPath or similar generic path objects.
 // For now, including a generic one.
-#include "nav_pathfind.h"                   // Changed from cs_nav_pathfind.h
+#include "nav_pathfind.h"
 #include "bot_constants.h" // For enums like RouteType, PriorityType, Place, RadioType, FFWeaponID etc.
 
 // State machine states
@@ -45,10 +45,12 @@
 
 #include "states/ff_bot_state_use_entity.h"
 #include "states/ff_bot_state_open_door.h"
-#include "states/ff_bot_state_capture_point.h" // Added CapturePointState include
+#include "states/ff_bot_state_capture_point.h"
+#include "states/ff_bot_state_carry_flag.h" // Added CarryFlagState include
 
 // Forward declarations for engine/game classes
-class CapturePointState; // Added forward declaration
+class CapturePointState;
+class CarryFlagState; // Added forward declaration
 class CBaseDoor;
 class CBasePropDoor;
 class CPushAwayEnumerator; // Likely from obstacle_pushaway.h or similar
@@ -63,7 +65,7 @@ class CBaseCombatWeapon; // From shareddefs.h or similar
 //--------------------------------------------------------------------------------------------------------------
 /**
  * For use with player->m_rgpPlayerItems[]
- * TODO: C4_SLOT is CS-specific. Adapt for FF if it has a similar unique objective item slot.
+ * TODO: OBJECTIVE_ITEM_SLOT was C4_SLOT. Adapt for FF if it has a similar unique objective item slot.
  */
 enum InventorySlotType
 {
@@ -83,7 +85,7 @@ enum InventorySlotType
 class BotState
 {
 public:
-	virtual ~BotState() {} // Added virtual destructor for base class with virtual methods
+	virtual ~BotState() {}
 	virtual void OnEnter( CFFBot *bot ) { }				///< when state is entered
 	virtual void OnUpdate( CFFBot *bot ) { }			///< state behavior
 	virtual void OnExit( CFFBot *bot ) { }				///< when state exited
@@ -92,25 +94,14 @@ public:
 
 
 //--------------------------------------------------------------------------------------------------------------
-// TODO: These state class definitions were moved to their own headers (ff_bot_state_*.h)
-// They are kept here temporarily for reference during the include fixing, but should be removed
-// if their definitions are indeed solely in their respective .h files now.
-// The previous subtasks (2,3,4,5) were about moving these out.
-// For now, assuming they are correctly defined in their own headers and these are redundant.
-/*
-class UseEntityState : public BotState { ... };
-class OpenDoorState : public BotState { ... };
-*/
-
-//--------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------------------
 /**
  * The Fortress Forever Bot
  */
-class CFFBot : public CBot< CFFPlayer > // Ensure CFFPlayer
+class CFFBot : public CBot< CFFPlayer >
 {
 public:
-	DECLARE_CLASS( CFFBot, CBot< CFFPlayer > ); // Ensure CFFPlayer
+	DECLARE_CLASS( CFFBot, CBot< CFFPlayer > );
 	DECLARE_DATADESC();
 
 	CFFBot( void );
@@ -166,7 +157,7 @@ public:
 	void Hunt( void );
 	bool IsHunting( void ) const;
 
-	void Attack( CFFPlayer *victim ); // Ensure CFFPlayer
+	void Attack( CFFPlayer *victim );
 	void FireWeaponAtEnemy( void );
 	void StopAttacking( void );
 	bool IsAttacking( void ) const;
@@ -174,23 +165,24 @@ public:
 	void MoveTo( const Vector &pos, RouteType route = SAFEST_ROUTE ); // RouteType enum
 	bool IsMovingTo( void ) const;
 
-	// TODO: Bomb-specific methods, adapt for FF objectives
-	// void PlantBomb( void ); // CS Specific
-	// void FetchBomb( void ); // CS Specific
-	// bool NoticeLooseBomb( void ) const; // CS Specific
-	// bool CanSeeLooseBomb( void ) const; // CS Specific
-	// void DefuseBomb( void ); // CS Specific
-	// bool IsDefusingBomb( void ) const; // CS Specific
-	// bool CanSeePlantedBomb( void ) const; // CS Specific
-	// void EscapeFromBomb( void ); // CS Specific
-	// bool IsEscapingFromBomb( void ) const; // CS Specific
+	// TODO_FF: Bomb-specific methods, adapt for FF objectives or remove
+	// void PlantBomb( void );
+	// void FetchBomb( void );
+	// bool NoticeLooseBomb( void ) const;
+	// bool CanSeeLooseBomb( void ) const;
+	// void DefuseBomb( void );
+	// bool IsDefusingBomb( void ) const;
+	// bool CanSeePlantedBomb( void ) const;
+	// void EscapeFromBomb( void );
+	// bool IsEscapingFromBomb( void ) const;
 
-	// TODO: Hostage-specific methods, adapt or remove for FF
-	// void RescueHostages( void ); // CS Specific
+	// TODO_FF: Hostage-specific methods, adapt or remove for FF
+	// void RescueHostages( void );
 
 	void UseEntity( CBaseEntity *entity );
 	void OpenDoor( CBaseEntity *door );
-	void CapturePoint( CBaseEntity *cpEntity ); // Added for new state
+	void CapturePoint( CBaseEntity *cpEntity );
+	void CarryEnemyFlag( void ); // Added for new state
 	bool IsOpeningDoor( void ) const;
 
 	void Buy( void );
@@ -203,11 +195,11 @@ public:
 
 	void TryToJoinTeam( int team );
 
-	void Follow( CFFPlayer *player ); // Ensure CFFPlayer
+	void Follow( CFFPlayer *player );
 	void ContinueFollowing( void );
 	void StopFollowing( void );
 	bool IsFollowing( void ) const;
-	CFFPlayer *GetFollowLeader( void ) const; // Ensure CFFPlayer
+	CFFPlayer *GetFollowLeader( void ) const;
 	float GetFollowDuration( void ) const;
 	bool CanAutoFollow( void ) const;
 
@@ -222,36 +214,34 @@ public:
 	bool IsDoingScenario( void ) const;
 
 	//- scenario / gamestate -----------------------------------------------------------------------------------------
-	FFGameState *GetGameState( void ); // Ensure FFGameState
-	const FFGameState *GetGameState( void ) const; // Ensure FFGameState
+	FFGameState *GetGameState( void );
+	const FFGameState *GetGameState( void ) const;
 
-	// TODO: Bomb-specific, adapt for FF objectives
+	// TODO_FF: Bomb-specific IsAtBombsite, adapt for FF objectives or remove
 	bool IsAtBombsite( void );
 	bool GuardRandomZone( float range = 500.0f );
 
 	bool IsBusy( void ) const;
 
 	//- high-level tasks ---------------------------------------------------------------------------------------------
-	// TODO: Update TaskType enum for FF objectives (CaptureFlag, DefendPoint, EscortVIP (if any))
+	// This enum is defined in bot_constants.h as BotTaskType.
+	// This local one might be redundant or a subset. For now, ensure it's not used directly if BotTaskType is preferred.
+	// TODO_FF: Reconcile this TaskType enum with BotTaskType in bot_constants.h
 	enum TaskType
 	{
 		SEEK_AND_DESTROY,
-		// CS Specific Tasks:
-		PLANT_BOMB, FIND_TICKING_BOMB, DEFUSE_BOMB, GUARD_TICKING_BOMB,
-		GUARD_BOMB_DEFUSER, GUARD_LOOSE_BOMB, GUARD_BOMB_ZONE, ESCAPE_FROM_BOMB,
-		VIP_ESCAPE, GUARD_VIP_ESCAPE_ZONE,
-		COLLECT_HOSTAGES, RESCUE_HOSTAGES, GUARD_HOSTAGES, GUARD_HOSTAGE_RESCUE_ZONE,
-		// Generic/FF applicable tasks:
-		GUARD_INITIAL_ENCOUNTER, HOLD_POSITION, FOLLOW,
-		MOVE_TO_LAST_KNOWN_ENEMY_POSITION, MOVE_TO_SNIPER_SPOT, SNIPING,
-		// FF Specific Tasks (Examples):
-		CAPTURE_FLAG, RETURN_FLAG, DEFEND_FLAG_STAND, CAPTURE_POINT, DEFEND_POINT,
+		// FF Specific Tasks (Examples from bot_constants.h, ensure consistency):
+		// BOT_TASK_PLANT_BOMB, BOT_TASK_FIND_TICKING_BOMB, ... (CS ones)
+		// BOT_TASK_CAPTURE_FLAG, BOT_TASK_RETURN_FLAG, ... (FF ones)
 		NUM_TASKS // Must be last
 	};
-	void SetTask( TaskType task, CBaseEntity *entity = NULL );
-	TaskType GetTask( void ) const;
+	// void SetTask( TaskType task, CBaseEntity *entity = NULL ); // Uses local TaskType
+	// TaskType GetTask( void ) const; // Uses local TaskType
+	void SetTask( BotTaskType task, CBaseEntity *entity = NULL ); // Changed to use global BotTaskType
+	BotTaskType GetTask( void ) const; // Changed to use global BotTaskType
 	CBaseEntity *GetTaskEntity( void );
 	const char *GetTaskName( void ) const;
+	CBaseEntity* GetClosestEscapeZone() const;
 
 	//- behavior modifiers ------------------------------------------------------------------------------------------
 	enum DispositionType
@@ -299,38 +289,38 @@ public:
 
 	//- radio and chatter--------------------------------------------------------------------------------------------
 	// void SendRadioMessage( RadioType event ); // Radio system removed
-	void SpeakAudio( const char *voiceFilename, float duration, int pitch ); // Generic audio, keep for now
-	// BotChatterInterface *GetChatter( void ); // Removed CS-specific chatter
-	bool RespondToHelpRequest( CFFPlayer *player, Place place, float maxRange = -1.0f ); // Ensure CFFPlayer
+	void SpeakAudio( const char *voiceFilename, float duration, int pitch );
+	// BotChatterInterface *GetChatter( void ); // Removed FF-specific chatter
+	bool RespondToHelpRequest( CFFPlayer *player, Place place, float maxRange = -1.0f );
 	bool IsUsingVoice() const;
 
 
 	//- enemies ------------------------------------------------------------------------------------------------------
-	void SetBotEnemy( CFFPlayer *enemy ); // Ensure CFFPlayer
-	CFFPlayer *GetBotEnemy( void ) const; // Ensure CFFPlayer
+	void SetBotEnemy( CFFPlayer *enemy );
+	CFFPlayer *GetBotEnemy( void ) const;
 	int GetNearbyEnemyCount( void ) const;
 	unsigned int GetEnemyPlace( void ) const; // Place enum
-	// TODO: Bomb-specific, adapt for FF objectives (e.g. flag carrier)
+	// TODO_FF: Bomb-specific CanSeeBomber/GetBomber, adapt for FF objectives (e.g. flag carrier) or remove
 	bool CanSeeBomber( void ) const;
-	CFFPlayer *GetBomber( void ) const; // Ensure CFFPlayer
+	CFFPlayer *GetBomber( void ) const;
 
 	int GetNearbyFriendCount( void ) const;
-	CFFPlayer *GetClosestVisibleFriend( void ) const; // Ensure CFFPlayer
-	CFFPlayer *GetClosestVisibleHumanFriend( void ) const; // Ensure CFFPlayer
+	CFFPlayer *GetClosestVisibleFriend( void ) const;
+	CFFPlayer *GetClosestVisibleHumanFriend( void ) const;
 
 	bool IsOutnumbered( void ) const;
 	int OutnumberedCount( void ) const;
 
 	// #define ONLY_VISIBLE_ENEMIES true // Prefer const bool
-	CFFPlayer *GetImportantEnemy( bool checkVisibility = false ) const; // Ensure CFFPlayer
+	CFFPlayer *GetImportantEnemy( bool checkVisibility = false ) const;
 
 	void UpdateReactionQueue( void );
-	CFFPlayer *GetRecognizedEnemy( void ); // Ensure CFFPlayer
+	CFFPlayer *GetRecognizedEnemy( void );
 	bool IsRecognizedEnemyReloading( void );
-	bool IsRecognizedEnemyProtectedByShield( void ); // TODO: Shield logic for FF
+	bool IsRecognizedEnemyProtectedByShield( void ); // TODO_FF: Shield logic for FF
 	float GetRangeToNearestRecognizedEnemy( void );
 
-	CFFPlayer *GetAttacker( void ) const; // Ensure CFFPlayer
+	CFFPlayer *GetAttacker( void ) const;
 	float GetTimeSinceAttacked( void ) const;
 	float GetFirstSawEnemyTimestamp( void ) const;
 	float GetLastSawEnemyTimestamp( void ) const;
@@ -344,11 +334,11 @@ public:
 	bool IsAwareOfEnemyDeath( void ) const;
 	int GetLastVictimID( void ) const;
 
-	bool CanSeeSniper( void ) const; // TODO: Sniper logic for FF
+	bool CanSeeSniper( void ) const; // TODO_FF: Sniper logic for FF
 	bool HasSeenSniperRecently( void ) const;
 
-	float GetTravelDistanceToPlayer( CFFPlayer *player ) const; // Ensure CFFPlayer
-	bool DidPlayerJustFireWeapon( const CFFPlayer *player ) const; // Ensure CFFPlayer
+	float GetTravelDistanceToPlayer( CFFPlayer *player ) const;
+	bool DidPlayerJustFireWeapon( const CFFPlayer *player ) const;
 
 	//- navigation --------------------------------------------------------------------------------------------------
 	bool HasPath( void ) const;
@@ -423,18 +413,18 @@ public:
 
 	// #define CHECK_FOV true // Prefer const bool
 	bool IsVisible( const Vector &pos, bool testFOV = false, const CBaseEntity *ignore = NULL ) const;
-	bool IsVisible( CFFPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const; // Ensure CFFPlayer
+	bool IsVisible( CFFPlayer *player, bool testFOV = false, unsigned char *visParts = NULL ) const;
 
-	bool IsNoticable( const CFFPlayer *player, unsigned char visibleParts ) const; // Ensure CFFPlayer
+	bool IsNoticable( const CFFPlayer *player, unsigned char visibleParts ) const;
 
 	bool IsEnemyPartVisible( VisiblePartType part ) const;
-	const Vector &GetPartPosition( CFFPlayer *player, VisiblePartType part ) const; // Ensure CFFPlayer
+	const Vector &GetPartPosition( CFFPlayer *player, VisiblePartType part ) const;
 
 	float ComputeWeaponSightRange( void );
 
 	bool IsAnyVisibleEnemyLookingAtMe( bool testFOV = false ) const;
 
-	bool IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const; // Ensure CFFPlayer
+	bool IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const;
 
 	//- approach points ---------------------------------------------------------------------------------------------
 	void ComputeApproachPoints( void );
@@ -454,25 +444,25 @@ public:
 	void EquipKnife( void );
 
 	// #define DONT_USE_SMOKE_GRENADE true // Prefer const bool
-	bool EquipGrenade( bool noSmoke = false ); // TODO: Smoke grenade logic for FF
+	bool EquipGrenade( bool noSmoke = false ); // TODO_FF: Smoke grenade logic for FF
 
 	bool IsUsingKnife( void ) const;
 	bool IsUsingPistol( void ) const;
 	bool IsUsingGrenade( void ) const;
-	bool IsUsingSniperRifle( void ) const; // TODO: Sniper logic for FF
-	bool IsUsing( FFWeaponID weapon ) const; // FFWeaponID (already correct)
-	bool IsSniper( void ) const; // TODO: Sniper logic for FF
-	bool IsSniping( void ) const; // TODO: Sniper logic for FF
+	bool IsUsingSniperRifle( void ) const; // TODO_FF: Sniper logic for FF
+	bool IsUsing( FFWeaponID weapon ) const;
+	bool IsSniper( void ) const; // TODO_FF: Sniper logic for FF
+	bool IsSniping( void ) const; // TODO_FF: Sniper logic for FF
 	bool IsUsingShotgun( void ) const;
-	bool IsUsingMachinegun( void ) const; // TODO: Machinegun logic for FF
+	bool IsUsingMachinegun( void ) const; // TODO_FF: Machinegun logic for FF
 	void ThrowGrenade( const Vector &target );
 	bool IsThrowingGrenade( void ) const;
 	bool HasGrenade( void ) const;
 	void AvoidEnemyGrenades( void );
 	bool IsAvoidingGrenade( void ) const;
-	bool DoesActiveWeaponHaveSilencer( void ) const; // TODO: Silencer logic for FF
+	bool DoesActiveWeaponHaveSilencer( void ) const; // TODO_FF: Silencer logic for FF
 	bool CanActiveWeaponFire( void ) const;
-	CFFWeaponBase *GetActiveFFWeapon( void ) const; // Renamed from GetActiveCSWeapon
+	CFFWeaponBase *GetActiveFFWeapon( void ) const;
 
 	void GiveWeapon( const char *weaponAlias );
 
@@ -487,7 +477,7 @@ public:
 	bool IsPrimaryWeaponEmpty( void ) const;
 	bool IsPistolEmpty( void ) const;
 
-	// TODO: Hostage logic for FF
+	// TODO_FF: Hostage logic for FF
 	int GetHostageEscortCount( void ) const;
 	void IncreaseHostageEscortCount( void );
 	float GetRangeToFarthestEscortedHostage( void ) const;
@@ -505,7 +495,7 @@ public:
 	void OnPlayerDeath( IGameEvent *event );
 	void OnPlayerFallDamage( IGameEvent *event );
 
-	// TODO: Bomb events for FF objectives
+	// TODO_FF: Bomb events for FF objectives or remove
 	void OnBombPickedUp( IGameEvent *event );
 	void OnBombPlanted( IGameEvent *event );
 	void OnBombBeep( IGameEvent *event );
@@ -522,7 +512,7 @@ public:
 	void OnBreakProp( IGameEvent *event );
 	void OnBreakBreakable( IGameEvent *event );
 
-	// TODO: Hostage events for FF
+	// TODO_FF: Hostage events for FF or remove
 	void OnHostageFollows( IGameEvent *event );
 	void OnHostageRescuedAll( IGameEvent *event );
 
@@ -533,7 +523,7 @@ public:
 
 	void OnBulletImpact( IGameEvent *event );
 
-	// TODO: Grenade events for FF
+	// TODO_FF: Grenade events for FF or remove
 	void OnHEGrenadeDetonate( IGameEvent *event );
 	void OnFlashbangDetonate( IGameEvent *event );
 	void OnSmokeGrenadeDetonate( IGameEvent *event );
@@ -554,7 +544,8 @@ private:
 	friend class InvestigateNoiseState; friend class BuyState; friend class MoveToState;
 	friend class HideState; friend class FollowState;
 	friend class UseEntityState; friend class OpenDoorState;
-	friend class CapturePointState; // Added friend class for CapturePointState
+	friend class CapturePointState;
+	friend class CarryFlagState; // Added friend class for CarryFlagState
 
 
 	Vector m_eyePosition; // BOTPORT: Remove this vile hack if possible
@@ -578,7 +569,7 @@ private:
 	CountdownTimer m_surpriseTimer;
 
 	bool m_isFollowing;
-	CHandle< CFFPlayer > m_leader; // Ensure CFFPlayer
+	CHandle< CFFPlayer > m_leader;
 	float m_followTimestamp;
 	float m_allowAutoFollowTime;
 
@@ -603,7 +594,8 @@ private:
 	FollowState				m_followState;
 	UseEntityState			m_useEntityState;
 	OpenDoorState			m_openDoorState;
-	CapturePointState		m_capturePointState; // Added member for CapturePointState
+	CapturePointState		m_capturePointState;
+	CarryFlagState			m_carryFlagState; // Added member for CarryFlagState
 
 	void SetState( BotState *state );
 	BotState *m_state;
@@ -611,7 +603,7 @@ private:
 	bool m_isAttacking;
 	bool m_isOpeningDoor;
 
-	TaskType m_task;
+	BotTaskType m_task; // Changed to use global BotTaskType
 	EHANDLE m_taskEntity;
 
 	Vector m_goalPosition;
@@ -620,8 +612,8 @@ private:
 	void MoveAwayFromPosition( const Vector &pos );
 	void StrafeAwayFromPosition( const Vector &pos );
 	void StuckCheck( void );
-	CNavArea *m_currentArea; // Changed from CCSNavArea
-	CNavArea *m_lastKnownArea; // Changed from CCSNavArea
+	CNavArea *m_currentArea;
+	CNavArea *m_lastKnownArea;
 	EHANDLE m_avoid;
 	float m_avoidTimestamp;
 	bool m_isStopping;
@@ -680,9 +672,9 @@ private:
 	float m_playerTravelDistance[ MAX_PLAYERS ]; // MAX_PLAYERS needs to be defined
 	unsigned char m_travelDistancePhase;
 
-	FFGameState m_gameState;
+	FFGameState m_gameState; // Instance of FFGameState
 
-	// TODO: Hostage logic for FF
+	// TODO_FF: Hostage logic for FF
 	byte m_hostageEscortCount;
 	void UpdateHostageEscortCount( void );
 	float m_hostageEscortCountTimestamp;
@@ -776,11 +768,11 @@ private:
 	};
 	static PartInfo m_partInfo[ MAX_PLAYERS ]; // MAX_PLAYERS
 
-	void ComputePartPositions( CFFPlayer *player ); // Ensure CFFPlayer
+	void ComputePartPositions( CFFPlayer *player );
 
 	DispositionType m_disposition; // Enum
 	CountdownTimer m_ignoreEnemiesTimer;
-	CHandle< CFFPlayer > m_enemy; // Ensure CFFPlayer
+	CHandle< CFFPlayer > m_enemy;
 	bool m_isEnemyVisible;
 	unsigned char m_visibleEnemyParts;
 	Vector m_lastEnemyPosition;
@@ -794,16 +786,16 @@ private:
 	unsigned int m_enemyPlace; // Place enum
 
 	struct WatchInfo { float timestamp; bool isEnemy; } m_watchInfo[ MAX_PLAYERS ]; // MAX_PLAYERS
-	CHandle< CFFPlayer > m_bomber; // Ensure CFFPlayer if it's a player type
+	CHandle< CFFPlayer > m_bomber;
 	// Assuming m_bomber is CFFPlayer based on GetBomber() returning CFFPlayer*
 
 	int m_nearbyFriendCount;
-	CHandle< CFFPlayer > m_closestVisibleFriend; // Ensure CFFPlayer
-	CHandle< CFFPlayer > m_closestVisibleHumanFriend; // Ensure CFFPlayer
+	CHandle< CFFPlayer > m_closestVisibleFriend;
+	CHandle< CFFPlayer > m_closestVisibleHumanFriend;
 
 	IntervalTimer m_attentionInterval;
 
-	CHandle< CFFPlayer > m_attacker; // Ensure CFFPlayer
+	CHandle< CFFPlayer > m_attacker;
 	float m_attackedTimestamp;
 
 	int m_lastVictimID;
@@ -811,29 +803,29 @@ private:
 	bool m_isRapidFiring;
 	IntervalTimer m_equipTimer;
 	CountdownTimer m_zoomTimer;
-	bool DoEquip( CFFWeaponBase *gun ); // Ensure CFFWeaponBase
+	bool DoEquip( CFFWeaponBase *gun );
 
 	void ReloadCheck( void );
-	void SilencerCheck( void ); // TODO: Silencer logic for FF
+	void SilencerCheck( void ); // TODO_FF: Silencer logic for FF
 
 	float m_fireWeaponTimestamp;
 
-	bool m_isEnemySniperVisible; // TODO: Sniper logic for FF
+	bool m_isEnemySniperVisible; // TODO_FF: Sniper logic for FF
 	CountdownTimer m_sawEnemySniperTimer;
 	
-	enum { MAX_ENEMY_QUEUE_FF = 20 }; // Renamed
+	enum { MAX_ENEMY_QUEUE_FF = 20 };
 	struct ReactionState
 	{
-		CHandle<CFFPlayer> player; // Ensure CFFPlayer
+		CHandle<CFFPlayer> player;
 		bool isReloading;
-		bool isProtectedByShield; // TODO: Shield logic for FF
+		bool isProtectedByShield; // TODO_FF: Shield logic for FF
 	}
-	m_enemyQueue[ MAX_ENEMY_QUEUE_FF ]; // Use renamed const
+	m_enemyQueue[ MAX_ENEMY_QUEUE_FF ];
 	byte m_enemyQueueIndex;
 	byte m_enemyQueueCount;
 	byte m_enemyQueueAttendIndex;
 
-	CFFPlayer *FindMostDangerousThreat( void ); // Ensure CFFPlayer
+	CFFPlayer *FindMostDangerousThreat( void );
 
 	bool m_isStuck;
 	float m_stuckTimestamp;
@@ -851,14 +843,14 @@ private:
 	// RadioType m_lastRadioCommand; // Enum - Radio system removed
 	// float m_lastRadioRecievedTimestamp; // Radio system removed
 	// float m_lastRadioSentTimestamp; // Radio system removed
-	// CHandle< CFFPlayer > m_radioSubject; // Ensure CFFPlayer - Radio system removed
+	// CHandle< CFFPlayer > m_radioSubject; // Radio system removed
 	// Vector m_radioPosition; // Radio system removed
 	// void RespondToRadioCommands( void ); // Radio system removed
-	bool IsRadioCommand( RadioType event ) const; // Enum - This might still be useful for interpreting player radio for info gathering, keep for now.
+	bool IsRadioCommand( RadioType event ) const; // Enum - This might still be useful for interpreting player radio for info gathering
 
 	float m_voiceEndTimestamp;
 
-	// BotChatterInterface m_chatter; // Removed CS-specific chatter
+	// BotChatterInterface m_chatter; // Removed FF-specific chatter
 	
 	// FF Specific members can be added here
 	// Example for CTF:
@@ -887,20 +879,20 @@ inline void CFFBot::BecomeAlert( void ) { const float alertCooldownTime = 10.0f;
 inline bool CFFBot::IsSneaking( void ) const { return !m_sneakTimer.IsElapsed(); }
 inline void CFFBot::Sneak( float duration ) { m_sneakTimer.Start( duration ); }
 inline bool CFFBot::IsFollowing( void ) const { return m_isFollowing; }
-inline CFFPlayer *CFFBot::GetFollowLeader( void ) const { return m_leader.Get(); } // Ensure CFFPlayer
+inline CFFPlayer *CFFBot::GetFollowLeader( void ) const { return m_leader.Get(); }
 inline float CFFBot::GetFollowDuration( void ) const { return gpGlobals->curtime - m_followTimestamp; }
 inline bool CFFBot::CanAutoFollow( void ) const { return (gpGlobals->curtime > m_allowAutoFollowTime); }
 inline void CFFBot::AimAtEnemy( void ) { m_isAimingAtEnemy = true; }
 inline void CFFBot::StopAiming( void ) { m_isAimingAtEnemy = false; }
 inline bool CFFBot::IsAimingAtEnemy( void ) const { return m_isAimingAtEnemy; }
 inline float CFFBot::GetStateTimestamp( void ) const { return m_stateTimestamp; }
-inline FFGameState *CFFBot::GetGameState( void ) { return &m_gameState; }
-inline const FFGameState *CFFBot::GetGameState( void ) const { return &m_gameState; }
-// TODO: IsAtBombsite is CS-specific. Adapt for FF objectives.
-inline bool CFFBot::IsAtBombsite( void ) { return m_bInBombZone; } // m_bInBombZone needs definition (likely from CPlayer)
-inline void CFFBot::SetTask( TaskType task, CBaseEntity *entity ) { m_task = task; m_taskEntity = entity; }
-inline CFFBot::TaskType CFFBot::GetTask( void ) const { return m_task; }
-inline CBaseEntity *CFFBot::GetTaskEntity( void ) { return m_taskEntity.Get(); } // Use .Get()
+inline FFGameState *CFFBot::GetGameState( void ) { return &m_gameState; } // Returns pointer to member FFGameState instance
+inline const FFGameState *CFFBot::GetGameState( void ) const { return &m_gameState; } // Returns const pointer
+// TODO_FF: IsAtBombsite is CS-specific. Adapt for FF objectives or remove.
+inline bool CFFBot::IsAtBombsite( void ) { return m_bInBombZone; } // m_bInBombZone needs definition (likely from CPlayer or game rules)
+inline void CFFBot::SetTask( BotTaskType task, CBaseEntity *entity ) { m_task = task; m_taskEntity = entity; } // Changed to use global BotTaskType
+inline BotTaskType CFFBot::GetTask( void ) const { return m_task; } // Changed to use global BotTaskType
+inline CBaseEntity *CFFBot::GetTaskEntity( void ) { return m_taskEntity.Get(); }
 inline CFFBot::MoraleType CFFBot::GetMorale( void ) const { return m_morale; }
 inline void CFFBot::Surprise( float duration ) { m_surpriseTimer.Start( duration ); }
 inline bool CFFBot::IsSurprised( void ) const { return !m_surpriseTimer.IsElapsed(); }
@@ -908,16 +900,16 @@ inline CNavArea *CFFBot::GetNoiseArea( void ) const { return m_noiseArea; }
 inline void CFFBot::ForgetNoise( void ) { m_noiseTimestamp = 0.0f; }
 inline float CFFBot::GetNoiseRange( void ) const { if (IsNoiseHeard()) return m_noiseTravelDistance; return 999999999.9f; }
 inline PriorityType CFFBot::GetNoisePriority( void ) const { return m_noisePriority; } // Enum
-// inline BotChatterInterface *CFFBot::GetChatter( void ) { return &m_chatter; } // Removed CS-specific chatter
-inline CFFPlayer *CFFBot::GetBotEnemy( void ) const { return m_enemy.Get(); } // Ensure CFFPlayer
-inline int CFFBot::GetNearbyEnemyCount( void ) const { return MIN( GetEnemiesRemaining(), m_nearbyEnemyCount ); } // GetEnemiesRemaining needs definition
+// inline BotChatterInterface *CFFBot::GetChatter( void ) { return &m_chatter; } // Removed FF-specific chatter
+inline CFFPlayer *CFFBot::GetBotEnemy( void ) const { return m_enemy.Get(); }
+inline int CFFBot::GetNearbyEnemyCount( void ) const { return MIN( GetEnemiesRemaining(), m_nearbyEnemyCount ); } // GetEnemiesRemaining needs definition from game rules or CPlayer
 inline unsigned int CFFBot::GetEnemyPlace( void ) const { return m_enemyPlace; } // Place enum
-// TODO: Bomb-specific logic
-inline bool CFFBot::CanSeeBomber( void ) const { return (m_bomber.IsValid() && m_bomber.Get()) ? true : false; } // Ensure CFFPlayer if m_bomber is CHandle<CFFPlayer>
-inline CFFPlayer *CFFBot::GetBomber( void ) const { return m_bomber.Get(); } // Ensure CFFPlayer
+// TODO_FF: Bomb-specific logic for CanSeeBomber/GetBomber. Adapt or remove.
+inline bool CFFBot::CanSeeBomber( void ) const { return (m_bomber.IsValid() && m_bomber.Get()) ? true : false; }
+inline CFFPlayer *CFFBot::GetBomber( void ) const { return m_bomber.Get(); }
 inline int CFFBot::GetNearbyFriendCount( void ) const { return MIN( GetFriendsRemaining(), m_nearbyFriendCount ); } // GetFriendsRemaining needs definition
-inline CFFPlayer *CFFBot::GetClosestVisibleFriend( void ) const { return m_closestVisibleFriend.Get(); } // Ensure CFFPlayer
-inline CFFPlayer *CFFBot::GetClosestVisibleHumanFriend( void ) const { return m_closestVisibleHumanFriend.Get(); } // Ensure CFFPlayer
+inline CFFPlayer *CFFBot::GetClosestVisibleFriend( void ) const { return m_closestVisibleFriend.Get(); }
+inline CFFPlayer *CFFBot::GetClosestVisibleHumanFriend( void ) const { return m_closestVisibleHumanFriend.Get(); }
 inline float CFFBot::GetTimeSinceAttacked( void ) const { return gpGlobals->curtime - m_attackedTimestamp; }
 inline float CFFBot::GetFirstSawEnemyTimestamp( void ) const { return m_firstSawEnemyTimestamp; }
 inline float CFFBot::GetLastSawEnemyTimestamp( void ) const { return m_lastSawEnemyTimestamp; }
@@ -927,10 +919,10 @@ inline const Vector &CFFBot::GetLastKnownEnemyPosition( void ) const { return m_
 inline bool CFFBot::IsEnemyVisible( void ) const { return m_isEnemyVisible; }
 inline float CFFBot::GetEnemyDeathTimestamp( void ) const { return m_enemyDeathTimestamp; }
 inline int CFFBot::GetLastVictimID( void ) const { return m_lastVictimID; }
-// TODO: Sniper logic for FF
+// TODO_FF: Sniper logic for FF
 inline bool CFFBot::CanSeeSniper( void ) const { return m_isEnemySniperVisible; }
 inline bool CFFBot::HasSeenSniperRecently( void ) const { return !m_sawEnemySniperTimer.IsElapsed(); }
-inline float CFFBot::GetTravelDistanceToPlayer( CFFPlayer *player ) const { if (!player || !player->IsAlive() || player->entindex() < 0 || player->entindex() >= MAX_PLAYERS) return -1.0f; return m_playerTravelDistance[ player->entindex() ]; } // Ensure CFFPlayer
+inline float CFFBot::GetTravelDistanceToPlayer( CFFPlayer *player ) const { if (!player || !player->IsAlive() || player->entindex() < 0 || player->entindex() >= MAX_PLAYERS) return -1.0f; return m_playerTravelDistance[ player->entindex() ]; }
 inline bool CFFBot::HasPath( void ) const { return (m_pathLength) ? true : false; }
 inline void CFFBot::DestroyPath( void ) { m_isStopping = false; m_pathLength = 0; m_pathLadder = NULL; }
 inline CNavArea *CFFBot::GetLastKnownArea( void ) const { return m_lastKnownArea; }
@@ -954,33 +946,33 @@ inline bool CFFBot::IsViewMoving( float angleVelThreshold ) const { /* ... exist
 inline bool CFFBot::HasViewBeenSteady( float duration ) const { return (m_viewSteadyTimer.GetElapsedTime() > duration); }
 inline bool CFFBot::HasLookAtTarget( void ) const { return (m_lookAtSpotState != NOT_LOOKING_AT_SPOT); } // Enum
 inline bool CFFBot::IsEnemyPartVisible( VisiblePartType part ) const { if (!IsEnemyVisible()) return false; return (m_visibleEnemyParts & part) ? true : false; } // Enum
-inline bool CFFBot::IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const { /* ... existing logic ... */ return false; } // Simplified
+inline bool CFFBot::IsSignificantlyCloser( const CFFPlayer *testPlayer, const CFFPlayer *referencePlayer ) const { /* ... existing logic ... */ return false; }
 inline void CFFBot::ClearApproachPoints( void ) { m_approachPointCount = 0; }
 inline const CNavArea *CFFBot::GetInitialEncounterArea( void ) const { return m_initialEncounterArea; }
 inline void CFFBot::SetInitialEncounterArea( const CNavArea *area ) { m_initialEncounterArea = area; }
-// TODO: Grenade logic
+// TODO_FF: Grenade logic
 inline bool CFFBot::IsThrowingGrenade( void ) const { return m_grenadeTossState != NOT_THROWING; } // Enum
 inline bool CFFBot::IsAvoidingGrenade( void ) const { return !m_isAvoidingGrenade.IsElapsed(); }
-inline void CFFBot::PrimaryAttack( void ) { /* ... existing logic ... */ BaseClass::PrimaryAttack(); } // Simplified
+inline void CFFBot::PrimaryAttack( void ) { /* ... existing logic ... */ BaseClass::PrimaryAttack(); }
 inline CFFBot::ZoomType CFFBot::GetZoomLevel( void ) { /* ... existing logic ... */ return NO_ZOOM; } // Enum
 inline bool CFFBot::IsWaitingForZoom( void ) const { return !m_zoomTimer.IsElapsed(); }
-// TODO: Hostage logic
+// TODO_FF: Hostage logic
 inline int CFFBot::GetHostageEscortCount( void ) const { return m_hostageEscortCount; }
 inline void CFFBot::IncreaseHostageEscortCount( void ) { ++m_hostageEscortCount; }
 inline void CFFBot::ResetWaitForHostagePatience( void ) { m_isWaitingForHostage = false; m_inhibitWaitingForHostageTimer.Invalidate(); }
 inline bool CFFBot::IsUsingVoice() const { return m_voiceEndTimestamp > gpGlobals->curtime; }
 inline bool CFFBot::IsOpeningDoor( void ) const { return m_isOpeningDoor; }
 
-// TODO: Update for FF sniper logic
-inline bool IsSniperRifle( CFFWeaponBase *weapon ) { if (weapon == NULL) return false; return weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE); } // Ensure CFFWeaponBase
+// TODO_FF: Update for FF sniper logic, ensure WEAPONTYPE_SNIPER_RIFLE is defined for FF
+inline bool IsSniperRifle( CFFWeaponBase *weapon ) { if (weapon == NULL) return false; return weapon->IsKindOf(WEAPONTYPE_SNIPER_RIFLE); }
 
 
 // PathCost class definition moved to ff_bot_pathfind.cpp or a more appropriate location.
 // For now, assuming it's defined elsewhere if CFFBot::ComputePath uses it.
 
 // Prototypes
-extern int GetBotFollowCount( CFFPlayer *leader ); // Ensure CFFPlayer
-// extern const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange = 250.0f ); // This is defined in ff_bot.cpp now // me should be CFFBot*
-// extern const HidingSpot *FindInitialEncounterSpot( CBaseEntity *me, const Vector &searchOrigin, float enemyArriveTime, float maxRange, bool isSniper ); // This would be in a nav utility or bot utility file
+extern int GetBotFollowCount( CFFPlayer *leader );
+// extern const Vector *FindNearbyRetreatSpot( CFFBot *me, float maxRange = 250.0f ); // Defined in ff_bot.cpp
+// extern const HidingSpot *FindInitialEncounterSpot( CBaseEntity *me, const Vector &searchOrigin, float enemyArriveTime, float maxRange, bool isSniper );
 
 #endif	// _FF_BOT_H_

@@ -640,6 +640,8 @@ CFFPlayer::CFFPlayer()
 	m_bClassicViewModels = false;
 	m_bClassicViewModelsParity = false;
 	m_iHandViewModelMode = 0;
+
+	m_pPlayerClassInfo = NULL; // Initialize CFFPlayerClassInfo pointer
 }
 
 CFFPlayer::~CFFPlayer()
@@ -1641,6 +1643,21 @@ void CFFPlayer::Spawn( void )
 
 	// Increment the spawn counter
 	m_iSpawnInterpCounter = (m_iSpawnInterpCounter + 1) % 8;
+
+	// Set CFFPlayerClassInfo for the bot
+	if (this->m_PlayerClass.m_szClassName && this->m_PlayerClass.m_szClassName[0]) // Assuming m_PlayerClass is the CPlayerClass struct/obj
+	{
+		PLAYERCLASS_FILE_INFO_HANDLE handle = LookupPlayerClassInfoSlot(this->m_PlayerClass.m_szClassName);
+		if (handle != GetInvalidPlayerClassInfoHandle()) {
+			this->m_pPlayerClassInfo = GetFilePlayerClassInfoFromHandle(handle);
+		} else {
+			this->m_pPlayerClassInfo = NULL;
+			Warning("CFFPlayer::Spawn(): Could not find CFFPlayerClassInfo for class '%s'\n", this->m_PlayerClass.m_szClassName);
+		}
+	} else {
+		this->m_pPlayerClassInfo = NULL;
+		// Warning("CFFPlayer::Spawn(): Class name not available for CFFPlayerClassInfo lookup.\n"); // This might be noisy if called before class is set
+	}
 }
 
 // Mirv: Moved all this out of spawn into here

@@ -9,14 +9,14 @@
 
 #include "cbase.h"
 #include "ff_bot.h"
-#include "ff_bot_manager.h" // For TheFFBots()
-#include "../ff_player.h"     // For CFFPlayer, ToCSPlayer (becomes ToFFPlayer if such a func exists)
-#include "../../shared/ff/ff_gamerules.h" // For FFGameRules()
-#include "../../shared/ff/weapons/ff_weapon_base.h" // For CFFWeaponBase (potentially used via CFFBot)
-// #include "../../shared/ff/weapons/ff_weapon_parse.h" // For CFFWeaponInfo (potentially used)
-#include "ff_gamestate.h"   // For FFGameState
-#include "nav_mesh.h"       // For CNavArea (potentially, though not directly used here, often via manager)
-#include "bot_constants.h"  // For PriorityType, RadioType, TEAM_TERRORIST, TEAM_CT etc.
+#include "ff_bot_manager.h"
+#include "../ff_player.h"
+#include "../../shared/ff/ff_gamerules.h"
+#include "../../shared/ff/weapons/ff_weapon_base.h"
+// #include "../../shared/ff/weapons/ff_weapon_parse.h"
+#include "ff_gamestate.h"
+#include "nav_mesh.h"
+#include "bot_constants.h"
 
 #include "KeyValues.h"      // Already included, seems fine
 
@@ -63,7 +63,7 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 		// chastise friendly fire from humans
 		if (killer && !killer->IsBot() && killer->GetTeamNumber() == GetTeamNumber() && killer != this)
 		{
-			GetChatter()->KilledFriend();
+			// GetChatter()->KilledFriend(); // Chatter system removed
 		}
 
 		if (IsAttacking())
@@ -77,7 +77,8 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 
 				// move to last known position of enemy - this could cause us to flank if 
 				// the danger has changed due to our teammate's recent death
-				SetTask( CFFBot::MOVE_TO_LAST_KNOWN_ENEMY_POSITION, GetBotEnemy() ); // TODO: Ensure TaskType enums are correct for FF
+				// Ensure GetTask() returns BotTaskType and enums like BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION are correct
+				SetTask( BOT_TASK_MOVE_TO_LAST_KNOWN_ENEMY_POSITION, GetBotEnemy() );
 				MoveTo( GetLastKnownEnemyPosition() );
 				return;
 			}
@@ -88,14 +89,15 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 			// If we just saw a nearby friend die, and we haven't yet acquired an enemy
 			// automatically acquire our dead friend's killer
 			//
-			if (GetDisposition() == CFFBot::ENGAGE_AND_INVESTIGATE || GetDisposition() == CFFBot::OPPORTUNITY_FIRE) // TODO: Ensure DispositionType enums are correct
+			// Ensure GetDisposition() returns DispositionType and enums like ENGAGE_AND_INVESTIGATE are correct
+			if (GetDisposition() == ENGAGE_AND_INVESTIGATE || GetDisposition() == OPPORTUNITY_FIRE)
 			{
 				CBasePlayer *otherAttacker = UTIL_PlayerByUserId( event->GetInt( "attacker" ) );
 
 				// check that attacker is an enemy (for friendly fire, etc)
 				if (otherAttacker && otherAttacker->IsPlayer())
 				{
-					CFFPlayer *friendKiller = static_cast<CFFPlayer *>( otherAttacker ); // Assuming attacker is CFFPlayer
+					CFFPlayer *friendKiller = static_cast<CFFPlayer *>( otherAttacker );
 					if (friendKiller->GetTeamNumber() != GetTeamNumber())
 					{
 						// check if we saw our friend die - dont check FOV - assume we're aware of our surroundings in combat
@@ -117,7 +119,8 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 
 						// if friend was far away and we haven't seen an enemy in awhile, go to where our friend was killed
 						const float longHidingTime = 20.0f;
-						if (IsHunting() || IsInvestigatingNoise() || (IsHiding() && GetTask() != CFFBot::FOLLOW && GetHidingTime() > longHidingTime)) // TODO: Ensure TaskType enums are correct
+						// Ensure GetTask() returns BotTaskType and enums like BOT_TASK_FOLLOW are correct
+						if (IsHunting() || IsInvestigatingNoise() || (IsHiding() && GetTask() != BOT_TASK_FOLLOW && GetHidingTime() > longHidingTime))
 						{
 							const float someTime = 10.0f;
 							const float farAway = 750.0f;
@@ -144,7 +147,7 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 			if (GetNearbyEnemyCount() <= 1)
 			{
 				// report if number of enemies left is few and we killed the last one we saw locally
-				GetChatter()->EnemiesRemaining();
+				// GetChatter()->EnemiesRemaining(); // Chatter system removed
 
 				Vector victimOrigin = (victim) ? GetCentroid( victim ) : Vector( 0, 0, 0 );
 				if (IsVisible( victimOrigin, CHECK_FOV ))
@@ -152,21 +155,21 @@ void CFFBot::OnPlayerDeath( IGameEvent *event )
 					// congratulate teammates on their kills
 					if (killer && killer != this)
 					{
-						float delay = RandomFloat( 2.0f, 3.0f );
-						if (killer->IsBot())
-						{
-							if (RandomFloat( 0.0f, 100.0f ) < 40.0f)
-								GetChatter()->Say( "NiceShot", 3.0f, delay ); // TODO: Update chatter events for FF
-						}
-						else
-						{
-							// humans get the honorific
-							// TODO: Update for FF if career mode or similar concept exists
-							// if (FFGameRules()->IsCareer())
-							//	GetChatter()->Say( "NiceShotCommander", 3.0f, delay ); // TODO: Update chatter events for FF
-							// else
-							//	GetChatter()->Say( "NiceShotSir", 3.0f, delay ); // TODO: Update chatter events for FF
-						}
+						// float delay = RandomFloat( 2.0f, 3.0f );
+						// if (killer->IsBot())
+						// {
+						// 	if (RandomFloat( 0.0f, 100.0f ) < 40.0f)
+						// 		GetChatter()->Say( "NiceShot", 3.0f, delay ); // Chatter system removed
+						// }
+						// else
+						// {
+						// 	// humans get the honorific
+						// 	// TODO_FF: Update for FF if career mode or similar concept exists
+						// 	// if (FFGameRules()->IsCareer())
+						// 	//	GetChatter()->Say( "NiceShotCommander", 3.0f, delay ); // Chatter system removed
+						// 	// else
+						// 	//	GetChatter()->Say( "NiceShotSir", 3.0f, delay ); // Chatter system removed
+						// }
 					}
 				}
 			}
@@ -181,7 +184,6 @@ void CFFBot::OnPlayerRadio( IGameEvent *event )
 		return;
 
 	// don't react to our own events
-	// TODO: ToCSPlayer might need to become ToFFPlayer if such a utility function exists or is needed for FFPlayer specific methods.
 	CFFPlayer *player = static_cast<CFFPlayer*>(UTIL_PlayerByUserId( event->GetInt( "userid" ) ));
 	if ( player == this )
 		return;
