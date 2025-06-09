@@ -85,6 +85,16 @@ enum RouteType
     FASTEST_ROUTE
 };
 
+// --- Bot Goal Types (mirroring Lua's Bot.k... constants) ---
+// These values MUST match the integer values assigned in Lua (e.g., Bot = { kFlag = 1, ... })
+const int BOT_GOAL_NONE = 0;            // Default/unknown
+const int BOT_GOAL_FLAG = 1;            // Corresponds to Bot.kFlag (CTF Flag item)
+const int BOT_GOAL_FLAG_CAP = 2;        // Corresponds to Bot.kFlagCap (CTF Capture Point)
+const int BOT_GOAL_CONTROL_POINT = 3;   // Hypothetical for CPs, if a unique type is added to Lua (e.g. Bot.kControlPoint)
+const int BOT_GOAL_HUNTED_ESCAPE = 4;   // Corresponds to Bot.kHuntedEscape (VIP Escape Zone)
+// Add other types as they are defined in Lua and needed by C++
+
+
 // --- Weapon Scoring Constants for EquipBestWeapon ---
 const float SCORE_BASE = 100.0f;
 const float SCORE_CLASS_WEAPON_BONUS = 500.0f;

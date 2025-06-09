@@ -16,6 +16,7 @@
 #include "utlvector.h"
 #include <algorithm>
 #include "../../shared/ff/ff_shareddefs.h" // For CLASS_CIVILIAN (hopefully) and team IDs
+#include "bot_util.h" // For GetEntityCpNumberFromLua
 
 // Lua includes
 extern "C" {
@@ -60,21 +61,20 @@ extern "C" {
 
 static const float CP_POLL_INTERVAL = 0.75f;
 
-struct CPInitData { /* ... (definition unchanged) ... */
-    CBaseEntity* entity;
-    string_t entityName;
-    int tentativeID;
-    bool operator<(const CPInitData& other) const {
-        return tentativeID < other.tentativeID;
-    }
+// Helper struct for sorting
+struct CPInitData {
+    CBaseEntity* pEntity;
+    string_t iszEntityName;
+    int tentativeID; // 0-indexed after potential conversion from 1-indexed Lua cp_number
+    bool operator<(const CPInitData& other) const { return tentativeID < other.tentativeID; }
 };
 
-FFGameState::FFGameState( CFFBot *owner ) { /* ... (implementation unchanged) ... */
+FFGameState::FFGameState( CFFBot *owner ) {
 	m_owner = owner;
 	m_nextCPPollTime = 0.0f;
 	Reset();
 }
-void FFGameState::Reset( void ) { /* ... (implementation unchanged, calls InitializeVIPState) ... */
+void FFGameState::Reset( void ) {
 	m_isRoundOver = false;
 	m_nextCPPollTime = gpGlobals->curtime + CP_POLL_INTERVAL;
 	InitializeFlagState(TEAM_ID_RED, FF_FLAG_ITEM_RED_NAME, FF_FLAG_STAND_RED_NAME);
@@ -83,7 +83,127 @@ void FFGameState::Reset( void ) { /* ... (implementation unchanged, calls Initia
 	InitializeVIPState();
 }
 void FFGameState::InitializeFlagState(int teamID, const char* flagItemEntityName, const char* flagStandEntityName) { /* ... (implementation unchanged) ... */ }
-void FFGameState::InitializeControlPointStates(const char* cpEntityClassName) { /* ... (implementation unchanged) ... */ }
+
+//--------------------------------------------------------------------------------------------------------------
+// Initializes the state of all control points.
+// It tries to get a 'cp_number' from Lua first, then falls back to name parsing.
+//--------------------------------------------------------------------------------------------------------------
+void FFGameState::InitializeControlPointStates(const char* cpEntityClassName)
+{
+    // Clear previous state
+    for (int i = 0; i < MAX_CONTROL_POINTS_FF; ++i) {
+        this->m_ControlPoints[i].Reset();
+        this->m_ControlPoints[i].pointID = -1;
+    }
+    this->m_numControlPoints = 0;
+
+    if (!cpEntityClassName) {
+        DevWarning("InitializeControlPointStates: cpEntityClassName is NULL.\n");
+        return;
+    }
+
+    CUtlVector<CPInitData> foundCPs;
+    CBaseEntity *pEntity = NULL;
+    // int sequentialIDCounter = 0; // Replaced with better fallback logic
+
+    // Iterate all entities of the given classname
+    // Note: Using FindEntityByClassname in a loop is standard. CEntitySphereQuery might be an alternative if class iteration is slow.
+    for (pEntity = gEntList.FindEntityByClassname(NULL, cpEntityClassName);
+         pEntity != NULL;
+         pEntity = gEntList.FindEntityByClassname(pEntity, cpEntityClassName))
+    {
+        if (foundCPs.Count() >= MAX_CONTROL_POINTS_FF) {
+            DevWarning("FFGameState: Found more CP entities than MAX_CONTROL_POINTS_FF (%d). Some CPs may not be tracked.\n", MAX_CONTROL_POINTS_FF);
+            break;
+        }
+
+        CPInitData cpData;
+        cpData.pEntity = pEntity;
+        cpData.iszEntityName = pEntity->GetEntityName();
+        cpData.tentativeID = -1; // Initialize as not found
+
+        // 1. Attempt to get cp_number from Lua using the new helper
+        int lua_cp_number = GetEntityCpNumberFromLua(pEntity); // From bot_util.h
+
+        if (lua_cp_number > 0) { // Lua cp_number is typically 1-indexed and positive
+            cpData.tentativeID = lua_cp_number - 1; // Convert to 0-indexed for C++
+            // DevMsg("FFGameState: CP '%s' (ent %d), Lua cp_number: %d -> tentativeID: %d\n", STRING(cpData.iszEntityName), pEntity->entindex(), lua_cp_number, cpData.tentativeID);
+        } else {
+            // 2. Fallback to name parsing (e.g., "control_point_1", "cp_alpha_3")
+            const char* name = STRING(cpData.iszEntityName);
+            const char* num_str = Q_strrchr(name, '_');
+            if (num_str && *(num_str + 1) != '\0') { // Check there's something after '_'
+                 char *endptr;
+                 long val = strtol(num_str + 1, &endptr, 10);
+                 if (*endptr == '\0' && val > 0) { // Successfully parsed a positive integer
+                    cpData.tentativeID = val - 1; // Assuming names are 1-indexed
+                    // DevMsg("FFGameState: CP '%s' (ent %d), Name-parsed ID: %d -> tentativeID: %d\n", name, pEntity->entindex(), (int)val, cpData.tentativeID);
+                 }
+            }
+        }
+
+        // If tentativeID is still -1, it means neither Lua nor name parsing yielded a valid ID.
+        // It will be handled after sorting to pick the lowest available slot.
+        if (cpData.tentativeID == -1) {
+             DevMsg("FFGameState: CP '%s' (ent %d) could not determine ID from Lua or name yet. Will attempt to assign lowest available slot after sorting.\n", STRING(cpData.iszEntityName), pEntity->entindex());
+        }
+        foundCPs.AddToTail(cpData);
+    }
+
+    if (foundCPs.Count() > 1) {
+        foundCPs.Sort();
+    }
+
+    bool usedIDs[MAX_CONTROL_POINTS_FF];
+    for(int k=0; k<MAX_CONTROL_POINTS_FF; ++k) usedIDs[k] = false;
+
+    for (int i = 0; i < foundCPs.Count(); ++i) {
+        if (this->m_numControlPoints >= MAX_CONTROL_POINTS_FF) {
+             DevWarning("FFGameState: Trying to populate m_ControlPoints exceeded MAX_CONTROL_POINTS_FF during sorted insertion.\n");
+             break;
+        }
+
+        CPInitData& cpData = foundCPs[i];
+
+        if (cpData.tentativeID == -1) {
+            bool foundSlot = false;
+            for (int j = 0; j < MAX_CONTROL_POINTS_FF; ++j) {
+                if (!usedIDs[j]) {
+                    cpData.tentativeID = j;
+                    DevMsg("FFGameState: CP '%s' assigned fallback ID %d.\n", STRING(cpData.iszEntityName), j);
+                    foundSlot = true;
+                    break;
+                }
+            }
+            if (!foundSlot) {
+                 DevWarning("FFGameState: CP '%s' could not be assigned a fallback ID (no free slots up to MAX_CONTROL_POINTS_FF). Skipping.\n", STRING(cpData.iszEntityName));
+                 continue;
+            }
+        }
+
+        if (cpData.tentativeID < 0 || cpData.tentativeID >= MAX_CONTROL_POINTS_FF) {
+            DevWarning("FFGameState: CP '%s' has invalid ID %d after processing. Skipping.\n", STRING(cpData.iszEntityName), cpData.tentativeID);
+            continue;
+        }
+        if (usedIDs[cpData.tentativeID]) {
+            DevWarning("FFGameState: Duplicate CP ID %d detected for '%s'. Original was '%s'. Skipping duplicate.\n",
+                cpData.tentativeID, STRING(cpData.iszEntityName), STRING(this->m_ControlPoints[cpData.tentativeID].m_iszEntityName));
+            continue;
+        }
+
+        usedIDs[cpData.tentativeID] = true;
+        this->m_ControlPoints[cpData.tentativeID].entity = cpData.pEntity;
+        this->m_ControlPoints[cpData.tentativeID].m_iszEntityName = cpData.iszEntityName;
+        this->m_ControlPoints[cpData.tentativeID].pointID = cpData.tentativeID;
+        // Default values for owningTeam, isLocked, captureProgress are set by FF_ControlPointState::Reset()
+
+        this->m_numControlPoints++;
+        // DevMsg("FFGameState: Initialized CP C++ ID %d: Name '%s', Lua-derived/parsed TentativeID %d, Entity %d\n",
+        //        cpData.tentativeID, STRING(cpData.iszEntityName), cpData.tentativeID, cpData.pEntity ? cpData.pEntity->entindex() : -1);
+    }
+
+    DevMsg("FFGameState: Finished initializing %d control points.\n", this->m_numControlPoints);
+}
 
 //--------------------------------------------------------------------------------------------------------------
 bool FFGameState::IsPlayerVIP(CFFPlayer* pPlayer) const
@@ -208,5 +328,3 @@ void FFGameState::OnPlayerSpawn(CFFPlayer* pPlayer) {
 CFFPlayer* FFGameState::GetVIP() const { return m_vipPlayer.Get(); }
 bool FFGameState::IsVIPAlive() const { return m_isVIPAlive && m_vipPlayer.IsValid() && m_vipPlayer->IsAlive(); } // More robust check
 bool FFGameState::IsVIPEscaped() const { return m_isVIPEscaped; }
-
-[end of mp/src/game/server/ff/bot/ff_gamestate.cpp]
