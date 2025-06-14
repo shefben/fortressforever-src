@@ -14,7 +14,6 @@
 
 #include "ff_objective_resource.h"
 #include "player_vs_environment/ff_population_manager.h"
-#include "econ_item_system.h"
 #include "ff_gamestats.h"
 
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_move_to.h"

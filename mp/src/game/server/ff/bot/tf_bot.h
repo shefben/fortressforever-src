@@ -450,7 +450,6 @@ public:
 	const EventChangeAttributes_t* GetEventChangeAttributes( const char* pszEventName ) const;
 	void OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEvent );
 
-	void AddItem( const char* pszItemName );
 
 	int GetUberHealthThreshold();
 	float GetUberDeployDelayDuration();

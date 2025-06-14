@@ -11,7 +11,6 @@
 #include "ff_obj_dispenser.h"
 #include "ff_gamerules.h"
 #include "ff_weapon_builder.h"
-#include "team_train_watcher.h"
 #include "bot/ff_bot.h"
 #include "bot/behavior/engineer/ff_bot_engineer_building.h"
 #include "bot/behavior/engineer/ff_bot_engineer_move_to_build.h"
@@ -217,29 +216,7 @@ bool CFFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CFFBot *me ) const
 		return false;
 	}
 
-	// payload
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
-	{
-		CTeamTrainWatcher *trainWatcher;
 
-		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
-		{
-			trainWatcher = TFGameRules()->GetPayloadToPush( me->GetTeamNumber() );
-		}
-		else
-		{
-			trainWatcher = TFGameRules()->GetPayloadToBlock( me->GetTeamNumber() );
-		}
-
-		if ( trainWatcher )
-		{
-			float sentryDistanceAlongPath;
-			trainWatcher->ProjectPointOntoPath( mySentry->GetAbsOrigin(), NULL, &sentryDistanceAlongPath );
-
-			const float behindTrainTolerance = SENTRY_MAX_RANGE;
-			return ( trainWatcher->GetTrainDistanceAlongTrack() > sentryDistanceAlongPath + behindTrainTolerance );
-		}
-	}
 
 	// control points
 	mySentry->UpdateLastKnownArea();

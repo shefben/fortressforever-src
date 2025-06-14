@@ -9,7 +9,6 @@
 #include "ff_obj_sentrygun.h"
 #include "team_control_point_master.h"
 #include "ff_weapon_pipebomblauncher.h"
-#include "team_train_watcher.h"
 #include "ff_bot.h"
 #include "ff_bot_manager.h"
 #include "ff_bot_vision.h"
@@ -20,15 +19,9 @@
 #include "NextBotUtil.h"
 #include "tier3/tier3.h"
 #include "vgui/ILocalize.h"
-#include "econ_item_system.h"
 #include "bot/behavior/ff_bot_use_item.h"
-#include "ff_wearable_item_demoshield.h"
-#include "ff_weapon_buff_item.h"
-#include "ff_weapon_lunchbox.h"
 #include "func_respawnroom.h"
 #include "soundenvelope.h"
-
-#include "econ_entity_creation.h"
 
 #include "player_vs_environment/ff_population_manager.h"
 
@@ -1297,22 +1290,7 @@ void CFFBot::InitClass( void )
 
 void CFFBot::ModifyMaxHealth( int nNewMaxHealth, bool bSetCurrentHealth /*= true*/, bool bAllowModelScaling /*= true*/ )
 {
-	if ( GetMaxHealth() != nNewMaxHealth )
-	{
-		static CSchemaAttributeDefHandle pAttrDef_HiddenMaxHealthNonBuffed( "hidden maxhealth non buffed" );
-		if ( !pAttrDef_HiddenMaxHealthNonBuffed )
-		{
-			Warning( "TFBotSpawner: Invalid attribute 'hidden maxhealth non buffed'\n" );
-		}
-		else
-		{
-			CAttributeList *pAttrList = GetAttributeList();
-			if ( pAttrList )
-			{
-				pAttrList->SetRuntimeAttributeValue( pAttrDef_HiddenMaxHealthNonBuffed, nNewMaxHealth - GetMaxHealth() );
-			}
-		}
-	}
+       // simplify max health modification for Fortress Forever
 
 	if ( bSetCurrentHealth )
 	{
@@ -1968,25 +1946,10 @@ void CFFBot::SetupSniperSpotAccumulation( void )
 
 	CBaseEntity *goalEntity = NULL;
 
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
-	{
-		// try to find a payload cart to guard
-		CTeamTrainWatcher *trainWatcher = TFGameRules()->GetPayloadToPush( GetTeamNumber() );
-
-		if ( !trainWatcher )
-		{
-			trainWatcher = TFGameRules()->GetPayloadToBlock( GetTeamNumber() );
-		}
-
-		if ( trainWatcher )
-		{
-			goalEntity = trainWatcher->GetTrainEntity();
-		}
-	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
-	{
-		goalEntity = GetMyControlPoint();
-	}
+       if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+       {
+               goalEntity = GetMyControlPoint();
+       }
 
 	if ( !goalEntity )
 	{
@@ -4480,129 +4443,17 @@ void CFFBot::OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEv
 		ModifyMaxHealth( nMaxHealth );
 		SetHealth( nHealth );
 
-		// give items to bot before apply attribute changes
-		FOR_EACH_VEC( pEvent->m_items, i )
-		{
-			AddItem( pEvent->m_items[i] );
-		}
+               // tags
+               ClearTags();
+               for( int g=0; g<pEvent->m_tags.Count(); ++g )
+               {
+                       AddTag( pEvent->m_tags[g] );
+               }
+       }
 
-		// add attributes to equipped items
-		FOR_EACH_VEC( pEvent->m_itemsAttributes, i )
-		{
-			const CFFBot::EventChangeAttributes_t::item_attributes_t& itemAttributes = pEvent->m_itemsAttributes[i];
-			CSchemaItemDefHandle itemDef( itemAttributes.m_itemName );
-			if ( !itemDef )
-			{
-				Warning( "Unable to find item %s to update attribute.\n", itemAttributes.m_itemName.Get() ); 
-			}
-
-			for ( int iItemSlot = LOADOUT_POSITION_PRIMARY ; iItemSlot < CLASS_LOADOUT_POSITION_COUNT ; iItemSlot++ )
-			{
-				CEconEntity* pEntity = NULL;
-				CEconItemView *pCurItemData = CFFPlayerSharedUtils::GetEconItemViewByLoadoutSlot( this, iItemSlot, &pEntity );
-				if ( pCurItemData && itemDef && ( pCurItemData->GetItemDefIndex() == itemDef->GetDefinitionIndex() ) )
-				{
-					for ( int iAtt=0; iAtt<itemAttributes.m_attributes.Count(); ++iAtt )
-					{
-						const static_attrib_t& attrib = itemAttributes.m_attributes[iAtt];
-						CAttributeList *pAttribList = pCurItemData->GetAttributeList();
-						if ( pAttribList )
-						{
-							pAttribList->SetRuntimeAttributeValue( attrib.GetAttributeDefinition(), attrib.m_value.asFloat );
-						}
-					}
-
-					if ( pEntity )
-					{
-						// update model incase we change style
-						pEntity->UpdateModelToClass();
-					}
-
-					// move on to the next set of attributes
-					break;
-				}
-			} // for each slot
-		} // for each set of attributes
-
-		// tags
-		ClearTags();
-		for( int g=0; g<pEvent->m_tags.Count(); ++g )
-		{
-			AddTag( pEvent->m_tags[g] );
-		}
-	}
 }
 
 
-void CFFBot::AddItem( const char* pszItemName )
-{
-	CItemSelectionCriteria criteria;
-	criteria.SetQuality( AE_USE_SCRIPT_VALUE );
-	criteria.BAddCondition( "name", k_EOperator_String_EQ, pszItemName, true );
-
-	CBaseEntity *pItem = ItemGeneration()->GenerateRandomItem( &criteria, WorldSpaceCenter(), vec3_angle );
-	if ( pItem )
-	{
-		CEconItemView *pScriptItem = static_cast< CBaseCombatWeapon * >( pItem )->GetAttributeContainer()->GetItem();
-
-		// If we already have an item in that slot, remove it
-		int iClass = GetPlayerClass()->GetClassIndex();
-		int iSlot = pScriptItem->GetStaticData()->GetLoadoutSlot( iClass );
-		equip_region_mask_t unNewItemRegionMask = pScriptItem->GetItemDefinition() ? pScriptItem->GetItemDefinition()->GetEquipRegionConflictMask() : 0;
-
-		if ( IsWearableSlot( iSlot ) )
-		{
-			// Remove any wearable that has a conflicting equip_region
-			for ( int wbl = 0; wbl < GetNumWearables(); wbl++ )
-			{
-				CEconWearable *pWearable = GetWearable( wbl );
-				if ( !pWearable )
-					continue;
-
-				equip_region_mask_t unWearableRegionMask = 0;
-				if ( pWearable->GetAttributeContainer()->GetItem() )
-				{
-					unWearableRegionMask = pWearable->GetAttributeContainer()->GetItem()->GetItemDefinition()->GetEquipRegionConflictMask();
-				}
-
-				if ( unWearableRegionMask & unNewItemRegionMask )
-				{
-					RemoveWearable( pWearable );
-				}
-			}
-		}
-		else
-		{
-			CBaseEntity	*pEntity = GetEntityForLoadoutSlot( iSlot );
-			if ( pEntity )
-			{
-				CBaseCombatWeapon *pWpn = dynamic_cast< CBaseCombatWeapon * >( pEntity );
-				Weapon_Detach( pWpn );
-				UTIL_Remove( pEntity );
-			}
-		}
-
-		// Fake global id
-		pScriptItem->SetItemID( 1 );
-
-		DispatchSpawn( pItem );
-
-		CEconEntity *pNewItem = assert_cast<CEconEntity*>( pItem );
-		if ( pNewItem )
-		{
-			pNewItem->GiveTo( this );
-		}
-
-		PostInventoryApplication();
-	}
-	else
-	{
-		if ( pszItemName && pszItemName[0] )
-		{
-			DevMsg( "CFFBotSpawner::AddItemToBot: Invalid item %s.\n", pszItemName );
-		}
-	}
-}
 
 
 int CFFBot::GetUberHealthThreshold()
