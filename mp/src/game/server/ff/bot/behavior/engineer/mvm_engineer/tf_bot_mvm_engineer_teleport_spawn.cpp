@@ -14,7 +14,7 @@
 #include "bot/map_entities/ff_bot_hint_entity.h"
 #include "string_t.h"
 #include "ff_fx.h"
-#include "player_vs_environment/ff_population_manager.h"
+#include "player_vs_environment/tf_population_manager.h"
 
 //---------------------------------------------------------------------------------------------
 CFFBotMvMEngineerTeleportSpawn::CFFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEntity* pHint, bool bFirstTeleportSpawn )
