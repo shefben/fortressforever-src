@@ -226,7 +226,6 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 		}
 
 
-
 		// stay in cover while we fully reload
 		if ( isDoingAFullReload )
 		{
