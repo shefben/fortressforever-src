@@ -138,23 +138,8 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 
 				//---------------------------------------
 				case 2:
-				{
-					static CSchemaAttributeDefHandle pAttrDef_HealthRegen( "health regen" );
-
-					m_upgradeTimer.Start( ff_mvm_bot_flag_carrier_interval_to_3rd_upgrade.GetFloat() );
-					
-					if ( !pAttrDef_HealthRegen )
-					{
-						Warning( "TFBotSpawner: Invalid attribute 'health regen'\n" );
-					}
-					else
-					{
-						CAttributeList *pAttrList = me->GetAttributeList();
-						if ( pAttrList )
-						{
-							pAttrList->SetRuntimeAttributeValue( pAttrDef_HealthRegen, ff_mvm_bot_flag_carrier_health_regen.GetFloat() );
-						}
-					}
+                               {
+                                       m_upgradeTimer.Start( ff_mvm_bot_flag_carrier_interval_to_3rd_upgrade.GetFloat() );
 
 					// update the objective resource so clients have the information
 					if ( TFObjectiveResource() )

@@ -221,6 +221,10 @@ typedef enum
 #define FF_WEAPON_SWORD                    FF_WEAPON_KNIFE
 #define FF_WEAPON_CHARGED_SMG              FF_WEAPON_AUTORIFLE
 #define FF_WEAPON_MEDIGUN                  FF_WEAPON_MEDKIT
+#define FF_WEAPON_SNIPERRIFLE_DECAP        FF_WEAPON_SNIPERRIFLE
+#define FF_WEAPON_SNIPERRIFLE_CLASSIC      FF_WEAPON_SNIPERRIFLE
+#define FF_WEAPON_BAT_WOOD                 FF_WEAPON_CROWBAR
+#define FF_WEAPON_BUILDER                  FF_WEAPON_DEPLOYDISPENSER
 #define FF_WEAPON_PRIMARY_MODE             Primary_Mode
 
 int AliasToWeaponID(const char *alias);

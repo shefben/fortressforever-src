@@ -24,20 +24,10 @@ ActionResult< CFFBot >	CFFBotMvMDeployBomb::OnStart( CFFBot *me, Action< CFFBot 
 	me->GetLocomotionInterface()->Stop();
 	me->SetAbsVelocity( Vector( 0.0f, 0.0f, 0.0f ) );
 
-	if ( me->IsMiniBoss() )
-	{
-		static CSchemaAttributeDefHandle pAttrDef_AirblastVerticalVulnerability( "airblast vertical vulnerability multiplier" );
-
-		// Minibosses can't be pushed once they start deploying
-		if ( !pAttrDef_AirblastVerticalVulnerability )
-		{
-			Warning( "TFBotSpawner: Invalid attribute 'airblast vertical vulnerability multiplier'\n" );
-		}
-		else
-		{
-			me->GetAttributeList()->SetRuntimeAttributeValue( pAttrDef_AirblastVerticalVulnerability, 0.0f );
-		}
-	}
+       if ( me->IsMiniBoss() )
+       {
+               // Minibosses can't be pushed once they start deploying
+       }
 
 	return Continue();
 }
@@ -159,17 +149,7 @@ void CFFBotMvMDeployBomb::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 
 	if ( me->IsMiniBoss() )
 	{
-		static CSchemaAttributeDefHandle pAttrDef_AirblastVerticalVulnerability( "airblast vertical vulnerability multiplier" );
-
-		// Minibosses can be pushed again
-		if ( !pAttrDef_AirblastVerticalVulnerability )
-		{
-			Warning( "TFBotSpawner: Invalid attribute 'airblast vertical vulnerability multiplier'\n" );
-		}
-		else
-		{
-			me->GetAttributeList()->RemoveAttribute( pAttrDef_AirblastVerticalVulnerability );
-		}
+               // Minibosses can be pushed again
 	}
 
 	me->SetDeployingBombState( TF_BOMB_DEPLOYING_NONE );
