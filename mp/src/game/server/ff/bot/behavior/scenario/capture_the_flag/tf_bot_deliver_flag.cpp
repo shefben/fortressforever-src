@@ -12,9 +12,9 @@
 #include "bot/behavior/ff_bot_taunt.h"
 #include "bot/behavior/ff_bot_mvm_deploy_bomb.h"
 
-#include "ff_objective_resource.h"
-#include "player_vs_environment/ff_population_manager.h"
-#include "ff_gamestats.h"
+#include "tf_objective_resource.h"
+#include "player_vs_environment/tf_population_manager.h"
+#include "tf_gamestats.h"
 
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_move_to.h"
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_wait.h"

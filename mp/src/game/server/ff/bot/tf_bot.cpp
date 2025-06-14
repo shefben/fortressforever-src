@@ -23,7 +23,7 @@
 #include "func_respawnroom.h"
 #include "soundenvelope.h"
 
-#include "player_vs_environment/ff_population_manager.h"
+#include "player_vs_environment/tf_population_manager.h"
 
 #include "bot/behavior/ff_bot_behavior.h"
 #include "bot/map_entities/ff_bot_generator.h"
@@ -1086,8 +1086,8 @@ void CFFBot::PhysicsSimulate( void )
 		m_Shared.AddCond( TF_COND_CRITBOOSTED_USER_BUFF );
 	}
 
-	// force my speed to be recalculated to keep squad together and restore speed afterwards
-	TeamFortress_SetSpeed();
+       // force my speed to be recalculated to keep squad together and restore speed afterwards
+       RecalculateSpeed();
 
 	if ( IsInASquad() )
 	{
