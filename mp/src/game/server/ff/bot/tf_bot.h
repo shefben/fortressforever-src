@@ -7,7 +7,7 @@
 #define FF_BOT_H
 
 #include "Player/NextBotPlayer.h"
-#include "../nav_mesh/ff_nav_mesh.h"
+#include "../../tf/nav_mesh/tf_nav_mesh.h"
 #include "ff_bot_vision.h"
 #include "ff_bot_body.h"
 #include "ff_bot_locomotion.h"

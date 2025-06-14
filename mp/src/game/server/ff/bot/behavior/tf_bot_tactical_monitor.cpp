@@ -486,19 +486,7 @@ EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnCommandString( CFFBot *me,
 			{ "override footstep sound set", 2.f },
 		};
 
-		CAttributeList *pAttribList = me->GetAttributeList();
-		if ( pAttribList )
-		{
-			for ( int i = 0; i < ARRAYSIZE( sAttribs ); i++ )
-			{
-				const CEconItemAttributeDefinition *pDef = ItemSystem()->GetItemSchema()->GetAttributeDefinitionByName( sAttribs[i].szName );
-				if ( pDef )
-				{
-					pAttribList->SetRuntimeAttributeValue( pDef, sAttribs[i].flValue );
-				}
-			}
-			me->NetworkStateChanged();
-		}
+               // attribute system not available in Fortress Forever
 	}
 	// !!! BountyMode prototype evaluation hacks below - this code will most likely be deleted soon
 	else if ( FStrEq( command, "become guardian" ) )
@@ -530,20 +518,8 @@ EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnCommandString( CFFBot *me,
 			{ "override footstep sound set", 4.f },
 		};
 
-		CAttributeList *pAttribList = me->GetAttributeList();
-		if ( pAttribList )
-		{
-			for ( int i = 0; i < ARRAYSIZE( sAttribs ); i++ )
-			{
-				const CEconItemAttributeDefinition *pDef = ItemSystem()->GetItemSchema()->GetAttributeDefinitionByName( sAttribs[i].szName );
-				if ( pDef )
-				{
-					pAttribList->SetRuntimeAttributeValue( pDef, sAttribs[i].flValue );
-				}
-			}
-			me->NetworkStateChanged();
-		}
-	}
+               // attribute system not available in Fortress Forever
+       }
 #endif // STAGING_ONLY
 
 	return TryContinue();

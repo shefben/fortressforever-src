@@ -12,9 +12,9 @@
 #include "bot/behavior/ff_bot_taunt.h"
 #include "bot/behavior/ff_bot_mvm_deploy_bomb.h"
 
-#include "ff_objective_resource.h"
-#include "player_vs_environment/ff_population_manager.h"
-#include "ff_gamestats.h"
+#include "tf_objective_resource.h"
+#include "player_vs_environment/tf_population_manager.h"
+#include "tf_gamestats.h"
 
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_move_to.h"
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_wait.h"
@@ -138,23 +138,8 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 
 				//---------------------------------------
 				case 2:
-				{
-					static CSchemaAttributeDefHandle pAttrDef_HealthRegen( "health regen" );
-
-					m_upgradeTimer.Start( ff_mvm_bot_flag_carrier_interval_to_3rd_upgrade.GetFloat() );
-					
-					if ( !pAttrDef_HealthRegen )
-					{
-						Warning( "TFBotSpawner: Invalid attribute 'health regen'\n" );
-					}
-					else
-					{
-						CAttributeList *pAttrList = me->GetAttributeList();
-						if ( pAttrList )
-						{
-							pAttrList->SetRuntimeAttributeValue( pAttrDef_HealthRegen, ff_mvm_bot_flag_carrier_health_regen.GetFloat() );
-						}
-					}
+                               {
+                                       m_upgradeTimer.Start( ff_mvm_bot_flag_carrier_interval_to_3rd_upgrade.GetFloat() );
 
 					// update the objective resource so clients have the information
 					if ( TFObjectiveResource() )
