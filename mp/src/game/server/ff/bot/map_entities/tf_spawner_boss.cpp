@@ -91,8 +91,8 @@ void CTFSpawnerBoss::OnBotStunned( CBotNPC *pBot )
 void CTFSpawnerBoss::SpawnerThink( void )
 {
 	// still waiting for the real game to start?
-	gamerules_roundstate_t roundState = TFGameRules()->State_Get();
-	if ( roundState >= GR_STATE_TEAM_WIN || roundState < GR_STATE_PREROUND || TFGameRules()->IsInWaitingForPlayers() )
+	gamerules_roundstate_t roundState = FFGameRules()->State_Get();
+	if ( roundState >= GR_STATE_TEAM_WIN || roundState < GR_STATE_PREROUND || FFGameRules()->IsInWaitingForPlayers() )
 	{
 		SetNextThink( gpGlobals->curtime + 1.0f );
 		return;

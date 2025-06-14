@@ -162,15 +162,15 @@ void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 //-----------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval )
 {
-	if ( TFGameRules()->RoundHasBeenWon() )
+	if ( FFGameRules()->RoundHasBeenWon() )
 	{
 #ifdef TF_RAID_MODE
-		if ( TFGameRules()->IsBossBattleMode() )
+		if ( FFGameRules()->IsBossBattleMode() )
 		{
 			return Continue();
 		}
 #endif // TF_RAID_MODE
-		if ( TFGameRules()->GetWinningTeam() == me->GetTeamNumber() )
+		if ( FFGameRules()->GetWinningTeam() == me->GetTeamNumber() )
 		{
 			// we won - kill all losers we see
 			return SuspendFor( new CFFBotSeekAndDestroy, "Get the losers!" );
@@ -197,7 +197,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		}
 	}
 
-	if ( TFGameRules()->State_Get() == GR_STATE_PREROUND )
+	if ( FFGameRules()->State_Get() == GR_STATE_PREROUND )
 	{
 		// clear stuck monitor so we dont jump when the preround elapses
 		me->GetLocomotionInterface()->ClearStuckStatus( "In preround" );
@@ -209,7 +209,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		return SuspendFor( result, "Opportunistically using buff item" );
 	}
 
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 	{
 		// if a human is staring at us, face them and taunt
 		if ( m_acknowledgeRetryTimer.IsElapsed() )
@@ -251,7 +251,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 	// check if we need to get to cover
 	QueryResultType shouldRetreat = me->GetIntentionInterface()->ShouldRetreat( me );
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		// never retreat in MvM mode
 		shouldRetreat = ANSWER_NO;
@@ -282,7 +282,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 
 	bool isAvailable = ( me->GetIntentionInterface()->ShouldHurry( me ) != ANSWER_YES );
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->HasTheFlag() )
+	if ( FFGameRules()->IsMannVsMachineMode() && me->HasTheFlag() )
 	{
 		isAvailable = false;
 	}
@@ -316,7 +316,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 
 		bool shouldDestroySentries = true;
 
-		if ( TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules()->IsMannVsMachineMode() )
 		{
 			shouldDestroySentries = false;
 		}

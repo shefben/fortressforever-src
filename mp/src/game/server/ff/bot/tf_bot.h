@@ -890,7 +890,7 @@ public:
 			}
 
 			// in training, avoid capturing the point until the human trainee does so
-			if ( TFGameRules()->IsInTraining() && 
+			if ( FFGameRules()->IsInTraining() && 
 				 area->HasAttributeTF( FF_NAV_CONTROL_POINT ) && 
 				 !m_me->IsAnyPointBeingCaptured() &&
 				 !m_me->IsPlayerClass( CLASS_ENGINEER ) )	// allow engineers to path so they can test travel distance for sentry placement
@@ -902,7 +902,7 @@ public:
 			if ( ( m_me->GetTeamNumber() == FF_TEAM_RED && area->HasAttributeTF( FF_NAV_SPAWN_ROOM_BLUE ) ) ||
 				 ( m_me->GetTeamNumber() == FF_TEAM_BLUE && area->HasAttributeTF( FF_NAV_SPAWN_ROOM_RED ) ) )
 			{
-				if ( !TFGameRules()->RoundHasBeenWon() )
+				if ( !FFGameRules()->RoundHasBeenWon() )
 				{
 					return -1.0f;
 				}

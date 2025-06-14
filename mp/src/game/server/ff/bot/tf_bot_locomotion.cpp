@@ -41,7 +41,7 @@ void CFFBotLocomotion::Update( void )
 // Move directly towards the given position
 void CFFBotLocomotion::Approach( const Vector &pos, float goalWeight )
 {
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( !IsOnGround() && !IsClimbingOrJumping() )
 		{
@@ -83,7 +83,7 @@ bool CFFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
 		return false;
 	}
 
-	if ( !TFGameRules()->RoundHasBeenWon() || TFGameRules()->GetWinningTeam() != me->GetTeamNumber() )
+	if ( !FFGameRules()->RoundHasBeenWon() || FFGameRules()->GetWinningTeam() != me->GetTeamNumber() )
 	{
 		if ( area->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) && me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
@@ -123,7 +123,7 @@ void CFFBotLocomotion::Jump( void )
 		return;
 	}
 
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 	{
 		int iCustomJumpParticle = 0;
 		CALL_ATTRIB_HOOK_INT_ON_OTHER( me, iCustomJumpParticle, bot_custom_jump_particle );

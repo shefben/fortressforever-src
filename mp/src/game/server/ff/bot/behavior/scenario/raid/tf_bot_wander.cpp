@@ -53,7 +53,7 @@ ActionResult< CFFBot >	CFFBotWander::Update( CFFBot *me, float interval )
 	if ( me->HasAttribute( CFFBot::AGGRESSIVE ) )
 	{
 		// I'm a mob rusher - pick a random raider and attack them!
-		CFFPlayer *victim = TFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
+		CFFPlayer *victim = FFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
 		if ( victim )
 		{
 			return SuspendFor( new CFFBotMobRush( victim ), "Rushing a raider" );

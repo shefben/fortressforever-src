@@ -61,12 +61,12 @@ ActionResult< CFFBot > CFFBotMissionDestroySentries::Update( CFFBot *me, float i
 			// next destroy the most dangerous sentry
  			int iTeam = ( me->GetTeamNumber() == FF_TEAM_RED ) ? FF_TEAM_BLUE : FF_TEAM_RED;
 
-			if ( TFGameRules() && TFGameRules()->IsPVEModeActive() )
+			if ( FFGameRules() && FFGameRules()->IsPVEModeActive() )
 			{
 				iTeam = FF_TEAM_PVE_DEFENDERS;
 			}
 
-			m_goalSentry = TFGameRules()->FindSentryGunWithMostKills( iTeam );
+			m_goalSentry = FFGameRules()->FindSentryGunWithMostKills( iTeam );
 		}
 	}
 

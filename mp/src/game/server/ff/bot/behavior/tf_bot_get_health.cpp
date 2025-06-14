@@ -110,13 +110,13 @@ bool CFFBotGetHealth::IsPossible( CFFBot *me )
 
 #ifdef TF_RAID_MODE
 	// mobs don't heal
-	if ( TFGameRules()->IsRaidMode() && me->HasAttribute( CFFBot::AGGRESSIVE ) )
+	if ( FFGameRules()->IsRaidMode() && me->HasAttribute( CFFBot::AGGRESSIVE ) )
 	{
 		return false;
 	}
 #endif // TF_RAID_MODE
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		return false;
 	}
@@ -134,7 +134,7 @@ bool CFFBotGetHealth::IsPossible( CFFBot *me )
 	CUtlVector< CHandle< CBaseEntity > > healthVector;
 	CHealthFilter healthFilter( me );
 
-	me->SelectReachableObjects( TFGameRules()->GetHealthEntityVector(), &healthVector, healthFilter, me->GetLastKnownArea(), searchRange );
+	me->SelectReachableObjects( FFGameRules()->GetHealthEntityVector(), &healthVector, healthFilter, me->GetLastKnownArea(), searchRange );
 
 	if ( healthVector.Count() == 0 )
 	{

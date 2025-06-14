@@ -115,7 +115,7 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 #endif // TF_RAID_MODE
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsBossBattleMode() )
+	if ( FFGameRules()->IsBossBattleMode() )
 	{
 		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
@@ -143,9 +143,9 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 			return new CFFBotEngineerBuild;
 		}
 
-		return new CFFBotEscort( TFGameRules()->GetActiveBoss() );
+		return new CFFBotEscort( FFGameRules()->GetActiveBoss() );
 	}
-	else if ( TFGameRules()->IsRaidMode() )
+	else if ( FFGameRules()->IsRaidMode() )
 	{
 		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
@@ -178,7 +178,7 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 	}
 #endif // TF_RAID_MODE	
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( me->IsPlayerClass( CLASS_SPY ) )
 		{
@@ -251,11 +251,11 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 		// capture the flag
 		return new CFFBotFetchFlag;
 	}
-       else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+       else if ( FFGameRules()->GetGameType() == TF_GAMETYPE_CP )
        {
                // if we have a point we can capture - do it
 		CUtlVector< CTeamControlPoint * > captureVector;
-		TFGameRules()->CollectCapturePoints( me, &captureVector );
+		FFGameRules()->CollectCapturePoints( me, &captureVector );
 
 		if ( captureVector.Count() > 0 )
 		{
@@ -264,7 +264,7 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 
 		// otherwise, defend our point(s) from capture
 		CUtlVector< CTeamControlPoint * > defendVector;
-		TFGameRules()->CollectDefendPoints( me, &defendVector );
+		FFGameRules()->CollectDefendPoints( me, &defendVector );
 
 		if ( defendVector.Count() > 0 )
 		{

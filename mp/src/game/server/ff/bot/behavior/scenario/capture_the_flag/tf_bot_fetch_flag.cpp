@@ -35,7 +35,7 @@ ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 
 	if ( !flag )
 	{
-		if ( TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules()->IsMannVsMachineMode() )
 		{
 			return SuspendFor( new CFFBotAttackFlagDefenders, "Flag flag exists - Attacking the enemy flag defenders" );
 		}
@@ -45,7 +45,7 @@ ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 
 
 
-	if ( TFGameRules()->IsMannVsMachineMode() && flag->IsHome() )
+	if ( FFGameRules()->IsMannVsMachineMode() && flag->IsHome() )
 	{
 		if ( gpGlobals->curtime - me->GetSpawnTime() < 1.0f && me->GetTeamNumber() != TEAM_SPECTATOR )
 		{
@@ -86,7 +86,7 @@ ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 	if ( m_repathTimer.IsElapsed() )
 	{
 		CFFBotPathCost cost( me, DEFAULT_ROUTE );
-		float maxPathLength = TFGameRules()->IsMannVsMachineMode() ? TFBOT_MVM_MAX_PATH_LENGTH : 0.0f;
+		float maxPathLength = FFGameRules()->IsMannVsMachineMode() ? TFBOT_MVM_MAX_PATH_LENGTH : 0.0f;
 		if ( m_path.Compute( me, flag->WorldSpaceCenter(), cost, maxPathLength ) == false )
 		{
 			if ( flag->IsDropped() )

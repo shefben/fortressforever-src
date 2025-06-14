@@ -246,8 +246,8 @@ void CFFBotGenerator::Activate()
 void CFFBotGenerator::GeneratorThink( void )
 {
 	// still waiting for the real game to start?
-	gamerules_roundstate_t roundState = TFGameRules()->State_Get();
-	if ( roundState >= GR_STATE_TEAM_WIN || roundState < GR_STATE_PREROUND ||  TFGameRules()->IsInWaitingForPlayers() )
+	gamerules_roundstate_t roundState = FFGameRules()->State_Get();
+	if ( roundState >= GR_STATE_TEAM_WIN || roundState < GR_STATE_PREROUND ||  FFGameRules()->IsInWaitingForPlayers() )
 	{
 		SetNextThink( gpGlobals->curtime + 1.0f );
 		return;
@@ -299,7 +299,7 @@ void CFFBotGenerator::SpawnBot( void )
 		m_spawnedBotVector.AddToTail( bot );
 
 #ifdef TF_RAID_MODE
-		if ( TFGameRules()->IsRaidMode() )
+		if ( FFGameRules()->IsRaidMode() )
 		{
 			bot->SetAttribute( CFFBot::IS_NPC );
 		}
@@ -381,7 +381,7 @@ void CFFBotGenerator::SpawnBot( void )
 		bot->HandleCommand_JoinClass( pClassName );
 
 		// in training, reset the after the bot joins the class
-		if ( TFGameRules()->IsInTraining() )
+		if ( FFGameRules()->IsInTraining() )
 		{
 			CFFBot::DifficultyType skill = bot->GetDifficulty();
 			CreateBotName( iTeam, bot->GetPlayerClass()->GetClassIndex(), skill, name, sizeof(name) );

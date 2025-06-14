@@ -43,7 +43,7 @@ ActionResult< CFFBot >	CFFBotMvMEngineerTeleportSpawn::Update( CFFBot *me, float
 	{
 		m_teleportDelay.Start( 0.1f );
 		if ( m_hintEntity )
-			TFGameRules()->PushAllPlayersAway( m_hintEntity->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
+			FFGameRules()->PushAllPlayersAway( m_hintEntity->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_teleportDelay.IsElapsed() )
 	{
@@ -75,11 +75,11 @@ ActionResult< CFFBot >	CFFBotMvMEngineerTeleportSpawn::Update( CFFBot *me, float
 				{
 					if ( pWave->NumEngineersTeleportSpawned() == 0 )
 					{
-						TFGameRules()->BroadcastSound( 255, "Announcer.MVM_First_Engineer_Teleport_Spawned" );
+						FFGameRules()->BroadcastSound( 255, "Announcer.MVM_First_Engineer_Teleport_Spawned" );
 					}
 					else
 					{
-						TFGameRules()->BroadcastSound( 255, "Announcer.MVM_Another_Engineer_Teleport_Spawned" );
+						FFGameRules()->BroadcastSound( 255, "Announcer.MVM_Another_Engineer_Teleport_Spawned" );
 					}
 
 					pWave->IncrementEngineerTeleportSpawned();

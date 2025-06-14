@@ -74,7 +74,7 @@ ActionResult< CFFBot >	CFFBotMvMEngineerBuildSentryGun::Update( CFFBot *me, floa
 	if ( !m_delayBuildTime.HasStarted() )
 	{
 		m_delayBuildTime.Start( 0.1f );
-		TFGameRules()->PushAllPlayersAway( m_sentryBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
+		FFGameRules()->PushAllPlayersAway( m_sentryBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_delayBuildTime.HasStarted() && m_delayBuildTime.IsElapsed() )
 	{
