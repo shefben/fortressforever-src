@@ -220,15 +220,6 @@ ActionResult< CFFBot >	CFFBotGetAmmo::OnStart( CFFBot *me, Action< CFFBot > *pri
 		return Done( "No path to ammo!" );
 	}
 
-	// if I'm a spy, cloak and disguise
-	if ( me->IsPlayerClass( CLASS_SPY ) )
-	{
-		if ( !me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
-	}
-
 	return Continue();
 }
 

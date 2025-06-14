@@ -51,7 +51,6 @@ void CFFBotVision::Update( void )
 		if ( !known || !known->IsVisibleRecently() )
 		{
 			// if a hidden spy changes disguises, we no longer recognize him
-			if ( playerVector[i]->m_Shared.InCond( TF_COND_DISGUISING ) )
 			{
 				me->ForgetSpy( playerVector[i] );				
 			}
@@ -283,9 +282,7 @@ bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 			return true;
 		}
 
-		if ( enemy->m_Shared.IsStealthed() )
 		{
-			if ( enemy->m_Shared.GetPercentInvisible() < 0.75f )
 			{
 				// spy is partially cloaked, and therefore attracts our attention
 				return false;
@@ -300,12 +297,10 @@ bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 			return false;
 		}
 
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISING ) )
 		{
 			return false;
 		}
 		
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISED ) && enemy->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 		{
 			// spy is disguised as a member of my team
 			return true;
@@ -385,9 +380,7 @@ bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 			return false;
 		}
 
-		if ( player->m_Shared.IsStealthed() )
 		{
-			if ( player->m_Shared.GetPercentInvisible() < 0.75f )
 			{
 				// spy is partially cloaked, and therefore attracts our attention
 				me->RealizeSpy( player );
@@ -405,7 +398,6 @@ bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 			// But only if we aren't suspecting them currently.  This happens when we bump into them.
 			if( !pSuspectInfo || !pSuspectInfo->IsCurrentlySuspected() )
 			{
-				if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 				{
 					me->ForgetSpy( player );
 					return false;
@@ -429,14 +421,12 @@ bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 			}
 		}
 
-		if ( player->m_Shared.InCond( TF_COND_DISGUISING ) )
 		{
 			// spotted a spy!
 			me->RealizeSpy( player );
 			return true;
 		}
 
-		if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 		{
 			// spy is disguised as a member of my team, don't notice him
 			return false;

@@ -132,8 +132,6 @@ void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 	{
 		CFFPlayer *enemy = enemyVector[i];
 
-		if ( enemy->m_Shared.IsStealthed() || enemy->m_Shared.InCond( TF_COND_DISGUISED ) )
-			continue;
 
 		float rangeSq = ( enemy->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
 		if ( rangeSq < closestRangeSq )
@@ -420,30 +418,6 @@ EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnCommandString( CFFBot *me,
 	else if ( FStrEq( command, "taunt" ) )
 	{
 		return TrySuspendFor( new CFFBotTaunt(), RESULT_TRY, "Received command to taunt" );
-	}
-	else if ( FStrEq( command, "cloak" ) )
-	{
-		if (  me->IsPlayerClass( CLASS_SPY ) && me->m_Shared.IsStealthed() == false )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "uncloak" ) )
-	{
-		if ( me->IsPlayerClass( CLASS_SPY ) && me->m_Shared.IsStealthed() == true )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "disguise") )
-	{
-		if ( me->IsPlayerClass( CLASS_SPY ) )
-		{
-			if ( me->CanDisguise() )
-			{
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( CLASS_SCOUT, CLASS_CIVILIAN-1 ) );
-			}
-		}
 	}
 	else if ( FStrEq( command, "build sentry at nearest sentry hint" ) )
 	{

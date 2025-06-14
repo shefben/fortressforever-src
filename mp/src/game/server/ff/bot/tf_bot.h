@@ -894,7 +894,7 @@ public:
 			if ( TFGameRules()->IsInTraining() && 
 				 area->HasAttributeTF( FF_NAV_CONTROL_POINT ) && 
 				 !m_me->IsAnyPointBeingCaptured() &&
-				 !m_me->IsPlayerClass( FF_CLASS_ENGINEER ) )	// allow engineers to path so they can test travel distance for sentry placement
+				 !m_me->IsPlayerClass( CLASS_ENGINEER ) )	// allow engineers to path so they can test travel distance for sentry placement
 			{
 				return -1.0f;
 			}
@@ -976,7 +976,7 @@ public:
 				}
 			}
 
-			if ( m_me->IsPlayerClass( FF_CLASS_SPY ) )
+			if ( m_me->IsPlayerClass( CLASS_SPY ) )
 			{
 				int enemyTeam = GetEnemyTeam( m_me->GetTeamNumber() );
 

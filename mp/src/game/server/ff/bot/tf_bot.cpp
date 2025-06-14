@@ -1131,18 +1131,6 @@ void CFFBot::Touch( CBaseEntity *pOther )
 	CFFPlayer *them = ToFFPlayer( pOther );
 	if ( them && IsEnemy( them ) )
 	{
-		if ( them->m_Shared.IsStealthed() || them->m_Shared.InCond( TF_COND_DISGUISED ) )
-		{
-			// bumped a spy - they are discovered!
-			if ( TFGameRules()->IsMannVsMachineMode() )	// we have to build up to knowing that they are a spy in MvM
-			{
-				SuspectSpy( them );
-			}
-			else
-			{
-				RealizeSpy( them );
-			}
-		}
 
 		// always notice if we bump an enemy
 		TheNextBots().OnWeaponFired( them, them->GetActiveFFWeapon() );
@@ -2299,7 +2287,7 @@ bool CFFBot::IsAmmoLow( void ) const
 			WEAPON_FILE_INFO_HANDLE	weaponInfoHandle = LookupWeaponInfoSlot( weaponAlias );
 			if ( weaponInfoHandle != GetInvalidWeaponInfoHandle() )
 			{
-				CTFWeaponInfo *weaponInfo = static_cast< CTFWeaponInfo * >( GetFileWeaponInfoFromHandle( weaponInfoHandle ) );
+				CFFWeaponInfo *weaponInfo = static_cast< CFFWeaponInfo * >( GetFileWeaponInfoFromHandle( weaponInfoHandle ) );
 				if ( weaponInfo && weaponInfo->GetWeaponData( FF_WEAPON_PRIMARY_MODE ).m_iProjectile == TF_PROJECTILE_NONE )
 				{
 					// we don't shoot anything, so we don't need ammo
@@ -2358,7 +2346,7 @@ bool CFFBot::IsAmmoFull( void ) const
 			WEAPON_FILE_INFO_HANDLE	weaponInfoHandle = LookupWeaponInfoSlot( weaponAlias );
 			if ( weaponInfoHandle != GetInvalidWeaponInfoHandle() )
 			{
-				CTFWeaponInfo *weaponInfo = static_cast< CTFWeaponInfo * >( GetFileWeaponInfoFromHandle( weaponInfoHandle ) );
+				CFFWeaponInfo *weaponInfo = static_cast< CFFWeaponInfo * >( GetFileWeaponInfoFromHandle( weaponInfoHandle ) );
 				if ( weaponInfo && weaponInfo->GetWeaponData( FF_WEAPON_PRIMARY_MODE ).m_iProjectile == TF_PROJECTILE_NONE )
 				{
 					// we don't shoot anything, so we don't need ammo
