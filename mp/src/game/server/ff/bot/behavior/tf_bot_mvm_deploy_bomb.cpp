@@ -6,7 +6,6 @@
 #include "team.h"
 #include "bot/ff_bot.h"
 #include "bot/behavior/ff_bot_mvm_deploy_bomb.h"
-#include "econ_item_system.h"
 
 
 extern ConVar ff_deploying_bomb_delay_time;

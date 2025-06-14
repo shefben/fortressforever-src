@@ -132,6 +132,7 @@ void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 	{
 		CFFPlayer *enemy = enemyVector[i];
 
+
 		float rangeSq = ( enemy->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
 		if ( rangeSq < closestRangeSq )
 		{
