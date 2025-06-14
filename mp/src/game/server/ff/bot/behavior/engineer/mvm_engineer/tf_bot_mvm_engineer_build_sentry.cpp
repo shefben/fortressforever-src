@@ -19,14 +19,14 @@
 extern ConVar ff_bot_engineer_mvm_building_health_multiplier;
 
 //---------------------------------------------------------------------------------------------
-CTFBotMvMEngineerBuildSentryGun::CTFBotMvMEngineerBuildSentryGun( CTFBotHintSentrygun* pSentryHint )
+CFFBotMvMEngineerBuildSentryGun::CFFBotMvMEngineerBuildSentryGun( CFFBotHintSentrygun* pSentryHint )
 {
 	m_sentryBuildHint = pSentryHint;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMvMEngineerBuildSentryGun::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	me->StartBuildingObjectOfType( OBJ_SENTRYGUN );
 
@@ -35,7 +35,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::OnStart( CTFBot *me, Act
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMvMEngineerBuildSentryGun::Update( CFFBot *me, float interval )
 {
 	if ( m_sentryBuildHint == NULL )
 		return Done( "No hint entity" );
@@ -57,7 +57,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::Update( CTFBot *me, floa
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, SAFEST_ROUTE );
+			CFFBotPathCost cost( me, SAFEST_ROUTE );
 			m_path.Compute( me, m_sentryBuildHint->GetAbsOrigin(), cost );
 		}
 
@@ -74,7 +74,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::Update( CTFBot *me, floa
 	if ( !m_delayBuildTime.HasStarted() )
 	{
 		m_delayBuildTime.Start( 0.1f );
-		TFGameRules()->PushAllPlayersAway( m_sentryBuildHint->GetAbsOrigin(), 400, 500, TF_TEAM_RED );
+		TFGameRules()->PushAllPlayersAway( m_sentryBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_delayBuildTime.HasStarted() && m_delayBuildTime.IsElapsed() )
 	{
@@ -112,7 +112,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildSentryGun::Update( CTFBot *me, floa
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMvMEngineerBuildSentryGun::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotMvMEngineerBuildSentryGun::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( m_sentry.Get() )
 	{

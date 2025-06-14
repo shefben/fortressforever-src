@@ -9,13 +9,13 @@
 #include "NextBot/NavMeshEntities/func_nav_prerequisite.h"
 
 
-class CTFBotNavEntWait : public Action< CTFBot >
+class CFFBotNavEntWait : public Action< CFFBot >
 {
 public:
-	CTFBotNavEntWait( const CFuncNavPrerequisite *prereq );
+	CFFBotNavEntWait( const CFuncNavPrerequisite *prereq );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "NavEntWait"; };
 

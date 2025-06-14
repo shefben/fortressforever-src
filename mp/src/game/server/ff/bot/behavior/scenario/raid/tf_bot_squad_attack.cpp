@@ -23,7 +23,7 @@ ConVar ff_raid_squad_vocalize_max_interval( "ff_raid_squad_vocalize_max_interval
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSquadAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSquadAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_vocalizeTimer.Start( RandomFloat( ff_raid_squad_vocalize_min_interval.GetFloat(), ff_raid_squad_vocalize_max_interval.GetFloat() ) );
 	m_victim = NULL;
@@ -34,16 +34,16 @@ ActionResult< CTFBot >	CTFBotSquadAttack::OnStart( CTFBot *me, Action< CTFBot > 
 
 //---------------------------------------------------------------------------------------------
 // the leader is the slowest member of the squad
-CTFBot *CTFBotSquadAttack::GetSquadLeader( CTFBot *me ) const
+CFFBot *CFFBotSquadAttack::GetSquadLeader( CFFBot *me ) const
 {
-	CTFBot *leader = NULL;
+	CFFBot *leader = NULL;
 	float leaderSpeed = FLT_MAX;
 
-	CTFBotSquad *squad = me->GetSquad();
-	CTFBotSquad::Iterator it;
+	CFFBotSquad *squad = me->GetSquad();
+	CFFBotSquad::Iterator it;
 	for( it = squad->GetFirstMember(); it != squad->InvalidIterator(); it = squad->GetNextMember( it ) )
 	{
-		CTFBot *bot = it();
+		CFFBot *bot = it();
 
 		float speed = bot->GetPlayerClass()->GetMaxSpeed();
 
@@ -59,18 +59,18 @@ CTFBot *CTFBotSquadAttack::GetSquadLeader( CTFBot *me ) const
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSquadAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotSquadAttack::Update( CFFBot *me, float interval )
 {
 	if ( !me->IsInASquad() )
 		return Done( "Not in a squad" );
 
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
-		return SuspendFor( new CTFBotMedicHeal );
+		return SuspendFor( new CFFBotMedicHeal );
 	}
 
-	CTFBot *leader = GetSquadLeader( me );
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBot *leader = GetSquadLeader( me );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 
 	if ( m_victim == NULL || m_victimConsiderTimer.IsElapsed() )
 	{
@@ -82,7 +82,7 @@ ActionResult< CTFBot > CTFBotSquadAttack::Update( CTFBot *me, float interval )
 	if ( m_victim )
 	{
 		const float engageRange = 500.0f;
-		if ( me->IsPlayerClass( TF_CLASS_PYRO ) || 
+		if ( me->IsPlayerClass( CLASS_PYRO ) || 
 			 me->IsRangeGreaterThan( m_victim->GetAbsOrigin(), engageRange ) || 
 			 !me->GetVisionInterface()->IsAbleToSee( m_victim, IVision::DISREGARD_FOV ) )
 		{
@@ -103,11 +103,11 @@ ActionResult< CTFBot > CTFBotSquadAttack::Update( CTFBot *me, float interval )
 		{
 			NDebugOverlay::Circle( me->GetAbsOrigin(), 20.0f, 255, 255, 0, 255, true, NDEBUG_PERSIST_TILL_NEXT_SERVER );
 
-			CTFBotSquad *squad = me->GetSquad();
-			CTFBotSquad::Iterator it;
+			CFFBotSquad *squad = me->GetSquad();
+			CFFBotSquad::Iterator it;
 			for( it = squad->GetFirstMember(); it != squad->InvalidIterator(); it = squad->GetNextMember( it ) )
 			{
-				CTFBot *bot = it();
+				CFFBot *bot = it();
 
 				if ( me->IsSelf( bot ) )
 					continue;
@@ -121,9 +121,9 @@ ActionResult< CTFBot > CTFBotSquadAttack::Update( CTFBot *me, float interval )
 	{
 		m_vocalizeTimer.Start( RandomFloat( ff_raid_squad_vocalize_min_interval.GetFloat(), ff_raid_squad_vocalize_max_interval.GetFloat() ) );
 
-		if ( me->IsPlayerClass( TF_CLASS_SCOUT ) )
+		if ( me->IsPlayerClass( CLASS_SCOUT ) )
 			me->EmitSound( "Scout.MobJabber" );
-		else if ( me->IsPlayerClass( TF_CLASS_HEAVYWEAPONS ) )
+		else if ( me->IsPlayerClass( CLASS_HEAVYWEAPONS ) )
 			me->EmitSound( "Heavy.MobJabber" );
 		else
 			me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_BATTLECRY );
@@ -134,14 +134,14 @@ ActionResult< CTFBot > CTFBotSquadAttack::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSquadAttack::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSquadAttack::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	return Continue();
 }
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSquadAttack::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotSquadAttack::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	return TryContinue();

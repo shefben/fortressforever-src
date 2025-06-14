@@ -12,14 +12,14 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-CTFBotNavEntDestroyEntity::CTFBotNavEntDestroyEntity( const CFuncNavPrerequisite *prereq )
+CFFBotNavEntDestroyEntity::CFFBotNavEntDestroyEntity( const CFuncNavPrerequisite *prereq )
 {
 	m_prereq = prereq;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotNavEntDestroyEntity::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	if ( m_prereq == NULL )
 	{
@@ -28,7 +28,7 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::OnStart( CTFBot *me, Action< C
 
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
-	m_wasIgnoringEnemies = me->HasAttribute( CTFBot::IGNORE_ENEMIES );
+	m_wasIgnoringEnemies = me->HasAttribute( CFFBot::IGNORE_ENEMIES );
 
 	m_isReadyToLaunchSticky = true;
 
@@ -37,7 +37,7 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::OnStart( CTFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotNavEntDestroyEntity::DetonateStickiesWhenSet( CTFBot *me, CTFPipebombLauncher *stickyLauncher ) const
+void CFFBotNavEntDestroyEntity::DetonateStickiesWhenSet( CFFBot *me, CTFPipebombLauncher *stickyLauncher ) const
 {
 	if ( !stickyLauncher )
 		return;
@@ -66,7 +66,7 @@ void CTFBotNavEntDestroyEntity::DetonateStickiesWhenSet( CTFBot *me, CTFPipebomb
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotNavEntDestroyEntity::Update( CFFBot *me, float interval )
 {
 	if ( m_prereq == NULL )
 	{
@@ -88,20 +88,20 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::Update( CTFBot *me, float inte
 
 	if ( me->IsDistanceBetweenLessThan( target, attackRange ) && me->GetVisionInterface()->IsLineOfSightClearToEntity( target ) )
 	{
-		me->SetAttribute( CTFBot::IGNORE_ENEMIES );
+		me->SetAttribute( CFFBot::IGNORE_ENEMIES );
 
 		me->GetBodyInterface()->AimHeadTowards( target->WorldSpaceCenter(), IBody::CRITICAL, 0.2f, NULL, "Aiming at target we need to destroy to progress" );
 
 		if ( me->GetBodyInterface()->IsHeadAimingOnTarget() )
 		{
 			// attack
-			if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+			if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 			{
 				// demomen use stickybombs to destroy the barrier
 				CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
 				CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
-				if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() != TF_WEAPON_PIPEBOMBLAUNCHER )
+				if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() != FF_WEAPON_PIPEBOMBLAUNCHER )
 				{
 					me->Weapon_Switch( stickyLauncher );
 				}
@@ -128,7 +128,7 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::Update( CTFBot *me, float inte
 
 	if ( !m_wasIgnoringEnemies )
 	{
-		me->ClearAttribute( CTFBot::IGNORE_ENEMIES );
+		me->ClearAttribute( CFFBot::IGNORE_ENEMIES );
 	}
 
 	// move into view of our target
@@ -136,7 +136,7 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::Update( CTFBot *me, float inte
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, target->GetAbsOrigin(), cost );
 	}
 
@@ -147,10 +147,10 @@ ActionResult< CTFBot >	CTFBotNavEntDestroyEntity::Update( CTFBot *me, float inte
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotNavEntDestroyEntity::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotNavEntDestroyEntity::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( !m_wasIgnoringEnemies )
 	{
-		me->ClearAttribute( CTFBot::IGNORE_ENEMIES );
+		me->ClearAttribute( CFFBot::IGNORE_ENEMIES );
 	}
 }

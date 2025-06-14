@@ -10,18 +10,18 @@
 
 typedef CUtlVector< CHandle< CBaseTFBotHintEntity > > HintVector_t;
 
-class CTFBotHintSentrygun;
-class CTFBotHintTeleporterExit;
+class CFFBotHintSentrygun;
+class CFFBotHintTeleporterExit;
 
-class CTFBotHintEngineerNest : public CBaseTFBotHintEntity
+class CFFBotHintEngineerNest : public CBaseTFBotHintEntity
 {
-	DECLARE_CLASS( CTFBotHintEngineerNest, CBaseTFBotHintEntity );
+	DECLARE_CLASS( CFFBotHintEngineerNest, CBaseTFBotHintEntity );
 public:
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
 
-	CTFBotHintEngineerNest( void );
-	virtual ~CTFBotHintEngineerNest() { }
+	CFFBotHintEngineerNest( void );
+	virtual ~CFFBotHintEngineerNest() { }
 
 	virtual void Spawn() OVERRIDE;
 
@@ -38,8 +38,8 @@ public:
 	bool IsStaleNest() const;
 	void DetonateStaleNest();
 
-	CTFBotHintSentrygun* GetSentryHint() const;
-	CTFBotHintTeleporterExit* GetTeleporterHint() const;
+	CFFBotHintSentrygun* GetSentryHint() const;
+	CFFBotHintTeleporterExit* GetTeleporterHint() const;
 private:
 	void DetonateObjectsFromHints( const HintVector_t& hints );
 	CBaseTFBotHintEntity* GetHint( const HintVector_t& hints ) const;

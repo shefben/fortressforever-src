@@ -4,20 +4,20 @@
 #ifndef FF_BOT_MVM_ENGINEER_BUILD_TELEPORTER_H
 #define FF_BOT_MVM_ENGINEER_BUILD_TELEPORTER_H
 
-class CTFBotHintTeleporterExit;
+class CFFBotHintTeleporterExit;
 
-class CTFBotMvMEngineerBuildTeleportExit : public Action< CTFBot >
+class CFFBotMvMEngineerBuildTeleportExit : public Action< CFFBot >
 {
 public:
-	CTFBotMvMEngineerBuildTeleportExit( CTFBotHintTeleporterExit *hint );
+	CFFBotMvMEngineerBuildTeleportExit( CFFBotHintTeleporterExit *hint );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "MvMEngineerBuildTeleportExit"; };
 
 private:
-	CHandle< CTFBotHintTeleporterExit > m_teleporterBuildHint;
+	CHandle< CFFBotHintTeleporterExit > m_teleporterBuildHint;
 
 	CountdownTimer m_delayBuildTime;
 	CountdownTimer m_repathTimer;

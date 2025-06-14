@@ -18,7 +18,7 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadBlock::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotPayloadBlock::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_path.Invalidate();
@@ -30,7 +30,7 @@ ActionResult< CTFBot >	CTFBotPayloadBlock::OnStart( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadBlock::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotPayloadBlock::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->IsVisibleRecently() )
@@ -47,7 +47,7 @@ ActionResult< CTFBot >	CTFBotPayloadBlock::Update( CTFBot *me, float interval )
 	// move toward the point, periodically repathing to account for changing situation
 	if ( m_repathTimer.IsElapsed() )
 	{
-		VPROF_BUDGET( "CTFBotPayloadBlock::Update( repath )", "NextBot" );
+		VPROF_BUDGET( "CFFBotPayloadBlock::Update( repath )", "NextBot" );
 		
 		CTeamTrainWatcher *trainWatcher = TFGameRules()->GetPayloadToBlock( me->GetTeamNumber() );
 		if ( !trainWatcher )
@@ -61,7 +61,7 @@ ActionResult< CTFBot >	CTFBotPayloadBlock::Update( CTFBot *me, float interval )
 			return Done( "Cart is missing" );
 		}
 
-		CTFBotPathCost cost( me, DEFAULT_ROUTE );
+		CFFBotPathCost cost( me, DEFAULT_ROUTE );
 		m_path.Compute( me, cart->WorldSpaceCenter(), cost );
 		m_repathTimer.Start( RandomFloat( 0.2f, 0.4f ) );
 	}
@@ -74,9 +74,9 @@ ActionResult< CTFBot >	CTFBotPayloadBlock::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotPayloadBlock::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotPayloadBlock::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
-	VPROF_BUDGET( "CTFBotPayloadBlock::OnResume", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadBlock::OnResume", "NextBot" );
 
 	m_repathTimer.Invalidate();
 
@@ -85,9 +85,9 @@ ActionResult< CTFBot > CTFBotPayloadBlock::OnResume( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnStuck( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotPayloadBlock::OnStuck", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadBlock::OnStuck", "NextBot" );
 
 	m_repathTimer.Invalidate();
 	me->GetLocomotionInterface()->ClearStuckStatus();
@@ -97,16 +97,16 @@ EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
-	VPROF_BUDGET( "CTFBotPayloadBlock::OnMoveToFailure", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadBlock::OnMoveToFailure", "NextBot" );
 
 	m_repathTimer.Invalidate();
 
@@ -115,35 +115,35 @@ EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnMoveToFailure( CTFBot *me, co
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnTerritoryContested( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnTerritoryContested( CFFBot *me, int territoryID )
 {
 	return TryToSustain( RESULT_IMPORTANT );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	return TryToSustain( RESULT_IMPORTANT );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadBlock::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadBlock::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	return TryToSustain( RESULT_IMPORTANT );
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotPayloadBlock::ShouldRetreat( const INextBot *bot ) const
+QueryResultType	CFFBotPayloadBlock::ShouldRetreat( const INextBot *bot ) const
 {
 	return ANSWER_UNDEFINED;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotPayloadBlock::ShouldHurry( const INextBot *bot ) const
+QueryResultType CFFBotPayloadBlock::ShouldHurry( const INextBot *bot ) const
 {
 	// hurry and block the cart - don't retreat, etc
 	return ANSWER_YES;

@@ -23,13 +23,13 @@ ConVar ff_raid_wanderer_vocalize_max_interval( "ff_raid_wanderer_vocalize_max_in
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CTFBotWander::CTFBotWander( void )
+CFFBotWander::CFFBotWander( void )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotWander::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotWander::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_vocalizeTimer.Start( RandomFloat( ff_raid_wanderer_vocalize_min_interval.GetFloat(), ff_raid_wanderer_vocalize_max_interval.GetFloat() ) );
 
@@ -38,7 +38,7 @@ ActionResult< CTFBot >	CTFBotWander::OnStart( CTFBot *me, Action< CTFBot > *prio
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotWander::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotWander::Update( CFFBot *me, float interval )
 {
 	// mobs use only their melee weapons
 	CBaseCombatWeapon *meleeWeapon = me->Weapon_GetSlot( TF_WPN_TYPE_MELEE );
@@ -48,15 +48,15 @@ ActionResult< CTFBot >	CTFBotWander::Update( CTFBot *me, float interval )
 	}
 
 
-	CTeam *raidingTeam = GetGlobalTeam( TF_TEAM_BLUE );
+	CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
 
-	if ( me->HasAttribute( CTFBot::AGGRESSIVE ) )
+	if ( me->HasAttribute( CFFBot::AGGRESSIVE ) )
 	{
 		// I'm a mob rusher - pick a random raider and attack them!
 		CTFPlayer *victim = TFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
 		if ( victim )
 		{
-			return SuspendFor( new CTFBotMobRush( victim ), "Rushing a raider" );
+			return SuspendFor( new CFFBotMobRush( victim ), "Rushing a raider" );
 		}
 	}
 	else if ( m_visionTimer.IsElapsed() )
@@ -88,7 +88,7 @@ ActionResult< CTFBot >	CTFBotWander::Update( CTFBot *me, float interval )
 
 		if ( threat )
 		{
-			return SuspendFor( new CTFBotMobRush( threat ), "Attacking threat!" );
+			return SuspendFor( new CFFBotMobRush( threat ), "Attacking threat!" );
 		}
 	}
 
@@ -97,7 +97,7 @@ ActionResult< CTFBot >	CTFBotWander::Update( CTFBot *me, float interval )
 		m_vocalizeTimer.Start( RandomFloat( ff_raid_wanderer_vocalize_min_interval.GetFloat(), ff_raid_wanderer_vocalize_max_interval.GetFloat() ) );
 
 		// mouth off
-		if ( me->IsPlayerClass( TF_CLASS_SCOUT ) )
+		if ( me->IsPlayerClass( CLASS_SCOUT ) )
 			me->EmitSound( "Scout.WanderJabber" );
 		else
 			me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_JEERS );
@@ -108,11 +108,11 @@ ActionResult< CTFBot >	CTFBotWander::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotWander::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result  )
+EventDesiredResult< CFFBot > CFFBotWander::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result  )
 {
 	if ( other && other->IsPlayer() && me->IsEnemy( other ) )
 	{
-		return TrySuspendFor( new CTFBotMobRush( (CTFPlayer *)other ), RESULT_IMPORTANT, "Attacking threat who touched me!" );
+		return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)other ), RESULT_IMPORTANT, "Attacking threat who touched me!" );
 	}
 
 	return TryContinue();
@@ -120,11 +120,11 @@ EventDesiredResult< CTFBot > CTFBotWander::OnContact( CTFBot *me, CBaseEntity *o
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotWander::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotWander::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && me->IsEnemy( info.GetAttacker() ) )
 	{
-		return TrySuspendFor( new CTFBotMobRush( (CTFPlayer *)info.GetAttacker() ), RESULT_IMPORTANT, "Attacking threat who attacked me!" );
+		return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)info.GetAttacker() ), RESULT_IMPORTANT, "Attacking threat who attacked me!" );
 	}
 
 	return TryContinue();
@@ -132,7 +132,7 @@ EventDesiredResult< CTFBot > CTFBotWander::OnInjured( CTFBot *me, const CTakeDam
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotWander::OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotWander::OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
 {
 	if ( victim && me->IsFriend( victim ) )
 	{
@@ -155,7 +155,7 @@ EventDesiredResult< CTFBot > CTFBotWander::OnOtherKilled( CTFBot *me, CBaseComba
 						reactionTime = ff_raid_wanderer_reaction_factor.GetFloat() * ( rangeToAttacker - ff_raid_wanderer_aggro_range.GetFloat() ) / ff_raid_wanderer_aggro_range.GetFloat();
 					}
 
-					return TrySuspendFor( new CTFBotMobRush( (CTFPlayer *)info.GetAttacker(), reactionTime ), RESULT_IMPORTANT, "Attacking my friend's attacker!" );
+					return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)info.GetAttacker(), reactionTime ), RESULT_IMPORTANT, "Attacking my friend's attacker!" );
 				}
 			}
 		}
@@ -166,7 +166,7 @@ EventDesiredResult< CTFBot > CTFBotWander::OnOtherKilled( CTFBot *me, CBaseComba
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotWander::OnCommandAttack( CTFBot *me, CBaseEntity *victim )
+EventDesiredResult< CFFBot > CFFBotWander::OnCommandAttack( CFFBot *me, CBaseEntity *victim )
 {
 	return TryContinue();
 }

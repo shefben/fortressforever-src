@@ -12,14 +12,14 @@
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotSpyHide::CTFBotSpyHide( CTFPlayer *victim )
+CFFBotSpyHide::CFFBotSpyHide( CTFPlayer *victim )
 {
 	m_initialVictim = victim;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyHide::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyHide::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_hidingSpot = NULL;
 	m_findTimer.Invalidate();
@@ -42,11 +42,11 @@ ActionResult< CTFBot >	CTFBotSpyHide::OnStart( CTFBot *me, Action< CTFBot > *pri
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyHide::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyHide::Update( CFFBot *me, float interval )
 {
 	if ( m_initialVictim != NULL && !me->GetVisionInterface()->IsIgnored( m_initialVictim ) )
 	{
-		return SuspendFor( new CTFBotSpyAttack( m_initialVictim ), "Going after our initial victim" );
+		return SuspendFor( new CFFBotSpyAttack( m_initialVictim ), "Going after our initial victim" );
 	}
 
 	// go after victims we've gotten behind
@@ -61,7 +61,7 @@ ActionResult< CTFBot >	CTFBotSpyHide::Update( CTFBot *me, float interval )
 			{
 				if ( !victim->IsLookingTowards( me ) || victim->IsFiringWeapon() )
 				{
-					return SuspendFor( new CTFBotSpyAttack( victim ), "Opportunistic attack or self defense!" );
+					return SuspendFor( new CFFBotSpyAttack( victim ), "Opportunistic attack or self defense!" );
 				}
 			}
 		}
@@ -84,7 +84,7 @@ ActionResult< CTFBot >	CTFBotSpyHide::Update( CTFBot *me, float interval )
 	  		m_incursionThreshold = myArea->GetIncursionDistance( enemyTeam );
 		}
 
-		return SuspendFor( new CTFBotSpyLurk, "Reached hiding spot - lurking" );
+		return SuspendFor( new CFFBotSpyLurk, "Reached hiding spot - lurking" );
 	}
 
 	if ( m_hidingSpot == NULL && m_findTimer.IsElapsed() )
@@ -105,7 +105,7 @@ ActionResult< CTFBot >	CTFBotSpyHide::Update( CTFBot *me, float interval )
 	{
 		m_repathTimer.Start( RandomFloat( 0.3f, 0.5f ) );
 
-		CTFBotPathCost cost( me, SAFEST_ROUTE );
+		CFFBotPathCost cost( me, SAFEST_ROUTE );
 		m_path.Compute( me, m_hidingSpot->GetPosition(), cost );
 	}
 
@@ -114,7 +114,7 @@ ActionResult< CTFBot >	CTFBotSpyHide::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSpyHide::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSpyHide::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_hidingSpot = NULL;
 	m_isAtGoal = false;
@@ -125,7 +125,7 @@ ActionResult< CTFBot > CTFBotSpyHide::OnResume( CTFBot *me, Action< CTFBot > *in
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyHide::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotSpyHide::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	m_isAtGoal = true;
 
@@ -134,7 +134,7 @@ EventDesiredResult< CTFBot > CTFBotSpyHide::OnMoveToSuccess( CTFBot *me, const P
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyHide::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotSpyHide::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_hidingSpot = NULL;
 	m_isAtGoal = false;
@@ -144,7 +144,7 @@ EventDesiredResult< CTFBot > CTFBotSpyHide::OnMoveToFailure( CTFBot *me, const P
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyHide::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyHide::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }
@@ -167,7 +167,7 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotSpyHide::FindHidingSpot( CTFBot *me )
+bool CFFBotSpyHide::FindHidingSpot( CFFBot *me )
 {
 	CTFNavArea *myArea = me->GetLastKnownArea();
 	if ( !myArea )

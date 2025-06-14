@@ -6,7 +6,7 @@
 #include "bot/ff_bot.h"
 #include "ff_bot_hint.h"
 
-BEGIN_DATADESC( CTFBotHint )
+BEGIN_DATADESC( CFFBotHint )
 	DEFINE_KEYFIELD( m_team, FIELD_INTEGER, "team" ),
 	DEFINE_KEYFIELD( m_hint, FIELD_INTEGER, "hint" ),
 	DEFINE_KEYFIELD( m_isDisabled, FIELD_BOOLEAN, "StartDisabled" ),
@@ -14,7 +14,7 @@ BEGIN_DATADESC( CTFBotHint )
 	DEFINE_INPUTFUNC( FIELD_VOID, "Disable", InputDisable ),
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( func_tfbot_hint, CTFBotHint );
+LINK_ENTITY_TO_CLASS( func_tfbot_hint, CFFBotHint );
 
 //
 // NOTE: For simplicity and runtime efficiency, this will not 
@@ -23,7 +23,7 @@ LINK_ENTITY_TO_CLASS( func_tfbot_hint, CTFBotHint );
 //
 
 //------------------------------------------------------------------------------
-CTFBotHint::CTFBotHint( void )
+CFFBotHint::CFFBotHint( void )
 {
 	m_isDisabled = false;
 }
@@ -31,7 +31,7 @@ CTFBotHint::CTFBotHint( void )
 
 //--------------------------------------------------------------------------------------------------------
 // Return true if this hint applies to the given entity
-bool CTFBotHint::IsFor( CTFBot *who ) const
+bool CFFBotHint::IsFor( CFFBot *who ) const
 {
 	if ( m_isDisabled )
 	{
@@ -48,7 +48,7 @@ bool CTFBotHint::IsFor( CTFBot *who ) const
 
 
 //--------------------------------------------------------------------------------------------------------
-void CTFBotHint::Spawn( void )
+void CFFBotHint::Spawn( void )
 {
 	BaseClass::Spawn();
 
@@ -67,7 +67,7 @@ void CTFBotHint::Spawn( void )
 
 
 //--------------------------------------------------------------------------------------------------------
-void CTFBotHint::UpdateOnRemove( void )
+void CFFBotHint::UpdateOnRemove( void )
 {
 	BaseClass::UpdateOnRemove();
 
@@ -76,7 +76,7 @@ void CTFBotHint::UpdateOnRemove( void )
 
 
 //--------------------------------------------------------------------------------------------------------
-void CTFBotHint::InputEnable( inputdata_t &inputdata )
+void CFFBotHint::InputEnable( inputdata_t &inputdata )
 {
 	m_isDisabled = false;
 	UpdateNavDecoration();
@@ -84,7 +84,7 @@ void CTFBotHint::InputEnable( inputdata_t &inputdata )
 
 
 //--------------------------------------------------------------------------------------------------------
-void CTFBotHint::InputDisable( inputdata_t &inputdata )
+void CFFBotHint::InputDisable( inputdata_t &inputdata )
 {
 	m_isDisabled = true;
 	UpdateNavDecoration();
@@ -92,7 +92,7 @@ void CTFBotHint::InputDisable( inputdata_t &inputdata )
 
 
 //--------------------------------------------------------------------------------------------------------
-void CTFBotHint::UpdateNavDecoration( void )
+void CFFBotHint::UpdateNavDecoration( void )
 {
 	Extent extent;
 	extent.Init( this );

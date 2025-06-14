@@ -10,7 +10,7 @@
 #include "ff_bot_generator.h"
 
 
-BEGIN_DATADESC( CTFBotProxy )
+BEGIN_DATADESC( CFFBotProxy )
 	DEFINE_KEYFIELD( m_botName,				FIELD_STRING,	"bot_name" ),
 	DEFINE_KEYFIELD( m_className,			FIELD_STRING,	"class" ),
 	DEFINE_KEYFIELD( m_teamName,			FIELD_STRING,	"team" ),
@@ -33,12 +33,12 @@ BEGIN_DATADESC( CTFBotProxy )
 	DEFINE_THINKFUNC( Think ),
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( bot_proxy, CTFBotProxy );
+LINK_ENTITY_TO_CLASS( bot_proxy, CFFBotProxy );
 
 
 
 //------------------------------------------------------------------------------
-CTFBotProxy::CTFBotProxy( void )
+CFFBotProxy::CFFBotProxy( void )
 {
 	V_strcpy_safe( m_botName, "TFBot" );
 	V_strcpy_safe( m_teamName, "auto" );
@@ -50,14 +50,14 @@ CTFBotProxy::CTFBotProxy( void )
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::Think( void )
+void CFFBotProxy::Think( void )
 {
 
 }
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::InputSetTeam( inputdata_t &inputdata )
+void CFFBotProxy::InputSetTeam( inputdata_t &inputdata )
 {
 	const char *teamName = inputdata.value.String();
 	if ( teamName && teamName[0] )
@@ -74,7 +74,7 @@ void CTFBotProxy::InputSetTeam( inputdata_t &inputdata )
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::InputSetClass( inputdata_t &inputdata )
+void CFFBotProxy::InputSetClass( inputdata_t &inputdata )
 {
 	const char *className = inputdata.value.String();
 	if ( className && className[0] )
@@ -91,33 +91,33 @@ void CTFBotProxy::InputSetClass( inputdata_t &inputdata )
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::InputSetMovementGoal( inputdata_t &inputdata )
+void CFFBotProxy::InputSetMovementGoal( inputdata_t &inputdata )
 {
 	const char *entityName = inputdata.value.String();
 	if ( entityName && entityName[0] )
 	{
-		m_moveGoal = dynamic_cast< CTFBotActionPoint * >( gEntList.FindEntityByName( NULL, entityName ) );
+		m_moveGoal = dynamic_cast< CFFBotActionPoint * >( gEntList.FindEntityByName( NULL, entityName ) );
 
 		// if m_bot exists, tell it to move to the new action point
 		if ( m_bot != NULL )
 		{
-			m_bot->SetActionPoint( (CTFBotActionPoint *)m_moveGoal.Get() );
+			m_bot->SetActionPoint( (CFFBotActionPoint *)m_moveGoal.Get() );
 		}
 	}
 }
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::InputSpawn( inputdata_t &inputdata )
+void CFFBotProxy::InputSpawn( inputdata_t &inputdata )
 {
-	m_bot = NextBotCreatePlayerBot< CTFBot >( m_botName );
+	m_bot = NextBotCreatePlayerBot< CFFBot >( m_botName );
 	if ( m_bot != NULL )
 	{
 		m_bot->SetSpawnPoint( this );
-		m_bot->SetAttribute( CTFBot::REMOVE_ON_DEATH );
-		m_bot->SetAttribute( CTFBot::IS_NPC );
+		m_bot->SetAttribute( CFFBot::REMOVE_ON_DEATH );
+		m_bot->SetAttribute( CFFBot::IS_NPC );
 
-		m_bot->SetActionPoint( (CTFBotActionPoint *)m_moveGoal.Get() );
+		m_bot->SetActionPoint( (CFFBotActionPoint *)m_moveGoal.Get() );
 
 		m_bot->HandleCommand_JoinTeam( m_teamName );
 		m_bot->HandleCommand_JoinClass( m_className );
@@ -128,7 +128,7 @@ void CTFBotProxy::InputSpawn( inputdata_t &inputdata )
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::InputDelete( inputdata_t &inputdata )
+void CFFBotProxy::InputDelete( inputdata_t &inputdata )
 {
 	if ( m_bot != NULL )
 	{
@@ -139,28 +139,28 @@ void CTFBotProxy::InputDelete( inputdata_t &inputdata )
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::OnInjured( void )
+void CFFBotProxy::OnInjured( void )
 {
 	m_onInjured.FireOutput( this, this );
 }
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::OnKilled( void )
+void CFFBotProxy::OnKilled( void )
 {
 	m_onKilled.FireOutput( this, this );
 }
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::OnAttackingEnemy( void )
+void CFFBotProxy::OnAttackingEnemy( void )
 {
 	m_onAttackingEnemy.FireOutput( this, this );
 }
 
 
 //------------------------------------------------------------------------------
-void CTFBotProxy::OnKilledEnemy( void )
+void CFFBotProxy::OnKilledEnemy( void )
 {
 	m_onKilledEnemy.FireOutput( this, this );
 }

@@ -10,14 +10,14 @@
 
 class CTFPlayer;
 
-class CTFBotHintSentrygun : public CBaseTFBotHintEntity
+class CFFBotHintSentrygun : public CBaseTFBotHintEntity
 {
 public:
-	DECLARE_CLASS( CTFBotHintSentrygun, CBaseTFBotHintEntity );
+	DECLARE_CLASS( CFFBotHintSentrygun, CBaseTFBotHintEntity );
 	DECLARE_DATADESC();
 
-	CTFBotHintSentrygun( void );
-	virtual ~CTFBotHintSentrygun() { }
+	CFFBotHintSentrygun( void );
+	virtual ~CFFBotHintSentrygun() { }
 
 	bool IsSticky() const;
 	bool IsInUse() const;
@@ -42,32 +42,32 @@ private:
 	CHandle< CTFPlayer > m_playerOwner;
 };
 
-inline bool CTFBotHintSentrygun::IsSticky() const
+inline bool CFFBotHintSentrygun::IsSticky() const
 {
 	return m_isSticky;
 }
 
-inline bool CTFBotHintSentrygun::IsInUse() const
+inline bool CFFBotHintSentrygun::IsInUse() const
 {
 	return m_iUseCount != 0;
 }
 
-inline CTFPlayer *CTFBotHintSentrygun::GetPlayerOwner() const
+inline CTFPlayer *CFFBotHintSentrygun::GetPlayerOwner() const
 {
 	return m_playerOwner;
 }
 
-inline void CTFBotHintSentrygun::SetPlayerOwner( CTFPlayer *pPlayerOwner )
+inline void CFFBotHintSentrygun::SetPlayerOwner( CTFPlayer *pPlayerOwner )
 {
 	m_playerOwner = pPlayerOwner;
 }
 
-inline void CTFBotHintSentrygun::IncrementUseCount()
+inline void CFFBotHintSentrygun::IncrementUseCount()
 {
 	++m_iUseCount;
 }
 
-inline void CTFBotHintSentrygun::DecrementUseCount()
+inline void CFFBotHintSentrygun::DecrementUseCount()
 {
 	--m_iUseCount;
 }

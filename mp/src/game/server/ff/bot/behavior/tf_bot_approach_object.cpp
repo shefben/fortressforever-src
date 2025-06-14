@@ -12,7 +12,7 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-CTFBotApproachObject::CTFBotApproachObject( CBaseEntity *loot, float range )
+CFFBotApproachObject::CFFBotApproachObject( CBaseEntity *loot, float range )
 {
 	m_loot = loot;
 	m_range = range;
@@ -20,7 +20,7 @@ CTFBotApproachObject::CTFBotApproachObject( CBaseEntity *loot, float range )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotApproachObject::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotApproachObject::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -29,7 +29,7 @@ ActionResult< CTFBot >	CTFBotApproachObject::OnStart( CTFBot *me, Action< CTFBot
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotApproachObject::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotApproachObject::Update( CFFBot *me, float interval )
 {
 	if ( m_loot == NULL )
 	{
@@ -56,7 +56,7 @@ ActionResult< CTFBot >	CTFBotApproachObject::Update( CTFBot *me, float interval 
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, m_loot->GetAbsOrigin(), cost );
 	}
 

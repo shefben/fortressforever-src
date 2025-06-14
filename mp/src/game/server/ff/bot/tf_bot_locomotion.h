@@ -9,16 +9,16 @@
 #include "NextBot/Player/NextBotPlayerLocomotion.h"
 
 //----------------------------------------------------------------------------
-class CTFBotLocomotion : public PlayerLocomotion
+class CFFBotLocomotion : public PlayerLocomotion
 {
 public:
-	DECLARE_CLASS( CTFBotLocomotion, PlayerLocomotion );
+	DECLARE_CLASS( CFFBotLocomotion, PlayerLocomotion );
 
-	CTFBotLocomotion( INextBot *bot ) : PlayerLocomotion( bot )
+	CFFBotLocomotion( INextBot *bot ) : PlayerLocomotion( bot )
 	{
 	}
 
-	virtual ~CTFBotLocomotion() { }
+	virtual ~CFFBotLocomotion() { }
 
 	virtual void Update( void );								// (EXTEND) update internal state
 
@@ -41,7 +41,7 @@ protected:
 	virtual void AdjustPosture( const Vector &moveGoal ) { }	// never crouch to navigate
 };
 
-inline float CTFBotLocomotion::GetMaxJumpHeight( void ) const
+inline float CFFBotLocomotion::GetMaxJumpHeight( void ) const
 {
 	// http://developer.valvesoftware.com/wiki/TF2/Team_Fortress_2_Mapper%27s_Reference
 	return 72.0f;

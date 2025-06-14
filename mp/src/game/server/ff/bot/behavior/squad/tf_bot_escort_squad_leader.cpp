@@ -15,7 +15,7 @@ ConVar ff_bot_formation_debug( "ff_bot_formation_debug", "0", FCVAR_CHEAT );
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEscortSquadLeader::CTFBotEscortSquadLeader( Action< CTFBot > *actionToDoAfterSquadDisbands ) // : m_path( ChasePath::LEAD_SUBJECT )
+CFFBotEscortSquadLeader::CFFBotEscortSquadLeader( Action< CFFBot > *actionToDoAfterSquadDisbands ) // : m_path( ChasePath::LEAD_SUBJECT )
 {
 	m_actionToDoAfterSquadDisbands = actionToDoAfterSquadDisbands;
 	m_formationPath.SetGoalTolerance( 0.0f );
@@ -23,7 +23,7 @@ CTFBotEscortSquadLeader::CTFBotEscortSquadLeader( Action< CTFBot > *actionToDoAf
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEscortSquadLeader::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEscortSquadLeader::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_formationForward = vec3_origin;
 
@@ -32,7 +32,7 @@ ActionResult< CTFBot >	CTFBotEscortSquadLeader::OnStart( CTFBot *me, Action< CTF
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotEscortSquadLeader::Update( CFFBot *me, float interval )
 {
 	if ( interval <= 0.0f )
 	{
@@ -46,7 +46,7 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 		me->EquipBestWeaponForThreat( threat );
 	}
 
-	CTFBotSquad *squad = me->GetSquad();
+	CFFBotSquad *squad = me->GetSquad();
 	if ( !squad )
 	{
 		if ( m_actionToDoAfterSquadDisbands )
@@ -60,7 +60,7 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 	// we need to update every tick to smoothly move in formation
 	me->FlagForUpdate();
 
-	CTFBot *leader = squad->GetLeader();
+	CFFBot *leader = squad->GetLeader();
 	if ( !leader || !leader->IsAlive() )
 	{
 		me->LeaveSquad();
@@ -76,14 +76,14 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && leader == me )
 	{
 		const char* pszNowLeader = "I'm now the squad leader! Going for the flag!";
-		if ( me->HasAttribute( CTFBot::AGGRESSIVE ) )
+		if ( me->HasAttribute( CFFBot::AGGRESSIVE ) )
 		{
 			// push for the point first, then attack
-			return ChangeTo( new CTFBotPushToCapturePoint( new CTFBotFetchFlag ), pszNowLeader );
+			return ChangeTo( new CFFBotPushToCapturePoint( new CFFBotFetchFlag ), pszNowLeader );
 		}
 
 		// capture the flag
-		return ChangeTo( new CTFBotFetchFlag, pszNowLeader );
+		return ChangeTo( new CFFBotFetchFlag, pszNowLeader );
 	}
 
 	// if we're using a melee weapon, close and attack with it while staying near the leader
@@ -92,7 +92,7 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 	{
 		if ( me->IsRangeLessThan( leader, ff_bot_squad_escort_range.GetFloat() ) && me->IsLineOfSightClear( leader ) )
 		{
-			ActionResult< CTFBot > result = m_meleeAttackAction.Update( me, interval );
+			ActionResult< CFFBot > result = m_meleeAttackAction.Update( me, interval );
 
 			if ( result.IsContinue() )
 			{
@@ -102,14 +102,14 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 		}
 	}
 
-	CUtlVector< CTFBot * > rawMemberVector;
+	CUtlVector< CFFBot * > rawMemberVector;
 	squad->CollectMembers( &rawMemberVector );
 
 	// cull out the medics - they do their own thing
-	CUtlVector< CTFBot * > memberVector;
+	CUtlVector< CFFBot * > memberVector;
 	for( int m=0; m<rawMemberVector.Count(); ++m )
 	{
-		if ( !rawMemberVector[m]->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( !rawMemberVector[m]->IsPlayerClass( CLASS_MEDIC ) )
 		{
 			memberVector.AddToTail( rawMemberVector[m] );
 		}
@@ -275,7 +275,7 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 
 			me->SetBrokenFormation( false );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			if ( m_formationPath.Compute( me, myFormationSpot, cost ) == false )
 			{
 				// no path back to formation
@@ -298,14 +298,14 @@ ActionResult< CTFBot > CTFBotEscortSquadLeader::Update( CTFBot *me, float interv
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotEscortSquadLeader::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotEscortSquadLeader::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotWaitForOutOfPositionSquadMember::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot > CFFBotWaitForOutOfPositionSquadMember::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_waitTimer.Start( 2.0f );
 
@@ -314,7 +314,7 @@ ActionResult< CTFBot > CTFBotWaitForOutOfPositionSquadMember::OnStart( CTFBot *m
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotWaitForOutOfPositionSquadMember::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotWaitForOutOfPositionSquadMember::Update( CFFBot *me, float interval )
 {
 	if ( m_waitTimer.IsElapsed() )
 	{

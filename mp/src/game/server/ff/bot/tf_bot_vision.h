@@ -9,14 +9,14 @@
 #include "NextBotVisionInterface.h"
 
 //----------------------------------------------------------------------------
-class CTFBotVision : public IVision
+class CFFBotVision : public IVision
 {
 public:
-	CTFBotVision( INextBot *bot ) : IVision( bot )
+	CFFBotVision( INextBot *bot ) : IVision( bot )
 	{
 	}
 
-	virtual ~CTFBotVision() { }
+	virtual ~CFFBotVision() { }
 
 	virtual void Update( void );								// update internal state
 

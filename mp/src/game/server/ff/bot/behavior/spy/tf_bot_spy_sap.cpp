@@ -16,14 +16,14 @@ extern ConVar ff_bot_debug_spy;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotSpySap::CTFBotSpySap( CBaseObject *sapTarget )
+CFFBotSpySap::CFFBotSpySap( CBaseObject *sapTarget )
 {
 	m_sapTarget = sapTarget;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpySap::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpySap::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	me->StopLookingAroundForEnemies();
 
@@ -38,7 +38,7 @@ ActionResult< CTFBot >	CTFBotSpySap::OnStart( CTFBot *me, Action< CTFBot > *prio
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpySap::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpySap::Update( CFFBot *me, float interval )
 {
 	CBaseObject *newSapTarget = me->GetNearestKnownSappableTarget();
 
@@ -68,14 +68,14 @@ ActionResult< CTFBot >	CTFBotSpySap::Update( CTFBot *me, float interval )
 	}
 
 	// opportunistic backstab if engineer is between me and my sap target
-	if ( victim && victim->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( victim && victim->IsPlayerClass( CLASS_ENGINEER ) )
 	{
 		const float nearbyRange = 150.0f;
 		if ( m_sapTarget->GetOwner() == victim && me->IsRangeLessThan( victim, nearbyRange ) )
 		{
 			if ( me->IsEntityBetweenTargetAndSelf( victim, m_sapTarget ) )
 			{
-				return SuspendFor( new CTFBotSpyAttack( victim ), "Backstabbing the engineer before I sap his buildings" );
+				return SuspendFor( new CFFBotSpyAttack( victim ), "Backstabbing the engineer before I sap his buildings" );
 			}
 		}
 	}
@@ -111,7 +111,7 @@ ActionResult< CTFBot >	CTFBotSpySap::Update( CTFBot *me, float interval )
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			if ( m_path.Compute( me, m_sapTarget, cost ) == false )
 			{
 				return Done( "No path to sap target!" );
@@ -134,9 +134,9 @@ ActionResult< CTFBot >	CTFBotSpySap::Update( CTFBot *me, float interval )
 		else
 		{
 			// everything is sapped - explicitly attack nearby enemy Engineers
-			if ( victim && victim->IsPlayerClass( TF_CLASS_ENGINEER ) )
+			if ( victim && victim->IsPlayerClass( CLASS_ENGINEER ) )
 			{
-				return SuspendFor( new CTFBotSpyAttack( victim ), "Attacking an engineer" );
+				return SuspendFor( new CFFBotSpyAttack( victim ), "Attacking an engineer" );
 			}
 
 			return Done( "All targets sapped" );
@@ -148,14 +148,14 @@ ActionResult< CTFBot >	CTFBotSpySap::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotSpySap::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotSpySap::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	me->StartLookingAroundForEnemies();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSpySap::OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSpySap::OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	me->StartLookingAroundForEnemies();
 
@@ -164,7 +164,7 @@ ActionResult< CTFBot > CTFBotSpySap::OnSuspend( CTFBot *me, Action< CTFBot > *in
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSpySap::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSpySap::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	me->StopLookingAroundForEnemies();
 
@@ -173,16 +173,16 @@ ActionResult< CTFBot > CTFBotSpySap::OnResume( CTFBot *me, Action< CTFBot > *int
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpySap::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotSpySap::OnStuck( CFFBot *me )
 {
 	return TryDone( RESULT_CRITICAL, "I'm stuck, probably on a sapped building that hasn't exploded yet" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpySap::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
+QueryResultType CFFBotSpySap::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
 	if ( m_sapTarget && !m_sapTarget->HasSapper() )
 	{
@@ -205,7 +205,7 @@ QueryResultType CTFBotSpySap::ShouldAttack( const INextBot *meBot, const CKnownE
 
 //---------------------------------------------------------------------------------------------
 // Don't avoid enemies when we're going in for the sap
-QueryResultType CTFBotSpySap::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
+QueryResultType CFFBotSpySap::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
 {
 	if ( m_sapTarget.Get() && me->IsRangeLessThan( m_sapTarget, 300.0f ) )
 	{
@@ -219,14 +219,14 @@ QueryResultType CTFBotSpySap::IsHindrance( const INextBot *me, CBaseEntity *bloc
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotSpySap::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotSpySap::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotSpySap::AreAllDangerousSentriesSapped( CTFBot *me ) const
+bool CFFBotSpySap::AreAllDangerousSentriesSapped( CFFBot *me ) const
 {
 	CUtlVector< CKnownEntity > knownVector;
 	me->GetVisionInterface()->CollectKnownEntities( &knownVector );

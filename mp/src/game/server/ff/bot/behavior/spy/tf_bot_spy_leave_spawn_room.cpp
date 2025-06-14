@@ -13,9 +13,9 @@
 extern bool IsSpaceToSpawnHere( const Vector &where );
 
 //---------------------------------------------------------------------------------------------
-bool TeleportNearVictim( CTFBot *me, CTFPlayer *victim, int attempt )
+bool TeleportNearVictim( CFFBot *me, CTFPlayer *victim, int attempt )
 {
-	VPROF_BUDGET( "CTFBotSpyLeaveSpawnRoom::TeleportNearVictim", "NextBot" );
+	VPROF_BUDGET( "CFFBotSpyLeaveSpawnRoom::TeleportNearVictim", "NextBot" );
 
 	if ( !victim )
 	{
@@ -84,7 +84,7 @@ bool TeleportNearVictim( CTFBot *me, CTFPlayer *victim, int attempt )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	// disguise as enemy team
 	me->DisguiseAsMemberOfEnemyTeam();
@@ -102,9 +102,9 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::OnStart( CTFBot *me, Action< CTF
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::Update( CFFBot *me, float interval )
 {
-	VPROF_BUDGET( "CTFBotSpyLeaveSpawnRoom::Update", "NextBot" );
+	VPROF_BUDGET( "CFFBotSpyLeaveSpawnRoom::Update", "NextBot" );
 
 	if ( m_waitTimer.IsElapsed() )
 	{
@@ -146,7 +146,7 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interv
 			return Continue();
 		}
 
-		return ChangeTo( new CTFBotSpyHide( victim ), "Hiding!" );
+		return ChangeTo( new CFFBotSpyHide( victim ), "Hiding!" );
 	}
 
 	return Continue();
@@ -154,7 +154,7 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interv
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyLeaveSpawnRoom::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyLeaveSpawnRoom::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

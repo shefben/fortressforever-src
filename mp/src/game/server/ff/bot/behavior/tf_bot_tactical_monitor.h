@@ -8,20 +8,20 @@
 
 class CObjectTeleporter;
 
-class CTFBotTacticalMonitor : public Action< CTFBot >
+class CFFBotTacticalMonitor : public Action< CFFBot >
 {
 public:
-	virtual Action< CTFBot > *InitialContainedAction( CTFBot *me );
+	virtual Action< CFFBot > *InitialContainedAction( CFFBot *me );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnNavAreaChanged( CTFBot *me, CNavArea *newArea, CNavArea *oldArea );
-	virtual EventDesiredResult< CTFBot > OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnNavAreaChanged( CFFBot *me, CNavArea *newArea, CNavArea *oldArea );
+	virtual EventDesiredResult< CFFBot > OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
 
 	// @note Tom Bui: Currently used for the training stuff, but once we get that interface down, we will turn that
 	// into a proper API
-	virtual EventDesiredResult< CTFBot > OnCommandString( CTFBot *me, const char *command );
+	virtual EventDesiredResult< CFFBot > OnCommandString( CFFBot *me, const char *command );
 
 	virtual const char *GetName( void ) const	{ return "TacticalMonitor"; }
 
@@ -33,13 +33,13 @@ private:
 	CountdownTimer m_attentionTimer;
 
 	CountdownTimer m_stickyBombCheckTimer;
-	void MonitorArmedStickyBombs( CTFBot *me );
+	void MonitorArmedStickyBombs( CFFBot *me );
 
-	bool ShouldOpportunisticallyTeleport( CTFBot *me ) const;
-	CObjectTeleporter *FindNearbyTeleporter( CTFBot *me );
+	bool ShouldOpportunisticallyTeleport( CFFBot *me ) const;
+	CObjectTeleporter *FindNearbyTeleporter( CFFBot *me );
 	CountdownTimer m_findTeleporterTimer;
 
-	void AvoidBumpingEnemies( CTFBot *me );
+	void AvoidBumpingEnemies( CFFBot *me );
 };
 
 

@@ -35,21 +35,21 @@ const int MaxPlacementAttempts = 5;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuilding::CTFBotEngineerBuilding( void )
+CFFBotEngineerBuilding::CFFBotEngineerBuilding( void )
 {
 	m_sentryBuildHint = NULL;
 }
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuilding::CTFBotEngineerBuilding( CTFBotHintSentrygun *sentryBuildHint )
+CFFBotEngineerBuilding::CFFBotEngineerBuilding( CFFBotHintSentrygun *sentryBuildHint )
 {
 	m_sentryBuildHint = sentryBuildHint;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuilding::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuilding::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_sentryTriesLeft = MaxPlacementAttempts;
 
@@ -66,7 +66,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::OnStart( CTFBot *me, Action< CTFB
 //---------------------------------------------------------------------------------------------
 // Everything is built, upgrade/maintain it
 // TODO: Upgrade/maintain nearby friendly buildings, too.
-void CTFBotEngineerBuilding::UpgradeAndMaintainBuildings( CTFBot *me )
+void CFFBotEngineerBuilding::UpgradeAndMaintainBuildings( CFFBot *me )
 {
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 	CObjectDispenser *myDispenser = (CObjectDispenser *)me->GetObjectOfType( OBJ_DISPENSER );
@@ -101,7 +101,7 @@ void CTFBotEngineerBuilding::UpgradeAndMaintainBuildings( CTFBot *me )
 			{
 				m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-				CTFBotPathCost cost( me, FASTEST_ROUTE );
+				CFFBotPathCost cost( me, FASTEST_ROUTE );
 				m_path.Compute( me, mySentry->GetAbsOrigin(), cost );
 			}
 
@@ -139,7 +139,7 @@ void CTFBotEngineerBuilding::UpgradeAndMaintainBuildings( CTFBot *me )
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, betweenMyBuildings, cost );
 		}
 
@@ -178,7 +178,7 @@ void CTFBotEngineerBuilding::UpgradeAndMaintainBuildings( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotEngineerBuilding::IsMetalSourceNearby( CTFBot *me ) const
+bool CFFBotEngineerBuilding::IsMetalSourceNearby( CFFBot *me ) const
 {
 	CUtlVector< CNavArea * > nearbyVector;
 	CollectSurroundingAreas( &nearbyVector, me->GetLastKnownArea(), 2000.0f, me->GetLocomotionInterface()->GetStepHeight(), me->GetLocomotionInterface()->GetStepHeight() );
@@ -192,12 +192,12 @@ bool CTFBotEngineerBuilding::IsMetalSourceNearby( CTFBot *me ) const
 		}
 
 		// this assumes all spawn rooms have resupply cabinets
-		if ( me->GetTeamNumber() == TF_TEAM_RED && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) )
+		if ( me->GetTeamNumber() == FF_TEAM_RED && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) )
 		{
 			return true;
 		}
 
-		if ( me->GetTeamNumber() == TF_TEAM_BLUE && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) )
+		if ( me->GetTeamNumber() == FF_TEAM_BLUE && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) )
 		{
 			return true;
 		}
@@ -208,7 +208,7 @@ bool CTFBotEngineerBuilding::IsMetalSourceNearby( CTFBot *me ) const
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CTFBot *me ) const
+bool CFFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CFFBot *me ) const
 {
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 
@@ -222,7 +222,7 @@ bool CTFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CTFBot *me ) const
 	{
 		CTeamTrainWatcher *trainWatcher;
 
-		if ( me->GetTeamNumber() == TF_TEAM_BLUE )
+		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
 			trainWatcher = TFGameRules()->GetPayloadToPush( me->GetTeamNumber() );
 		}
@@ -252,7 +252,7 @@ bool CTFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CTFBot *me ) const
 
 		if ( sentryArea && pointArea )
 		{
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			if ( NavAreaTravelDistance( sentryArea, pointArea, cost, ff_bot_engineer_max_sentry_travel_distance_to_point.GetFloat() ) < 0 &&
 				 NavAreaTravelDistance( pointArea, sentryArea, cost, ff_bot_engineer_max_sentry_travel_distance_to_point.GetFloat() ) < 0 )
 			{
@@ -266,7 +266,7 @@ bool CTFBotEngineerBuilding::CheckIfSentryIsOutOfPosition( CTFBot *me ) const
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuilding::Update( CFFBot *me, float interval )
 {
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 	CObjectDispenser *myDispenser = (CObjectDispenser *)me->GetObjectOfType( OBJ_DISPENSER );
@@ -297,15 +297,15 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 
 			if ( m_sentryBuildHint )
 			{
-				return SuspendFor( new CTFBotEngineerBuildSentryGun( m_sentryBuildHint ), "Building a Sentry at a hint location" );
+				return SuspendFor( new CFFBotEngineerBuildSentryGun( m_sentryBuildHint ), "Building a Sentry at a hint location" );
 			}
 
-			return SuspendFor( new CTFBotEngineerBuildSentryGun, "Building a Sentry" );
+			return SuspendFor( new CFFBotEngineerBuildSentryGun, "Building a Sentry" );
 		}
 		else
 		{
 			// can't build a Sentry here - pick a new place
-			return ChangeTo( new CTFBotEngineerMoveToBuild, "Couldn't find a place to build" );
+			return ChangeTo( new CFFBotEngineerMoveToBuild, "Couldn't find a place to build" );
 		}
 	}
 
@@ -358,7 +358,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 
 				me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_MOVEUP );
 
-				return ChangeTo( new CTFBotEngineerMoveToBuild, "Need to move my gear closer to the point!" );
+				return ChangeTo( new CFFBotEngineerMoveToBuild, "Need to move my gear closer to the point!" );
 			}
 		}
 	}
@@ -415,7 +415,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 		{
 			m_dispenserRetryTimer.Start( dispenserRebuildInterval );
 
-			return SuspendFor( new CTFBotEngineerBuildDispenser, "Building a Dispenser" );
+			return SuspendFor( new CFFBotEngineerBuildDispenser, "Building a Dispenser" );
 		}
 	}
 
@@ -435,8 +435,8 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 		{
 			// if there are teleporter exit hints, find the closest one to our sentry and use it
 			CUtlVector< CBaseEntity * > hintVector;
-			CTFBotHintTeleporterExit *hint = NULL;
-			while( ( hint = (CTFBotHintTeleporterExit *)gEntList.FindEntityByClassname( hint, "bot_hint_teleporter_exit" ) ) != NULL )
+			CFFBotHintTeleporterExit *hint = NULL;
+			while( ( hint = (CFFBotHintTeleporterExit *)gEntList.FindEntityByClassname( hint, "bot_hint_teleporter_exit" ) ) != NULL )
 			{
 				if ( hint->IsEnabled() && hint->InSameTeam( me ) )
 				{
@@ -451,14 +451,14 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 
 				if ( closeHint )
 				{
-					return SuspendFor( new CTFBotEngineerBuildTeleportExit( closeHint->GetAbsOrigin(), closeHint->GetAbsAngles().y ), "Building teleporter exit at nearby hint" );
+					return SuspendFor( new CFFBotEngineerBuildTeleportExit( closeHint->GetAbsOrigin(), closeHint->GetAbsAngles().y ), "Building teleporter exit at nearby hint" );
 				}
 			}
 		}
 		else if ( me->IsRangeLessThan( mySentry, 300.0f ) )
 		{
 			// drop a teleporter exit near our sentry
-			return SuspendFor( new CTFBotEngineerBuildTeleportExit(), "Building teleporter exit" );
+			return SuspendFor( new CFFBotEngineerBuildTeleportExit(), "Building teleporter exit" );
 		}
 	}
 
@@ -470,28 +470,28 @@ ActionResult< CTFBot >	CTFBotEngineerBuilding::Update( CTFBot *me, float interva
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotEngineerBuilding::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotEngineerBuilding::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	me->StartLookingAroundForEnemies();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEngineerBuilding::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotEngineerBuilding::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerBuilding::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotEngineerBuilding::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerBuilding::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotEngineerBuilding::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }

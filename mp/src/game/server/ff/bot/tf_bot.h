@@ -23,9 +23,9 @@
 #define FF_BOT_TYPE	1337
 
 class CTriggerAreaCapture;
-class CTFBotActionPoint;
+class CFFBotActionPoint;
 class CObjectSentrygun;
-class CTFBotGenerator;
+class CFFBotGenerator;
 
 extern void BotGenerateAndWearItem( CTFPlayer *pBot, const char *itemName );
 
@@ -49,13 +49,13 @@ extern void BotGenerateAndWearItem( CTFPlayer *pBot, const char *itemName );
 
 
 //----------------------------------------------------------------------------
-class CTFBot: public NextBotPlayer< CTFPlayer >, public CGameEventListener
+class CFFBot: public NextBotPlayer< CTFPlayer >, public CGameEventListener
 {
 public:
-	DECLARE_CLASS( CTFBot, NextBotPlayer< CTFPlayer > );
+	DECLARE_CLASS( CFFBot, NextBotPlayer< CTFPlayer > );
 
-	CTFBot();
-	virtual ~CTFBot();
+	CFFBot();
+	virtual ~CFFBot();
 
 	virtual void		Spawn();
 	virtual void		FireGameEvent( IGameEvent *event );
@@ -83,14 +83,18 @@ public:
 	static CBasePlayer *AllocatePlayerEntity( edict_t *pEdict, const char *playerName );
 
 	virtual void PressFireButton( float duration = -1.0f ) OVERRIDE;
-	virtual void PressAltFireButton( float duration = -1.0f ) OVERRIDE;
-	virtual void PressSpecialFireButton( float duration = -1.0f ) OVERRIDE;
+       virtual void PressAltFireButton( float duration = -1.0f ) OVERRIDE;
+       virtual void PressSpecialFireButton( float duration = -1.0f ) OVERRIDE;
+
+       // grenade helpers
+       void ThrowConcussionGrenade();
+       void ThrowEMPGrenade();
 
 	// INextBot
-	virtual CTFBotLocomotion	*GetLocomotionInterface( void ) const	{ return m_locomotor; }
-	virtual CTFBotBody			*GetBodyInterface( void ) const			{ return m_body; }
-	virtual CTFBotVision		*GetVisionInterface( void ) const		{ return m_vision; }
-	DECLARE_INTENTION_INTERFACE( CTFBot );
+	virtual CFFBotLocomotion	*GetLocomotionInterface( void ) const	{ return m_locomotor; }
+	virtual CFFBotBody			*GetBodyInterface( void ) const			{ return m_body; }
+	virtual CFFBotVision		*GetVisionInterface( void ) const		{ return m_vision; }
+	DECLARE_INTENTION_INTERFACE( CFFBot );
 
 	virtual bool IsDormantWhenDead( void ) const;			// should this player-bot continue to update itself when dead (respawn logic, etc)
 
@@ -100,7 +104,7 @@ public:
 
 	virtual int	GetAllowedTauntPartnerTeam() const OVERRIDE { return GetTeamNumber(); }
 
-	// CTFBot specific
+	// CFFBot specific
 	CTeamControlPoint *GetMyControlPoint( void ) const;				// return point we want to capture, or need to defend
 	void ClearMyControlPoint( void );
 	bool WasPointJustLost( void ) const;							// return true if we just lost territory recently
@@ -232,7 +236,7 @@ public:
 		SUPPRESS_FIRE				= 1<<3,
 		DISABLE_DODGE				= 1<<4,
 		BECOME_SPECTATOR_ON_DEATH	= 1<<5,					// move bot to spectator team when killed
-		QUOTA_MANANGED				= 1<<6,					// managed by the bot quota in CTFBotManager 
+		QUOTA_MANANGED				= 1<<6,					// managed by the bot quota in CFFBotManager 
 		RETAIN_BUILDINGS			= 1<<7,					// don't destroy this bot's buildings when it disconnects
 		SPAWN_WITH_FULL_CHARGE		= 1<<8,					// all weapons start with full charge (ie: uber)
 		ALWAYS_CRIT					= 1<<9,					// always fire critical hits
@@ -281,23 +285,23 @@ public:
 	void RememberEnemySentry( CObjectSentrygun *sentry, const Vector &injurySpot );
 	const Vector &GetSpotWhereEnemySentryLastInjuredMe( void ) const;
 
-	void SetActionPoint( CTFBotActionPoint *point );
-	CTFBotActionPoint *GetActionPoint( void ) const;
+	void SetActionPoint( CFFBotActionPoint *point );
+	CFFBotActionPoint *GetActionPoint( void ) const;
 
 	bool HasProxy( void ) const;
-	void SetProxy( CTFBotProxy *proxy );					// attach this bot to a bot_proxy entity for map I/O communications
-	CTFBotProxy *GetProxy( void ) const;
+	void SetProxy( CFFBotProxy *proxy );					// attach this bot to a bot_proxy entity for map I/O communications
+	CFFBotProxy *GetProxy( void ) const;
 
 	bool HasSpawner( void ) const;
-	void SetSpawner( CTFBotGenerator *spawner );
-	CTFBotGenerator *GetSpawner( void ) const;
+	void SetSpawner( CFFBotGenerator *spawner );
+	CFFBotGenerator *GetSpawner( void ) const;
 
-	void JoinSquad( CTFBotSquad *squad );					// become a member of the given squad
+	void JoinSquad( CFFBotSquad *squad );					// become a member of the given squad
 	void LeaveSquad( void );								// leave our current squad
 	void DeleteSquad( void );
 	bool IsInASquad( void ) const;
 	bool IsSquadmate( CTFPlayer *who ) const;				// return true if given bot is in my squad
-	CTFBotSquad *GetSquad( void ) const;					// return squad we are in, or NULL
+	CFFBotSquad *GetSquad( void ) const;					// return squad we are in, or NULL
 	float GetSquadFormationError( void ) const;				// return normalized error term where 0 = in formation position and 1 = completely out of position
 	void SetSquadFormationError( float error );
 	bool HasBrokenFormation( void ) const;					// return true if this bot is far out of formation, or has no path back
@@ -352,7 +356,7 @@ public:
 	void RemoveTag( const char *tag );
 	bool HasTag( const char *tag );
 
-	Action< CTFBot > *OpportunisticallyUseWeaponAbilities( void );
+	Action< CFFBot > *OpportunisticallyUseWeaponAbilities( void );
 
 	CTFPlayer *SelectRandomReachableEnemy( void );	// mostly for MvM - pick a random enemy player that is not in their spawn room
 
@@ -409,9 +413,9 @@ public:
 		{
 			m_eventName = "default";
 			
-			m_skill = CTFBot::EASY;
-			m_weaponRestriction = CTFBot::ANY_WEAPON;
-			m_mission = CTFBot::NO_MISSION;
+			m_skill = CFFBot::EASY;
+			m_weaponRestriction = CFFBot::ANY_WEAPON;
+			m_mission = CFFBot::NO_MISSION;
 			m_prevMission = m_mission;
 			m_attributeFlags = 0;
 			m_maxVisionRange = -1.f;
@@ -446,7 +450,7 @@ public:
 	void ClearEventChangeAttributes() { m_eventChangeAttributes.RemoveAll(); }
 	void AddEventChangeAttributes( const EventChangeAttributes_t* newEvent );
 	const EventChangeAttributes_t* GetEventChangeAttributes( const char* pszEventName ) const;
-	void OnEventChangeAttributes( const CTFBot::EventChangeAttributes_t* pEvent );
+	void OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEvent );
 
 	void AddItem( const char* pszItemName );
 
@@ -454,9 +458,9 @@ public:
 	float GetUberDeployDelayDuration();
 
 private:
-	CTFBotLocomotion	*m_locomotor;
-	CTFBotBody			*m_body;
-	CTFBotVision		*m_vision;
+	CFFBotLocomotion	*m_locomotor;
+	CFFBotBody			*m_body;
+	CFFBotVision		*m_vision;
 
 	CountdownTimer m_lookAtEnemyInvasionAreasTimer;
 
@@ -469,11 +473,11 @@ private:
 
 	CTFNavArea *m_homeArea;
 
-	CHandle< CTFBotActionPoint > m_actionPoint;
-	CHandle< CTFBotProxy > m_proxy;
-	CHandle< CTFBotGenerator > m_spawner;
+	CHandle< CFFBotActionPoint > m_actionPoint;
+	CHandle< CFFBotProxy > m_proxy;
+	CHandle< CFFBotGenerator > m_spawner;
 
-	CTFBotSquad *m_squad;
+	CFFBotSquad *m_squad;
 	bool m_didReselectClass;
 
 	CHandle< CObjectSentrygun > m_enemySentry;
@@ -546,7 +550,7 @@ private:
 };
 
 
-inline void CTFBot::SetTeleportWhere( const CUtlStringList& teleportWhereName )
+inline void CFFBot::SetTeleportWhere( const CUtlStringList& teleportWhereName )
 {
 	// deep copy strings
 	for ( int i=0; i<teleportWhereName.Count(); ++i )
@@ -555,302 +559,302 @@ inline void CTFBot::SetTeleportWhere( const CUtlStringList& teleportWhereName )
 	}
 }
 
-inline const CUtlStringList& CTFBot::GetTeleportWhere()
+inline const CUtlStringList& CFFBot::GetTeleportWhere()
 {
 	return m_teleportWhereName;
 }
 
-inline void CTFBot::ClearTeleportWhere()
+inline void CFFBot::ClearTeleportWhere()
 {
 	m_teleportWhereName.RemoveAll();
 }
 
-inline void CTFBot::SetMissionString( CUtlString string )
+inline void CFFBot::SetMissionString( CUtlString string )
 {
 	m_missionString = string;
 }
 
-inline CUtlString *CTFBot::GetMissionString( void )
+inline CUtlString *CFFBot::GetMissionString( void )
 {
 	return &m_missionString;
 }
 
-inline void CTFBot::SetMissionTarget( CBaseEntity *target )
+inline void CFFBot::SetMissionTarget( CBaseEntity *target )
 {
 	m_missionTarget = target;
 }
 
-inline CBaseEntity *CTFBot::GetMissionTarget( void ) const
+inline CBaseEntity *CFFBot::GetMissionTarget( void ) const
 {
 	return m_missionTarget;
 }
 
-inline float CTFBot::GetSquadFormationError( void ) const
+inline float CFFBot::GetSquadFormationError( void ) const
 {
 	return m_squadFormationError;
 }
 
-inline void CTFBot::SetSquadFormationError( float error )
+inline void CFFBot::SetSquadFormationError( float error )
 {
 	m_squadFormationError = error;
 }
 
-inline bool CTFBot::HasBrokenFormation( void ) const
+inline bool CFFBot::HasBrokenFormation( void ) const
 {
 	return m_hasBrokenFormation;
 }
 
-inline void CTFBot::SetBrokenFormation( bool state )
+inline void CFFBot::SetBrokenFormation( bool state )
 {
 	m_hasBrokenFormation = state;
 }
 
-inline void CTFBot::SetMaxVisionRangeOverride( float range )
+inline void CFFBot::SetMaxVisionRangeOverride( float range )
 {
 	m_maxVisionRangeOverride = range;
 }
 
-inline float CTFBot::GetMaxVisionRangeOverride( void ) const
+inline float CFFBot::GetMaxVisionRangeOverride( void ) const
 {
 	return m_maxVisionRangeOverride;
 }
 
-inline void CTFBot::SetBehaviorFlag( unsigned int flags )
+inline void CFFBot::SetBehaviorFlag( unsigned int flags )
 {
 	m_behaviorFlags |= flags;
 }
 
-inline void CTFBot::ClearBehaviorFlag( unsigned int flags )
+inline void CFFBot::ClearBehaviorFlag( unsigned int flags )
 {
 	m_behaviorFlags &= ~flags;
 }
 
-inline bool CTFBot::IsBehaviorFlagSet( unsigned int flags ) const
+inline bool CFFBot::IsBehaviorFlagSet( unsigned int flags ) const
 {
 	return ( m_behaviorFlags & flags ) ? true : false;
 }
 
-inline void CTFBot::StartLookingAroundForEnemies( void )
+inline void CFFBot::StartLookingAroundForEnemies( void )
 {
 	m_isLookingAroundForEnemies = true;
 }
 
-inline void CTFBot::StopLookingAroundForEnemies( void )
+inline void CFFBot::StopLookingAroundForEnemies( void )
 {
 	m_isLookingAroundForEnemies = false;
 }
 
-inline int CTFBot::GetBotType( void ) const
+inline int CFFBot::GetBotType( void ) const
 {
 	return FF_BOT_TYPE;
 }
 
-inline void CTFBot::RememberEnemySentry( CObjectSentrygun *sentry, const Vector &injurySpot )
+inline void CFFBot::RememberEnemySentry( CObjectSentrygun *sentry, const Vector &injurySpot )
 {
 	m_enemySentry = sentry;
 	m_spotWhereEnemySentryLastInjuredMe = injurySpot;
 }
 
-inline CObjectSentrygun *CTFBot::GetEnemySentry( void ) const
+inline CObjectSentrygun *CFFBot::GetEnemySentry( void ) const
 {
 	return m_enemySentry;
 }
 
-inline const Vector &CTFBot::GetSpotWhereEnemySentryLastInjuredMe( void ) const
+inline const Vector &CFFBot::GetSpotWhereEnemySentryLastInjuredMe( void ) const
 {
 	return m_spotWhereEnemySentryLastInjuredMe;
 }
 
-inline CTFBot::DifficultyType CTFBot::GetDifficulty( void ) const
+inline CFFBot::DifficultyType CFFBot::GetDifficulty( void ) const
 {
 	return m_difficulty;
 }
 
-inline void CTFBot::SetDifficulty( CTFBot::DifficultyType difficulty )
+inline void CFFBot::SetDifficulty( CFFBot::DifficultyType difficulty )
 {
 	m_difficulty = difficulty;
 
 	m_nBotSkill = m_difficulty;
 }
 
-inline bool CTFBot::IsDifficulty( DifficultyType skill ) const
+inline bool CFFBot::IsDifficulty( DifficultyType skill ) const
 {
 	return skill == m_difficulty;
 }
 
-inline bool CTFBot::HasProxy( void ) const
+inline bool CFFBot::HasProxy( void ) const
 {
 	return m_proxy == NULL ? false : true;
 }
 
-inline void CTFBot::SetProxy( CTFBotProxy *proxy )
+inline void CFFBot::SetProxy( CFFBotProxy *proxy )
 {
 	m_proxy = proxy;
 }
 
-inline CTFBotProxy *CTFBot::GetProxy( void ) const
+inline CFFBotProxy *CFFBot::GetProxy( void ) const
 {
 	return m_proxy;
 }
 
-inline bool CTFBot::HasSpawner( void ) const
+inline bool CFFBot::HasSpawner( void ) const
 {
 	return m_spawner == NULL ? false : true;
 }
 
-inline void CTFBot::SetSpawner( CTFBotGenerator *spawner )
+inline void CFFBot::SetSpawner( CFFBotGenerator *spawner )
 {
 	m_spawner = spawner;
 }
 
-inline CTFBotGenerator *CTFBot::GetSpawner( void ) const
+inline CFFBotGenerator *CFFBot::GetSpawner( void ) const
 {
 	return m_spawner;
 }
 
-inline void CTFBot::SetActionPoint( CTFBotActionPoint *point )
+inline void CFFBot::SetActionPoint( CFFBotActionPoint *point )
 {
 	m_actionPoint = point;
 }
 
-inline CTFBotActionPoint *CTFBot::GetActionPoint( void ) const
+inline CFFBotActionPoint *CFFBot::GetActionPoint( void ) const
 {
 	return m_actionPoint;
 }
 
-inline bool CTFBot::IsInASquad( void ) const
+inline bool CFFBot::IsInASquad( void ) const
 {
 	return m_squad == NULL ? false : true;
 }
 
-inline CTFBotSquad *CTFBot::GetSquad( void ) const
+inline CFFBotSquad *CFFBot::GetSquad( void ) const
 {
 	return m_squad;
 }
 
-inline void CTFBot::SetHomeArea( CTFNavArea *area )
+inline void CFFBot::SetHomeArea( CTFNavArea *area )
 {
 	m_homeArea = area;
 }
 
-inline CTFNavArea *CTFBot::GetHomeArea( void ) const
+inline CTFNavArea *CFFBot::GetHomeArea( void ) const
 {
 	return m_homeArea;
 }
 
-inline void CTFBot::ClearWeaponRestrictions( void )
+inline void CFFBot::ClearWeaponRestrictions( void )
 {
 	m_weaponRestrictionFlags = 0;
 }
 
-inline void CTFBot::SetWeaponRestriction( int restrictionFlags )
+inline void CFFBot::SetWeaponRestriction( int restrictionFlags )
 {
 	m_weaponRestrictionFlags |= restrictionFlags;
 }
 
-inline bool CTFBot::HasWeaponRestriction( int restrictionFlags ) const
+inline bool CFFBot::HasWeaponRestriction( int restrictionFlags ) const
 {
 	return m_weaponRestrictionFlags & restrictionFlags ? true : false;
 }
 
-inline void CTFBot::SetAttribute( int attributeFlag )
+inline void CFFBot::SetAttribute( int attributeFlag )
 {
 	m_attributeFlags |= attributeFlag;
 }
 
-inline void CTFBot::ClearAttribute( int attributeFlag )
+inline void CFFBot::ClearAttribute( int attributeFlag )
 {
 	m_attributeFlags &= ~attributeFlag;
 }
 
-inline void CTFBot::ClearAllAttributes()
+inline void CFFBot::ClearAllAttributes()
 {
 	m_attributeFlags = 0;
 }
 
-inline bool CTFBot::HasAttribute( int attributeFlag ) const
+inline bool CFFBot::HasAttribute( int attributeFlag ) const
 {
 	return m_attributeFlags & attributeFlag ? true : false;
 }
 
-inline CTFNavArea *CTFBot::GetSpawnArea( void ) const
+inline CTFNavArea *CFFBot::GetSpawnArea( void ) const
 {
 	return m_spawnArea;
 }
 
-inline bool CTFBot::WasPointJustLost( void ) const
+inline bool CFFBot::WasPointJustLost( void ) const
 {
 	return m_justLostPointTimer.HasStarted() && !m_justLostPointTimer.IsElapsed();
 }
 
-inline const CUtlVector< CTFBot::SniperSpotInfo > *CTFBot::GetSniperSpots( void ) const
+inline const CUtlVector< CFFBot::SniperSpotInfo > *CFFBot::GetSniperSpots( void ) const
 {
 	return &m_sniperSpotVector;
 }
 
-inline bool CTFBot::HasSniperSpots( void ) const
+inline bool CFFBot::HasSniperSpots( void ) const
 {
 	return m_sniperSpotVector.Count() > 0 ? true : false;
 }
 
-inline CTFBot::MissionType CTFBot::GetMission( void ) const
+inline CFFBot::MissionType CFFBot::GetMission( void ) const
 {
 	return m_mission;
 }
 
-inline void CTFBot::SetPrevMission( MissionType mission )
+inline void CFFBot::SetPrevMission( MissionType mission )
 {
 	m_prevMission = mission;
 }
 
-inline CTFBot::MissionType CTFBot::GetPrevMission( void ) const
+inline CFFBot::MissionType CFFBot::GetPrevMission( void ) const
 {
 	return m_prevMission;
 }
 
-inline bool CTFBot::HasMission( MissionType mission ) const
+inline bool CFFBot::HasMission( MissionType mission ) const
 {
 	return m_mission == mission ? true : false;
 }
 
-inline bool CTFBot::IsOnAnyMission( void ) const
+inline bool CFFBot::IsOnAnyMission( void ) const
 {
 	return m_mission == NO_MISSION ? false : true;
 }
 
-inline void CTFBot::SetScaleOverride( float fScale )
+inline void CFFBot::SetScaleOverride( float fScale )
 {
 	m_fModelScaleOverride = fScale;
 
 	SetModelScale( m_fModelScaleOverride > 0.0f ? m_fModelScaleOverride : 1.0f );
 }
 
-inline bool CTFBot::IsEnvironmentNoisy( void ) const
+inline bool CFFBot::IsEnvironmentNoisy( void ) const
 {
 	return !m_noisyTimer.IsElapsed();
 }
 
 //---------------------------------------------------------------------------------------------
-inline CTFBot *ToTFBot( CBaseEntity *pEntity )
+inline CFFBot *ToTFBot( CBaseEntity *pEntity )
 {
 	if ( !pEntity || !pEntity->IsPlayer() || !ToTFPlayer( pEntity )->IsBotOfType( FF_BOT_TYPE ) )
 		return NULL;
 
-	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< CTFBot * >( pEntity ) != 0 );
+	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< CFFBot * >( pEntity ) != 0 );
 
-	return static_cast< CTFBot * >( pEntity );
+	return static_cast< CFFBot * >( pEntity );
 }
 
 
 //---------------------------------------------------------------------------------------------
-inline const CTFBot *ToTFBot( const CBaseEntity *pEntity )
+inline const CFFBot *ToTFBot( const CBaseEntity *pEntity )
 {
 	if ( !pEntity || !pEntity->IsPlayer() || !ToTFPlayer( const_cast< CBaseEntity * >( pEntity ) )->IsBotOfType( FF_BOT_TYPE ) )
 		return NULL;
 
-	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< const CTFBot * >( pEntity ) != 0 );
+	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< const CFFBot * >( pEntity ) != 0 );
 
-	return static_cast< const CTFBot * >( pEntity );
+	return static_cast< const CFFBot * >( pEntity );
 }
 
 
@@ -858,10 +862,10 @@ inline const CTFBot *ToTFBot( const CBaseEntity *pEntity )
 /**
  * Functor used with NavAreaBuildPath()
  */
-class CTFBotPathCost : public IPathCost
+class CFFBotPathCost : public IPathCost
 {
 public:
-	CTFBotPathCost( CTFBot *me, RouteType routeType )
+	CFFBotPathCost( CFFBot *me, RouteType routeType )
 	{
 		m_me = me;
 		m_routeType = routeType;
@@ -872,7 +876,7 @@ public:
 
 	virtual float operator()( CNavArea *baseArea, CNavArea *fromArea, const CNavLadder *ladder, const CFuncElevator *elevator, float length ) const
 	{
-		VPROF_BUDGET( "CTFBotPathCost::operator()", "NextBot" );
+		VPROF_BUDGET( "CFFBotPathCost::operator()", "NextBot" );
 
 		CTFNavArea *area = (CTFNavArea *)baseArea;
 
@@ -1018,7 +1022,7 @@ public:
 		}
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	RouteType m_routeType;
 	float m_stepHeight;
 	float m_maxJumpHeight;
@@ -1057,8 +1061,8 @@ public:
 		if ( m_team != TEAM_ANY && player->GetTeamNumber() != m_team )
 			return true;
 
-		CTFBot *bot = ToTFBot( player );
-		if ( bot && bot->HasAttribute( CTFBot::IS_NPC ) )
+		CFFBot *bot = ToTFBot( player );
+		if ( bot && bot->HasAttribute( CFFBot::IS_NPC ) )
 			return true;
 
 		float rangeSq = ( m_where - player->GetAbsOrigin() ).LengthSqr();

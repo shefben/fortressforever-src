@@ -32,7 +32,7 @@ ConVar ff_mvm_bot_flag_carrier_health_regen( "ff_mvm_bot_flag_carrier_health_reg
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDeliverFlag::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotDeliverFlag::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_flTotalTravelDistance = -1.0f;
 
@@ -40,7 +40,7 @@ ActionResult< CTFBot >	CTFBotDeliverFlag::OnStart( CTFBot *me, Action< CTFBot > 
 
 	if ( ff_mvm_bot_allow_flag_carrier_to_fight.GetBool() == false )
 	{
-		me->SetAttribute( CTFBot::SUPPRESS_FIRE );
+		me->SetAttribute( CFFBot::SUPPRESS_FIRE );
 	}
 
 	// mini-bosses don't upgrade - they are already tough
@@ -73,12 +73,12 @@ ActionResult< CTFBot >	CTFBotDeliverFlag::OnStart( CTFBot *me, Action< CTFBot > 
 
 //---------------------------------------------------------------------------------------------
 // In Mann Vs Machine, the flag carrier gets stronger the longer he carries the flag
-bool CTFBotDeliverFlag::UpgradeOverTime( CTFBot *me )
+bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 {
 	if ( TFGameRules()->IsMannVsMachineMode() && m_upgradeLevel != DONT_UPGRADE )
 	{
 		CTFNavArea *myArea = me->GetLastKnownArea();
-		int spawnRoomFlag = me->GetTeamNumber() == TF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
+		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
 
 		if ( myArea && myArea->HasAttributeTF( spawnRoomFlag ) )
 		{
@@ -132,7 +132,7 @@ bool CTFBotDeliverFlag::UpgradeOverTime( CTFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 1 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( gpGlobals->curtime );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( gpGlobals->curtime + m_upgradeTimer.GetRemainingTime() );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE1, TF_TEAM_PVE_DEFENDERS );
+						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE1, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup1", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -163,7 +163,7 @@ bool CTFBotDeliverFlag::UpgradeOverTime( CTFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 2 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( gpGlobals->curtime );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( gpGlobals->curtime + m_upgradeTimer.GetRemainingTime() );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE2, TF_TEAM_PVE_DEFENDERS );
+						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE2, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup2", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -180,7 +180,7 @@ bool CTFBotDeliverFlag::UpgradeOverTime( CTFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 3 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( -1 );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( -1 );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE3, TF_TEAM_PVE_DEFENDERS );
+						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE3, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup3", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -194,7 +194,7 @@ bool CTFBotDeliverFlag::UpgradeOverTime( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotDeliverFlag::Update( CFFBot *me, float interval )
 {
 	CCaptureFlag *flag = me->GetFlagToFetch();
 
@@ -212,7 +212,7 @@ ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
 	if ( TFGameRules()->IsMannVsMachineMode() )
 	{
 		// let the bomb carrier use it's buff banners/etc
-		Action< CTFBot > *result = me->OpportunisticallyUseWeaponAbilities();
+		Action< CFFBot > *result = me->OpportunisticallyUseWeaponAbilities();
 		if ( result )
 		{
 			return SuspendFor( result, "Opportunistically using buff item" );
@@ -236,7 +236,7 @@ ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
 			return Done( "No flag capture zone exists!" );
 		}
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, zone->WorldSpaceCenter(), cost );
 
 		float flOldTravelDistance = m_flTotalTravelDistance;
@@ -249,7 +249,7 @@ ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
 
 			// Look for players that helped with the reset and send an event
 			CUtlVector<CTFPlayer *> playerVector;
-			CollectPlayers( &playerVector, TF_TEAM_PVE_DEFENDERS );
+			CollectPlayers( &playerVector, FF_TEAM_PVE_DEFENDERS );
 			FOR_EACH_VEC( playerVector, i )
 			{
 				CTFPlayer *pPlayer = playerVector[i];
@@ -277,7 +277,7 @@ ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
 
 	if ( UpgradeOverTime( me ) )
 	{
-		return SuspendFor( new CTFBotTaunt, "Taunting for our new upgrade" );
+		return SuspendFor( new CFFBotTaunt, "Taunting for our new upgrade" );
 	}
 
 	return Continue();
@@ -285,9 +285,9 @@ ActionResult< CTFBot > CTFBotDeliverFlag::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotDeliverFlag::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotDeliverFlag::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
-	me->ClearAttribute( CTFBot::SUPPRESS_FIRE );
+	me->ClearAttribute( CFFBot::SUPPRESS_FIRE );
 
 	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
 	{
@@ -297,7 +297,7 @@ void CTFBotDeliverFlag::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotDeliverFlag::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotDeliverFlag::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	if ( ff_mvm_bot_allow_flag_carrier_to_fight.GetBool() )
 	{
@@ -310,7 +310,7 @@ QueryResultType CTFBotDeliverFlag::ShouldAttack( const INextBot *me, const CKnow
 
 //---------------------------------------------------------------------------------------------
 // are we in a hurry?
-QueryResultType CTFBotDeliverFlag::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotDeliverFlag::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
@@ -318,18 +318,18 @@ QueryResultType CTFBotDeliverFlag::ShouldHurry( const INextBot *me ) const
 
 //---------------------------------------------------------------------------------------------
 // is it time to retreat?
-QueryResultType	CTFBotDeliverFlag::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotDeliverFlag::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDeliverFlag::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotDeliverFlag::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	if ( TFGameRules()->IsMannVsMachineMode() && other && FClassnameIs( other, "func_capturezone" ) )
 	{
-		return TrySuspendFor( new CTFBotMvMDeployBomb, RESULT_CRITICAL, "Delivering the bomb!" );
+		return TrySuspendFor( new CFFBotMvMDeployBomb, RESULT_CRITICAL, "Delivering the bomb!" );
 	}
 
 	return TryContinue();
@@ -338,14 +338,14 @@ EventDesiredResult< CTFBot > CTFBotDeliverFlag::OnContact( CTFBot *me, CBaseEnti
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CTFBotPushToCapturePoint::CTFBotPushToCapturePoint( Action< CTFBot > *nextAction )
+CFFBotPushToCapturePoint::CFFBotPushToCapturePoint( Action< CFFBot > *nextAction )
 {
 	m_nextAction = nextAction;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotPushToCapturePoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotPushToCapturePoint::Update( CFFBot *me, float interval )
 {
 	// flag collection and delivery is handled by our parent behavior, ScenarioMonitor
 
@@ -381,7 +381,7 @@ ActionResult< CTFBot > CTFBotPushToCapturePoint::Update( CTFBot *me, float inter
 
 	if ( m_repathTimer.IsElapsed() )
 	{
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, zone->WorldSpaceCenter(), cost );
 
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
@@ -393,7 +393,7 @@ ActionResult< CTFBot > CTFBotPushToCapturePoint::Update( CTFBot *me, float inter
 }
 
 //-----------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPushToCapturePoint::OnNavAreaChanged( CTFBot *me, CNavArea *newArea, CNavArea *oldArea )
+EventDesiredResult< CFFBot > CFFBotPushToCapturePoint::OnNavAreaChanged( CFFBot *me, CNavArea *newArea, CNavArea *oldArea )
 {
 	// does the area we are entering have a prerequisite?
 	if ( newArea && newArea->HasPrerequisite( me ) )
@@ -408,11 +408,11 @@ EventDesiredResult< CTFBot > CTFBotPushToCapturePoint::OnNavAreaChanged( CTFBot 
 				// this prerequisite applies to me
 				if ( prereq->IsTask( CFuncNavPrerequisite::TASK_WAIT ) )
 				{
-					return TrySuspendFor( new CTFBotNavEntWait( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to wait" );
+					return TrySuspendFor( new CFFBotNavEntWait( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to wait" );
 				}
 				else if ( prereq->IsTask( CFuncNavPrerequisite::TASK_MOVE_TO_ENTITY ) )
 				{
-					return TrySuspendFor( new CTFBotNavEntMoveTo( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to move to an entity" );
+					return TrySuspendFor( new CFFBotNavEntMoveTo( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to move to an entity" );
 				}
 			}
 		}

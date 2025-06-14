@@ -6,13 +6,13 @@
 #ifndef FF_BOT_ENGINEER_BUILD_TELEPORT_ENTRANCE_H
 #define FF_BOT_ENGINEER_BUILD_TELEPORT_ENTRANCE_H
 
-class CTFBotEngineerBuildTeleportEntrance : public Action< CTFBot >
+class CFFBotEngineerBuildTeleportEntrance : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
 
 	virtual const char *GetName( void ) const	{ return "EngineerBuildTeleportEntrance"; };
 

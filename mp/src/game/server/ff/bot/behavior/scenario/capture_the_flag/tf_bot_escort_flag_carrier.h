@@ -12,11 +12,11 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotEscortFlagCarrier : public Action< CTFBot >
+class CFFBotEscortFlagCarrier : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "EscortFlagCarrier"; };
 
@@ -24,7 +24,7 @@ private:
 	PathFollower m_path;
 	CountdownTimer m_repathTimer;
 
-	CTFBotMeleeAttack m_meleeAttackAction;
+	CFFBotMeleeAttack m_meleeAttackAction;
 };
 
 

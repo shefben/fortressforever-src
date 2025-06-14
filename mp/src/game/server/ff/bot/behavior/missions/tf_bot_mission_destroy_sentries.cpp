@@ -19,14 +19,14 @@
 //
 
 //---------------------------------------------------------------------------------------------
-CTFBotMissionDestroySentries::CTFBotMissionDestroySentries( CObjectSentrygun *goalSentry )
+CFFBotMissionDestroySentries::CFFBotMissionDestroySentries( CObjectSentrygun *goalSentry )
 {
 	m_goalSentry = goalSentry;
 }
 
 
 //---------------------------------------------------------------------------------------------
-CObjectSentrygun *CTFBotMissionDestroySentries::SelectSentryTarget( CTFBot *me )
+CObjectSentrygun *CFFBotMissionDestroySentries::SelectSentryTarget( CFFBot *me )
 {
 	
 	return NULL;
@@ -34,22 +34,22 @@ CObjectSentrygun *CTFBotMissionDestroySentries::SelectSentryTarget( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMissionDestroySentries::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMissionDestroySentries::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
-		return ChangeTo( new CTFBotMedicHeal, "My job is to heal/uber the others in the mission" );
+		return ChangeTo( new CFFBotMedicHeal, "My job is to heal/uber the others in the mission" );
 	}
 
 	// focus only on the mission
-	me->SetAttribute( CTFBot::IGNORE_ENEMIES );
+	me->SetAttribute( CFFBot::IGNORE_ENEMIES );
 
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotMissionDestroySentries::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotMissionDestroySentries::Update( CFFBot *me, float interval )
 {
 	if ( m_goalSentry == NULL )
 	{
@@ -59,11 +59,11 @@ ActionResult< CTFBot > CTFBotMissionDestroySentries::Update( CTFBot *me, float i
 		if ( m_goalSentry == NULL )
 		{
 			// next destroy the most dangerous sentry
- 			int iTeam = ( me->GetTeamNumber() == TF_TEAM_RED ) ? TF_TEAM_BLUE : TF_TEAM_RED;
+ 			int iTeam = ( me->GetTeamNumber() == FF_TEAM_RED ) ? FF_TEAM_BLUE : FF_TEAM_RED;
 
 			if ( TFGameRules() && TFGameRules()->IsPVEModeActive() )
 			{
-				iTeam = TF_TEAM_PVE_DEFENDERS;
+				iTeam = FF_TEAM_PVE_DEFENDERS;
 			}
 
 			m_goalSentry = TFGameRules()->FindSentryGunWithMostKills( iTeam );
@@ -71,15 +71,15 @@ ActionResult< CTFBot > CTFBotMissionDestroySentries::Update( CTFBot *me, float i
 	}
 
 	// for suicide bombers, we never want them to revert to normal behavior even if there is no sentry to kill
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
-		return SuspendFor( new CTFBotMissionSuicideBomber, "On a suicide mission to blow up a sentry" );
+		return SuspendFor( new CFFBotMissionSuicideBomber, "On a suicide mission to blow up a sentry" );
 	}
 
 	if ( m_goalSentry == NULL )
 	{
 		// no sentries left to destroy - our mission is complete
-		me->SetMission( CTFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
+		me->SetMission( CFFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
 		return ChangeTo( GetParentAction()->InitialContainedAction( me ), "Mission complete - reverting to normal behavior" );
 	}
 
@@ -88,17 +88,17 @@ ActionResult< CTFBot > CTFBotMissionDestroySentries::Update( CTFBot *me, float i
 		me->RememberEnemySentry( m_goalSentry, m_goalSentry->WorldSpaceCenter() );
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( me->IsPlayerClass( CLASS_SPY ) )
 	{
-		return SuspendFor( new CTFBotSpySap( m_goalSentry ), "On a mission to sap a sentry" );
+		return SuspendFor( new CFFBotSpySap( m_goalSentry ), "On a mission to sap a sentry" );
 	}
 
-	return SuspendFor( new CTFBotDestroyEnemySentry, "On a mission to destroy a sentry" );
+	return SuspendFor( new CFFBotDestroyEnemySentry, "On a mission to destroy a sentry" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionDestroySentries::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotMissionDestroySentries::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
-	me->ClearAttribute( CTFBot::IGNORE_ENEMIES );
+	me->ClearAttribute( CFFBot::IGNORE_ENEMIES );
 }

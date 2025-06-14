@@ -9,7 +9,7 @@
 
 
 //----------------------------------------------------------------------
-CTFBotSquad::CTFBotSquad( void )
+CFFBotSquad::CFFBotSquad( void )
 {
 	m_leader = NULL;
 	m_formationSize = -1.0f;
@@ -18,7 +18,7 @@ CTFBotSquad::CTFBotSquad( void )
 
 
 //----------------------------------------------------------------------
-void CTFBotSquad::Join( CTFBot *bot )
+void CFFBotSquad::Join( CFFBot *bot )
 {
 	// first member is the leader
 	if ( m_roster.Count() == 0 )
@@ -35,7 +35,7 @@ void CTFBotSquad::Join( CTFBot *bot )
 
 
 //----------------------------------------------------------------------
-void CTFBotSquad::Leave( CTFBot *bot )
+void CFFBotSquad::Leave( CFFBot *bot )
 {
 	m_roster.FindAndRemove( bot );
 
@@ -46,7 +46,7 @@ void CTFBotSquad::Leave( CTFBot *bot )
 		// pick the next living leader that's left in the squad
 		if ( m_bShouldPreserveSquad )
 		{
-			CUtlVector< CTFBot* > members;
+			CUtlVector< CFFBot* > members;
 			CollectMembers( &members );
 			if ( members.Count() )
 			{
@@ -72,16 +72,16 @@ void CTFBotSquad::Leave( CTFBot *bot )
 
 
 //----------------------------------------------------------------------
-INextBotEventResponder *CTFBotSquad::FirstContainedResponder( void ) const
+INextBotEventResponder *CFFBotSquad::FirstContainedResponder( void ) const
 {
 	return m_roster.Count() ? m_roster[0] : NULL;
 }
 
 
 //----------------------------------------------------------------------
-INextBotEventResponder *CTFBotSquad::NextContainedResponder( INextBotEventResponder *current ) const
+INextBotEventResponder *CFFBotSquad::NextContainedResponder( INextBotEventResponder *current ) const
 {
-	CTFBot *currentBot = (CTFBot *)current;
+	CFFBot *currentBot = (CFFBot *)current;
 
 	int i = m_roster.Find( currentBot );
 
@@ -91,19 +91,19 @@ INextBotEventResponder *CTFBotSquad::NextContainedResponder( INextBotEventRespon
 	if ( ++i >= m_roster.Count() )
 		return NULL;
 
-	return (CTFBot *)m_roster[i];
+	return (CFFBot *)m_roster[i];
 }
 
 
 //----------------------------------------------------------------------
-CTFBot *CTFBotSquad::GetLeader( void ) const
+CFFBot *CFFBotSquad::GetLeader( void ) const
 {
 	return m_leader;
 }
 
 
 //----------------------------------------------------------------------
-void CTFBotSquad::CollectMembers( CUtlVector< CTFBot * > *memberVector ) const
+void CFFBotSquad::CollectMembers( CUtlVector< CFFBot * > *memberVector ) const
 {
 	for( int i=0; i<m_roster.Count(); ++i )
 	{
@@ -116,7 +116,7 @@ void CTFBotSquad::CollectMembers( CUtlVector< CTFBot * > *memberVector ) const
 
 
 //----------------------------------------------------------------------
-CTFBotSquad::Iterator CTFBotSquad::GetFirstMember( void ) const
+CFFBotSquad::Iterator CFFBotSquad::GetFirstMember( void ) const
 {
 	// find first non-NULL member
 	for( int i=0; i<m_roster.Count(); ++i )
@@ -128,7 +128,7 @@ CTFBotSquad::Iterator CTFBotSquad::GetFirstMember( void ) const
 
 
 //----------------------------------------------------------------------
-CTFBotSquad::Iterator CTFBotSquad::GetNextMember( const Iterator &it ) const
+CFFBotSquad::Iterator CFFBotSquad::GetNextMember( const Iterator &it ) const
 {
 	// find next non-NULL member
 	for( int i=it.m_index+1; i<m_roster.Count(); ++i )
@@ -140,7 +140,7 @@ CTFBotSquad::Iterator CTFBotSquad::GetNextMember( const Iterator &it ) const
 
 
 //----------------------------------------------------------------------
-int CTFBotSquad::GetMemberCount( void ) const
+int CFFBotSquad::GetMemberCount( void ) const
 {
 	// count the non-NULL members
 	int count = 0;
@@ -154,7 +154,7 @@ int CTFBotSquad::GetMemberCount( void ) const
 
 //----------------------------------------------------------------------
 // Return the speed of the slowest member of the squad
-float CTFBotSquad::GetSlowestMemberSpeed( bool includeLeader ) const
+float CFFBotSquad::GetSlowestMemberSpeed( bool includeLeader ) const
 {
 	float speed = FLT_MAX;
 
@@ -179,7 +179,7 @@ float CTFBotSquad::GetSlowestMemberSpeed( bool includeLeader ) const
 //----------------------------------------------------------------------
 // Return the speed of the slowest member of the squad, 
 // considering their ideal class speed.
-float CTFBotSquad::GetSlowestMemberIdealSpeed( bool includeLeader ) const
+float CFFBotSquad::GetSlowestMemberIdealSpeed( bool includeLeader ) const
 {
 	float speed = FLT_MAX;
 
@@ -203,7 +203,7 @@ float CTFBotSquad::GetSlowestMemberIdealSpeed( bool includeLeader ) const
 
 //----------------------------------------------------------------------
 // Return the maximum formation error of the squad's memebers.
-float CTFBotSquad::GetMaxSquadFormationError( void ) const
+float CFFBotSquad::GetMaxSquadFormationError( void ) const
 {
 	float maxError = 0.0f;
 
@@ -226,7 +226,7 @@ float CTFBotSquad::GetMaxSquadFormationError( void ) const
 
 //----------------------------------------------------------------------
 // Return true if the squad leader needs to wait for members to catch up, ignoring those who have broken ranks
-bool CTFBotSquad::ShouldSquadLeaderWaitForFormation( void ) const
+bool CFFBotSquad::ShouldSquadLeaderWaitForFormation( void ) const
 {
 	// skip the leader since he's what the formation forms around
 	for( int i=1; i<m_roster.Count(); ++i )
@@ -237,7 +237,7 @@ bool CTFBotSquad::ShouldSquadLeaderWaitForFormation( void ) const
 			if ( m_roster[i]->GetSquadFormationError() >= 1.0f && 
 				 !m_roster[i]->HasBrokenFormation() && 
 				 !m_roster[i]->GetLocomotionInterface()->IsStuck() &&
-				 !m_roster[i]->IsPlayerClass( TF_CLASS_MEDIC ) )		// Medics do their own thing
+				 !m_roster[i]->IsPlayerClass( CLASS_MEDIC ) )		// Medics do their own thing
 			{
 				// wait for me!
 				return true;
@@ -251,7 +251,7 @@ bool CTFBotSquad::ShouldSquadLeaderWaitForFormation( void ) const
 
 //----------------------------------------------------------------------
 // Return true if the squad is in formation (everyone is in or nearly in their desired positions)
-bool CTFBotSquad::IsInFormation( void ) const
+bool CFFBotSquad::IsInFormation( void ) const
 {
 	// skip the leader since he's what the formation forms around
 	for( int i=1; i<m_roster.Count(); ++i )
@@ -260,7 +260,7 @@ bool CTFBotSquad::IsInFormation( void ) const
 		{
 			if ( m_roster[i]->HasBrokenFormation() ||
 				 m_roster[i]->GetLocomotionInterface()->IsStuck() ||
-				 m_roster[i]->IsPlayerClass( TF_CLASS_MEDIC ) )		// Medics do their own thing
+				 m_roster[i]->IsPlayerClass( CLASS_MEDIC ) )		// Medics do their own thing
 			{
 				// I'm not "in formation"
 				continue;
@@ -279,7 +279,7 @@ bool CTFBotSquad::IsInFormation( void ) const
 
 //----------------------------------------------------------------------
 // Tell all members to leave the squad and then delete itself
-void CTFBotSquad::DisbandAndDeleteSquad( void )
+void CFFBotSquad::DisbandAndDeleteSquad( void )
 {
 	// Tell each member of the squad to remove this reference
 	for( int i=0; i < m_roster.Count(); ++i )

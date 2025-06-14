@@ -21,7 +21,7 @@ ConVar ff_raid_mob_avoid_range( "ff_raid_mob_avoid_range", "100", FCVAR_CHEAT );
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CTFBotMobRush::CTFBotMobRush( CTFPlayer *victim, float reactionTime )
+CFFBotMobRush::CFFBotMobRush( CTFPlayer *victim, float reactionTime )
 {
 	m_victim = victim;
 
@@ -31,7 +31,7 @@ CTFBotMobRush::CTFBotMobRush( CTFPlayer *victim, float reactionTime )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotMobRush::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot > CFFBotMobRush::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_vocalizeTimer.Start( RandomFloat( ff_raid_mob_rush_vocalize_min_interval.GetFloat(), ff_raid_mob_rush_vocalize_max_interval.GetFloat() ) );
 	return Continue();
@@ -39,7 +39,7 @@ ActionResult< CTFBot > CTFBotMobRush::OnStart( CTFBot *me, Action< CTFBot > *pri
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMobRush::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMobRush::Update( CFFBot *me, float interval )
 {
 	// mobs use only their melee weapons
 	CBaseCombatWeapon *meleeWeapon = me->Weapon_GetSlot( TF_WPN_TYPE_MELEE );
@@ -82,11 +82,11 @@ ActionResult< CTFBot >	CTFBotMobRush::Update( CTFBot *me, float interval )
 	me->PressFireButton();
 
 	// chase them down
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Update( me, m_victim, cost );
 
 	// avoid friends
-	CTeam *team = GetGlobalTeam( TF_TEAM_RED );
+	CTeam *team = GetGlobalTeam( FF_TEAM_RED );
 	for( int t=0; t<team->GetNumPlayers(); ++t )
 	{
 		CTFPlayer *teamMember = (CTFPlayer *)team->GetPlayer(t);
@@ -107,16 +107,16 @@ ActionResult< CTFBot >	CTFBotMobRush::Update( CTFBot *me, float interval )
 	if ( !m_victim->IsAlive() && me->IsRangeLessThan( m_victim, ff_bot_taunt_range.GetFloat() ) )
 	{
 		// we got 'em!
-		return ChangeTo( new CTFBotTaunt, "Taunt their corpse" );
+		return ChangeTo( new CFFBotTaunt, "Taunt their corpse" );
 	}
 
 	if ( m_vocalizeTimer.IsElapsed() )
 	{
 		m_vocalizeTimer.Start( RandomFloat( ff_raid_mob_rush_vocalize_min_interval.GetFloat(), ff_raid_mob_rush_vocalize_max_interval.GetFloat() ) );
 
-		if ( me->IsPlayerClass( TF_CLASS_SCOUT ) )
+		if ( me->IsPlayerClass( CLASS_SCOUT ) )
 			me->EmitSound( "Scout.MobJabber" );
-		else if ( me->IsPlayerClass( TF_CLASS_HEAVYWEAPONS ) )
+		else if ( me->IsPlayerClass( CLASS_HEAVYWEAPONS ) )
 			me->EmitSound( "Heavy.MobJabber" );
 		else
 			me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_BATTLECRY );
@@ -127,28 +127,28 @@ ActionResult< CTFBot >	CTFBotMobRush::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMobRush::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotMobRush::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	return TryToSustain( RESULT_CRITICAL, "Ignoring contact" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMobRush::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMobRush::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	return TryToSustain( RESULT_CRITICAL, "Ignoring injury" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMobRush::OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMobRush::OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
 {
 	return TryToSustain( RESULT_CRITICAL, "Ignoring friend death" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMobRush::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMobRush::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	return TryToSustain( RESULT_CRITICAL );
@@ -156,7 +156,7 @@ EventDesiredResult< CTFBot > CTFBotMobRush::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotMobRush::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotMobRush::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }

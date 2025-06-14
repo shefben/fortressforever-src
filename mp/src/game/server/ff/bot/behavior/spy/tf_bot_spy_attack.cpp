@@ -19,14 +19,14 @@ ConVar ff_bot_spy_change_target_range_threshold( "ff_bot_spy_change_target_range
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotSpyAttack::CTFBotSpyAttack( CTFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
+CFFBotSpyAttack::CFFBotSpyAttack( CTFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
 {
 	m_victim = victim;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_isCoverBlown = false;
@@ -41,7 +41,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::OnStart( CTFBot *me, Action< CTFBot > *p
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetKnown( m_victim );
 
@@ -84,7 +84,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 	CBaseObject *sapTarget = me->GetNearestKnownSappableTarget();
 	if ( sapTarget && me->IsEntityBetweenTargetAndSelf( sapTarget, threat->GetEntity() ) )
 	{
-		return ChangeTo( new CTFBotSpySap( sapTarget ), "Opportunistically sapping an enemy object between my victim and I" );
+		return ChangeTo( new CFFBotSpySap( sapTarget ), "Opportunistically sapping an enemy object between my victim and I" );
 	}
 
 	if ( me->IsAnyEnemySentryAbleToAttackMe() )
@@ -94,7 +94,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 		CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
 		me->Weapon_Switch( myGun );
 
-		return ChangeTo( new CTFBotRetreatToCover, "Escaping sentry fire!" );
+		return ChangeTo( new CFFBotRetreatToCover, "Escaping sentry fire!" );
 	}
 
 	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
@@ -132,10 +132,10 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 
 	switch( me->GetDifficulty() )
 	{
-	case CTFBot::EASY:		behindTolerance = 0.9f;		break;
-	case CTFBot::NORMAL:	behindTolerance = 0.7071f;	break;
-	case CTFBot::HARD:		behindTolerance = 0.2f;		break;
-	case CTFBot::EXPERT:	behindTolerance = 0.0f;		break;
+	case CFFBot::EASY:		behindTolerance = 0.9f;		break;
+	case CFFBot::NORMAL:	behindTolerance = 0.7071f;	break;
+	case CFFBot::HARD:		behindTolerance = 0.2f;		break;
+	case CFFBot::EXPERT:	behindTolerance = 0.0f;		break;
 	}
 
 	if ( TFGameRules()->IsMannVsMachineMode() )
@@ -146,7 +146,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 	bool isBehindVictim = DotProduct( playerThreatForward, toPlayerThreat ) > behindTolerance;
 
 	// easy Spies always think they're in position to backstab
-	if ( me->GetDifficulty() == CTFBot::EASY )
+	if ( me->GetDifficulty() == CFFBot::EASY )
 	{
 		isBehindVictim = true;
 	}
@@ -270,7 +270,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 				}
 			}
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Update( me, threat->GetEntity(), cost );
 		}
 	}
@@ -280,7 +280,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSpyAttack::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSpyAttack::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_victim = NULL;
 	m_path.Invalidate();
@@ -291,14 +291,14 @@ ActionResult< CTFBot > CTFBotSpyAttack::OnResume( CTFBot *me, Action< CTFBot > *
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnStuck( CFFBot *me )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	if ( me->IsEnemy( info.GetAttacker() ) )
 	{
@@ -310,7 +310,7 @@ EventDesiredResult< CTFBot > CTFBotSpyAttack::OnInjured( CTFBot *me, const CTake
 			CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
 			me->Weapon_Switch( myGun );
 
-			return TryChangeTo( new CTFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
+			return TryChangeTo( new CFFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
 		}
 	}
 
@@ -319,7 +319,7 @@ EventDesiredResult< CTFBot > CTFBotSpyAttack::OnInjured( CTFBot *me, const CTake
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	if ( me->IsEnemy( other ) && other->MyCombatCharacterPointer() )
 	{
@@ -334,23 +334,23 @@ EventDesiredResult< CTFBot > CTFBotSpyAttack::OnContact( CTFBot *me, CBaseEntity
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotSpyAttack::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotSpyAttack::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_UNDEFINED;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyAttack::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotSpyAttack::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
 	if ( m_isCoverBlown ||
 		 me->m_Shared.InCond( TF_COND_BURNING ) ||
@@ -368,7 +368,7 @@ QueryResultType CTFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKno
 
 //---------------------------------------------------------------------------------------------
 // Use this to signal the enemy we are focusing on, so we dont avoid them
-QueryResultType CTFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
+QueryResultType CFFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
 {
 	if ( blocker != IS_ANY_HINDRANCE_POSSIBLE )
 	{
@@ -385,12 +385,12 @@ QueryResultType CTFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *b
 
 //---------------------------------------------------------------------------------------------
 // Return the more dangerous of the two threats to 'subject', or NULL if we have no opinion
-const CKnownEntity * CTFBotSpyAttack::SelectMoreDangerousThreat( const INextBot *meBot, 
+const CKnownEntity * CFFBotSpyAttack::SelectMoreDangerousThreat( const INextBot *meBot, 
 																 const CBaseCombatCharacter *subject,
 																 const CKnownEntity *threat1, 
 																 const CKnownEntity *threat2 ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
 	if ( me->IsSelf( subject ) )
 	{

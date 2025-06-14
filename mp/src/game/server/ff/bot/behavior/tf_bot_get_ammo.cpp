@@ -16,7 +16,7 @@ ConVar ff_bot_debug_ammo_scavenging( "ff_bot_debug_ammo_scavenging", "0", FCVAR_
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotGetAmmo::CTFBotGetAmmo( void )
+CFFBotGetAmmo::CFFBotGetAmmo( void )
 {
 	m_path.Invalidate();
 	m_ammo = NULL;
@@ -28,7 +28,7 @@ CTFBotGetAmmo::CTFBotGetAmmo( void )
 class CAmmoFilter : public INextBotFilter
 {
 public:
-	CAmmoFilter( CTFBot *me )
+	CAmmoFilter( CFFBot *me )
 	{
 		m_me = me;
 		m_ammoArea = NULL;
@@ -60,8 +60,8 @@ public:
 				return false;
 			}
 
-			if ( ( m_me->GetTeamNumber() == TF_TEAM_RED && m_ammoArea->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) ) ||
-				 ( m_me->GetTeamNumber() == TF_TEAM_BLUE && m_ammoArea->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) ) )
+			if ( ( m_me->GetTeamNumber() == FF_TEAM_RED && m_ammoArea->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) ) ||
+				 ( m_me->GetTeamNumber() == FF_TEAM_BLUE && m_ammoArea->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) ) )
 			{
 				// the supply cabinet is in my spawn room, or not in any spawn room
 				return true;
@@ -86,7 +86,7 @@ public:
 			{
 				// for now, assume Engineers want to go fetch ammo boxes unless their dispenser is fully upgraded
 				// unless we have no sentry yet, then we need to leech off of buddy's dispenser to get started
-				if ( !m_me->IsPlayerClass( TF_CLASS_ENGINEER ) || ( (CBaseObject *)candidate )->GetUpgradeLevel() >= 3 || !m_me->GetObjectOfType( OBJ_SENTRYGUN ) )
+				if ( !m_me->IsPlayerClass( CLASS_ENGINEER ) || ( (CBaseObject *)candidate )->GetUpgradeLevel() >= 3 || !m_me->GetObjectOfType( OBJ_SENTRYGUN ) )
 				{
 					CBaseObject	*dispenser = (CBaseObject *)candidate;
 					if ( !dispenser->IsBuilding() && !dispenser->IsDisabled() )
@@ -100,13 +100,13 @@ public:
 		return false;
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	mutable CTFNavArea *m_ammoArea;
 };
 
 
 //---------------------------------------------------------------------------------------------
-static CTFBot *s_possibleBot = NULL;
+static CFFBot *s_possibleBot = NULL;
 static CHandle< CBaseEntity > s_possibleAmmo = NULL;
 static int s_possibleFrame = 0;
 
@@ -115,9 +115,9 @@ static int s_possibleFrame = 0;
 /**
  * Return true if this Action has what it needs to perform right now
  */
-bool CTFBotGetAmmo::IsPossible( CTFBot *me )
+bool CFFBotGetAmmo::IsPossible( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotGetAmmo::IsPossible", "NextBot" );
+	VPROF_BUDGET( "CFFBotGetAmmo::IsPossible", "NextBot" );
 
 	int i;
 
@@ -196,9 +196,9 @@ bool CTFBotGetAmmo::IsPossible( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGetAmmo::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotGetAmmo::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	VPROF_BUDGET( "CTFBotGetAmmo::OnStart", "NextBot" );
+	VPROF_BUDGET( "CFFBotGetAmmo::OnStart", "NextBot" );
 
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -214,14 +214,14 @@ ActionResult< CTFBot >	CTFBotGetAmmo::OnStart( CTFBot *me, Action< CTFBot > *pri
 	m_ammo = s_possibleAmmo;
 	m_isGoalDispenser = m_ammo->ClassMatches( "obj_dispenser*" );
 
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	if ( !m_path.Compute( me, m_ammo->WorldSpaceCenter(), cost ) )
 	{
 		return Done( "No path to ammo!" );
 	}
 
 	// if I'm a spy, cloak and disguise
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( me->IsPlayerClass( CLASS_SPY ) )
 	{
 		if ( !me->m_Shared.IsStealthed() )
 		{
@@ -234,7 +234,7 @@ ActionResult< CTFBot >	CTFBotGetAmmo::OnStart( CTFBot *me, Action< CTFBot > *pri
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGetAmmo::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotGetAmmo::Update( CFFBot *me, float interval )
 {
 	if ( me->IsAmmoFull() )
 	{
@@ -245,10 +245,10 @@ ActionResult< CTFBot >	CTFBotGetAmmo::Update( CTFBot *me, float interval )
 	{
 /*
 		// engineers try to gather all the metal they can
-		if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) && CTFBotGetAmmo::IsPossible( me ) )
+		if ( me->IsPlayerClass( CLASS_ENGINEER ) && CFFBotGetAmmo::IsPossible( me ) )
 		{
 			// more ammo to be had
-			return ChangeTo( new CTFBotGetAmmo, "Not full yet - grabbing more ammo" );
+			return ChangeTo( new CFFBotGetAmmo, "Not full yet - grabbing more ammo" );
 		}
 */
 
@@ -304,35 +304,35 @@ ActionResult< CTFBot >	CTFBotGetAmmo::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGetAmmo::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotGetAmmo::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGetAmmo::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotGetAmmo::OnStuck( CFFBot *me )
 {
 	return TryDone( RESULT_CRITICAL, "Stuck trying to reach ammo" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGetAmmo::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotGetAmmo::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGetAmmo::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotGetAmmo::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	return TryDone( RESULT_CRITICAL, "Failed to reach ammo" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotGetAmmo::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotGetAmmo::ShouldHurry( const INextBot *me ) const
 {
 	// if we need ammo, we best hustle
 	return ANSWER_YES;

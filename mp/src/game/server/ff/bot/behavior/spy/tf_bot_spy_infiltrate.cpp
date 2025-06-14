@@ -19,7 +19,7 @@ extern ConVar ff_bot_path_lookahead_range;
 ConVar ff_bot_debug_spy( "ff_bot_debug_spy", "0", FCVAR_CHEAT );
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyInfiltrate::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyInfiltrate::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_hideArea = NULL;
 
@@ -30,7 +30,7 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::OnStart( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyInfiltrate::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 {
 	// switch to our pistol
 	CBaseCombatWeapon *myGun = me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
@@ -69,13 +69,13 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::Update( CTFBot *me, float interval )
 		CBaseObject *enemyObject = (CBaseObject *)threat->GetEntity();
 		if ( !enemyObject->HasSapper() && me->IsEnemy( enemyObject ) )
 		{
-			return SuspendFor( new CTFBotSpySap( enemyObject ), "Sapping an enemy object" );
+			return SuspendFor( new CFFBotSpySap( enemyObject ), "Sapping an enemy object" );
 		}
 	}
 
 	if ( me->GetEnemySentry() && !me->GetEnemySentry()->HasSapper() )
 	{
-		return SuspendFor( new CTFBotSpySap( me->GetEnemySentry() ), "Sapping a Sentry" );
+		return SuspendFor( new CFFBotSpySap( me->GetEnemySentry() ), "Sapping a Sentry" );
 	}
 
 	if ( !m_hideArea && m_findHidingSpotTimer.IsElapsed() )
@@ -101,11 +101,11 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::Update( CTFBot *me, float interval )
 					{
 						if ( me->m_Shared.IsStealthed() )
 						{
-							return SuspendFor( new CTFBotRetreatToCover( new CTFBotSpyAttack( victim ) ), "Hiding to decloak before going after a backstab victim" );
+							return SuspendFor( new CFFBotRetreatToCover( new CFFBotSpyAttack( victim ) ), "Hiding to decloak before going after a backstab victim" );
 						}
 						else
 						{
-							return SuspendFor( new CTFBotSpyAttack( victim ), "Going after a backstab victim" );
+							return SuspendFor( new CFFBotSpyAttack( victim ), "Going after a backstab victim" );
 						}
 					}
 				}					
@@ -150,7 +150,7 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::Update( CTFBot *me, float interval )
 
 				// we may not be able to path to our hiding spot, but get as close as we can
 				// (dropdown mid spawn in cp_gorge)
-				CTFBotPathCost cost( me, SAFEST_ROUTE );
+				CFFBotPathCost cost( me, SAFEST_ROUTE );
 				m_path.Compute( me, m_hideArea->GetCenter(), cost );
 			}
 
@@ -165,20 +165,20 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotSpyInfiltrate::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotSpyInfiltrate::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyInfiltrate::OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotSpyInfiltrate::OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyInfiltrate::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotSpyInfiltrate::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_repathTimer.Invalidate();
 	m_hideArea = NULL;
@@ -188,7 +188,7 @@ ActionResult< CTFBot >	CTFBotSpyInfiltrate::OnResume( CTFBot *me, Action< CTFBot
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotSpyInfiltrate::FindHidingSpot( CTFBot *me )
+bool CFFBotSpyInfiltrate::FindHidingSpot( CFFBot *me )
 {
 	m_hideArea = NULL;
 
@@ -297,7 +297,7 @@ bool CTFBotSpyInfiltrate::FindHidingSpot( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotSpyInfiltrate::OnStuck( CFFBot *me )
 {
 	m_hideArea = NULL;
 	m_findHidingSpotTimer.Invalidate();
@@ -307,7 +307,7 @@ EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotSpyInfiltrate::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	// enemy spawn likely changed - find new hiding spot after internal data has updated
 	m_hideArea = NULL;
@@ -318,7 +318,7 @@ EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnTerritoryCaptured( CTFBot *m
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotSpyInfiltrate::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	// enemy spawn likely changed - find new hiding spot after internal data has updated
 	m_hideArea = NULL;
@@ -329,7 +329,7 @@ EventDesiredResult< CTFBot > CTFBotSpyInfiltrate::OnTerritoryLost( CTFBot *me, i
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyInfiltrate::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyInfiltrate::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

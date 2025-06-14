@@ -8,16 +8,16 @@
 
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotHint;
+class CFFBotHint;
 
-class CTFBotSniperLurk : public Action< CTFBot >
+class CFFBotSniperLurk : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
-	virtual ActionResult< CTFBot >	OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction );
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
 	// Snipers choose their targets a bit differently
 	virtual const CKnownEntity *	SelectMoreDangerousThreat( const INextBot *me, 
@@ -39,13 +39,13 @@ private:
 	Vector m_homePosition;			// where we want to snipe from
 	bool m_isHomePositionValid;
 	bool m_isAtHome;
-	bool FindNewHome( CTFBot *me );
+	bool FindNewHome( CFFBot *me );
 	CountdownTimer m_findHomeTimer;
 	bool m_isOpportunistic;
 
-	CUtlVector< CHandle< CTFBotHint > > m_hintVector;
-	CHandle< CTFBotHint > m_priorHint;
-	bool FindHint( CTFBot *me );
+	CUtlVector< CHandle< CFFBotHint > > m_hintVector;
+	CHandle< CFFBotHint > m_priorHint;
+	bool FindHint( CFFBot *me );
 };
 
 #endif // FF_BOT_SNIPER_LURK_H

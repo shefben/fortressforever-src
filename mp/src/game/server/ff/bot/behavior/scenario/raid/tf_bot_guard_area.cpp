@@ -31,7 +31,7 @@ ConVar ff_raid_special_vocalize_max_interval( "ff_raid_special_vocalize_max_inte
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGuardArea::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotGuardArea::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_chasePath.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -45,15 +45,15 @@ ActionResult< CTFBot >	CTFBotGuardArea::OnStart( CTFBot *me, Action< CTFBot > *p
 
 	switch( me->GetPlayerClass()->GetClassIndex() )
 	{
-	case TF_CLASS_SCOUT:		criteria.pszItemName = "Scout Hat 1";		break;
-	case TF_CLASS_SNIPER:		criteria.pszItemName = "Sniper Hat 1";		break;
-	case TF_CLASS_SOLDIER:		criteria.pszItemName = "Soldier Pot Hat";	break;
-	case TF_CLASS_DEMOMAN:		criteria.pszItemName = "Demo Top Hat";		break;
-	case TF_CLASS_MEDIC:		criteria.pszItemName = "Medic Hat 1";		break;
-	case TF_CLASS_HEAVYWEAPONS:	criteria.pszItemName = "Heavy Ushanka Hat";	break;
-	case TF_CLASS_PYRO:			criteria.pszItemName = "Pyro Chicken Hat";	break;
-	case TF_CLASS_SPY:			criteria.pszItemName = "Spy Derby Hat";		break;
-	case TF_CLASS_ENGINEER:		criteria.pszItemName = "Engineer Hat 1";	break;
+	case CLASS_SCOUT:		criteria.pszItemName = "Scout Hat 1";		break;
+	case CLASS_SNIPER:		criteria.pszItemName = "Sniper Hat 1";		break;
+	case CLASS_SOLDIER:		criteria.pszItemName = "Soldier Pot Hat";	break;
+	case CLASS_DEMOMAN:		criteria.pszItemName = "Demo Top Hat";		break;
+	case CLASS_MEDIC:		criteria.pszItemName = "Medic Hat 1";		break;
+	case CLASS_HEAVYWEAPONS:	criteria.pszItemName = "Heavy Ushanka Hat";	break;
+	case CLASS_PYRO:			criteria.pszItemName = "Pyro Chicken Hat";	break;
+	case CLASS_SPY:			criteria.pszItemName = "Spy Derby Hat";		break;
+	case CLASS_ENGINEER:		criteria.pszItemName = "Engineer Hat 1";	break;
 	default:					criteria.pszItemName = "";					break;
 	}
 
@@ -94,7 +94,7 @@ public:
 
 		CTFNavArea *area = (CTFNavArea *)baseArea;
 
-		CTeam *raidingTeam = GetGlobalTeam( TF_TEAM_BLUE );
+		CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
 		for( int i=0; i<raidingTeam->GetNumPlayers(); ++i )
 		{
 			CTFPlayer *player = (CTFPlayer *)raidingTeam->GetPlayer(i);
@@ -119,7 +119,7 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotGuardArea::Update( CFFBot *me, float interval )
 {
 	// emit vocalizations to warn players we're in the area
 	if ( m_vocalizeTimer.IsElapsed() )
@@ -128,14 +128,14 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 		me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_JEERS );
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
-		return SuspendFor( new CTFBotMedicHeal );
+		return SuspendFor( new CFFBotMedicHeal );
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 	{
-		return SuspendFor( new CTFBotEngineerBuild );
+		return SuspendFor( new CFFBotEngineerBuild );
 	}
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
@@ -147,18 +147,18 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 		CTFNavArea *threatArea = (CTFNavArea *)threat->GetLastKnownArea();
 		if ( myArea && threatArea )
 		{
-			if ( threatArea->GetIncursionDistance( TF_TEAM_BLUE ) < myArea->GetIncursionDistance( TF_TEAM_BLUE ) )
+			if ( threatArea->GetIncursionDistance( FF_TEAM_BLUE ) < myArea->GetIncursionDistance( FF_TEAM_BLUE ) )
 			{
 				if ( me->IsRangeGreaterThan( threat->GetLastKnownPosition(), ff_bot_guard_aggro_range.GetFloat() ) )
 				{
 					// threat is far off and hasn't reached us yet - hide until they are closer
-					return SuspendFor( new CTFBotRetreatToCover, "Hiding until threat gets closer" );
+					return SuspendFor( new CFFBotRetreatToCover, "Hiding until threat gets closer" );
 				}
 			}
 		}
 
 		// attack!
-		return SuspendFor( new CTFBotAttack, "Attacking nearby threat" );
+		return SuspendFor( new CFFBotAttack, "Attacking nearby threat" );
 	}
 	else
 	{
@@ -180,7 +180,7 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 
 		if ( !m_pathToPoint.IsValid() || m_repathTimer.IsElapsed() )
 		{
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_pathToPoint.Compute( me, moveTo, cost );
 			m_repathTimer.Start( RandomFloat( 2.0f, 3.0f ) );
 		}
@@ -193,9 +193,9 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 		if ( me->GetHomeArea() == me->GetLastKnownArea() )
 		{
 			// at home
-			if ( CTFBotPrepareStickybombTrap::IsPossible( me ) )
+			if ( CFFBotPrepareStickybombTrap::IsPossible( me ) )
 			{
-				return SuspendFor( new CTFBotPrepareStickybombTrap, "Laying sticky bombs!" );
+				return SuspendFor( new CFFBotPrepareStickybombTrap, "Laying sticky bombs!" );
 			}
 		}
 
@@ -206,7 +206,7 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 			CTFNavArea *vantageArea = me->FindVantagePoint();
 			if ( vantageArea )
 			{
-				CTFBotPathCost cost( me, FASTEST_ROUTE );
+				CFFBotPathCost cost( me, FASTEST_ROUTE );
 				m_pathToVantageArea.Compute( me, vantageArea->GetCenter(), cost );
 			}
 		}
@@ -221,7 +221,7 @@ ActionResult< CTFBot >	CTFBotGuardArea::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardArea::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotGuardArea::OnStuck( CFFBot *me )
 {
 	m_chasePath.Invalidate();
 	m_pathToPoint.Invalidate();
@@ -232,28 +232,28 @@ EventDesiredResult< CTFBot > CTFBotGuardArea::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardArea::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotGuardArea::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardArea::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotGuardArea::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotGuardArea::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotGuardArea::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardArea::OnCommandApproach( CTFBot *me, const Vector &pos, float range )
+EventDesiredResult< CFFBot > CFFBotGuardArea::OnCommandApproach( CFFBot *me, const Vector &pos, float range )
 {
 	return TryContinue();
 }

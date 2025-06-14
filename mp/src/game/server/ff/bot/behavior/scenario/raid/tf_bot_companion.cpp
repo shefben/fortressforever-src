@@ -26,16 +26,16 @@ extern ConVar ff_bot_path_lookahead_range;
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCompanion::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotCompanion::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CTFBotCompanion::GetLeader( void )
+CTFPlayer *CFFBotCompanion::GetLeader( void )
 {
-	CTeam *raidingTeam = GetGlobalTeam( TF_TEAM_BLUE );
+	CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
 	CTFPlayer *leader = NULL;
 	float leaderSpeed = FLT_MAX;
 
@@ -47,9 +47,9 @@ CTFPlayer *CTFBotCompanion::GetLeader( void )
 			continue;
 
 /*
-		if ( player->IsPlayerClass( TF_CLASS_ENGINEER ) ||
-			 player->IsPlayerClass( TF_CLASS_SNIPER ) ||
-			 player->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( player->IsPlayerClass( CLASS_ENGINEER ) ||
+			 player->IsPlayerClass( CLASS_SNIPER ) ||
+			 player->IsPlayerClass( CLASS_MEDIC ) )
 			continue;
 */
 
@@ -70,14 +70,14 @@ CTFPlayer *CTFBotCompanion::GetLeader( void )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCompanion::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotCompanion::Update( CFFBot *me, float interval )
 {
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		const CKnownEntity *patient = me->GetVisionInterface()->GetClosestKnown( me->GetTeamNumber() );
 		if ( patient )
 		{
-			return SuspendFor( new CTFBotMedicHeal );
+			return SuspendFor( new CFFBotMedicHeal );
 		}
 	}
 
@@ -85,7 +85,7 @@ ActionResult< CTFBot >	CTFBotCompanion::Update( CTFBot *me, float interval )
 	if ( !leader )
 		return Continue();
 
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 
 	if ( me->IsSelf( leader ) )
@@ -94,7 +94,7 @@ ActionResult< CTFBot >	CTFBotCompanion::Update( CTFBot *me, float interval )
 		if ( threat && threat->IsVisibleRecently() && me->IsRangeLessThan( threat->GetEntity(), engageRange ) )
 		{
 			// stop pushing ahead and kill nearby threats
-			return SuspendFor( new CTFBotAttack, "Attacking nearby threats" );
+			return SuspendFor( new CFFBotAttack, "Attacking nearby threats" );
 		}
 
 		// head toward next capture point
@@ -110,7 +110,7 @@ ActionResult< CTFBot >	CTFBotCompanion::Update( CTFBot *me, float interval )
 		{
 			// we don't see anything, but the leader is under attack - find a better vantage point
 			const float nearRange = 1000.0f;
-			return SuspendFor( new CTFBotMoveToVantagePoint( nearRange ), "Moving to where I can see the enemy" );
+			return SuspendFor( new CFFBotMoveToVantagePoint( nearRange ), "Moving to where I can see the enemy" );
 		}
 
 		if ( leader && me->IsDistanceBetweenGreaterThan( leader, ff_raid_companion_follow_range.GetFloat() ) )
@@ -124,7 +124,7 @@ ActionResult< CTFBot >	CTFBotCompanion::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCompanion::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotCompanion::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	return Continue();
@@ -134,14 +134,14 @@ ActionResult< CTFBot >	CTFBotCompanion::OnResume( CTFBot *me, Action< CTFBot > *
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGuardian::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotGuardian::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGuardian::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotGuardian::Update( CFFBot *me, float interval )
 {
 	if ( me->GetActionPoint() )
 	{
@@ -154,7 +154,7 @@ ActionResult< CTFBot >	CTFBotGuardian::Update( CTFBot *me, float interval )
 			{
 				m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) );
 
-				CTFBotPathCost cost( me, FASTEST_ROUTE );
+				CFFBotPathCost cost( me, FASTEST_ROUTE );
 				m_path.Compute( me, home, cost );
 			}
 
@@ -169,14 +169,14 @@ ActionResult< CTFBot >	CTFBotGuardian::Update( CTFBot *me, float interval )
 	m_path.Invalidate();
 	me->SetHomeArea( me->GetLastKnownArea() );
 
-	if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 	{
-		return SuspendFor( new CTFBotEngineerBuild );
+		return SuspendFor( new CFFBotEngineerBuild );
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_SNIPER ) )
+	if ( me->IsPlayerClass( CLASS_SNIPER ) )
 	{
-		return SuspendFor( new CTFBotSniperLurk );
+		return SuspendFor( new CFFBotSniperLurk );
 	}
 
 	return Continue();
@@ -184,7 +184,7 @@ ActionResult< CTFBot >	CTFBotGuardian::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotGuardian::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotGuardian::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	return Continue();
@@ -192,7 +192,7 @@ ActionResult< CTFBot >	CTFBotGuardian::OnResume( CTFBot *me, Action< CTFBot > *i
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardian::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotGuardian::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	return TryContinue( RESULT_IMPORTANT );
@@ -200,7 +200,7 @@ EventDesiredResult< CTFBot > CTFBotGuardian::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardian::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotGuardian::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	m_path.Invalidate();
 	return TryContinue( RESULT_IMPORTANT );
@@ -208,7 +208,7 @@ EventDesiredResult< CTFBot > CTFBotGuardian::OnMoveToSuccess( CTFBot *me, const 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotGuardian::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotGuardian::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_path.Invalidate();
 	return TryContinue( RESULT_IMPORTANT );

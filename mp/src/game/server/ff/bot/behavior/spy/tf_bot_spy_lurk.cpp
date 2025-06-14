@@ -20,7 +20,7 @@ extern ConVar ff_bot_debug_spy;
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLurk::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyLurk::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	// cloak 
 	if ( !me->m_Shared.IsStealthed() )
@@ -38,7 +38,7 @@ ActionResult< CTFBot >	CTFBotSpyLurk::OnStart( CTFBot *me, Action< CTFBot > *pri
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLurk::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyLurk::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->GetEntity() )
@@ -46,13 +46,13 @@ ActionResult< CTFBot >	CTFBotSpyLurk::Update( CTFBot *me, float interval )
 		CBaseObject *enemyObject = dynamic_cast< CBaseObject * >( threat->GetEntity() );
 		if ( enemyObject && !enemyObject->HasSapper() && me->IsEnemy( enemyObject ) )
 		{
-			return SuspendFor( new CTFBotSpySap( enemyObject ), "Sapping an enemy object" );
+			return SuspendFor( new CFFBotSpySap( enemyObject ), "Sapping an enemy object" );
 		}
 	}
 
 	if ( me->GetEnemySentry() != NULL && !me->GetEnemySentry()->HasSapper() )
 	{
-		return SuspendFor( new CTFBotSpySap( me->GetEnemySentry() ), "Sapping a Sentry" );
+		return SuspendFor( new CFFBotSpySap( me->GetEnemySentry() ), "Sapping a Sentry" );
 	}
 
 	if ( m_lurkTimer.IsElapsed() )
@@ -75,7 +75,7 @@ ActionResult< CTFBot >	CTFBotSpyLurk::Update( CTFBot *me, float interval )
 		{
 			if ( !victim->IsLookingTowards( me ) )
 			{
-				return ChangeTo( new CTFBotSpyAttack( victim ), "Going after a backstab victim" );
+				return ChangeTo( new CFFBotSpyAttack( victim ), "Going after a backstab victim" );
 			}
 		}
 	}
@@ -85,7 +85,7 @@ ActionResult< CTFBot >	CTFBotSpyLurk::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyLurk::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyLurk::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

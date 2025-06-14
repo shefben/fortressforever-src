@@ -33,15 +33,15 @@ ConVar ff_bot_defense_debug( "ff_bot_defense_debug", "0", FCVAR_CHEAT );
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDefendPoint::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotDefendPoint::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
 	m_defenseArea = NULL;
 
 	// higher skilled bots prefer to seek and destroy until the time is almost up
-	static float roamChance[ CTFBot::NUM_DIFFICULTY_LEVELS ] = { 10.0f, 50.0f, 75.0f, 90.0f };
-	m_isAllowedToRoam = ( RandomFloat( 0.0f, 100.0f ) < roamChance[ (int)clamp( me->GetDifficulty(), CTFBot::EASY, CTFBot::EXPERT ) ] );
+	static float roamChance[ CFFBot::NUM_DIFFICULTY_LEVELS ] = { 10.0f, 50.0f, 75.0f, 90.0f };
+	m_isAllowedToRoam = ( RandomFloat( 0.0f, 100.0f ) < roamChance[ (int)clamp( me->GetDifficulty(), CFFBot::EASY, CFFBot::EXPERT ) ] );
 
 	return Continue();
 }
@@ -51,7 +51,7 @@ ActionResult< CTFBot >	CTFBotDefendPoint::OnStart( CTFBot *me, Action< CTFBot > 
 /**
  * Return true if we're in immediate danger of losing the point
  */
-bool CTFBotDefendPoint::IsPointThreatened( CTFBot *me )
+bool CFFBotDefendPoint::IsPointThreatened( CFFBot *me )
 {
 	CTeamControlPoint *point = me->GetMyControlPoint();
 
@@ -91,15 +91,15 @@ bool CTFBotDefendPoint::IsPointThreatened( CTFBot *me )
 
 //---------------------------------------------------------------------------------------------
 // Are we smart enough to get on the point to block the cap
-bool CTFBotDefendPoint::WillBlockCapture( CTFBot *me ) const
+bool CFFBotDefendPoint::WillBlockCapture( CFFBot *me ) const
 {
 	if ( TFGameRules()->IsInTraining() )
 		return false;
 	
-	if ( me->IsDifficulty( CTFBot::EASY ) )
+	if ( me->IsDifficulty( CFFBot::EASY ) )
 		return false;
 
-	if ( me->IsDifficulty( CTFBot::NORMAL ) )
+	if ( me->IsDifficulty( CFFBot::NORMAL ) )
 	{
 		// 50% chance of blocking cap
 		return me->TransientlyConsistentRandomValue() > 0.5f;
@@ -110,7 +110,7 @@ bool CTFBotDefendPoint::WillBlockCapture( CTFBot *me ) const
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotDefendPoint::Update( CFFBot *me, float interval )
 {
 	// King of the Hill logic
 	CTeamControlPointMaster *master = g_hControlPointMasters.Count() ? g_hControlPointMasters[0] : NULL;
@@ -120,7 +120,7 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 		CTeamControlPoint *point = master->GetControlPoint( 0 );
 		if ( point && point->GetOwner() != me->GetTeamNumber() )
 		{
-			return ChangeTo( new CTFBotCapturePoint, "We need to capture the point!" );
+			return ChangeTo( new CFFBotCapturePoint, "We need to capture the point!" );
 		}
 	}
 
@@ -129,12 +129,12 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 	if ( point == NULL )
 	{
 		const float roamTime = 10.0f;
-		return SuspendFor( new CTFBotSeekAndDestroy( roamTime ), "Seek and destroy until a point becomes available" );
+		return SuspendFor( new CFFBotSeekAndDestroy( roamTime ), "Seek and destroy until a point becomes available" );
 	}
 
 	if ( point->GetTeamNumber() != me->GetTeamNumber() )
 	{
-		return ChangeTo( new CTFBotCapturePoint, "We need to capture our point(s)" );
+		return ChangeTo( new CFFBotCapturePoint, "We need to capture our point(s)" );
 	}
 
 	// if point in is danger - get ON the point!
@@ -142,7 +142,7 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 	if ( IsPointThreatened( me ) && WillBlockCapture( me ) )
 	{
 		// point is being captured - get on it!
-		return SuspendFor( new CTFBotDefendPointBlockCapture, "Moving to block point capture!" );
+		return SuspendFor( new CFFBotDefendPointBlockCapture, "Moving to block point capture!" );
 	}
 
 	// point is safe for the moment
@@ -151,17 +151,17 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 	if ( me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
 	{
 		const float uberChargeTime = 6.0;
-		return SuspendFor( new CTFBotSeekAndDestroy( uberChargeTime ), "Attacking because I'm uber'd!" );
+		return SuspendFor( new CFFBotSeekAndDestroy( uberChargeTime ), "Attacking because I'm uber'd!" );
 	}
 
 	if ( point && point->IsLocked() )
 	{
-		return SuspendFor( new CTFBotSeekAndDestroy, "Seek and destroy until the point unlocks" );
+		return SuspendFor( new CFFBotSeekAndDestroy, "Seek and destroy until the point unlocks" );
 	}
 
 	if ( m_isAllowedToRoam && me->GetTimeLeftToCapture() > ff_bot_defense_must_defend_time.GetFloat() )
 	{
-		return SuspendFor( new CTFBotSeekAndDestroy( 15.0f ), "Seek and destroy - we have lots of time" );
+		return SuspendFor( new CFFBotSeekAndDestroy( 15.0f ), "Seek and destroy - we have lots of time" );
 	}
 
 	if ( TFGameRules()->InSetup() )
@@ -180,17 +180,17 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 		// we're aware of an enemy
 		m_idleTimer.Reset();
 
-		if ( me->IsPlayerClass( TF_CLASS_PYRO ) )
+		if ( me->IsPlayerClass( CLASS_PYRO ) )
 		{
 			// go get 'em
-			return SuspendFor( new CTFBotSeekAndDestroy( 15.0f ), "Going after an enemy" );
+			return SuspendFor( new CFFBotSeekAndDestroy( 15.0f ), "Going after an enemy" );
 		}
 
 		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
-		if ( myWeapon && ( myWeapon->IsMeleeWeapon() || myWeapon->IsWeapon( TF_WEAPON_FLAMETHROWER ) ) )
+		if ( myWeapon && ( myWeapon->IsMeleeWeapon() || myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) ) )
 		{
 			// TODO: Check if threat is visible and if not, move to last known position
-			CTFBotPathCost cost( me, me->IsPlayerClass( TF_CLASS_PYRO ) ? SAFEST_ROUTE : FASTEST_ROUTE );
+			CFFBotPathCost cost( me, me->IsPlayerClass( CLASS_PYRO ) ? SAFEST_ROUTE : FASTEST_ROUTE );
 			m_chasePath.Update( me, threat->GetEntity(), cost );
 
 			return Continue();
@@ -208,21 +208,21 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 		if ( me->GetLastKnownArea() == m_defenseArea )
 		{
 			// at our defense position
-			if ( CTFBotPrepareStickybombTrap::IsPossible( me ) )
+			if ( CFFBotPrepareStickybombTrap::IsPossible( me ) )
 			{
-				return SuspendFor( new CTFBotPrepareStickybombTrap, "Laying sticky bombs!" );
+				return SuspendFor( new CFFBotPrepareStickybombTrap, "Laying sticky bombs!" );
 			}
 		}
 		else
 		{
 			// move to our desired defense position, repathing periodically to account for changing situation
-			VPROF_BUDGET( "CTFBotDefendPoint::Update( repath )", "NextBot" );
+			VPROF_BUDGET( "CFFBotDefendPoint::Update( repath )", "NextBot" );
 
 			if ( m_repathTimer.IsElapsed() )
 			{
 				m_repathTimer.Start( RandomFloat( 2.0f, 3.0f ) ); 
 
-				CTFBotPathCost cost( me, DEFAULT_ROUTE );
+				CFFBotPathCost cost( me, DEFAULT_ROUTE );
 				m_path.Compute( me, m_defenseArea->GetCenter(), cost );
 			}
 
@@ -238,7 +238,7 @@ ActionResult< CTFBot >	CTFBotDefendPoint::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotDefendPoint::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotDefendPoint::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	// may have lost point - recheck
 	me->ClearMyControlPoint();
@@ -250,14 +250,14 @@ ActionResult< CTFBot > CTFBotDefendPoint::OnResume( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result  )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result  )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	m_defenseArea = SelectAreaToDefendFrom( me );
@@ -268,14 +268,14 @@ EventDesiredResult< CTFBot > CTFBotDefendPoint::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_path.Invalidate();
 	m_defenseArea = SelectAreaToDefendFrom( me );
@@ -284,7 +284,7 @@ EventDesiredResult< CTFBot > CTFBotDefendPoint::OnMoveToFailure( CTFBot *me, con
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnTerritoryContested( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnTerritoryContested( CFFBot *me, int territoryID )
 {
 	// handled in the Update() loop
 	return TryContinue();
@@ -292,14 +292,14 @@ EventDesiredResult< CTFBot > CTFBotDefendPoint::OnTerritoryContested( CTFBot *me
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPoint::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPoint::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	// we lost it, fall back to next point
 	me->ClearMyControlPoint();
@@ -381,9 +381,9 @@ public:
 /**
  * Select the area where we will guard the point from
  */
-CTFNavArea *CTFBotDefendPoint::SelectAreaToDefendFrom( CTFBot *me )
+CTFNavArea *CFFBotDefendPoint::SelectAreaToDefendFrom( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotDefendPoint::SelectAreaToDefendFrom", "NextBot" );
+	VPROF_BUDGET( "CFFBotDefendPoint::SelectAreaToDefendFrom", "NextBot" );
 
 	CTeamControlPoint *point = me->GetMyControlPoint();
 	if ( !point )
@@ -398,7 +398,7 @@ CTFNavArea *CTFBotDefendPoint::SelectAreaToDefendFrom( CTFBot *me )
 	if ( !TFGameRules()->IsInKothMode() &&
 		 point->GetTeamCapPercentage( me->GetTeamNumber() ) <= 0.0f &&	// point is currently safe
 		 ( ObjectiveResource()->GetPreviousPointForPoint( point->GetPointIndex(), me->GetTeamNumber(), 0 ) < 0 ||		 // this is the first cap point
-			me->IsPlayerClass( TF_CLASS_PYRO ) ) )						// pyros are skirmishers
+			me->IsPlayerClass( CLASS_PYRO ) ) )						// pyros are skirmishers
 	{
 		if ( TheTFNavMesh()->GetSetupGateDefenseAreas() )
 		{

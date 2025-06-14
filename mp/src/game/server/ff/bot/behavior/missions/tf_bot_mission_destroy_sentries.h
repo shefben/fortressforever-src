@@ -8,22 +8,22 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotMissionDestroySentries : public Action< CTFBot >
+class CFFBotMissionDestroySentries : public Action< CFFBot >
 {
 public:
-	CTFBotMissionDestroySentries( CObjectSentrygun *goalSentry = NULL );
-	virtual ~CTFBotMissionDestroySentries() { }
+	CFFBotMissionDestroySentries( CObjectSentrygun *goalSentry = NULL );
+	virtual ~CFFBotMissionDestroySentries() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
 	virtual const char *GetName( void ) const	{ return "MissionDestroySentries"; };
 
 private:
 	CHandle< CObjectSentrygun > m_goalSentry;
 
-	CObjectSentrygun *SelectSentryTarget( CTFBot *me );
+	CObjectSentrygun *SelectSentryTarget( CFFBot *me );
 };
 
 

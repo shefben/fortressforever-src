@@ -17,7 +17,7 @@ extern int GetBotEscortCount( int team );
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotAttackFlagDefenders::CTFBotAttackFlagDefenders( float minDuration )
+CFFBotAttackFlagDefenders::CFFBotAttackFlagDefenders( float minDuration )
 {
 	if ( minDuration > 0.0f )
 	{
@@ -31,17 +31,17 @@ CTFBotAttackFlagDefenders::CTFBotAttackFlagDefenders( float minDuration )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotAttackFlagDefenders::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotAttackFlagDefenders::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
 	m_chasePlayer = NULL;
-	return CTFBotAttack::OnStart( me, priorAction );
+	return CFFBotAttack::OnStart( me, priorAction );
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotAttackFlagDefenders::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotAttackFlagDefenders::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->IsVisibleRecently() )
@@ -76,21 +76,21 @@ ActionResult< CTFBot > CTFBotAttackFlagDefenders::Update( CTFBot *me, float inte
 			}
 
 			// escort the flag carrier, unless the carrier is in a squad
-			CTFBot *botCarrier = ToTFBot( carrier );
+			CFFBot *botCarrier = ToTFBot( carrier );
 			if ( !botCarrier || !botCarrier->IsInASquad() )
 			{
 				if ( me->IsRangeLessThan( carrier, ff_bot_flag_escort_range.GetFloat() ) )
 				{
 					if ( GetBotEscortCount( me->GetTeamNumber() ) < ff_bot_flag_escort_max_count.GetInt() )
 					{
-						return ChangeTo( new CTFBotEscortFlagCarrier, "Near flag carrier - escorting" );
+						return ChangeTo( new CFFBotEscortFlagCarrier, "Near flag carrier - escorting" );
 					}
 				}
 			}
 		}
 	}
 
-	ActionResult< CTFBot > result = CTFBotAttack::Update( me, interval );
+	ActionResult< CFFBot > result = CFFBotAttack::Update( me, interval );
 
 	if ( result.IsDone() )
 	{
@@ -104,7 +104,7 @@ ActionResult< CTFBot > CTFBotAttackFlagDefenders::Update( CTFBot *me, float inte
 		if ( m_chasePlayer == NULL )
 		{
 			// everyone is dead or hiding in the spawn room - go escort the flag
-			return ChangeTo( new CTFBotEscortFlagCarrier, "No reachable victim - escorting flag" );
+			return ChangeTo( new CFFBotEscortFlagCarrier, "No reachable victim - escorting flag" );
 		}
 
 		// cheat and "see" our victim so we know where to go
@@ -114,7 +114,7 @@ ActionResult< CTFBot > CTFBotAttackFlagDefenders::Update( CTFBot *me, float inte
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 3.0f ) );
 
-			CTFBotPathCost cost( me, DEFAULT_ROUTE );
+			CFFBotPathCost cost( me, DEFAULT_ROUTE );
 			float maxPathLength = TFGameRules()->IsMannVsMachineMode() ? TFBOT_MVM_MAX_PATH_LENGTH : 0.0f;
 			m_path.Compute( me, m_chasePlayer, cost, maxPathLength );
 		}

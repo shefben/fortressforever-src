@@ -8,20 +8,20 @@
 
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotSpySap : public Action< CTFBot >
+class CFFBotSpySap : public Action< CFFBot >
 {
 public:
-	CTFBotSpySap( CBaseObject *sapTarget );
-	virtual ~CTFBotSpySap() { }
+	CFFBotSpySap( CBaseObject *sapTarget );
+	virtual ~CFFBotSpySap() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
-	virtual ActionResult< CTFBot >	OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction );
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
 
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;	// should we attack "them"?
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;							// is it time to retreat?
@@ -35,8 +35,8 @@ private:
 	CountdownTimer m_repathTimer;
 	PathFollower m_path;
 
-	CBaseObject *GetNearestKnownSappableTarget( CTFBot *me );
-	bool AreAllDangerousSentriesSapped( CTFBot *me ) const;
+	CBaseObject *GetNearestKnownSappableTarget( CFFBot *me );
+	bool AreAllDangerousSentriesSapped( CFFBot *me ) const;
 };
 
 #endif // FF_BOT_SPY_SAP_H

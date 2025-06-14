@@ -10,18 +10,18 @@
 
 //------------------------------------------------------------------------------
 
-BEGIN_DATADESC( CTFBotRoster )
+BEGIN_DATADESC( CFFBotRoster )
 	DEFINE_KEYFIELD( m_teamName,								FIELD_STRING,	"team" ),
 	DEFINE_KEYFIELD( m_bAllowClassChanges,						FIELD_BOOLEAN,	"allowClassChanges" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_SCOUT],			FIELD_BOOLEAN,	"allowScout" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_SNIPER],		FIELD_BOOLEAN,	"allowSniper" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_SOLDIER],		FIELD_BOOLEAN,	"allowSoldier" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_DEMOMAN],		FIELD_BOOLEAN,	"allowDemoman" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_MEDIC],			FIELD_BOOLEAN,	"allowMedic" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_HEAVYWEAPONS],	FIELD_BOOLEAN,	"allowHeavy" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_PYRO],			FIELD_BOOLEAN,	"allowPyro" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_SPY],			FIELD_BOOLEAN,	"allowSpy" ),
-	DEFINE_KEYFIELD( m_bAllowedClasses[TF_CLASS_ENGINEER],		FIELD_BOOLEAN,	"allowEngineer" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_SCOUT],			FIELD_BOOLEAN,	"allowScout" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_SNIPER],		FIELD_BOOLEAN,	"allowSniper" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_SOLDIER],		FIELD_BOOLEAN,	"allowSoldier" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_DEMOMAN],		FIELD_BOOLEAN,	"allowDemoman" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_MEDIC],			FIELD_BOOLEAN,	"allowMedic" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_HEAVYWEAPONS],	FIELD_BOOLEAN,	"allowHeavy" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_PYRO],			FIELD_BOOLEAN,	"allowPyro" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_SPY],			FIELD_BOOLEAN,	"allowSpy" ),
+	DEFINE_KEYFIELD( m_bAllowedClasses[CLASS_ENGINEER],		FIELD_BOOLEAN,	"allowEngineer" ),
 
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetTeam", InputSetTeam ),
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetAllowScout", InputSetAllowScout ),
@@ -36,72 +36,72 @@ BEGIN_DATADESC( CTFBotRoster )
 
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( bot_roster, CTFBotRoster );
+LINK_ENTITY_TO_CLASS( bot_roster, CFFBotRoster );
 
 //------------------------------------------------------------------------------
 
-CTFBotRoster::CTFBotRoster()
+CFFBotRoster::CFFBotRoster()
 {
 	memset( m_bAllowedClasses, 0, sizeof( m_bAllowedClasses ) );
 }
 
 //------------------------------------------------------------------------------
 
-void CTFBotRoster::InputSetAllowScout( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowScout( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_SCOUT] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_SCOUT] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowSniper( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowSniper( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_SNIPER] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_SNIPER] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowSoldier( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowSoldier( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_SOLDIER] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_SOLDIER] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowDemoman( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowDemoman( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_DEMOMAN] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_DEMOMAN] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowMedic( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowMedic( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_MEDIC] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_MEDIC] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowHeavy( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowHeavy( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_HEAVYWEAPONS] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_HEAVYWEAPONS] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowPyro( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowPyro( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_PYRO] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_PYRO] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowSpy( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowSpy( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_SPY] = inputdata.value.Bool();
+	m_bAllowedClasses[CLASS_SPY] = inputdata.value.Bool();
 }
 
-void CTFBotRoster::InputSetAllowEngineer( inputdata_t &inputdata )
+void CFFBotRoster::InputSetAllowEngineer( inputdata_t &inputdata )
 {
-	m_bAllowedClasses[TF_CLASS_ENGINEER] = inputdata.value.Bool();
-}
-
-//------------------------------------------------------------------------------
-
-bool CTFBotRoster::IsClassAllowed( int iBotClass ) const
-{
-	return iBotClass > TF_CLASS_UNDEFINED && iBotClass < TF_LAST_NORMAL_CLASS && m_bAllowedClasses[iBotClass];
+	m_bAllowedClasses[CLASS_ENGINEER] = inputdata.value.Bool();
 }
 
 //------------------------------------------------------------------------------
 
-bool CTFBotRoster::IsClassChangeAllowed() const
+bool CFFBotRoster::IsClassAllowed( int iBotClass ) const
+{
+	return iBotClass > CLASS_UNDEFINED && iBotClass < CLASS_CIVILIAN && m_bAllowedClasses[iBotClass];
+}
+
+//------------------------------------------------------------------------------
+
+bool CFFBotRoster::IsClassChangeAllowed() const
 {
 	return m_bAllowClassChanges;
 }

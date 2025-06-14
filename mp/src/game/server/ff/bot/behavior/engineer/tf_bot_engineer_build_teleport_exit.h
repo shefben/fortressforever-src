@@ -6,17 +6,17 @@
 #ifndef FF_BOT_ENGINEER_BUILD_TELEPORT_EXIT_H
 #define FF_BOT_ENGINEER_BUILD_TELEPORT_EXIT_H
 
-class CTFBotEngineerBuildTeleportExit : public Action< CTFBot >
+class CFFBotEngineerBuildTeleportExit : public Action< CFFBot >
 {
 public:
-	CTFBotEngineerBuildTeleportExit( void );
-	CTFBotEngineerBuildTeleportExit( const Vector &buildLocation, float buildAngle );
+	CFFBotEngineerBuildTeleportExit( void );
+	CFFBotEngineerBuildTeleportExit( const Vector &buildLocation, float buildAngle );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
 
 	virtual const char *GetName( void ) const	{ return "EngineerBuildTeleportExit"; };
 

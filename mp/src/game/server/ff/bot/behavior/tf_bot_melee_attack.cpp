@@ -15,14 +15,14 @@ ConVar ff_bot_melee_attack_abandon_range( "ff_bot_melee_attack_abandon_range", "
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotMeleeAttack::CTFBotMeleeAttack( float giveUpRange )
+CFFBotMeleeAttack::CFFBotMeleeAttack( float giveUpRange )
 {
 	m_giveUpRange = giveUpRange < 0.0f ? ff_bot_melee_attack_abandon_range.GetFloat() : giveUpRange;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMeleeAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMeleeAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -31,7 +31,7 @@ ActionResult< CTFBot >	CTFBotMeleeAttack::OnStart( CTFBot *me, Action< CTFBot > 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMeleeAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMeleeAttack::Update( CFFBot *me, float interval )
 {
 	// bash the bad guys
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
@@ -60,7 +60,7 @@ ActionResult< CTFBot >	CTFBotMeleeAttack::Update( CTFBot *me, float interval )
 	me->PressFireButton();
 
 	// chase them down
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Update( me, threat->GetEntity(), cost );
 
 	return Continue();

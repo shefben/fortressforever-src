@@ -27,7 +27,7 @@ ConVar ff_bot_max_sticky_launch_at_sentry_range( "ff_bot_max_sticky_launch_at_se
 
 //---------------------------------------------------------------------------------------------
 // Search for angle to land grenade near target
-bool FindGrenadeAim( CTFBot *me, CBaseEntity *target, float *aimYaw, float *aimPitch )
+bool FindGrenadeAim( CFFBot *me, CBaseEntity *target, float *aimYaw, float *aimPitch )
 {
 	Vector toTarget = target->WorldSpaceCenter() - me->EyePosition();
 
@@ -77,7 +77,7 @@ bool FindGrenadeAim( CTFBot *me, CBaseEntity *target, float *aimYaw, float *aimP
 
 //---------------------------------------------------------------------------------------------
 // Search for angle to land sticky near target
-bool FindStickybombAim( CTFBot *me, CBaseEntity *target, float *aimYaw, float *aimPitch, float *aimCharge )
+bool FindStickybombAim( CFFBot *me, CBaseEntity *target, float *aimYaw, float *aimPitch, float *aimCharge )
 {
 	Vector toTarget = target->WorldSpaceCenter() - me->EyePosition();
 
@@ -156,13 +156,13 @@ bool FindStickybombAim( CTFBot *me, CBaseEntity *target, float *aimYaw, float *a
 
 //---------------------------------------------------------------------------------------------
 // Return true if this Action has what it needs to perform right now
-bool CTFBotDestroyEnemySentry::IsPossible( CTFBot *me )
+bool CFFBotDestroyEnemySentry::IsPossible( CFFBot *me )
 {
-	if ( me->IsPlayerClass( TF_CLASS_HEAVYWEAPONS ) ||
-		 me->IsPlayerClass( TF_CLASS_SNIPER ) ||
-		 me->IsPlayerClass( TF_CLASS_MEDIC ) ||
-		 me->IsPlayerClass( TF_CLASS_ENGINEER ) ||
-		 me->IsPlayerClass( TF_CLASS_PYRO ) )
+	if ( me->IsPlayerClass( CLASS_HEAVYWEAPONS ) ||
+		 me->IsPlayerClass( CLASS_SNIPER ) ||
+		 me->IsPlayerClass( CLASS_MEDIC ) ||
+		 me->IsPlayerClass( CLASS_ENGINEER ) ||
+		 me->IsPlayerClass( CLASS_PYRO ) )
 	{
 		// these classes have no way to kill a sentry at long range
 		return false;
@@ -175,7 +175,7 @@ bool CTFBotDestroyEnemySentry::IsPossible( CTFBot *me )
 	}
 
 	// if we're a spy, we have better ways of destroying sentries that shooting at it
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( me->IsPlayerClass( CLASS_SPY ) )
 	{
 		return false;
 	}
@@ -183,7 +183,7 @@ bool CTFBotDestroyEnemySentry::IsPossible( CTFBot *me )
 #ifdef TF_RAID_MODE
 	if ( TFGameRules()->IsRaidMode() )
 	{
-		if ( me->GetTeamNumber() == TF_TEAM_PVE_INVADERS )
+		if ( me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 		{
 			return false;
 		}
@@ -192,7 +192,7 @@ bool CTFBotDestroyEnemySentry::IsPossible( CTFBot *me )
 
 	if ( TFGameRules()->IsMannVsMachineMode() )
 	{
-		if ( me->GetTeamNumber() == TF_TEAM_PVE_INVADERS )
+		if ( me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 		{
 			return false;
 		}
@@ -206,7 +206,7 @@ bool CTFBotDestroyEnemySentry::IsPossible( CTFBot *me )
 class CFindSafeAttackArea : public ISearchSurroundingAreasFunctor
 {
 public:
-	CFindSafeAttackArea( CTFBot *me )
+	CFindSafeAttackArea( CFFBot *me )
 	{
 		m_me = me;
 		m_attackSpot = me->GetAbsOrigin();
@@ -257,7 +257,7 @@ public:
 	}
 
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CTFNavArea *m_sentryArea;
 	Vector m_attackSpot;
 	bool m_foundAttackSpot;
@@ -269,7 +269,7 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotDestroyEnemySentry::ComputeSafeAttackSpot( CTFBot *me )
+void CFFBotDestroyEnemySentry::ComputeSafeAttackSpot( CFFBot *me )
 {
 	m_hasSafeAttackSpot = false;	
 
@@ -373,7 +373,7 @@ void CTFBotDestroyEnemySentry::ComputeSafeAttackSpot( CTFBot *me )
 class FindSafeSentryApproachAreaScan : public ISearchSurroundingAreasFunctor
 {
 public:
-	FindSafeSentryApproachAreaScan( CTFBot *me )
+	FindSafeSentryApproachAreaScan( CFFBot *me )
 	{
 		m_me = me;
 
@@ -441,14 +441,14 @@ public:
 		}
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CUtlVector< CTFNavArea * > m_approachAreaVector;
 	bool m_isEscaping;
 };
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotDestroyEnemySentry::ComputeCornerAttackSpot( CTFBot *me )
+void CFFBotDestroyEnemySentry::ComputeCornerAttackSpot( CFFBot *me )
 {
 	m_safeAttackSpot = vec3_origin;
 	m_hasSafeAttackSpot = false;
@@ -524,7 +524,7 @@ void CTFBotDestroyEnemySentry::ComputeCornerAttackSpot( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDestroyEnemySentry::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotDestroyEnemySentry::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -543,7 +543,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::OnStart( CTFBot *me, Action< CT
 	m_safeAttackSpot = find.m_attackSpot;
 */
 
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
 		ComputeCornerAttackSpot( me );
 	}
@@ -566,7 +566,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::OnStart( CTFBot *me, Action< CT
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotDestroyEnemySentry::Update( CFFBot *me, float interval )
 {
 	if ( me->GetEnemySentry() == NULL )
 	{
@@ -576,7 +576,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 	// if the sentry changes, re-evaluate
 	if ( me->GetEnemySentry() != m_targetSentry )
 	{
-		return ChangeTo( new CTFBotDestroyEnemySentry, "Changed sentry target" );
+		return ChangeTo( new CFFBotDestroyEnemySentry, "Changed sentry target" );
 	}
 
 	if ( me->m_Shared.IsInvulnerable() )
@@ -587,14 +587,14 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 
 			// we just became uber - are we close enough to rush the sentry?
 			const float maxRushDistance = 500.0f;
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			float travelDistance = NavAreaTravelDistance( me->GetLastKnownArea(), 
 														  m_targetSentry->GetLastKnownArea(), 
 														  cost, maxRushDistance );
 
 			if ( travelDistance >= 0.0f )
 			{
-				return SuspendFor( new CTFBotUberAttackEnemySentry( m_targetSentry ), "Go get it!" );
+				return SuspendFor( new CFFBotUberAttackEnemySentry( m_targetSentry ), "Go get it!" );
 			}
 		}
 	}
@@ -603,7 +603,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 		m_wasUber = false;
 	}
 
-	if ( !me->HasAttribute( CTFBot::IGNORE_ENEMIES ) )
+	if ( !me->HasAttribute( CFFBot::IGNORE_ENEMIES ) )
 	{
 		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 		if ( threat && threat->IsVisibleInFOVNow() )
@@ -634,7 +634,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 	}
 
 
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
 		// a demoman wants to get close to the sentry but just out of range or line of sight so
 		// he can pepper the area with stickies and destroy it
@@ -645,7 +645,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 		{
 			m_repathTimer.Start( 1.0f );
 
-			CTFBotPathCost cost( me, SAFEST_ROUTE );
+			CFFBotPathCost cost( me, SAFEST_ROUTE );
 			m_path.Compute( me, attackSpot, cost );
 		}
 
@@ -659,7 +659,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 		else if ( FindStickybombAim( me, m_targetSentry, &aimYaw, &aimPitch, &aimCharge ) )
 		{
 			// found an opportunistic spot to sticky the sentry from
-			return ChangeTo( new CTFBotStickybombSentrygun( me->GetEnemySentry(), aimYaw, aimPitch, aimCharge ), "Destroying sentry with opportunistic sticky shot" );
+			return ChangeTo( new CFFBotStickybombSentrygun( me->GetEnemySentry(), aimYaw, aimPitch, aimCharge ), "Destroying sentry with opportunistic sticky shot" );
 		}
 
 		// move towards sentry
@@ -673,7 +673,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 			 ( me->IsLineOfFireClear( me->GetEnemySentry() ) && me->IsRangeLessThan( m_targetSentry, 1000.0f ) ) )	// opportunistic shot
 		{
 			// reached attack spot
-			return ChangeTo( new CTFBotStickybombSentrygun( me->GetEnemySentry() ), "Destroying sentry with stickies" );
+			return ChangeTo( new CFFBotStickybombSentrygun( me->GetEnemySentry() ), "Destroying sentry with stickies" );
 		}
 
 		if ( me->IsRangeLessThan( attackSpot, 200.0f ) )
@@ -720,7 +720,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 		{
 			if ( me->EquipLongRangeWeapon() == false )
 			{
-				return SuspendFor( new CTFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
+				return SuspendFor( new CFFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
 			}
 
 			me->PressFireButton();
@@ -748,7 +748,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 
 			if ( DotProduct( to, sentryForward ) > 0.8f )
 			{
-				return SuspendFor( new CTFBotRetreatToCover( 0.1f ), "Taking cover from sentry fire" );
+				return SuspendFor( new CFFBotRetreatToCover( 0.1f ), "Taking cover from sentry fire" );
 			}
 		}
 
@@ -764,7 +764,7 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 	{
 		m_repathTimer.Start( 1.0f );
 
-		CTFBotPathCost cost( me, SAFEST_ROUTE );
+		CFFBotPathCost cost( me, SAFEST_ROUTE );
 		Vector moveGoal = m_hasSafeAttackSpot ? m_safeAttackSpot : me->GetEnemySentry()->GetAbsOrigin();
 
 		if ( !m_path.Compute( me, moveGoal, cost ) )
@@ -781,12 +781,12 @@ ActionResult< CTFBot >	CTFBotDestroyEnemySentry::Update( CTFBot *me, float inter
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotDestroyEnemySentry::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotDestroyEnemySentry::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	m_repathTimer.Invalidate();
 
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
 		ComputeCornerAttackSpot( me );
 	}
@@ -800,7 +800,7 @@ ActionResult< CTFBot > CTFBotDestroyEnemySentry::OnResume( CTFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotDestroyEnemySentry::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotDestroyEnemySentry::ShouldHurry( const INextBot *me ) const
 {
 	// while killing a sentry we're "hurrying" so we don't dodge
 	return m_isAttackingSentry ? ANSWER_YES : ANSWER_UNDEFINED;
@@ -808,7 +808,7 @@ QueryResultType CTFBotDestroyEnemySentry::ShouldHurry( const INextBot *me ) cons
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotDestroyEnemySentry::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotDestroyEnemySentry::ShouldRetreat( const INextBot *me ) const
 {
 	// push in to kill the sentry
 	return ANSWER_NO;
@@ -816,7 +816,7 @@ QueryResultType	CTFBotDestroyEnemySentry::ShouldRetreat( const INextBot *me ) co
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotDestroyEnemySentry::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType	CFFBotDestroyEnemySentry::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	// if we're in range to attack the sentry, we handle firing directly
 	return m_isAttackingSentry ? ANSWER_NO : ANSWER_UNDEFINED;
@@ -826,25 +826,25 @@ QueryResultType	CTFBotDestroyEnemySentry::ShouldAttack( const INextBot *me, cons
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CTFBotUberAttackEnemySentry::CTFBotUberAttackEnemySentry( CObjectSentrygun *sentryTarget )
+CFFBotUberAttackEnemySentry::CFFBotUberAttackEnemySentry( CObjectSentrygun *sentryTarget )
 {
 	m_targetSentry = sentryTarget;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotUberAttackEnemySentry::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot > CFFBotUberAttackEnemySentry::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	m_wasIgnoringEnemies = me->HasAttribute( CTFBot::IGNORE_ENEMIES );
+	m_wasIgnoringEnemies = me->HasAttribute( CFFBot::IGNORE_ENEMIES );
 
-	me->SetAttribute( CTFBot::IGNORE_ENEMIES );
+	me->SetAttribute( CFFBot::IGNORE_ENEMIES );
 
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotUberAttackEnemySentry::Update( CFFBot *me, float interval )
 {
 	if ( !me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
 	{
@@ -857,7 +857,7 @@ ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float in
 	}
 
 	float aimYaw, aimPitch;
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) && FindGrenadeAim( me, m_targetSentry, &aimYaw, &aimPitch ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) && FindGrenadeAim( me, m_targetSentry, &aimYaw, &aimPitch ) )
 	{
 		QAngle aimAngles;
 		aimAngles.x = aimPitch;
@@ -878,7 +878,7 @@ ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float in
 		{
 			if ( me->EquipLongRangeWeapon() == false )
 			{
-				return SuspendFor( new CTFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
+				return SuspendFor( new CFFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
 			}
 
 			me->PressFireButton();
@@ -900,7 +900,7 @@ ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float in
 		{
 			if ( me->EquipLongRangeWeapon() == false )
 			{
-				return SuspendFor( new CTFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
+				return SuspendFor( new CFFBotRetreatToCover( 0.1f ), "No suitable range weapon available right now" );
 			}
 
 			me->PressFireButton();
@@ -918,7 +918,7 @@ ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float in
 	{
 		m_repathTimer.Start( 1.0f );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, m_targetSentry->WorldSpaceCenter(), cost );
 	}
 
@@ -929,31 +929,31 @@ ActionResult< CTFBot > CTFBotUberAttackEnemySentry::Update( CTFBot *me, float in
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotUberAttackEnemySentry::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotUberAttackEnemySentry::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( !m_wasIgnoringEnemies )
 	{
-		me->ClearAttribute( CTFBot::IGNORE_ENEMIES );
+		me->ClearAttribute( CFFBot::IGNORE_ENEMIES );
 	}
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotUberAttackEnemySentry::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotUberAttackEnemySentry::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotUberAttackEnemySentry::ShouldRetreat( const INextBot *me ) const
+QueryResultType CFFBotUberAttackEnemySentry::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotUberAttackEnemySentry::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotUberAttackEnemySentry::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_YES;
 }

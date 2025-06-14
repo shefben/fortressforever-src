@@ -9,15 +9,15 @@
 #include "Path/NextBotChasePath.h"
 
 //---------------------------------------------------------------------------------
-class CTFBotDestroyEnemySentry : public Action< CTFBot >
+class CFFBotDestroyEnemySentry : public Action< CFFBot >
 {
 public:
-	static bool IsPossible( CTFBot *me );			// return true if this Action has what it needs to perform right now
+	static bool IsPossible( CFFBot *me );			// return true if this Action has what it needs to perform right now
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;					// are we in a hurry?
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;					// is it time to retreat?
@@ -37,28 +37,28 @@ private:
 
 	Vector m_safeAttackSpot;
 	bool m_hasSafeAttackSpot;
-	void ComputeSafeAttackSpot( CTFBot *me );
-	void ComputeCornerAttackSpot( CTFBot *me );
+	void ComputeSafeAttackSpot( CFFBot *me );
+	void ComputeCornerAttackSpot( CFFBot *me );
 
 	bool m_isAttackingSentry;
 	bool m_wasUber;
 
-	ActionResult< CTFBot > EquipLongRangeWeapon( CTFBot *me );
+	ActionResult< CFFBot > EquipLongRangeWeapon( CFFBot *me );
 
 	CHandle< CObjectSentrygun > m_targetSentry;
 };
 
 
 //---------------------------------------------------------------------------------
-class CTFBotUberAttackEnemySentry : public Action< CTFBot >
+class CFFBotUberAttackEnemySentry : public Action< CFFBot >
 {
 public:
-	CTFBotUberAttackEnemySentry( CObjectSentrygun *sentryTarget );
-	virtual ~CTFBotUberAttackEnemySentry() { }
+	CFFBotUberAttackEnemySentry( CObjectSentrygun *sentryTarget );
+	virtual ~CFFBotUberAttackEnemySentry() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;					// are we in a hurry?
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;					// is it time to retreat?

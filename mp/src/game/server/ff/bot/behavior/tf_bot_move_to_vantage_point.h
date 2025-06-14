@@ -8,18 +8,18 @@
 
 #include "Path/NextBotChasePath.h"
 
-class CTFBotMoveToVantagePoint : public Action< CTFBot >
+class CFFBotMoveToVantagePoint : public Action< CFFBot >
 {
 public:
-	CTFBotMoveToVantagePoint( float maxTravelDistance = 2000.0f );
-	virtual ~CTFBotMoveToVantagePoint() { }
+	CFFBotMoveToVantagePoint( float maxTravelDistance = 2000.0f );
+	virtual ~CFFBotMoveToVantagePoint() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnMoveToSuccess( CTFBot *me, const Path *path );
-	virtual EventDesiredResult< CTFBot > OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnMoveToSuccess( CFFBot *me, const Path *path );
+	virtual EventDesiredResult< CFFBot > OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason );
 
 	virtual const char *GetName( void ) const	{ return "MoveToVantagePoint"; };
 

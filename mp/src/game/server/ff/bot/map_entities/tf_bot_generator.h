@@ -9,14 +9,14 @@
 #include "bot/ff_bot.h"
 
 
-class CTFBotGenerator : public CPointEntity
+class CFFBotGenerator : public CPointEntity
 {
 public:
-	DECLARE_CLASS( CTFBotGenerator, CPointEntity );
+	DECLARE_CLASS( CFFBotGenerator, CPointEntity );
 	DECLARE_DATADESC();
 
-	CTFBotGenerator( void );
-	virtual ~CTFBotGenerator() { }
+	CFFBotGenerator( void );
+	virtual ~CFFBotGenerator() { }
 
 	virtual void Activate();
 
@@ -36,7 +36,7 @@ public:
 	void InputRemoveBots( inputdata_t &inputdata );
 
 	// Output
-	void OnBotKilled( CTFBot *pBot );
+	void OnBotKilled( CFFBot *pBot );
 
 private:
 	bool m_bBotChoosesClass;
@@ -63,7 +63,7 @@ private:
 	COutputEvent m_onExpended;
 	COutputEvent m_onBotKilled;
 
-	CUtlVector< CHandle< CTFBot > > m_spawnedBotVector;
+	CUtlVector< CHandle< CFFBot > > m_spawnedBotVector;
 };
 
 //---------------------------------------------------------------
@@ -72,19 +72,19 @@ private:
 // means "tell the bot I created to move here and do what this node says".
 // Things like "stay here", "move to <next task point>", "face towards <X>", "shoot at <Y>", etc
 //
-class CTFBotActionPoint : public CPointEntity
+class CFFBotActionPoint : public CPointEntity
 {
-	DECLARE_CLASS( CTFBotActionPoint, CPointEntity );
+	DECLARE_CLASS( CFFBotActionPoint, CPointEntity );
 public:
 	DECLARE_DATADESC();
 
- 	CTFBotActionPoint( void );
- 	virtual ~CTFBotActionPoint() { }
+ 	CFFBotActionPoint( void );
+ 	virtual ~CFFBotActionPoint() { }
 
 	virtual void Activate();
 
 	bool IsWithinRange( CBaseEntity *entity );
-	void ReachedActionPoint( CTFBot* pBot );
+	void ReachedActionPoint( CFFBot* pBot );
 
 	CHandle< CBaseEntity > m_moveGoal;
 

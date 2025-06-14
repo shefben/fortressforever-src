@@ -30,13 +30,13 @@ int GetBotEscortCount( int team )
 	int i;
 	for( i=0; i<livePlayerVector.Count(); ++i )
 	{
-		CTFBot *bot = dynamic_cast< CTFBot * >( livePlayerVector[i] );
+		CFFBot *bot = dynamic_cast< CFFBot * >( livePlayerVector[i] );
 		if ( bot )
 		{
-			Behavior< CTFBot > *behavior = (Behavior< CTFBot > *)bot->GetIntentionInterface()->FirstContainedResponder();
+			Behavior< CFFBot > *behavior = (Behavior< CFFBot > *)bot->GetIntentionInterface()->FirstContainedResponder();
 			if ( behavior )
 			{
-				Action< CTFBot > *action = (Action< CTFBot > *)behavior->FirstContainedResponder();
+				Action< CFFBot > *action = (Action< CFFBot > *)behavior->FirstContainedResponder();
 
 				while( action && action->GetActiveChildAction() )
 				{
@@ -56,7 +56,7 @@ int GetBotEscortCount( int team )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEscortFlagCarrier::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEscortFlagCarrier::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -65,7 +65,7 @@ ActionResult< CTFBot >	CTFBotEscortFlagCarrier::OnStart( CTFBot *me, Action< CTF
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEscortFlagCarrier::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotEscortFlagCarrier::Update( CFFBot *me, float interval )
 {
 	CCaptureFlag *flag = me->GetFlagToFetch();
 
@@ -90,7 +90,7 @@ ActionResult< CTFBot > CTFBotEscortFlagCarrier::Update( CTFBot *me, float interv
 		if ( me->SelectRandomReachableEnemy() )
 		{
 			// too far away - give up
-			return ChangeTo( new CTFBotAttackFlagDefenders, "Too far from flag carrier - attack defenders!" );
+			return ChangeTo( new CFFBotAttackFlagDefenders, "Too far from flag carrier - attack defenders!" );
 		}
 	}
 
@@ -106,7 +106,7 @@ ActionResult< CTFBot > CTFBotEscortFlagCarrier::Update( CTFBot *me, float interv
 	{
 		if ( me->IsRangeLessThan( carrier, ff_bot_flag_escort_range.GetFloat() ) && me->IsLineOfSightClear( carrier ) )
 		{
-			ActionResult< CTFBot > result = m_meleeAttackAction.Update( me, interval );
+			ActionResult< CFFBot > result = m_meleeAttackAction.Update( me, interval );
 
 			if ( result.IsContinue() )
 			{
@@ -129,7 +129,7 @@ ActionResult< CTFBot > CTFBotEscortFlagCarrier::Update( CTFBot *me, float interv
 				}
 			}
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, carrier, cost );
 
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
