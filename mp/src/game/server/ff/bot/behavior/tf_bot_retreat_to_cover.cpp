@@ -230,8 +230,6 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 			return ChangeTo( m_actionToChangeToOnceCoverReached, "Doing given action now that I'm in cover" );
 		}
 
-
-
 		// stay in cover while we fully reload
 		if ( isDoingAFullReload )
 		{
