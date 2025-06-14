@@ -15,7 +15,7 @@
 class CFFBotMobRush : public Action< CFFBot >
 {
 public:
-	CFFBotMobRush( CTFPlayer *victim, float reactionTime = 0.0f );
+	CFFBotMobRush( CFFPlayer *victim, float reactionTime = 0.0f );
 
 	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
 	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
@@ -30,7 +30,7 @@ public:
 	virtual const char *GetName( void ) const	{ return "MobRush"; };
 
 private:
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 	CountdownTimer m_reactionTimer;
 	CountdownTimer m_tauntTimer;
 	CountdownTimer m_vocalizeTimer;

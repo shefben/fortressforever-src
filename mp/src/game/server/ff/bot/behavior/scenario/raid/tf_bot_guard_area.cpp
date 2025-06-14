@@ -97,7 +97,7 @@ public:
 		CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
 		for( int i=0; i<raidingTeam->GetNumPlayers(); ++i )
 		{
-			CTFPlayer *player = (CTFPlayer *)raidingTeam->GetPlayer(i);
+			CFFPlayer *player = (CFFPlayer *)raidingTeam->GetPlayer(i);
 
 			if ( !player->IsAlive() || !player->GetLastKnownArea() )
 				continue;

@@ -170,7 +170,7 @@ bool CFFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 	if ( !threat->WasEverVisible() || threat->GetTimeSinceLastSeen() > hiddenAwhile )
 		return false;
 
-	CTFPlayer *player = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *player = ToFFPlayer( threat->GetEntity() );
 
 	Vector to = subject->GetAbsOrigin() - threat->GetLastKnownPosition();
 	float threatRange = to.NormalizeInPlace();

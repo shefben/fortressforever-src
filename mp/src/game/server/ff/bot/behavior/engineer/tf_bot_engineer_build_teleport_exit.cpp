@@ -133,10 +133,10 @@ ActionResult< CFFBot >	CFFBotEngineerBuildTeleportExit::Update( CFFBot *me, floa
 
 
 	// build exit roughly at this spot
-	CTFWeaponBase *myGun = me->GetActiveTFWeapon();
+	CFFWeaponBase *myGun = me->GetActiveFFWeapon();
 	if ( myGun )
 	{
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( myGun );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( myGun );
 		if ( builder )
 		{
 			if ( builder->IsValidPlacement() )

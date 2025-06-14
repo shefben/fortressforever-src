@@ -25,7 +25,7 @@ public:
 private:
 	CountdownTimer m_minDurationTimer;
 	CountdownTimer m_watchFlagTimer;
-	CHandle< CTFPlayer > m_chasePlayer;
+	CHandle< CFFPlayer > m_chasePlayer;
 	PathFollower m_path;
 	CountdownTimer m_repathTimer;
 };

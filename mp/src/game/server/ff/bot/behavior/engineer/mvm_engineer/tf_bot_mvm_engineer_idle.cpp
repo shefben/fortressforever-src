@@ -63,7 +63,7 @@ bool GetBombInfo( BombInfo_t* pBombInfo = NULL )
 	{
 		CCaptureFlag *pTempFlag = static_cast< CCaptureFlag* >( ICaptureFlagAutoList::AutoList()[i] );
 		Vector vTempBombSpot;
-		CTFPlayer *carrier = ToTFPlayer( pTempFlag->GetOwnerEntity() );
+		CFFPlayer *carrier = ToFFPlayer( pTempFlag->GetOwnerEntity() );
 		if ( carrier )
 		{
 			vTempBombSpot = carrier->GetAbsOrigin();

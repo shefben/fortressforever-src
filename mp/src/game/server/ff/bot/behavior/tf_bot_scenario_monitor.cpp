@@ -336,7 +336,7 @@ ActionResult< CFFBot >	CFFBotScenarioMonitor::Update( CFFBot *me, float interval
 
 		if ( flag )
 		{
-			CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+			CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 			if ( carrier )
 			{
 				m_lostFlagTimer.Invalidate();
