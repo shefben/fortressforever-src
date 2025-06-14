@@ -89,7 +89,7 @@ ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 		// go after victims we've gotten behind
 		if ( threat && threat->GetTimeSinceLastKnown() < 3.0f )
 		{
-			CTFPlayer *victim = ToTFPlayer( threat->GetEntity() );
+			CFFPlayer *victim = ToFFPlayer( threat->GetEntity() );
 			if ( victim )
 			{
 				CTFNavArea *victimArea = (CTFNavArea *)victim->GetLastKnownArea();

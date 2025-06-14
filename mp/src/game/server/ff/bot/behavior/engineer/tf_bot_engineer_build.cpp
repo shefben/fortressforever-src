@@ -100,7 +100,7 @@ QueryResultType CFFBotEngineerBuild::ShouldAttack( const INextBot *meBot, const 
 	CFFBot *me = (CFFBot *)meBot->GetEntity();
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 
-	CTFPlayer *themPlayer = ToTFPlayer( them->GetEntity() );
+	CFFPlayer *themPlayer = ToFFPlayer( them->GetEntity() );
 
 	if ( themPlayer && themPlayer->IsPlayerClass( CLASS_SPY ) )
 	{

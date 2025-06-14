@@ -21,7 +21,7 @@ ConVar ff_raid_mob_avoid_range( "ff_raid_mob_avoid_range", "100", FCVAR_CHEAT );
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CFFBotMobRush::CFFBotMobRush( CTFPlayer *victim, float reactionTime )
+CFFBotMobRush::CFFBotMobRush( CFFPlayer *victim, float reactionTime )
 {
 	m_victim = victim;
 
@@ -89,7 +89,7 @@ ActionResult< CFFBot >	CFFBotMobRush::Update( CFFBot *me, float interval )
 	CTeam *team = GetGlobalTeam( FF_TEAM_RED );
 	for( int t=0; t<team->GetNumPlayers(); ++t )
 	{
-		CTFPlayer *teamMember = (CTFPlayer *)team->GetPlayer(t);
+		CFFPlayer *teamMember = (CFFPlayer *)team->GetPlayer(t);
 
 		if ( !teamMember->IsAlive() )
 			continue;

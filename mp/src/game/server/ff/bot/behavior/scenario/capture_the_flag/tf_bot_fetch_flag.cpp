@@ -74,7 +74,7 @@ ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 		me->EquipBestWeaponForThreat( threat );
 	}
 
-	CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+	CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 	if ( carrier )
 	{
 		if ( m_isTemporary )

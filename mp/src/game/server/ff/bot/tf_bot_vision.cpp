@@ -38,7 +38,7 @@ void CFFBotVision::Update( void )
 		return;
 
 	// forget spies we have lost sight of
-	CUtlVector< CTFPlayer * > playerVector;
+	CUtlVector< CFFPlayer * > playerVector;
 	CollectPlayers( &playerVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 	for( int i=0; i<playerVector.Count(); ++i )
@@ -185,7 +185,7 @@ bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 
 	if ( subject->IsPlayer() )
 	{
-		CTFPlayer *enemy = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *enemy = static_cast< CFFPlayer * >( subject );
 
 		// test for designer-defined ignorance
 		switch( enemy->GetPlayerClass()->GetClassIndex() )
@@ -354,7 +354,7 @@ bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 
 	if ( subject->IsPlayer() && me->IsEnemy( subject ) )
 	{
-		CTFPlayer *player = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *player = static_cast< CFFPlayer * >( subject );
 
 		if ( player->m_Shared.InCond( TF_COND_BURNING ) ||
 			 player->m_Shared.InCond( TF_COND_URINE ) ||

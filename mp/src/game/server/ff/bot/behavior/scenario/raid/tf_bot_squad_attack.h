@@ -31,7 +31,7 @@ private:
 	CountdownTimer m_vocalizeTimer;
 	PathFollower m_path;
 	ChasePath m_chasePath;
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 	CountdownTimer m_victimConsiderTimer;
 
 	CFFBot *GetSquadLeader( CFFBot *me ) const;

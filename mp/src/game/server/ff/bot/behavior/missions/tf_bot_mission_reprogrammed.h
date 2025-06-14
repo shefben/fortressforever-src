@@ -39,7 +39,7 @@ private:
 
 	void StartDetonate( CFFBot *me, bool wasSuccessful = false );
 	void Detonate( CFFBot *me );
-	CTFPlayer *FindNearestEnemy( CFFBot *me );
+	CFFPlayer *FindNearestEnemy( CFFBot *me );
 	bool m_hasDetonated;
 	bool m_wasSuccessful;
 

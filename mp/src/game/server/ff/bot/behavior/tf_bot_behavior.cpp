@@ -296,7 +296,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnInjured( CFFBot *me, const CTak
 			me->DelayedThreatNotice( info.GetInflictor(), 0.5f );
 
 			// chance of nearby friends noticing the backstab
-			CUtlVector< CTFPlayer * > playerVector;
+			CUtlVector< CFFPlayer * > playerVector;
 			CollectPlayers( &playerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 			float minRange = ff_bot_notice_backstab_min_range.GetFloat();
@@ -554,7 +554,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseC
 
 	if ( do_taunt )
 	{
-		CTFPlayer *playerVictim = ToTFPlayer( victim );
+		CFFPlayer *playerVictim = ToFFPlayer( victim );
 
 		me->ForgetSpy( playerVictim );
 
@@ -564,7 +564,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseC
 			m_nextDisguise = playerVictim->GetPlayerClass()->GetClassIndex();
 		}
 
-		if ( !ToTFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
+		if ( !ToFFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
 		{
 			bool isTaunting = !me->HasTheFlag() && RandomFloat( 0.0f, 100.0f ) <= ff_bot_taunt_victim_chance.GetFloat();
 
@@ -878,7 +878,7 @@ bool CFFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 	if ( !me->IsLineOfFireClear( threat->GetEntity() ) )
 		return false;
 
-	CTFPlayer *threatPlayer = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *threatPlayer = ToFFPlayer( threat->GetEntity() );
 
 	Vector to = me->GetAbsOrigin() - threat->GetLastKnownPosition();
 	float threatRange = to.NormalizeInPlace();
@@ -973,13 +973,13 @@ const CKnownEntity *CFFBotMainAction::GetHealerOfThreat( const CKnownEntity *thr
 	if ( !threat || !threat->GetEntity() )
 		return NULL;
 
-	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 	if ( playerThreat )
 	{
 		for( int i=0; i<playerThreat->m_Shared.GetNumHealers(); ++i )
 		{
 			CBaseEntity *healer = playerThreat->m_Shared.GetHealerByIndex( i );
-			CTFPlayer *playerHealer = ToTFPlayer( healer );
+			CFFPlayer *playerHealer = ToFFPlayer( healer );
 
 			if ( playerHealer )
 			{
@@ -1028,8 +1028,8 @@ const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreat( const INextBot 
 // Given a pair of enemy players, return the closest Spy of those two, or NULL if neither is a Spy
 const CKnownEntity *SelectClosestSpyToMe( CFFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 )
 {
-	CTFPlayer *playerThreat1 = ToTFPlayer( threat1->GetEntity() );
-	CTFPlayer *playerThreat2 = ToTFPlayer( threat2->GetEntity() );
+	CFFPlayer *playerThreat1 = ToFFPlayer( threat1->GetEntity() );
+	CFFPlayer *playerThreat2 = ToFFPlayer( threat2->GetEntity() );
 
 	if ( playerThreat1 && playerThreat1->IsPlayerClass( CLASS_SPY ) )
 	{
@@ -1306,7 +1306,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	// if our target is uber'd, most weapons are useless - unless we're in MvM, where invuln tanking is valuable
 	if ( TFGameRules() && !TFGameRules()->IsMannVsMachineMode() )
 	{
-		CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+		CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 		if ( playerThreat && playerThreat->m_Shared.IsInvulnerable() )
 		{
 			if ( !myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER ) &&

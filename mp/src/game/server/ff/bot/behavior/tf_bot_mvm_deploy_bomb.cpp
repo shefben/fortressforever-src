@@ -62,11 +62,11 @@ ActionResult< CFFBot > CFFBotMvMDeployBomb::Update( CFFBot *me, float interval )
 		if ( me->IsRangeGreaterThan( m_anchorPos, movedRange ) )
 		{
 			// Look for players that pushed me away and send an event
-			CUtlVector<CTFPlayer *> playerVector;
+			CUtlVector<CFFPlayer *> playerVector;
 			CollectPlayers( &playerVector, FF_TEAM_PVE_DEFENDERS );
 			FOR_EACH_VEC( playerVector, i )
 			{
-				CTFPlayer *pPlayer = playerVector[i];
+				CFFPlayer *pPlayer = playerVector[i];
 				if ( !pPlayer )
 					continue;
 

@@ -122,15 +122,15 @@ void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 
 	const float avoidRange = 200.0f;
 
-	CUtlVector< CTFPlayer * > enemyVector;
+	CUtlVector< CFFPlayer * > enemyVector;
 	CollectPlayers( &enemyVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
-	CTFPlayer *closestEnemy = NULL;
+	CFFPlayer *closestEnemy = NULL;
 	float closestRangeSq = avoidRange * avoidRange;
 
 	for( int i=0; i<enemyVector.Count(); ++i )
 	{
-		CTFPlayer *enemy = enemyVector[i];
+		CFFPlayer *enemy = enemyVector[i];
 
 		if ( enemy->m_Shared.IsStealthed() || enemy->m_Shared.InCond( TF_COND_DISGUISED ) )
 			continue;
@@ -216,7 +216,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		// if a human is staring at us, face them and taunt
 		if ( m_acknowledgeRetryTimer.IsElapsed() )
 		{
-			CTFPlayer *watcher = me->GetClosestHumanLookingAtMe();
+			CFFPlayer *watcher = me->GetClosestHumanLookingAtMe();
 			if ( watcher )
 			{
 				if ( !m_attentionTimer.HasStarted() )

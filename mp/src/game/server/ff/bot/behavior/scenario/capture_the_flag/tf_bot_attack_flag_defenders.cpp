@@ -64,7 +64,7 @@ ActionResult< CFFBot > CFFBotAttackFlagDefenders::Update( CFFBot *me, float inte
 		// can't reach flag if it is at home
 		if ( !TFGameRules()->IsMannVsMachineMode() || !flag->IsHome() )
 		{
-			CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+			CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 			if ( !carrier )
 			{
 				return Done( "Flag was dropped" );

@@ -53,7 +53,7 @@ ActionResult< CFFBot >	CFFBotWander::Update( CFFBot *me, float interval )
 	if ( me->HasAttribute( CFFBot::AGGRESSIVE ) )
 	{
 		// I'm a mob rusher - pick a random raider and attack them!
-		CTFPlayer *victim = TFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
+		CFFPlayer *victim = TFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
 		if ( victim )
 		{
 			return SuspendFor( new CFFBotMobRush( victim ), "Rushing a raider" );
@@ -65,12 +65,12 @@ ActionResult< CFFBot >	CFFBotWander::Update( CFFBot *me, float interval )
 		m_visionTimer.Start( RandomFloat( 0.5f, 1.0f ) );
 
 		// find closest visible raider within aggro range
-		CTFPlayer *threat = NULL;
+		CFFPlayer *threat = NULL;
 		float closeThreatRangeSq = ff_raid_wanderer_aggro_range.GetFloat() * ff_raid_wanderer_aggro_range.GetFloat();
 
 		for( int i=0; i<raidingTeam->GetNumPlayers(); ++i )
 		{
-			CTFPlayer *player = (CTFPlayer *)raidingTeam->GetPlayer(i);
+			CFFPlayer *player = (CFFPlayer *)raidingTeam->GetPlayer(i);
 
 			if ( !player->IsAlive() )
 				continue;
@@ -112,7 +112,7 @@ EventDesiredResult< CFFBot > CFFBotWander::OnContact( CFFBot *me, CBaseEntity *o
 {
 	if ( other && other->IsPlayer() && me->IsEnemy( other ) )
 	{
-		return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)other ), RESULT_IMPORTANT, "Attacking threat who touched me!" );
+		return TrySuspendFor( new CFFBotMobRush( (CFFPlayer *)other ), RESULT_IMPORTANT, "Attacking threat who touched me!" );
 	}
 
 	return TryContinue();
@@ -124,7 +124,7 @@ EventDesiredResult< CFFBot > CFFBotWander::OnInjured( CFFBot *me, const CTakeDam
 {
 	if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && me->IsEnemy( info.GetAttacker() ) )
 	{
-		return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)info.GetAttacker() ), RESULT_IMPORTANT, "Attacking threat who attacked me!" );
+		return TrySuspendFor( new CFFBotMobRush( (CFFPlayer *)info.GetAttacker() ), RESULT_IMPORTANT, "Attacking threat who attacked me!" );
 	}
 
 	return TryContinue();
@@ -155,7 +155,7 @@ EventDesiredResult< CFFBot > CFFBotWander::OnOtherKilled( CFFBot *me, CBaseComba
 						reactionTime = ff_raid_wanderer_reaction_factor.GetFloat() * ( rangeToAttacker - ff_raid_wanderer_aggro_range.GetFloat() ) / ff_raid_wanderer_aggro_range.GetFloat();
 					}
 
-					return TrySuspendFor( new CFFBotMobRush( (CTFPlayer *)info.GetAttacker(), reactionTime ), RESULT_IMPORTANT, "Attacking my friend's attacker!" );
+					return TrySuspendFor( new CFFBotMobRush( (CFFPlayer *)info.GetAttacker(), reactionTime ), RESULT_IMPORTANT, "Attacking my friend's attacker!" );
 				}
 			}
 		}

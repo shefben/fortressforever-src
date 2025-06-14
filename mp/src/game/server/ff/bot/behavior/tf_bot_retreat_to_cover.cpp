@@ -246,7 +246,7 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 		int numHealers = me->m_Shared.GetNumHealers();
 		for ( int i=0; i<numHealers; ++i )
 		{
-			CTFPlayer *medic = ToTFPlayer( me->m_Shared.GetHealerByIndex( i ) );
+			CFFPlayer *medic = ToFFPlayer( me->m_Shared.GetHealerByIndex( i ) );
 
 			if ( medic && medic->MedicGetChargeLevel() > 0.9f )
 			{
