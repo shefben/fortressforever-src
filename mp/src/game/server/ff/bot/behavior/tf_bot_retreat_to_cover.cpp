@@ -169,14 +169,7 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::OnStart( CFFBot *me, Action< CFFBot
 
 	m_waitInCoverTimer.Start( m_hideDuration );
 
-	// if I'm a spy, cloak and disguise while I retreat
-	if ( me->IsPlayerClass( CLASS_SPY ) )
-	{
-		if ( !me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
-	}
+
 
 	return Continue();
 }
@@ -187,8 +180,7 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
 
-	if ( me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
-		return Done( "I'm invulnerable - no need to retreat!" );
+
 
 	if ( ShouldRetreat( me ) == ANSWER_NO )
 		return Done( "No longer need to retreat" );
@@ -198,7 +190,7 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 
 	// reload while moving to cover
 	bool isDoingAFullReload = false;
-	CTFWeaponBase *myPrimary = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+	CFFWeaponBase *myPrimary = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 	if ( myPrimary && me->GetAmmoCount( TF_AMMO_PRIMARY ) > 0 && me->IsBarrageAndReloadWeapon( myPrimary ) )
 	{
 		if ( myPrimary->Clip1() < myPrimary->GetMaxClip1() )
@@ -231,29 +223,14 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 			return Continue();
 		}
 
-		// uncloak so we can attack when we leave cover
-		if ( me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
+
 
 		if ( m_actionToChangeToOnceCoverReached )
 		{
 			return ChangeTo( m_actionToChangeToOnceCoverReached, "Doing given action now that I'm in cover" );
 		}
 
-		// if I'm being healed by a medic who nearly has his charge built up, wait in cover until his charge is ready
-		int numHealers = me->m_Shared.GetNumHealers();
-		for ( int i=0; i<numHealers; ++i )
-		{
-			CFFPlayer *medic = ToFFPlayer( me->m_Shared.GetHealerByIndex( i ) );
 
-			if ( medic && medic->MedicGetChargeLevel() > 0.9f )
-			{
-				// wait for uber to finish
-				return Continue();
-			}
-		}
 
 		// stay in cover while we fully reload
 		if ( isDoingAFullReload )

@@ -27,11 +27,7 @@ ActionResult< CFFBot >	CFFBotSpySap::OnStart( CFFBot *me, Action< CFFBot > *prio
 {
 	me->StopLookingAroundForEnemies();
 
-	// uncloak so we can sap
-	if ( me->m_Shared.IsStealthed() )
-	{
-		me->PressAltFireButton();
-	}
+
 
 	return Continue();
 }
@@ -93,11 +89,7 @@ ActionResult< CFFBot >	CFFBotSpySap::Update( CFFBot *me, float interval )
 
 		me->Weapon_Switch( mySapper );
 
-		// uncloak
-		if ( me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
+
 
 		// sap our target
 		me->GetBodyInterface()->AimHeadTowards( m_sapTarget, IBody::MANDATORY, 0.1f, NULL, "Aiming my sapper" );
@@ -190,13 +182,7 @@ QueryResultType CFFBotSpySap::ShouldAttack( const INextBot *meBot, const CKnownE
 		return ANSWER_NO;
 	}
 
-	if ( !me->m_Shared.InCond( TF_COND_DISGUISED ) &&
-		 !me->m_Shared.InCond( TF_COND_DISGUISING ) &&
-		 !me->m_Shared.IsStealthed() )
-	{
-		// our cover is blown!
-		return ANSWER_YES;
-	}
+
 
 	// if we've sapped, attack
 	return AreAllDangerousSentriesSapped( me ) ? ANSWER_YES : ANSWER_NO;

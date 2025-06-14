@@ -9,6 +9,7 @@
 #include "bot/behavior/spy/ff_bot_spy_attack.h"
 #include "bot/behavior/ff_bot_retreat_to_cover.h"
 #include "bot/behavior/spy/ff_bot_spy_sap.h"
+#include "ff_weapon_base.h"
 
 #include "nav_mesh.h"
 
@@ -106,21 +107,7 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 	// remember who we are attacking (in case we changed our minds)
 	m_victim = playerThreat;
 
-	// uncloak so we can attack
-	if ( me->m_Shared.IsStealthed() && m_decloakTimer.IsElapsed() )
-	{
-		me->PressAltFireButton();
-		m_decloakTimer.Start( 1.0f );
-	}
-
-	bool isKnifeFight = false;
-
-	if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-		 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-		 me->m_Shared.IsStealthed() )
-	{
-		isKnifeFight = true;
-	}
+       bool isKnifeFight = false;
 
 	Vector playerThreatForward;
 	playerThreat->EyeVectors( &playerThreatForward );
@@ -167,19 +154,15 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 		m_isCoverBlown |= ( playerThreat->GetTimeSinceWeaponFired() < 0.25f );
 	}
 	
-	if ( m_isCoverBlown ||
-		 me->m_Shared.InCond( TF_COND_BURNING ) ||
-		 me->m_Shared.InCond( TF_COND_URINE ) ||
-		 me->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-		 me->m_Shared.InCond( TF_COND_BLEEDING ) )
-	{
-		isKnifeFight = false;
-	}
+       if ( m_isCoverBlown )
+       {
+               isKnifeFight = false;
+       }
 
 	CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( isKnifeFight ? TF_WPN_TYPE_MELEE : TF_WPN_TYPE_PRIMARY );
 	me->Weapon_Switch( myGun );
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+       CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 
 	bool isMovingTowardVictim = true;
 
@@ -229,22 +212,12 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 			}
 
 			if ( threatRange < me->GetDesiredAttackRange() )
-			{
-				// if we're still disguised, go for the backstab
-				if ( me->m_Shared.InCond( TF_COND_DISGUISED ) )
-				{
-					if ( isBehindVictim || m_isCoverBlown )
-					{
-						// we're behind them (or they're onto us) - backstab!
-						me->PressFireButton();
-					}
-				}
-				else
-				{
-					// we're exposed - stab! stab! stab!
-					me->PressFireButton();
-				}
-			}
+                       {
+                               if ( isBehindVictim || m_isCoverBlown )
+                               {
+                                       me->PressFireButton();
+                               }
+                       }
 		}
 	}
 	else
@@ -300,19 +273,15 @@ EventDesiredResult< CFFBot > CFFBotSpyAttack::OnStuck( CFFBot *me )
 //---------------------------------------------------------------------------------------------
 EventDesiredResult< CFFBot > CFFBotSpyAttack::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
-	if ( me->IsEnemy( info.GetAttacker() ) )
-	{
-		if ( !me->m_Shared.InCond( TF_COND_DISGUISED ) )
-		{
-			// hurt by an enemy and exposed as a spy - flee!
-			m_isCoverBlown = true;
+       if ( me->IsEnemy( info.GetAttacker() ) )
+       {
+               m_isCoverBlown = true;
 
-			CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
-			me->Weapon_Switch( myGun );
+               CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
+               me->Weapon_Switch( myGun );
 
-			return TryChangeTo( new CFFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
-		}
-	}
+               return TryChangeTo( new CFFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
+       }
 
 	return TryContinue();
 }
@@ -352,15 +321,11 @@ QueryResultType CFFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKno
 {
 	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
-	if ( m_isCoverBlown ||
-		 me->m_Shared.InCond( TF_COND_BURNING ) ||
-		 me->m_Shared.InCond( TF_COND_URINE ) ||
-		 me->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-		 me->m_Shared.InCond( TF_COND_BLEEDING ) )
-	{
-		// our cover is blown anyway
-		return ANSWER_YES;
-	}
+       if ( m_isCoverBlown )
+       {
+               // our cover is blown anyway
+               return ANSWER_YES;
+       }
 
 	return ANSWER_NO;
 }
@@ -394,7 +359,7 @@ const CKnownEntity * CFFBotSpyAttack::SelectMoreDangerousThreat( const INextBot 
 
 	if ( me->IsSelf( subject ) )
 	{
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+               CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon && myWeapon->IsMeleeWeapon() )
 		{
 			// attack the closest victim with my knife

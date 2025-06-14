@@ -53,15 +53,13 @@ ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 		isInMySpawn = false;
 	}
 
-	// cloak when we first enter an area of active combat
-	if ( !me->m_Shared.IsStealthed() && 
-		 !isInMySpawn && 
-		 myArea->IsInCombat() && 
-		 !m_hasEnteredCombatZone )
-	{
-		m_hasEnteredCombatZone = true;
-		me->PressAltFireButton();
-	}
+       // begin attack when we first enter an area of active combat
+       if ( !isInMySpawn &&
+                myArea->IsInCombat() &&
+                !m_hasEnteredCombatZone )
+       {
+               m_hasEnteredCombatZone = true;
+       }
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->GetEntity() && threat->GetEntity()->IsBaseObject() )
@@ -97,17 +95,10 @@ ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 				{
 					int victimTeam = victim->GetTeamNumber();
 
-					if ( victimArea->GetIncursionDistance( victimTeam ) > myArea->GetIncursionDistance( victimTeam ) )
-					{
-						if ( me->m_Shared.IsStealthed() )
-						{
-							return SuspendFor( new CFFBotRetreatToCover( new CFFBotSpyAttack( victim ) ), "Hiding to decloak before going after a backstab victim" );
-						}
-						else
-						{
-							return SuspendFor( new CFFBotSpyAttack( victim ), "Going after a backstab victim" );
-						}
-					}
+                                       if ( victimArea->GetIncursionDistance( victimTeam ) > myArea->GetIncursionDistance( victimTeam ) )
+                                       {
+                                               return SuspendFor( new CFFBotSpyAttack( victim ), "Going after a backstab victim" );
+                                       }
 				}					
 			}
 		}

@@ -577,31 +577,6 @@ ActionResult< CFFBot >	CFFBotDestroyEnemySentry::Update( CFFBot *me, float inter
 	if ( me->GetEnemySentry() != m_targetSentry )
 	{
 		return ChangeTo( new CFFBotDestroyEnemySentry, "Changed sentry target" );
-	}
-
-	if ( me->m_Shared.IsInvulnerable() )
-	{
-		if ( !m_wasUber )
-		{
-			m_wasUber = true;
-
-			// we just became uber - are we close enough to rush the sentry?
-			const float maxRushDistance = 500.0f;
-			CFFBotPathCost cost( me, FASTEST_ROUTE );
-			float travelDistance = NavAreaTravelDistance( me->GetLastKnownArea(), 
-														  m_targetSentry->GetLastKnownArea(), 
-														  cost, maxRushDistance );
-
-			if ( travelDistance >= 0.0f )
-			{
-				return SuspendFor( new CFFBotUberAttackEnemySentry( m_targetSentry ), "Go get it!" );
-			}
-		}
-	}
-	else
-	{
-		m_wasUber = false;
-	}
 
 	if ( !me->HasAttribute( CFFBot::IGNORE_ENEMIES ) )
 	{
@@ -846,10 +821,7 @@ ActionResult< CFFBot > CFFBotUberAttackEnemySentry::OnStart( CFFBot *me, Action<
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot > CFFBotUberAttackEnemySentry::Update( CFFBot *me, float interval )
 {
-	if ( !me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
-	{
-		return Done( "No longer uber" );
-	}
+
 
 	if ( m_targetSentry == NULL )
 	{

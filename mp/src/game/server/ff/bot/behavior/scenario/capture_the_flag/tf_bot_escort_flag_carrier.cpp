@@ -101,7 +101,7 @@ ActionResult< CFFBot > CFFBotEscortFlagCarrier::Update( CFFBot *me, float interv
 		me->EquipBestWeaponForThreat( threat );
 	}
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon && myWeapon->IsMeleeWeapon() )
 	{
 		if ( me->IsRangeLessThan( carrier, ff_bot_flag_escort_range.GetFloat() ) && me->IsLineOfSightClear( carrier ) )

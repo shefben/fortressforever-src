@@ -62,7 +62,7 @@ public:
 ActionResult< CFFBot >	CFFBotMedicRetreat::Update( CFFBot *me, float interval )
 {
 	// equip the syringegun and defend ourselves!
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( myWeapon->GetWeaponID() != FF_WEAPON_SYRINGEGUN_MEDIC )

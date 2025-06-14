@@ -169,9 +169,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES1, true );
 		// This resets the Bonk drink meter...
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES2, true );
-		me->GiveAmmo( 100, TF_AMMO_METAL, true );
-
-		me->m_Shared.AddToSpyCloakMeter( 100.0f );
+               me->GiveAmmo( 100, TF_AMMO_METAL, true );
 
 		CTFNavArea *myArea = me->GetLastKnownArea();
 		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
@@ -215,31 +213,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 		}
 	}
 
-	// spies always want to be disguised
-	if ( !me->IsFiringWeapon() && !me->m_Shared.InCond( TF_COND_DISGUISED ) && !me->m_Shared.InCond( TF_COND_DISGUISING ) )
-	{
-		if ( me->CanDisguise() )
-		{
-			if ( m_nextDisguise == CLASS_UNDEFINED )
-			{
-				if ( me->IsDifficulty( CFFBot::EASY ) || me->IsDifficulty( CFFBot::NORMAL ) )
-				{
-					// disguise as a random class
-					me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( CLASS_SCOUT, CLASS_CIVILIAN-1 ) );
-				}
-				else
-				{
-					me->DisguiseAsMemberOfEnemyTeam();
-				}
-			}
-			else
-			{
-				// disguise as the class we just killed
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), m_nextDisguise );
-				m_nextDisguise = CLASS_UNDEFINED;
-			}
-		}
-	}
+
 
 	me->EquipRequiredWeapon();
 
@@ -618,7 +592,7 @@ Vector CFFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 			}
 		}
 
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+		CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon )
 		{
 			// lead our target and aim for the feet with the rocket launcher
@@ -1235,7 +1209,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 		return;
 	}
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( !myWeapon )
 		return;
 
@@ -1523,16 +1497,7 @@ QueryResultType	CFFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 	if ( TFGameRules()->InSetup() )
 		return ANSWER_NO;
 
-	// if we're an undercover spy, don't blow our cover
-	if ( me->IsPlayerClass( CLASS_SPY ) )
-	{
-		if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-			 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-			 me->m_Shared.IsStealthed() )
-		{
-			return ANSWER_NO;
-		}
-	}
+
 
 	CCompareFriendFoeInfluence compare( me );
 	me->GetVisionInterface()->ForEachKnownEntity( compare );
@@ -1553,13 +1518,9 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	if ( me->IsDifficulty( CFFBot::EASY ) )
 		return;
 
-	// no need to dodge if we're invulnerable
-	if ( me->m_Shared.IsInvulnerable() )
-		return;
-
-	// don't dodge if we're trying to snipe
-	if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
-		return;
+       // no need to dodge if we're invulnerable or trying to snipe
+       if ( me->m_Shared.IsInvulnerable() )
+               return;
 
 	// don't dodge if we are taunting
 	if ( me->m_Shared.InCond( TF_COND_TAUNTING ) )
@@ -1581,13 +1542,7 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		return;
 
-	// disguised/cloaked spies don't dodge
-	if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-		 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-		 me->m_Shared.IsStealthed() )
-	{
-		return;
-	}
+
 
 
 #ifdef TF_RAID_MODE
@@ -1600,7 +1555,7 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	{
 		bool isShotClear = true;
 
-		CTFWeaponBase *myGun = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+		CFFWeaponBase *myGun = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 		if ( myGun && myGun->IsWeapon( FF_WEAPON_COMPOUND_BOW ) )
 		{
 			CTFCompoundBow *myBow = (CTFCompoundBow *)myGun;

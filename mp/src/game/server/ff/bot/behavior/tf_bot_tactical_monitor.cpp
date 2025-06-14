@@ -270,7 +270,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		{
 			if ( me->IsDifficulty( CFFBot::HARD ) || me->IsDifficulty( CFFBot::EXPERT ) )
 			{
-				CTFWeaponBase *myPrimary = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+				CFFWeaponBase *myPrimary = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 				if ( myPrimary && me->GetAmmoCount( TF_AMMO_PRIMARY ) > 0 && me->IsBarrageAndReloadWeapon( myPrimary ) )
 				{
 					if ( myPrimary->Clip1() <= 1 )

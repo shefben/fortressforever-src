@@ -78,7 +78,7 @@ QueryResultType CFFBotEngineerBuild::ShouldHurry( const INextBot *meBot ) const
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 	CObjectDispenser *myDispenser = (CObjectDispenser *)me->GetObjectOfType( OBJ_DISPENSER );
 
-	if ( mySentry && myDispenser && !mySentry->IsBuilding() && !myDispenser->IsBuilding() && me->GetActiveTFWeapon() && me->GetActiveTFWeapon()->GetWeaponID() == FF_WEAPON_WRENCH )
+	if ( mySentry && myDispenser && !mySentry->IsBuilding() && !myDispenser->IsBuilding() && me->GetActiveFFWeapon() && me->GetActiveFFWeapon()->GetWeaponID() == FF_WEAPON_WRENCH )
 	{
 		if ( me->IsAmmoLow() && myDispenser->GetAvailableMetal() <= 0 )
 		{

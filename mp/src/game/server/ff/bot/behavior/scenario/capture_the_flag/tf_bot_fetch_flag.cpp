@@ -43,11 +43,7 @@ ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 		return Done( "No flag" );
 	}
 
-	// uncloak so we can attack
-	if ( me->m_Shared.IsStealthed() )
-	{
-		me->PressAltFireButton();
-	}
+
 
 	if ( TFGameRules()->IsMannVsMachineMode() && flag->IsHome() )
 	{

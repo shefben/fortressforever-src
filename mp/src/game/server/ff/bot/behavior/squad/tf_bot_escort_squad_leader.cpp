@@ -87,7 +87,7 @@ ActionResult< CFFBot > CFFBotEscortSquadLeader::Update( CFFBot *me, float interv
 	}
 
 	// if we're using a melee weapon, close and attack with it while staying near the leader
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon && myWeapon->IsMeleeWeapon() )
 	{
 		if ( me->IsRangeLessThan( leader, ff_bot_squad_escort_range.GetFloat() ) && me->IsLineOfSightClear( leader ) )
