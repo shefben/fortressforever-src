@@ -2,7 +2,7 @@
 // Michael Booth, September 2012
 
 #include "cbase.h"
-#include "nav_mesh/ff_nav_mesh.h"
+#include "../../../../../tf/nav_mesh/tf_nav_mesh.h"
 #include "ff_player.h"
 #include "ff_gamerules.h"
 #include "ff_obj_sentrygun.h"
