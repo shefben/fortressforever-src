@@ -9,7 +9,6 @@
 #include "ff_gamerules.h"
 #include "ff_obj_sentrygun.h"
 #include "ff_weapon_builder.h"
-#include "team_train_watcher.h"
 #include "bot/ff_bot.h"
 #include "bot/behavior/engineer/ff_bot_engineer_build.h"
 #include "bot/behavior/engineer/ff_bot_engineer_move_to_build.h"
@@ -75,32 +74,6 @@ void CFFBotEngineerMoveToBuild::CollectBuildAreas( CFFBot *me )
 			pointAreaVector.AddToTail( zoneArea );
 			pointCentroid += zoneArea->GetCenter();
 			pointEnemyIncursion += zoneArea->GetIncursionDistance( enemyTeam );
-		}
-	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
-	{
-		CTeamTrainWatcher *trainWatcher;
-
-		if ( myTeam == FF_TEAM_BLUE )
-		{
-			trainWatcher = TFGameRules()->GetPayloadToPush( me->GetTeamNumber() );
-		}
-		else
-		{
-			trainWatcher = TFGameRules()->GetPayloadToBlock( me->GetTeamNumber() );
-		}
-
-		if ( trainWatcher )
-		{
-			Vector checkpointPos = trainWatcher->GetNextCheckpointPosition();
-
-			CTFNavArea *checkpointArea = (CTFNavArea *)TheTFNavMesh()->GetNearestNavArea( checkpointPos, false, 500.0f, true );
-			if ( checkpointArea )
-			{
-				pointAreaVector.AddToTail( checkpointArea );
-				pointCentroid += checkpointArea->GetCenter();
-				pointEnemyIncursion += checkpointArea->GetIncursionDistance( enemyTeam );
-			}
 		}
 	}
 	else

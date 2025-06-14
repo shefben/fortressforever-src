@@ -87,7 +87,7 @@ ActionResult< CFFBot > CFFBotEscortSquadLeader::Update( CFFBot *me, float interv
 	}
 
 	// if we're using a melee weapon, close and attack with it while staying near the leader
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon && myWeapon->IsMeleeWeapon() )
 	{
 		if ( me->IsRangeLessThan( leader, ff_bot_squad_escort_range.GetFloat() ) && me->IsLineOfSightClear( leader ) )
@@ -246,7 +246,7 @@ ActionResult< CFFBot > CFFBotEscortSquadLeader::Update( CFFBot *me, float interv
 		normalizedError = error / maxError;
 	}
 
-	// this error term is used in CTFPlayer::TeamFortress_CalculateMaxSpeed() to 
+	// this error term is used in CFFPlayer::TeamFortress_CalculateMaxSpeed() to 
 	// modulate our speed
 	// 0 = in position (no error)
 	// 1 = far out of position (max error)

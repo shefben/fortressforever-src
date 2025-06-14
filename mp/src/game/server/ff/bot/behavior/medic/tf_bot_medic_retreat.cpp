@@ -49,7 +49,7 @@ public:
 	{
 		if ( entity && entity->IsPlayer() && entity->GetTeamNumber() == m_team )
 		{
-			return !ToTFPlayer( entity )->IsPlayerClass( CLASS_MEDIC ) && !ToTFPlayer( entity )->IsPlayerClass( CLASS_SNIPER );
+			return !ToFFPlayer( entity )->IsPlayerClass( CLASS_MEDIC ) && !ToFFPlayer( entity )->IsPlayerClass( CLASS_SNIPER );
 		}
 		return false;
 	}
@@ -62,7 +62,7 @@ public:
 ActionResult< CFFBot >	CFFBotMedicRetreat::Update( CFFBot *me, float interval )
 {
 	// equip the syringegun and defend ourselves!
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( myWeapon->GetWeaponID() != FF_WEAPON_SYRINGEGUN_MEDIC )

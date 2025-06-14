@@ -11,7 +11,7 @@
 class CFFBotSpyHide : public Action< CFFBot >
 {
 public:
-	CFFBotSpyHide( CTFPlayer *victim = NULL );
+	CFFBotSpyHide( CFFPlayer *victim = NULL );
 	virtual ~CFFBotSpyHide() { }
 
 	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
@@ -27,7 +27,7 @@ public:
 	virtual const char *GetName( void ) const	{ return "SpyHide"; };
 
 private:
-	CHandle< CTFPlayer > m_initialVictim;
+	CHandle< CFFPlayer > m_initialVictim;
 
 	HidingSpot *m_hidingSpot;
 	bool FindHidingSpot( CFFBot *me );

@@ -27,8 +27,6 @@ class CFFBotActionPoint;
 class CObjectSentrygun;
 class CFFBotGenerator;
 
-extern void BotGenerateAndWearItem( CTFPlayer *pBot, const char *itemName );
-
 //----------------------------------------------------------------------------
 // These must remain in sync with the bot_generator's spawnflags in tf.fgd:
 #define TFBOT_IGNORE_ENEMY_SCOUTS		0x0001
@@ -49,10 +47,10 @@ extern void BotGenerateAndWearItem( CTFPlayer *pBot, const char *itemName );
 
 
 //----------------------------------------------------------------------------
-class CFFBot: public NextBotPlayer< CTFPlayer >, public CGameEventListener
+class CFFBot: public NextBotPlayer< CFFPlayer >, public CGameEventListener
 {
 public:
-	DECLARE_CLASS( CFFBot, NextBotPlayer< CTFPlayer > );
+	DECLARE_CLASS( CFFBot, NextBotPlayer< CFFPlayer > );
 
 	CFFBot();
 	virtual ~CFFBot();
@@ -171,16 +169,16 @@ public:
 	void EquipBestWeaponForThreat( const CKnownEntity *threat );	// equip the best weapon we have to attack the given threat
 	bool EquipLongRangeWeapon( void );								// equip a weapon that can damage far-away targets
 
-	void PushRequiredWeapon( CTFWeaponBase *weapon );				// force us to equip and use this weapon until popped off the required stack
+	void PushRequiredWeapon( CFFWeaponBase *weapon );				// force us to equip and use this weapon until popped off the required stack
 	void PopRequiredWeapon( void );									// pop top required weapon off of stack and discard
 
 	#define MY_CURRENT_GUN NULL										// can be passed as weapon to following queries
-	bool IsCombatWeapon( CTFWeaponBase *weapon ) const;				// return true if given weapon can be used to attack
-	bool IsHitScanWeapon( CTFWeaponBase *weapon ) const;			// return true if given weapon is a "hitscan" weapon (scattered tracelines with instant damage)
-	bool IsContinuousFireWeapon( CTFWeaponBase *weapon ) const;		// return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
-	bool IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const;// return true if given weapon launches explosive projectiles with splash damage
-	bool IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const;	// return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
-	bool IsQuietWeapon( CTFWeaponBase *weapon ) const;				// return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
+	bool IsCombatWeapon( CFFWeaponBase *weapon ) const;				// return true if given weapon can be used to attack
+	bool IsHitScanWeapon( CFFWeaponBase *weapon ) const;			// return true if given weapon is a "hitscan" weapon (scattered tracelines with instant damage)
+	bool IsContinuousFireWeapon( CFFWeaponBase *weapon ) const;		// return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
+	bool IsExplosiveProjectileWeapon( CFFWeaponBase *weapon ) const;// return true if given weapon launches explosive projectiles with splash damage
+	bool IsBarrageAndReloadWeapon( CFFWeaponBase *weapon ) const;	// return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
+	bool IsQuietWeapon( CFFWeaponBase *weapon ) const;				// return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
 
 	bool IsEnvironmentNoisy( void ) const;							// return true if there are/have been loud noises (ie: non-quiet weapons) nearby very recently
 
@@ -194,7 +192,7 @@ public:
 	void ClearWeaponRestrictions( void );
 	void SetWeaponRestriction( int restrictionFlags );
 	bool HasWeaponRestriction( int restrictionFlags ) const;
-	bool IsWeaponRestricted( CTFWeaponBase *weapon ) const;
+	bool IsWeaponRestricted( CFFWeaponBase *weapon ) const;
 
 	bool ShouldFireCompressionBlast( void );
 
@@ -211,7 +209,7 @@ public:
 		bool IsCurrentlySuspected();
 		void Suspect(); // The verb form of the word, not the noun.
 		bool TestForRealizing();
-		CHandle< CTFPlayer > m_suspectedSpy;
+		CHandle< CFFPlayer > m_suspectedSpy;
 
 	private:
 
@@ -219,14 +217,14 @@ public:
 		CUtlVector< int > m_touchTimes;
 	};
 
-	bool IsKnownSpy( CTFPlayer *player ) const;				// return true if we are sure this player actually is an enemy spy
-	SuspectedSpyInfo_t* IsSuspectedSpy( CTFPlayer *player );			// return true if we suspect this player might be an enemy spy
-	void SuspectSpy( CTFPlayer *player );					// note that this player might be a spy
-	void RealizeSpy( CTFPlayer *player );					// note that this player *IS* a spy
-	void ForgetSpy( CTFPlayer *player );					// remove player from spy suspect system
-	void StopSuspectingSpy( CTFPlayer *pPlayer );
+	bool IsKnownSpy( CFFPlayer *player ) const;				// return true if we are sure this player actually is an enemy spy
+	SuspectedSpyInfo_t* IsSuspectedSpy( CFFPlayer *player );			// return true if we suspect this player might be an enemy spy
+	void SuspectSpy( CFFPlayer *player );					// note that this player might be a spy
+	void RealizeSpy( CFFPlayer *player );					// note that this player *IS* a spy
+	void ForgetSpy( CFFPlayer *player );					// remove player from spy suspect system
+	void StopSuspectingSpy( CFFPlayer *pPlayer );
 
-	CTFPlayer *GetClosestHumanLookingAtMe( int team = TEAM_ANY ) const;	// return the nearest human player on the given team who is looking directly at me
+	CFFPlayer *GetClosestHumanLookingAtMe( int team = TEAM_ANY ) const;	// return the nearest human player on the given team who is looking directly at me
 
 	enum AttributeType
 	{
@@ -300,7 +298,7 @@ public:
 	void LeaveSquad( void );								// leave our current squad
 	void DeleteSquad( void );
 	bool IsInASquad( void ) const;
-	bool IsSquadmate( CTFPlayer *who ) const;				// return true if given bot is in my squad
+	bool IsSquadmate( CFFPlayer *who ) const;				// return true if given bot is in my squad
 	CFFBotSquad *GetSquad( void ) const;					// return squad we are in, or NULL
 	float GetSquadFormationError( void ) const;				// return normalized error term where 0 = in formation position and 1 = completely out of position
 	void SetSquadFormationError( float error );
@@ -358,7 +356,7 @@ public:
 
 	Action< CFFBot > *OpportunisticallyUseWeaponAbilities( void );
 
-	CTFPlayer *SelectRandomReachableEnemy( void );	// mostly for MvM - pick a random enemy player that is not in their spawn room
+	CFFPlayer *SelectRandomReachableEnemy( void );	// mostly for MvM - pick a random enemy player that is not in their spawn room
 
 	float GetDesiredPathLookAheadRange( void ) const;	// different sized bots used different lookahead distances
 
@@ -452,7 +450,6 @@ public:
 	const EventChangeAttributes_t* GetEventChangeAttributes( const char* pszEventName ) const;
 	void OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEvent );
 
-	void AddItem( const char* pszItemName );
 
 	int GetUberHealthThreshold();
 	float GetUberDeployDelayDuration();
@@ -484,7 +481,7 @@ private:
 	Vector m_spotWhereEnemySentryLastInjuredMe;			// the last position where I was injured by an enemy sentry
 
 	CUtlVector< SuspectedSpyInfo_t* > m_suspectedSpyVector;
-	CUtlVector< CHandle< CTFPlayer > > m_knownSpyVector;
+	CUtlVector< CHandle< CFFPlayer > > m_knownSpyVector;
 
 	CUtlVector< SniperSpotInfo > m_sniperSpotVector;	// collection of good sniping spots for the current objective
 
@@ -517,7 +514,7 @@ private:
 	CHandle< CBaseEntity > m_missionTarget;
 	CUtlString m_missionString;
 
-	CUtlStack< CHandle<CTFWeaponBase> > m_requiredWeaponStack;	// if non-empty, bot must equip the weapon on top of the stack
+	CUtlStack< CHandle<CFFWeaponBase> > m_requiredWeaponStack;	// if non-empty, bot must equip the weapon on top of the stack
 
 	CountdownTimer m_noisyTimer;
 
@@ -837,7 +834,7 @@ inline bool CFFBot::IsEnvironmentNoisy( void ) const
 //---------------------------------------------------------------------------------------------
 inline CFFBot *ToTFBot( CBaseEntity *pEntity )
 {
-	if ( !pEntity || !pEntity->IsPlayer() || !ToTFPlayer( pEntity )->IsBotOfType( FF_BOT_TYPE ) )
+	if ( !pEntity || !pEntity->IsPlayer() || !ToFFPlayer( pEntity )->IsBotOfType( FF_BOT_TYPE ) )
 		return NULL;
 
 	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< CFFBot * >( pEntity ) != 0 );
@@ -849,7 +846,7 @@ inline CFFBot *ToTFBot( CBaseEntity *pEntity )
 //---------------------------------------------------------------------------------------------
 inline const CFFBot *ToTFBot( const CBaseEntity *pEntity )
 {
-	if ( !pEntity || !pEntity->IsPlayer() || !ToTFPlayer( const_cast< CBaseEntity * >( pEntity ) )->IsBotOfType( FF_BOT_TYPE ) )
+	if ( !pEntity || !pEntity->IsPlayer() || !ToFFPlayer( const_cast< CBaseEntity * >( pEntity ) )->IsBotOfType( FF_BOT_TYPE ) )
 		return NULL;
 
 	Assert( "***IMPORTANT!!! DONT IGNORE ME!!!***" && dynamic_cast< const CFFBot * >( pEntity ) != 0 );

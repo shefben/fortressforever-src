@@ -10,7 +10,7 @@
 #include "ff_team.h"
 
 class CFFBot;
-class CTFPlayer;
+class CFFPlayer;
 class CFFBotSquad;
 class CStuckBotEvent;
 
@@ -100,7 +100,7 @@ public:
 	void DrawStuckBotData( float deltaT = 0.1f );
 
 #ifdef FF_CREEP_MODE
-	void OnCreepKilled( CTFPlayer *killer );
+	void OnCreepKilled( CFFPlayer *killer );
 #endif
 
 	bool RemoveBotFromTeamAndKick( int nTeam );

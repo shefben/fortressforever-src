@@ -14,7 +14,6 @@
 
 #include "ff_objective_resource.h"
 #include "player_vs_environment/ff_population_manager.h"
-#include "econ_item_system.h"
 #include "ff_gamestats.h"
 
 #include "bot/behavior/nav_entities/ff_bot_nav_ent_move_to.h"
@@ -93,7 +92,7 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 		{
 			m_buffPulseTimer.Start( 1.0f );
 
-			CUtlVector< CTFPlayer * > playerVector;
+			CUtlVector< CFFPlayer * > playerVector;
 			CollectPlayers( &playerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 			const float buffRadius = 450.0f;
@@ -203,7 +202,7 @@ ActionResult< CFFBot > CFFBotDeliverFlag::Update( CFFBot *me, float interval )
 		return Done( "No flag" );
 	}
 
-	CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+	CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 	if ( !carrier || !me->IsSelf( carrier ) )
 	{
 		return Done( "I'm no longer carrying the flag" );
@@ -248,11 +247,11 @@ ActionResult< CFFBot > CFFBotDeliverFlag::Update( CFFBot *me, float interval )
 			TFGameRules()->BroadcastSound( 255, "Announcer.MVM_Bomb_Reset" );
 
 			// Look for players that helped with the reset and send an event
-			CUtlVector<CTFPlayer *> playerVector;
+			CUtlVector<CFFPlayer *> playerVector;
 			CollectPlayers( &playerVector, FF_TEAM_PVE_DEFENDERS );
 			FOR_EACH_VEC( playerVector, i )
 			{
-				CTFPlayer *pPlayer = playerVector[i];
+				CFFPlayer *pPlayer = playerVector[i];
 				if ( !pPlayer )
 					continue;
 

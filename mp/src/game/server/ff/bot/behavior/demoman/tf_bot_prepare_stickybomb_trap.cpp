@@ -22,7 +22,7 @@ public:
 	{
 		CFFBot *me = ToTFBot( bot->GetEntity() );
 
-		CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+		CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 		if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() == FF_WEAPON_PIPEBOMBLAUNCHER )
 		{
 			// launch the sticky
@@ -200,7 +200,7 @@ ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::Update( CFFBot *me, float in
 		InitBombTargetAreas( me );
 	}
 
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
 	if ( !myCurrentWeapon || !stickyLauncher )

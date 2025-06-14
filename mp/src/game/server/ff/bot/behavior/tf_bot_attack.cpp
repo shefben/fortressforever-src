@@ -35,7 +35,7 @@ ActionResult< CFFBot >	CFFBotAttack::OnStart( CFFBot *me, Action< CFFBot > *prio
 // head aiming and weapon firing is handled elsewhere - we just need to get into position to fight
 ActionResult< CFFBot >	CFFBotAttack::Update( CFFBot *me, float interval )
 {
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	bool isUsingCloseRangeWeapon = ( myWeapon && ( myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) || myWeapon->IsMeleeWeapon() ) );
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();

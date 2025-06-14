@@ -10,7 +10,6 @@
 #include "ff_player.h"
 #include "bot/ff_bot.h"
 #include "team_control_point_master.h"
-#include "econ_entity_creation.h"
 #include "bot/behavior/ff_bot_retreat_to_cover.h"
 #include "bot/behavior/sniper/ff_bot_sniper_attack.h"
 #include "bot/behavior/engineer/ff_bot_engineer_build.h"
@@ -97,7 +96,7 @@ public:
 		CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
 		for( int i=0; i<raidingTeam->GetNumPlayers(); ++i )
 		{
-			CTFPlayer *player = (CTFPlayer *)raidingTeam->GetPlayer(i);
+			CFFPlayer *player = (CFFPlayer *)raidingTeam->GetPlayer(i);
 
 			if ( !player->IsAlive() || !player->GetLastKnownArea() )
 				continue;

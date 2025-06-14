@@ -9,7 +9,6 @@
 #include "ff_obj_sentrygun.h"
 #include "team_control_point_master.h"
 #include "ff_weapon_pipebomblauncher.h"
-#include "team_train_watcher.h"
 #include "ff_bot.h"
 #include "ff_bot_manager.h"
 #include "ff_bot_vision.h"
@@ -20,15 +19,9 @@
 #include "NextBotUtil.h"
 #include "tier3/tier3.h"
 #include "vgui/ILocalize.h"
-#include "econ_item_system.h"
 #include "bot/behavior/ff_bot_use_item.h"
-#include "ff_wearable_item_demoshield.h"
-#include "ff_weapon_buff_item.h"
-#include "ff_weapon_lunchbox.h"
 #include "func_respawnroom.h"
 #include "soundenvelope.h"
-
-#include "econ_entity_creation.h"
 
 #include "player_vs_environment/ff_population_manager.h"
 
@@ -695,7 +688,7 @@ public:
 
 	bool operator() ( CBasePlayer *basePlayer )
 	{
-		CTFPlayer *player = (CTFPlayer *)basePlayer;
+		CFFPlayer *player = (CFFPlayer *)basePlayer;
 
 		if ( player->GetTeamNumber() != m_myTeam )
 			return true;
@@ -1128,7 +1121,7 @@ void CFFBot::Touch( CBaseEntity *pOther )
 {
 	BaseClass::Touch( pOther );
 
-	CTFPlayer *them = ToTFPlayer( pOther );
+	CFFPlayer *them = ToFFPlayer( pOther );
 	if ( them && IsEnemy( them ) )
 	{
 		if ( them->m_Shared.IsStealthed() || them->m_Shared.InCond( TF_COND_DISGUISED ) )
@@ -1145,7 +1138,7 @@ void CFFBot::Touch( CBaseEntity *pOther )
 		}
 
 		// always notice if we bump an enemy
-		TheNextBots().OnWeaponFired( them, them->GetActiveTFWeapon() );
+		TheNextBots().OnWeaponFired( them, them->GetActiveFFWeapon() );
 	}
 }
 
@@ -1161,7 +1154,7 @@ void CFFBot::AvoidPlayers( CUserCmd *pCmd )
 	Vector forward, right;
 	EyeVectors( &forward, &right );
 
-	CUtlVector< CTFPlayer * > playerVector;
+	CUtlVector< CFFPlayer * > playerVector;
 	CollectPlayers( &playerVector, GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 	Vector avoidVector = vec3_origin;
@@ -1175,7 +1168,7 @@ void CFFBot::AvoidPlayers( CUserCmd *pCmd )
 
 	for( int i=0; i<playerVector.Count(); ++i )
 	{
-		CTFPlayer *them = playerVector[i];
+		CFFPlayer *them = playerVector[i];
 
 		if ( IsSelf( them ) )
 		{
@@ -1309,22 +1302,7 @@ void CFFBot::InitClass( void )
 
 void CFFBot::ModifyMaxHealth( int nNewMaxHealth, bool bSetCurrentHealth /*= true*/, bool bAllowModelScaling /*= true*/ )
 {
-	if ( GetMaxHealth() != nNewMaxHealth )
-	{
-		static CSchemaAttributeDefHandle pAttrDef_HiddenMaxHealthNonBuffed( "hidden maxhealth non buffed" );
-		if ( !pAttrDef_HiddenMaxHealthNonBuffed )
-		{
-			Warning( "TFBotSpawner: Invalid attribute 'hidden maxhealth non buffed'\n" );
-		}
-		else
-		{
-			CAttributeList *pAttrList = GetAttributeList();
-			if ( pAttrList )
-			{
-				pAttrList->SetRuntimeAttributeValue( pAttrDef_HiddenMaxHealthNonBuffed, nNewMaxHealth - GetMaxHealth() );
-			}
-		}
-	}
+       // simplify max health modification for Fortress Forever
 
 	if ( bSetCurrentHealth )
 	{
@@ -1399,7 +1377,7 @@ void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 	{
 		if ( IsPlayerClass( CLASS_SPY ) )
 		{
-			CUtlVector< CTFPlayer * > playerVector;
+			CUtlVector< CFFPlayer * > playerVector;
 			CollectPlayers( &playerVector, FF_TEAM_PVE_INVADERS, COLLECT_ONLY_LIVING_PLAYERS );
 
 			int spyCount = 0;
@@ -1444,7 +1422,7 @@ void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 				}
 			}
 
-			CUtlVector< CTFPlayer* > playerVector;
+			CUtlVector< CFFPlayer* > playerVector;
 			CollectPlayers( &playerVector, FF_TEAM_PVE_INVADERS, COLLECT_ONLY_LIVING_PLAYERS );
 			bool bShouldAnnounceLastEngineerBotDeath = HasAttribute( CFFBot::TELEPORT_TO_HINT );
 			if ( bShouldAnnounceLastEngineerBotDeath )
@@ -1980,25 +1958,10 @@ void CFFBot::SetupSniperSpotAccumulation( void )
 
 	CBaseEntity *goalEntity = NULL;
 
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
-	{
-		// try to find a payload cart to guard
-		CTeamTrainWatcher *trainWatcher = TFGameRules()->GetPayloadToPush( GetTeamNumber() );
-
-		if ( !trainWatcher )
-		{
-			trainWatcher = TFGameRules()->GetPayloadToBlock( GetTeamNumber() );
-		}
-
-		if ( trainWatcher )
-		{
-			goalEntity = trainWatcher->GetTrainEntity();
-		}
-	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
-	{
-		goalEntity = GetMyControlPoint();
-	}
+       if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+       {
+               goalEntity = GetMyControlPoint();
+       }
 
 	if ( !goalEntity )
 	{
@@ -2277,7 +2240,7 @@ void CFFBot::SelectReachableObjects( const CUtlVector< CHandle< CBaseEntity > > 
 //---------------------------------------------------------------------------------------------
 bool CFFBot::IsAmmoLow( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( myWeapon->GetWeaponID() == FF_WEAPON_WRENCH )
@@ -2336,7 +2299,7 @@ bool CFFBot::IsAmmoFull( void ) const
 	return isPrimaryFull && isSecondaryFull;
 
 /*
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( IsPlayerClass( CLASS_ENGINEER ) )
@@ -2402,7 +2365,7 @@ void CFFBot::OnWeaponFired( CBaseCombatCharacter *whoFired, CBaseCombatWeapon *w
 
 	int noticeChance = 100;
 
-	if ( IsQuietWeapon( (CTFWeaponBase *)weapon ) )
+	if ( IsQuietWeapon( (CFFWeaponBase *)weapon ) )
 	{
 		if ( IsRangeGreaterThan( whoFired, ff_bot_notice_quiet_gunfire_range.GetFloat() ) )
 		{
@@ -2691,7 +2654,7 @@ public:
 		CTeam *enemyTeam = GetGlobalTeam( m_enemyTeamIndex );
 		for( int i=0; i<enemyTeam->GetNumPlayers(); ++i )
 		{
-			CTFPlayer *enemy = (CTFPlayer *)enemyTeam->GetPlayer(i);
+			CFFPlayer *enemy = (CFFPlayer *)enemyTeam->GetPlayer(i);
 
 			if ( !enemy->IsAlive() || !enemy->GetLastKnownArea() )
 				continue;
@@ -2745,7 +2708,7 @@ float CFFBot::GetThreatDanger( CBaseCombatCharacter *who ) const
 
 	if ( who->IsPlayer() )
 	{
-		CTFPlayer *player = ToTFPlayer( who );
+		CFFPlayer *player = ToFFPlayer( who );
 
 		// ubers are scary
 		if ( player->m_Shared.IsInvulnerable() )
@@ -2802,7 +2765,7 @@ float CFFBot::GetThreatDanger( CBaseCombatCharacter *who ) const
  */
 float CFFBot::GetMaxAttackRange( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( !myWeapon )
 		return 0.0f;
 
@@ -2853,7 +2816,7 @@ float CFFBot::GetMaxAttackRange( void ) const
  */
 float CFFBot::GetDesiredAttackRange( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( !myWeapon )
 		return 0.0f;
 
@@ -2948,13 +2911,13 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 	}
 #endif // TF_RAID_MODE
 	 
-	CTFWeaponBase *primary = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_PRIMARY ) );
+	CFFWeaponBase *primary = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_PRIMARY ) );
 	if ( !IsCombatWeapon( primary ) )
 	{
 		primary = NULL;
 	}
 
-	CTFWeaponBase *secondary = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
+	CFFWeaponBase *secondary = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 	if ( !IsCombatWeapon( secondary ) )
 	{
 		secondary = NULL;
@@ -2973,13 +2936,13 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 		secondary = NULL;
 	}
 
-	CTFWeaponBase *melee = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_MELEE ) );
+	CFFWeaponBase *melee = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_MELEE ) );
 	if ( !IsCombatWeapon( melee ) )
 	{
 		melee = NULL;
 	}
 
-	CTFWeaponBase *gun = NULL;
+	CFFWeaponBase *gun = NULL;
 	if ( primary )
 	{
 		gun = primary;
@@ -3085,7 +3048,7 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 			// keep flamethrower out to reflect projectiles
 			if ( threat->GetEntity() && threat->GetEntity()->IsPlayer() )
 			{
-				CTFPlayer *enemy = ToTFPlayer( threat->GetEntity() );
+				CFFPlayer *enemy = ToFFPlayer( threat->GetEntity() );
 
 				if ( enemy->IsPlayerClass( CLASS_SOLDIER ) || enemy->IsPlayerClass( CLASS_DEMOMAN ) )
 				{
@@ -3144,7 +3107,7 @@ bool CFFBot::EquipLongRangeWeapon( void )
 
 //-----------------------------------------------------------------------------------------------------
 // Force us to equip and use this weapon until popped off the required stack
-void CFFBot::PushRequiredWeapon( CTFWeaponBase *weapon )
+void CFFBot::PushRequiredWeapon( CFFWeaponBase *weapon )
 {
 	m_requiredWeaponStack.Push( weapon );
 }
@@ -3160,11 +3123,11 @@ void CFFBot::PopRequiredWeapon( void )
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon can be used to attack
-bool CFFBot::IsCombatWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsCombatWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )		// MY_CURRENT_GUN == NULL
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3192,11 +3155,11 @@ bool CFFBot::IsCombatWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon is a "hitscan" weapon
-bool CFFBot::IsHitScanWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsHitScanWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )		// MY_CURRENT_GUN == NULL
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3234,11 +3197,11 @@ bool CFFBot::IsHitScanWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
-bool CFFBot::IsContinuousFireWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsContinuousFireWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( !IsCombatWeapon( weapon ) )
@@ -3268,11 +3231,11 @@ bool CFFBot::IsContinuousFireWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon launches explosive projectiles with splash damage
-bool CFFBot::IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsExplosiveProjectileWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3294,11 +3257,11 @@ bool CFFBot::IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
-bool CFFBot::IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsBarrageAndReloadWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon ) 
@@ -3320,11 +3283,11 @@ bool CFFBot::IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // Return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
-bool CFFBot::IsQuietWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsQuietWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon ) 
@@ -3416,11 +3379,11 @@ bool CFFBot::IsEntityBetweenTargetAndSelf( CBaseEntity *other, CBaseEntity *targ
 
 //-----------------------------------------------------------------------------------------------------
 // Return true if we are sure this player actually is an enemy spy
-bool CFFBot::IsKnownSpy( CTFPlayer *player ) const
+bool CFFBot::IsKnownSpy( CFFPlayer *player ) const
 {
 	for( int i=0; i<m_knownSpyVector.Count(); ++i )
 	{
-		CTFPlayer *spy = m_knownSpyVector[i];
+		CFFPlayer *spy = m_knownSpyVector[i];
 		if ( spy && player->entindex() == spy->entindex() )
 		{
 			return true;
@@ -3433,12 +3396,12 @@ bool CFFBot::IsKnownSpy( CTFPlayer *player ) const
 
 //-----------------------------------------------------------------------------------------------------
 // Return true if we suspect this player might be an enemy spy
-CFFBot::SuspectedSpyInfo_t* CFFBot::IsSuspectedSpy( CTFPlayer *pPlayer )
+CFFBot::SuspectedSpyInfo_t* CFFBot::IsSuspectedSpy( CFFPlayer *pPlayer )
 {
 	for( int i=0; i<m_suspectedSpyVector.Count(); ++i )
 	{
 		SuspectedSpyInfo_t* pSpyInfo = m_suspectedSpyVector[i];
-		CTFPlayer* pSpy = pSpyInfo->m_suspectedSpy;
+		CFFPlayer* pSpy = pSpyInfo->m_suspectedSpy;
 		if ( pSpy && pPlayer->entindex() == pSpy->entindex() )
 		{
 			return pSpyInfo;
@@ -3451,7 +3414,7 @@ CFFBot::SuspectedSpyInfo_t* CFFBot::IsSuspectedSpy( CTFPlayer *pPlayer )
 
 //-----------------------------------------------------------------------------------------------------
 // Note that this player might be a spy
-void CFFBot::SuspectSpy( CTFPlayer *pPlayer )
+void CFFBot::SuspectSpy( CFFPlayer *pPlayer )
 {
 	SuspectedSpyInfo_t* pSpyInfo = IsSuspectedSpy( pPlayer );
 
@@ -3544,7 +3507,7 @@ bool CFFBot::SuspectedSpyInfo_t::IsCurrentlySuspected()
 
 //-----------------------------------------------------------------------------------------------------
 // Note that this player *IS* a spy
-void CFFBot::RealizeSpy( CTFPlayer *pPlayer )
+void CFFBot::RealizeSpy( CFFPlayer *pPlayer )
 {
 	// We already know about this spy
 	if ( IsKnownSpy( pPlayer ) )
@@ -3562,11 +3525,11 @@ void CFFBot::RealizeSpy( CTFPlayer *pPlayer )
 	if( pSuspectInfo && pSuspectInfo->IsCurrentlySuspected() )
 	{
 		// Tell others around us we've realized there's a spy
-		CUtlVector< CTFPlayer * > playerVector;
+		CUtlVector< CFFPlayer * > playerVector;
 		CollectPlayers( &playerVector, GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 		FOR_EACH_VEC( playerVector, i )
 		{
-			CTFPlayer* pOther = playerVector[i];
+			CFFPlayer* pOther = playerVector[i];
 
 			if( !pOther->IsBot() )
 				continue;
@@ -3595,19 +3558,19 @@ void CFFBot::RealizeSpy( CTFPlayer *pPlayer )
 
 //-----------------------------------------------------------------------------------------------------
 // Remove player from spy suspect system
-void CFFBot::ForgetSpy( CTFPlayer *pPlayer )
+void CFFBot::ForgetSpy( CFFPlayer *pPlayer )
 {
 	StopSuspectingSpy( pPlayer );
 	m_knownSpyVector.FindAndFastRemove( pPlayer );
 }
 
-void CFFBot::StopSuspectingSpy( CTFPlayer *pPlayer )
+void CFFBot::StopSuspectingSpy( CFFPlayer *pPlayer )
 {
 	// Find the entry matching this spy
 	for( int i=0; i<m_suspectedSpyVector.Count(); ++i )
 	{
 		SuspectedSpyInfo_t* pSpyInfo = m_suspectedSpyVector[i];
-		CTFPlayer* pSpy = pSpyInfo->m_suspectedSpy;
+		CFFPlayer* pSpy = pSpyInfo->m_suspectedSpy;
 		if ( pSpy && pPlayer->entindex() == pSpy->entindex() )
 		{
 			delete pSpyInfo;
@@ -3620,17 +3583,17 @@ void CFFBot::StopSuspectingSpy( CTFPlayer *pPlayer )
 
 //-----------------------------------------------------------------------------------------------------
 // Return the nearest human player on the given team who is looking directly at me
-CTFPlayer *CFFBot::GetClosestHumanLookingAtMe( int team ) const
+CFFPlayer *CFFBot::GetClosestHumanLookingAtMe( int team ) const
 {
-	CUtlVector< CTFPlayer * > otherVector;
+	CUtlVector< CFFPlayer * > otherVector;
 	CollectPlayers( &otherVector, team, COLLECT_ONLY_LIVING_PLAYERS );
 
 	float closeRange = FLT_MAX;
-	CTFPlayer *close = NULL;
+	CFFPlayer *close = NULL;
 
 	for( int i=0; i<otherVector.Count(); ++i )
 	{
-		CTFPlayer *other = otherVector[i];
+		CFFPlayer *other = otherVector[i];
 
 		if ( other->IsBot() )
 			continue;
@@ -3694,7 +3657,7 @@ void CFFBot::DeleteSquad( void )
 }
 
 //---------------------------------------------------------------------------------------------
-bool CFFBot::IsWeaponRestricted( CTFWeaponBase *weapon ) const
+bool CFFBot::IsWeaponRestricted( CFFWeaponBase *weapon ) const
 {
 	if ( !weapon )
 	{
@@ -3775,7 +3738,7 @@ bool CFFBot::ShouldFireCompressionBlast( void )
 		const CKnownEntity *threat = GetVisionInterface()->GetPrimaryKnownThreat( true );
 		if ( threat && threat->GetEntity() && threat->GetEntity()->IsPlayer() )
 		{
-			CTFPlayer *pushVictim = ToTFPlayer( threat->GetEntity() );
+			CFFPlayer *pushVictim = ToFFPlayer( threat->GetEntity() );
 
 			if ( IsRangeLessThan( pushVictim, ff_bot_pyro_shove_away_range.GetFloat() ) )
 			{
@@ -4010,7 +3973,7 @@ void CFFBot::UpdateDelayedThreatNotices( void )
 			{
 				if ( who->IsPlayer() )
 				{
-					CTFPlayer *player = ToTFPlayer( who );
+					CFFPlayer *player = ToFFPlayer( who );
 					if ( player->IsPlayerClass( CLASS_SPY ) )
 					{
 						RealizeSpy( player );
@@ -4053,14 +4016,13 @@ void CFFBot::GiveRandomItem( loadout_positions_t loadoutPosition )
 		UTIL_Remove( myMelee );
 */
 
-		const char *itemName = itemVector[ which ]->GetDefinitionName();
-		BotGenerateAndWearItem( this, itemName );
+// Fortress Forever does not support wearable item generation
 	}
 }
 
 
 //---------------------------------------------------------------------------------------------
-bool CFFBot::IsSquadmate( CTFPlayer *who ) const
+bool CFFBot::IsSquadmate( CFFPlayer *who ) const
 {
 	if ( !m_squad || !who || !who->IsBotOfType( TF_BOT_TYPE ) )
 		return false;
@@ -4073,7 +4035,7 @@ bool CFFBot::IsSquadmate( CTFPlayer *who ) const
 // Set Spy disguise to be a class that someone on the enemy team is actually using
 void CFFBot::DisguiseAsMemberOfEnemyTeam( void )
 {
-	CUtlVector< CTFPlayer * > enemyVector;
+	CUtlVector< CFFPlayer * > enemyVector;
 	CollectPlayers( &enemyVector, GetEnemyTeam( GetTeamNumber() ) );
 
 	int disguise = RandomInt( CLASS_SCOUT, CLASS_CIVILIAN-1 );
@@ -4224,7 +4186,7 @@ Action< CFFBot > *CFFBot::OpportunisticallyUseWeaponAbilities( void )
 
 	for ( int w=0; w<MAX_WEAPONS; ++w )
 	{
-		CTFWeaponBase *weapon = ( CTFWeaponBase * )GetWeapon( w );
+		CFFWeaponBase *weapon = ( CFFWeaponBase * )GetWeapon( w );
 		if ( !weapon )
 			continue;
 
@@ -4271,16 +4233,16 @@ Action< CFFBot > *CFFBot::OpportunisticallyUseWeaponAbilities( void )
 
 //-----------------------------------------------------------------------------------------
 // mostly for MvM - pick a random enemy player that is not in their spawn room
-CTFPlayer *CFFBot::SelectRandomReachableEnemy( void )
+CFFPlayer *CFFBot::SelectRandomReachableEnemy( void )
 {
-	CUtlVector< CTFPlayer * > livePlayerVector;
+	CUtlVector< CFFPlayer * > livePlayerVector;
 	CollectPlayers( &livePlayerVector, GetEnemyTeam( GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 	// only consider players who have left their spawn
-	CUtlVector< CTFPlayer * > playerVector;
+	CUtlVector< CFFPlayer * > playerVector;
 	for( int i=0; i<livePlayerVector.Count(); ++i )
 	{
-		CTFPlayer *player = livePlayerVector[i];
+		CFFPlayer *player = livePlayerVector[i];
 		if ( !PointInRespawnRoom( player, player->WorldSpaceCenter() ) )
 		{
 			playerVector.AddToTail( player );
@@ -4493,129 +4455,16 @@ void CFFBot::OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEv
 		ModifyMaxHealth( nMaxHealth );
 		SetHealth( nHealth );
 
-		// give items to bot before apply attribute changes
-		FOR_EACH_VEC( pEvent->m_items, i )
-		{
-			AddItem( pEvent->m_items[i] );
-		}
-
-		// add attributes to equipped items
-		FOR_EACH_VEC( pEvent->m_itemsAttributes, i )
-		{
-			const CFFBot::EventChangeAttributes_t::item_attributes_t& itemAttributes = pEvent->m_itemsAttributes[i];
-			CSchemaItemDefHandle itemDef( itemAttributes.m_itemName );
-			if ( !itemDef )
-			{
-				Warning( "Unable to find item %s to update attribute.\n", itemAttributes.m_itemName.Get() ); 
-			}
-
-			for ( int iItemSlot = LOADOUT_POSITION_PRIMARY ; iItemSlot < CLASS_LOADOUT_POSITION_COUNT ; iItemSlot++ )
-			{
-				CEconEntity* pEntity = NULL;
-				CEconItemView *pCurItemData = CTFPlayerSharedUtils::GetEconItemViewByLoadoutSlot( this, iItemSlot, &pEntity );
-				if ( pCurItemData && itemDef && ( pCurItemData->GetItemDefIndex() == itemDef->GetDefinitionIndex() ) )
-				{
-					for ( int iAtt=0; iAtt<itemAttributes.m_attributes.Count(); ++iAtt )
-					{
-						const static_attrib_t& attrib = itemAttributes.m_attributes[iAtt];
-						CAttributeList *pAttribList = pCurItemData->GetAttributeList();
-						if ( pAttribList )
-						{
-							pAttribList->SetRuntimeAttributeValue( attrib.GetAttributeDefinition(), attrib.m_value.asFloat );
-						}
-					}
-
-					if ( pEntity )
-					{
-						// update model incase we change style
-						pEntity->UpdateModelToClass();
-					}
-
-					// move on to the next set of attributes
-					break;
-				}
-			} // for each slot
-		} // for each set of attributes
-
-		// tags
-		ClearTags();
-		for( int g=0; g<pEvent->m_tags.Count(); ++g )
-		{
-			AddTag( pEvent->m_tags[g] );
-		}
-	}
+               // tags
+               ClearTags();
+               for( int g=0; g<pEvent->m_tags.Count(); ++g )
+               {
+                       AddTag( pEvent->m_tags[g] );
+               }
+       }
 }
 
 
-void CFFBot::AddItem( const char* pszItemName )
-{
-	CItemSelectionCriteria criteria;
-	criteria.SetQuality( AE_USE_SCRIPT_VALUE );
-	criteria.BAddCondition( "name", k_EOperator_String_EQ, pszItemName, true );
-
-	CBaseEntity *pItem = ItemGeneration()->GenerateRandomItem( &criteria, WorldSpaceCenter(), vec3_angle );
-	if ( pItem )
-	{
-		CEconItemView *pScriptItem = static_cast< CBaseCombatWeapon * >( pItem )->GetAttributeContainer()->GetItem();
-
-		// If we already have an item in that slot, remove it
-		int iClass = GetPlayerClass()->GetClassIndex();
-		int iSlot = pScriptItem->GetStaticData()->GetLoadoutSlot( iClass );
-		equip_region_mask_t unNewItemRegionMask = pScriptItem->GetItemDefinition() ? pScriptItem->GetItemDefinition()->GetEquipRegionConflictMask() : 0;
-
-		if ( IsWearableSlot( iSlot ) )
-		{
-			// Remove any wearable that has a conflicting equip_region
-			for ( int wbl = 0; wbl < GetNumWearables(); wbl++ )
-			{
-				CEconWearable *pWearable = GetWearable( wbl );
-				if ( !pWearable )
-					continue;
-
-				equip_region_mask_t unWearableRegionMask = 0;
-				if ( pWearable->GetAttributeContainer()->GetItem() )
-				{
-					unWearableRegionMask = pWearable->GetAttributeContainer()->GetItem()->GetItemDefinition()->GetEquipRegionConflictMask();
-				}
-
-				if ( unWearableRegionMask & unNewItemRegionMask )
-				{
-					RemoveWearable( pWearable );
-				}
-			}
-		}
-		else
-		{
-			CBaseEntity	*pEntity = GetEntityForLoadoutSlot( iSlot );
-			if ( pEntity )
-			{
-				CBaseCombatWeapon *pWpn = dynamic_cast< CBaseCombatWeapon * >( pEntity );
-				Weapon_Detach( pWpn );
-				UTIL_Remove( pEntity );
-			}
-		}
-
-		// Fake global id
-		pScriptItem->SetItemID( 1 );
-
-		DispatchSpawn( pItem );
-
-		CEconEntity *pNewItem = assert_cast<CEconEntity*>( pItem );
-		if ( pNewItem )
-		{
-			pNewItem->GiveTo( this );
-		}
-
-		PostInventoryApplication();
-	}
-	else
-	{
-		if ( pszItemName && pszItemName[0] )
-		{
-			DevMsg( "CFFBotSpawner::AddItemToBot: Invalid item %s.\n", pszItemName );
-		}
-	}
-}
 
 
 int CFFBot::GetUberHealthThreshold()

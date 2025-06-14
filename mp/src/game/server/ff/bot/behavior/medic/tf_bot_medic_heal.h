@@ -31,17 +31,17 @@ public:
 private:
 	ChasePath m_chasePath;
 
-	CTFPlayer *SelectPatient( CFFBot *me, CTFPlayer *current );
+	CFFPlayer *SelectPatient( CFFBot *me, CFFPlayer *current );
 	CountdownTimer m_changePatientTimer;
 
 	CountdownTimer m_delayUberTimer;
 
-	CHandle< CTFPlayer > m_patient;
+	CHandle< CFFPlayer > m_patient;
 	Vector m_patientAnchorPos;							// a spot where the patient was, to track if they are moving
 	CountdownTimer m_isPatientRunningTimer;
 	bool IsPatientRunning( void ) const;
 
-	bool IsStable( CTFPlayer *patient ) const;			// return true if the given patient is healthy and safe for now
+	bool IsStable( CFFPlayer *patient ) const;			// return true if the given patient is healthy and safe for now
 
 	CTFNavArea *FindCoverArea( CFFBot *me );
 	CTFNavArea *m_coverArea;
@@ -55,7 +55,7 @@ private:
 
 	bool IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) const;
 
-	bool IsGoodUberTarget( CTFPlayer *who ) const;
+	bool IsGoodUberTarget( CFFPlayer *who ) const;
 
 	bool CanDeployUber( CFFBot *me, const CWeaponMedigun* pMedigun ) const;
 };
