@@ -7,7 +7,7 @@
 #include "ff_player.h"
 #include "bot/ff_bot.h"
 #include "bot/behavior/demoman/ff_bot_stickybomb_sentrygun.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 #include "ff_obj_sentrygun.h"
 #include "NextBotUtil.h"
 
@@ -109,8 +109,8 @@ bool CFFBotStickybombSentrygun::IsAimOnTarget( CFFBot *me, float pitch, float ya
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotStickybombSentrygun::Update( CFFBot *me, float interval )
 {
-	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
-	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
+       CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
+       CBaseCombatWeapon *stickyLauncher = me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY );
 
 	if ( !myCurrentWeapon || !stickyLauncher )
 	{
@@ -156,31 +156,11 @@ ActionResult< CFFBot >	CFFBotStickybombSentrygun::Update( CFFBot *me, float inte
 		requiredStickyBombs = 5;
 	}
 
-	if ( stickyLauncher->GetPipeBombCount() >= requiredStickyBombs || me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
-	{
-		// stickies laid - detonate them once they are on the ground
-		const CUtlVector< CHandle< CTFGrenadePipebombProjectile > > &pipeVector = stickyLauncher->GetPipeBombVector();
-
-		int i;
-		for( i=0; i<pipeVector.Count(); ++i )
-		{
-			if ( pipeVector[i].Get() && !pipeVector[i]->m_bTouched )
-			{
-				break;
-			}
-		}
-
-		if ( i == pipeVector.Count() )
-		{
-			// stickies are on the ground
-			me->PressAltFireButton();
-
-			if ( me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
-			{
-				return Done( "Out of ammo" );
-			}
-		}
-	}
+       if ( me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
+       {
+               me->PressAltFireButton();
+               return Done( "Out of ammo" );
+       }
 	else if ( m_isChargingShot )
 	{
 		// fudge charge time a bit longer - better to overshoot

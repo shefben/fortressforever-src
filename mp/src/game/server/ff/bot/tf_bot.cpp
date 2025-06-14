@@ -8,7 +8,7 @@
 #include "ff_gamerules.h"
 #include "ff_obj_sentrygun.h"
 #include "team_control_point_master.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 #include "ff_bot.h"
 #include "ff_bot_manager.h"
 #include "ff_bot_vision.h"

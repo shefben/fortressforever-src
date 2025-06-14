@@ -8,7 +8,7 @@
 
 #include "Path/NextBotPathFollow.h"
 #include "NextBot/NavMeshEntities/func_nav_prerequisite.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 
 class CFFBotNavEntDestroyEntity : public Action< CFFBot >
 {
@@ -27,7 +27,7 @@ private:
 	CountdownTimer m_repathTimer;
 	bool m_wasIgnoringEnemies;
 
-	void DetonateStickiesWhenSet( CFFBot *me, CTFPipebombLauncher *stickyLauncher ) const;
+     void DetonateStickiesWhenSet( CFFBot *me, CBaseCombatWeapon *stickyLauncher ) const;
 	bool m_isReadyToLaunchSticky;
 };
 

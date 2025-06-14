@@ -7,7 +7,7 @@
 #include "fmtstr.h"
 
 #include "ff_gamerules.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 #include "NextBot/NavMeshEntities/func_nav_prerequisite.h"
 
 #include "bot/ff_bot.h"
@@ -57,60 +57,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::OnStart( CFFBot *me, Action< CFFBo
 //-----------------------------------------------------------------------------------------
 void CFFBotTacticalMonitor::MonitorArmedStickyBombs( CFFBot *me )
 {
-	if ( m_stickyBombCheckTimer.IsElapsed() )
-	{
-		m_stickyBombCheckTimer.Start( RandomFloat( 0.3f, 1.0f ) );
-
-		// are there any enemies on/near my sticky bombs?
-		CTFPipebombLauncher *gun = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
-		if ( gun )
-		{
-			const CUtlVector< CHandle< CTFGrenadePipebombProjectile > > &pipeBombVector = gun->GetPipeBombVector();
-
-			if ( pipeBombVector.Count() > 0 )
-			{
-				CUtlVector< CKnownEntity > knownVector;
-				me->GetVisionInterface()->CollectKnownEntities( &knownVector );
-
-				for( int p=0; p<pipeBombVector.Count(); ++p )
-				{
-					CTFGrenadePipebombProjectile *sticky = pipeBombVector[p];
-					if ( !sticky )
-					{
-						continue;
-					}
-
-					for( int k=0; k<knownVector.Count(); ++k )
-					{
-						if ( knownVector[k].IsObsolete() )
-						{
-							continue;
-						}
-
-						if ( knownVector[k].GetEntity()->IsBaseObject() )
-						{
-							// we want to put several stickies on a sentry and det at once
-							continue;
-						}
-
-						if ( sticky->GetTeamNumber() != GetEnemyTeam( knownVector[k].GetEntity()->GetTeamNumber() ) )
-						{
-							// "known" is either a spectator, or on our team
-							continue;
-						}
-
-						const float closeRange = 150.0f;
-						if ( ( knownVector[k].GetLastKnownPosition() - sticky->GetAbsOrigin() ).IsLengthLessThan( closeRange ) )
-						{
-							// they are close - blow it!
-							me->PressAltFireButton();
-							return;
-						}
-					}
-				}
-			}
-		}
-	}
+       // skip TF2 sticky bomb proximity checks - Fortress Forever stickies detonate manually
 }
 
 

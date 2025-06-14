@@ -7,7 +7,7 @@
 #include "ff_player.h"
 #include "bot/ff_bot.h"
 #include "bot/behavior/demoman/ff_bot_prepare_stickybomb_trap.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 
 #define MAX_STICKYBOMB_COUNT 8
 
@@ -93,14 +93,14 @@ bool CFFBotPrepareStickybombTrap::IsPossible( CFFBot *me )
 		return false;
 	}
 
-	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
-	if ( stickyLauncher && !me->IsWeaponRestricted( stickyLauncher ) )
-	{
-		if ( stickyLauncher->GetPipeBombCount() >= MAX_STICKYBOMB_COUNT || me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
-		{
-			return false;
-		}
-	}
+       CBaseCombatWeapon *stickyLauncher = me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY );
+       if ( stickyLauncher && !me->IsWeaponRestricted( stickyLauncher ) )
+       {
+               if ( me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
+               {
+                       return false;
+               }
+       }
 
 	return true;
 }
@@ -152,15 +152,15 @@ ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::OnStart( CFFBot *me, Action<
 	// me->PressAltFireButton();
 
 	// reload entire clip before laying sticky trap
-	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
-	if ( stickyLauncher )
-	{
-		m_isFullReloadNeeded = ( me->GetAmmoCount( TF_AMMO_SECONDARY ) >= stickyLauncher->GetMaxClip1() && stickyLauncher->Clip1() < stickyLauncher->GetMaxClip1() );
-	}
-	else
-	{
-		m_isFullReloadNeeded = false;
-	}
+       CBaseCombatWeapon *stickyLauncher = me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY );
+       if ( stickyLauncher )
+       {
+               m_isFullReloadNeeded = ( me->GetAmmoCount( TF_AMMO_SECONDARY ) >= stickyLauncher->GetMaxClip1() && stickyLauncher->Clip1() < stickyLauncher->GetMaxClip1() );
+       }
+       else
+       {
+               m_isFullReloadNeeded = false;
+       }
 
 	m_myArea = me->GetLastKnownArea();
 	if ( !m_myArea )
@@ -200,8 +200,8 @@ ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::Update( CFFBot *me, float in
 		InitBombTargetAreas( me );
 	}
 
-	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
-	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
+       CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
+       CBaseCombatWeapon *stickyLauncher = me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY );
 
 	if ( !myCurrentWeapon || !stickyLauncher )
 	{
@@ -230,10 +230,10 @@ ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::Update( CFFBot *me, float in
 	}
 
 
-	if ( stickyLauncher->GetPipeBombCount() >= MAX_STICKYBOMB_COUNT || me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
-	{
-		return Done( "Max sticky bombs reached" );
-	}
+       if ( me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
+       {
+               return Done( "Out of ammo" );
+       }
 
 
 	// aim towards areas where enemy will come from

@@ -7,7 +7,7 @@
 #include "fmtstr.h"
 
 #include "ff_gamerules.h"
-#include "ff_weapon_pipebomblauncher.h"
+#include "tf_weapon_pipebomblauncher.h"
 #include "NextBot/NavMeshEntities/func_nav_prerequisite.h"
 
 #include "bot/ff_bot.h"

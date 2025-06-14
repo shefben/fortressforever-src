@@ -37,31 +37,15 @@ ActionResult< CFFBot >	CFFBotNavEntDestroyEntity::OnStart( CFFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-void CFFBotNavEntDestroyEntity::DetonateStickiesWhenSet( CFFBot *me, CTFPipebombLauncher *stickyLauncher ) const
+void CFFBotNavEntDestroyEntity::DetonateStickiesWhenSet( CFFBot *me, CBaseCombatWeapon *stickyLauncher ) const
 {
-	if ( !stickyLauncher )
-		return;
+       if ( !stickyLauncher )
+               return;
 
-	if ( stickyLauncher->GetPipeBombCount() >= 8 || me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
-	{
-		// stickies laid - detonate them once they are on the ground
-		const CUtlVector< CHandle< CTFGrenadePipebombProjectile > > &pipeVector = stickyLauncher->GetPipeBombVector();
-
-		int i;
-		for( i=0; i<pipeVector.Count(); ++i )
-		{
-			if ( pipeVector[i].Get() && !pipeVector[i]->m_bTouched )
-			{
-				break;
-			}
-		}
-
-		if ( i == pipeVector.Count() )
-		{
-			// stickies are on the ground
-			me->PressAltFireButton();
-		}
-	}
+       if ( me->GetAmmoCount( TF_AMMO_SECONDARY ) <= 0 )
+       {
+               me->PressAltFireButton();
+       }
 }
 
 
@@ -98,8 +82,8 @@ ActionResult< CFFBot >	CFFBotNavEntDestroyEntity::Update( CFFBot *me, float inte
 			if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 			{
 				// demomen use stickybombs to destroy the barrier
-				CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
-				CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
+                               CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
+                               CBaseCombatWeapon *stickyLauncher = me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY );
 
 				if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() != FF_WEAPON_PIPEBOMBLAUNCHER )
 				{
