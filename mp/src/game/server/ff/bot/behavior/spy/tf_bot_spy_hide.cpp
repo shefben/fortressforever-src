@@ -12,7 +12,7 @@
 
 
 //---------------------------------------------------------------------------------------------
-CFFBotSpyHide::CFFBotSpyHide( CTFPlayer *victim )
+CFFBotSpyHide::CFFBotSpyHide( CFFPlayer *victim )
 {
 	m_initialVictim = victim;
 }
@@ -53,7 +53,7 @@ ActionResult< CFFBot >	CFFBotSpyHide::Update( CFFBot *me, float interval )
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->GetTimeSinceLastKnown() < 3.0f )
 	{
-		CTFPlayer *victim = ToTFPlayer( threat->GetEntity() );
+		CFFPlayer *victim = ToFFPlayer( threat->GetEntity() );
 		if ( victim )
 		{
 			const float attackRange = 750.0f;

@@ -122,18 +122,15 @@ void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 
 	const float avoidRange = 200.0f;
 
-	CUtlVector< CTFPlayer * > enemyVector;
+	CUtlVector< CFFPlayer * > enemyVector;
 	CollectPlayers( &enemyVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
-	CTFPlayer *closestEnemy = NULL;
+	CFFPlayer *closestEnemy = NULL;
 	float closestRangeSq = avoidRange * avoidRange;
 
 	for( int i=0; i<enemyVector.Count(); ++i )
 	{
-		CTFPlayer *enemy = enemyVector[i];
-
-		if ( enemy->m_Shared.IsStealthed() || enemy->m_Shared.InCond( TF_COND_DISGUISED ) )
-			continue;
+		CFFPlayer *enemy = enemyVector[i];
 
 		float rangeSq = ( enemy->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
 		if ( rangeSq < closestRangeSq )
@@ -216,7 +213,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		// if a human is staring at us, face them and taunt
 		if ( m_acknowledgeRetryTimer.IsElapsed() )
 		{
-			CTFPlayer *watcher = me->GetClosestHumanLookingAtMe();
+			CFFPlayer *watcher = me->GetClosestHumanLookingAtMe();
 			if ( watcher )
 			{
 				if ( !m_attentionTimer.HasStarted() )
@@ -270,7 +267,7 @@ ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval
 		{
 			if ( me->IsDifficulty( CFFBot::HARD ) || me->IsDifficulty( CFFBot::EXPERT ) )
 			{
-				CTFWeaponBase *myPrimary = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+				CFFWeaponBase *myPrimary = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 				if ( myPrimary && me->GetAmmoCount( TF_AMMO_PRIMARY ) > 0 && me->IsBarrageAndReloadWeapon( myPrimary ) )
 				{
 					if ( myPrimary->Clip1() <= 1 )
@@ -420,30 +417,6 @@ EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnCommandString( CFFBot *me,
 	else if ( FStrEq( command, "taunt" ) )
 	{
 		return TrySuspendFor( new CFFBotTaunt(), RESULT_TRY, "Received command to taunt" );
-	}
-	else if ( FStrEq( command, "cloak" ) )
-	{
-		if (  me->IsPlayerClass( CLASS_SPY ) && me->m_Shared.IsStealthed() == false )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "uncloak" ) )
-	{
-		if ( me->IsPlayerClass( CLASS_SPY ) && me->m_Shared.IsStealthed() == true )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "disguise") )
-	{
-		if ( me->IsPlayerClass( CLASS_SPY ) )
-		{
-			if ( me->CanDisguise() )
-			{
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( CLASS_SCOUT, CLASS_CIVILIAN-1 ) );
-			}
-		}
 	}
 	else if ( FStrEq( command, "build sentry at nearest sentry hint" ) )
 	{

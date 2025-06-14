@@ -41,7 +41,7 @@ static bool UTIL_KickBotFromTeam( int kickTeam )
 	// try to kick a dead bot first
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)
@@ -65,7 +65,7 @@ static bool UTIL_KickBotFromTeam( int kickTeam )
 	// no dead bots, kick any bot on the given team
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)
@@ -246,12 +246,11 @@ void CFFBotManager::SpawnCreep( int team, CFFBotSquad *squad )
 	bot->HandleCommand_JoinClass( ff_creep_class.GetString() );
 	bot->JoinSquad( squad );
 	bot->AddGlowEffect();
-	//BotGenerateAndWearItem( bot, "Honest Halo" );
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CFFBotManager::OnCreepKilled( CTFPlayer *killer )
+void CFFBotManager::OnCreepKilled( CFFPlayer *killer )
 {
 	CFFBot *bot = ToTFBot( killer );
 	if ( bot && bot->HasAttribute( CFFBot::IS_NPC ) )
@@ -281,12 +280,12 @@ void CFFBotManager::OnCreepKilled( CTFPlayer *killer )
 //----------------------------------------------------------------------------------------------------------------
 bool CFFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 {
-	CUtlVector< CTFPlayer* > vecCandidates;
+	CUtlVector< CFFPlayer* > vecCandidates;
 
 	// Gather potential candidates
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 
 		if ( pPlayer == NULL )
 			continue;
@@ -307,13 +306,13 @@ bool CFFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 		}
 	}
 	
-	CTFPlayer *pVictim = NULL;
+	CFFPlayer *pVictim = NULL;
 	if ( vecCandidates.Count() > 0 )
 	{
 		// first look for bots that are currently dead
 		FOR_EACH_VEC( vecCandidates, i )
 		{
-			CTFPlayer *pPlayer = vecCandidates[i];
+			CFFPlayer *pPlayer = vecCandidates[i];
 			if ( pPlayer && !pPlayer->IsAlive() )
 			{
 				pVictim = pPlayer;
@@ -326,7 +325,7 @@ bool CFFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 		{
 			FOR_EACH_VEC( vecCandidates, i )
 			{
-				CTFPlayer *pPlayer = vecCandidates[i];
+				CFFPlayer *pPlayer = vecCandidates[i];
 				if ( pPlayer )
 				{
 					pVictim = pPlayer;
@@ -390,7 +389,7 @@ void CFFBotManager::MaintainBotQuota()
 	int nSpectators = 0;
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 
 		if ( pPlayer == NULL )
 			continue;
@@ -553,7 +552,7 @@ bool CFFBotManager::IsAllBotTeam( int iTeam )
 	// check to see if any players on the team are humans
 	for ( int i = 0, n = pTeam->GetNumPlayers(); i < n; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( pTeam->GetPlayer( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( pTeam->GetPlayer( i ) );
 		if ( pPlayer == NULL )
 		{
 			continue;
@@ -625,7 +624,7 @@ CFFBot* CFFBotManager::GetAvailableBotFromPool()
 {
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)

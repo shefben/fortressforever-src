@@ -40,7 +40,7 @@ private:
 class CFFBotCreepAttack : public Action< CFFBot >
 {
 public:
-	CFFBotCreepAttack( CTFPlayer *victim );
+	CFFBotCreepAttack( CFFPlayer *victim );
 
 	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
 	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
@@ -48,7 +48,7 @@ public:
 	virtual const char *GetName( void ) const	{ return "CreepAttack"; };
 
 private:
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 };
 
 

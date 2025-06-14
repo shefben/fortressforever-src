@@ -124,7 +124,7 @@ ActionResult< CFFBot >	CFFBotEngineerBuildSentryGun::Update( CFFBot *me, float i
 	{
 		// no precise build location - go through the normal build process
 
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( me->GetActiveTFWeapon() );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( me->GetActiveFFWeapon() );
 		if ( !builder || builder->GetType() != OBJ_SENTRYGUN || builder->m_hObjectBeingBuilt == NULL )
 		{
 			// at home position, build a sentry (switch to the sentry builder "gun")

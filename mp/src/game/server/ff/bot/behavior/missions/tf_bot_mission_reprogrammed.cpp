@@ -45,7 +45,7 @@ ActionResult< CFFBot >	CFFBotMissionReprogrammed::OnStart( CFFBot *me, Action< C
 	// Find nearest, accessible teammate
 	if ( !m_victim )
 	{
-		CTFPlayer *pTarget = FindNearestEnemy( me );
+		CFFPlayer *pTarget = FindNearestEnemy( me );
 		if ( pTarget )
 		{
 			me->SetMissionTarget( pTarget );
@@ -93,7 +93,7 @@ ActionResult< CFFBot >	CFFBotMissionReprogrammed::Update( CFFBot *me, float inte
 	{
 		m_victim.Set( NULL );
 
-		CTFPlayer *pTarget = FindNearestEnemy( me );
+		CFFPlayer *pTarget = FindNearestEnemy( me );
 		if ( pTarget )
 		{
 			me->SetMissionTarget( pTarget );
@@ -259,7 +259,7 @@ void CFFBotMissionReprogrammed::Detonate( CFFBot *me )
 		}
 	}
 
-	CUtlVector< CTFPlayer* > playerVector;
+	CUtlVector< CFFPlayer* > playerVector;
 	CUtlVector< CBaseCombatCharacter* > victimVector;
 
 	// Only damage our original team (reprogramming switches team)
@@ -335,13 +335,13 @@ void CFFBotMissionReprogrammed::Detonate( CFFBot *me )
 }
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CFFBotMissionReprogrammed::FindNearestEnemy( CFFBot *me )
+CFFPlayer *CFFBotMissionReprogrammed::FindNearestEnemy( CFFBot *me )
 {
-	CUtlVector< CTFPlayer* > playerVector;
+	CUtlVector< CFFPlayer* > playerVector;
 
 	CollectPlayers( &playerVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
-	CTFPlayer *pClosestPlayer = NULL;
+	CFFPlayer *pClosestPlayer = NULL;
 	float flClosestPlayerDist = FLT_MAX;
 
 	FOR_EACH_VEC( playerVector, i )

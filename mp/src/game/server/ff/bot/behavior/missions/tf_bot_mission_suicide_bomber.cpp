@@ -62,7 +62,7 @@ ActionResult< CFFBot >	CFFBotMissionSuicideBomber::Update( CFFBot *me, float int
 				CObjectSentrygun *sentry = dynamic_cast< CObjectSentrygun * >( m_victim.Get() );
 				if ( sentry && sentry->GetOwner() )
 				{
-					CTFPlayer *pOwner = ToTFPlayer( sentry->GetOwner() );
+					CFFPlayer *pOwner = ToFFPlayer( sentry->GetOwner() );
 					if ( pOwner )
 					{
 						IGameEvent *event = gameeventmanager->CreateEvent( "mvm_sentrybuster_detonate" );
@@ -258,7 +258,7 @@ void CFFBotMissionSuicideBomber::Detonate( CFFBot *me )
 				{
 					if ( damagerHistory->hEntity && ( gpGlobals->curtime - damagerHistory->flTimeDamage <= 5.0f ) )
 					{
-						CTFPlayer *pRecentDamager = ToTFPlayer( damagerHistory->hEntity );
+						CFFPlayer *pRecentDamager = ToFFPlayer( damagerHistory->hEntity );
 						if ( pRecentDamager )
 						{
 							pRecentDamager->AwardAchievement( ACHIEVEMENT_TF_MVM_KILL_SENTRY_BUSTER );
@@ -269,7 +269,7 @@ void CFFBotMissionSuicideBomber::Detonate( CFFBot *me )
 		}
 	}
 
-	CUtlVector< CTFPlayer * > playerVector;
+	CUtlVector< CFFPlayer * > playerVector;
 	CollectPlayers( &playerVector, FF_TEAM_RED, COLLECT_ONLY_LIVING_PLAYERS );
 	CollectPlayers( &playerVector, FF_TEAM_BLUE, COLLECT_ONLY_LIVING_PLAYERS, APPEND_PLAYERS );
 

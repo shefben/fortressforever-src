@@ -70,10 +70,10 @@ ActionResult< CFFBot >	CFFBotEngineerBuildTeleportEntrance::Update( CFFBot *me, 
 	m_path.Update( me );
 
 	// build
-	CTFWeaponBase *myGun = me->GetActiveTFWeapon();
+	CFFWeaponBase *myGun = me->GetActiveFFWeapon();
 	if ( myGun )
 	{
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( myGun );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( myGun );
 		if ( builder )
 		{
 			// don't build on slopes - causes player blockages

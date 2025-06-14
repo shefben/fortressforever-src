@@ -106,9 +106,7 @@ bool CFFBotGetHealth::IsPossible( CFFBot *me )
 {
 	VPROF_BUDGET( "CFFBotGetHealth::IsPossible", "NextBot" );
 
-	// don't move to fetch health if we have a healer
-	if ( me->m_Shared.GetNumHealers() > 0 )
-		return false;
+
 
 #ifdef TF_RAID_MODE
 	// mobs don't heal
@@ -128,11 +126,7 @@ bool CFFBotGetHealth::IsPossible( CFFBot *me )
 	float t = ( healthRatio - ff_bot_health_critical_ratio.GetFloat() ) / ( ff_bot_health_ok_ratio.GetFloat() - ff_bot_health_critical_ratio.GetFloat() );
 	t = clamp( t, 0.0f, 1.0f );
 
-	if ( me->m_Shared.InCond( TF_COND_BURNING ) )
-	{
-		// on fire - get health now
-		t = 0.0f;
-	}
+
 
 	// the more we are hurt, the farther we'll travel to get health
 	float searchRange = ff_bot_health_search_far_range.GetFloat() + t * ( ff_bot_health_search_near_range.GetFloat() - ff_bot_health_search_far_range.GetFloat() );
@@ -214,14 +208,7 @@ ActionResult< CFFBot >	CFFBotGetHealth::OnStart( CFFBot *me, Action< CFFBot > *p
 		return Done( "No path to health!" );
 	}
 
-	// if I'm a spy, cloak and disguise
-	if ( me->IsPlayerClass( CLASS_SPY ) )
-	{
-		if ( !me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
-	}
+
 
 	return Continue();
 }
@@ -236,27 +223,7 @@ ActionResult< CFFBot >	CFFBotGetHealth::Update( CFFBot *me, float interval )
 	}
 
 	// if a medic is healing us, give up on getting a kit
-	int i;
-	for( i=0; i<me->m_Shared.GetNumHealers(); ++i )
-	{
-		if ( !me->m_Shared.HealerIsDispenser( i ) )
-			break;
-	}
 
-	if ( i < me->m_Shared.GetNumHealers() )
-	{
-		return Done( "A Medic is healing me" );
-	}
-
-	if ( me->m_Shared.GetNumHealers() )
-	{
-		// a dispenser is healing me, don't wait if I'm in combat
-		const CKnownEntity *known = me->GetVisionInterface()->GetPrimaryKnownThreat();
-		if ( known && known->IsVisibleInFOVNow() )
-		{
-			return Done( "No time to wait for health, I must fight" );
-		}
-	}
 
 	if ( me->GetHealth() >= me->GetMaxHealth() )
 	{
@@ -269,10 +236,8 @@ ActionResult< CFFBot >	CFFBotGetHealth::Update( CFFBot *me, float interval )
 	if ( close.m_closePlayer && !me->InSameTeam( close.m_closePlayer ) )
 		return Done( "An enemy is closer to it" );
 
-	// un-zoom
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
-	if ( myWeapon && myWeapon->IsWeapon( FF_WEAPON_SNIPERRIFLE ) && me->m_Shared.InCond( TF_COND_ZOOMED ) )
-		me->PressAltFireButton();
+       // un-zoom
+       CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 
 	if ( !m_path.IsValid() )
 	{
