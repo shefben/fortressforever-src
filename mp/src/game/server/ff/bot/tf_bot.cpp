@@ -4012,7 +4012,7 @@ void CFFBot::GiveRandomItem( loadout_positions_t loadoutPosition )
 //---------------------------------------------------------------------------------------------
 bool CFFBot::IsSquadmate( CFFPlayer *who ) const
 {
-	if ( !m_squad || !who || !who->IsBotOfType( TF_BOT_TYPE ) )
+       if ( !m_squad || !who || !who->IsBotOfType( FF_BOT_TYPE ) )
 		return false;
 
 	return GetSquad() == ToTFBot( who )->GetSquad();
