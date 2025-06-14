@@ -180,7 +180,7 @@ ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::OnStart( CFFBot *me, Action<
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::Update( CFFBot *me, float interval )
 {
-	if ( !TFGameRules()->InSetup() )
+	if ( !FFGameRules()->InSetup() )
 	{
 		const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 		if ( threat )

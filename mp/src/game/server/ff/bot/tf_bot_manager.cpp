@@ -140,7 +140,7 @@ void CFFBotManager::OnRoundRestart( void )
 	}
 
 
-#ifdef TF_CREEP_MODE
+#ifdef FF_CREEP_MODE
 	m_creepExperience[ FF_TEAM_RED ] = 0;
 	m_creepExperience[ FF_TEAM_BLUE ] = 0;
 #endif
@@ -156,7 +156,7 @@ void CFFBotManager::Update()
 
 	DrawStuckBotData();
 
-#ifdef TF_CREEP_MODE
+#ifdef FF_CREEP_MODE
 	UpdateCreepWaves();
 #endif
 
@@ -164,7 +164,7 @@ void CFFBotManager::Update()
 }
 
 
-#ifdef TF_CREEP_MODE
+#ifdef FF_CREEP_MODE
 ConVar ff_creep_initial_delay( "ff_creep_initial_delay", "30" );
 ConVar ff_creep_wave_interval( "ff_creep_wave_interval", "30" );
 ConVar ff_creep_wave_count( "ff_creep_wave_count", "3" );
@@ -175,16 +175,16 @@ ConVar ff_creep_level_up( "ff_creep_level_up", "6" );
 //----------------------------------------------------------------------------------------------------------------
 void CFFBotManager::UpdateCreepWaves()
 {
-	if ( !TFGameRules()->IsCreepWaveMode() )
+	if ( !FFGameRules()->IsCreepWaveMode() )
 		return;
 
-	if ( TFGameRules()->RoundHasBeenWon() )
+	if ( FFGameRules()->RoundHasBeenWon() )
 	{
 		// no more creep waves - game is over
 		return;
 	}
 
-	if ( TFGameRules()->InSetup() || TFGameRules()->State_Get() == GR_STATE_STARTGAME || TFGameRules()->State_Get() == GR_STATE_PREROUND )
+	if ( FFGameRules()->InSetup() || FFGameRules()->State_Get() == GR_STATE_STARTGAME || FFGameRules()->State_Get() == GR_STATE_PREROUND )
 	{
 		// no creeps at start of round
 		m_creepWaveTimer.Start( ff_creep_initial_delay.GetFloat() );
@@ -275,7 +275,7 @@ void CFFBotManager::OnCreepKilled( CFFPlayer *killer )
 	UTIL_ClientPrintAll( HUD_PRINTTALK, "%s killed a creep" );
 }
 
-#endif // TF_CREEP_MODE
+#endif // FF_CREEP_MODE
 
 //----------------------------------------------------------------------------------------------------------------
 bool CFFBotManager::RemoveBotFromTeamAndKick( int nTeam )
@@ -359,11 +359,11 @@ void CFFBotManager::MaintainBotQuota()
 		return;
 
 	// new players can't spawn immediately after the round has been going for some time
-	if ( !TFGameRules() )
+	if ( !FFGameRules() )
 		return;
 
 	// training mode controls the bots
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 		return;
 
 	// if it is not time to do anything...
@@ -460,8 +460,8 @@ void CFFBotManager::MaintainBotQuota()
 	if ( desiredBotCount > nTFBotsOnGameTeams )
 	{
 		// don't try to add a bot if it would unbalance
-		if ( !TFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_BLUE, TEAM_UNASSIGNED ) ||
-			 !TFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_RED, TEAM_UNASSIGNED ) )
+		if ( !FFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_BLUE, TEAM_UNASSIGNED ) ||
+			 !FFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_RED, TEAM_UNASSIGNED ) )
 		{
 			CFFBot *pBot = GetAvailableBotFromPool();
 			if ( pBot == NULL )
@@ -571,7 +571,7 @@ bool CFFBotManager::IsAllBotTeam( int iTeam )
 
 	// okay, this is a bit trickier...
 	// if there are no people on this team, then we need to check the "assigned" human team
-	return TFGameRules()->GetAssignedHumanTeam() != iTeam;
+	return FFGameRules()->GetAssignedHumanTeam() != iTeam;
 }
 
 

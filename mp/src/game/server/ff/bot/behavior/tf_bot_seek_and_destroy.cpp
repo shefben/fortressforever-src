@@ -58,7 +58,7 @@ ActionResult< CFFBot >	CFFBotSeekAndDestroy::Update( CFFBot *me, float interval 
 		return Done( "Behavior duration elapsed" );
 	}
 
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 	{
 		// if the trainee has started capturing the point, assist them
 		if ( me->IsAnyPointBeingCaptured() )
@@ -83,7 +83,7 @@ ActionResult< CFFBot >	CFFBotSeekAndDestroy::Update( CFFBot *me, float interval 
 			}
 		}
 		
-		if ( !TFGameRules()->RoundHasBeenWon() && me->GetTimeLeftToCapture() < ff_bot_offense_must_push_time.GetFloat() )
+		if ( !FFGameRules()->RoundHasBeenWon() && me->GetTimeLeftToCapture() < ff_bot_offense_must_push_time.GetFloat() )
 		{
 			return Done( "Time to push for the objective" );
 		}
@@ -92,7 +92,7 @@ ActionResult< CFFBot >	CFFBotSeekAndDestroy::Update( CFFBot *me, float interval 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat )
 	{
-		if ( TFGameRules()->RoundHasBeenWon() )
+		if ( FFGameRules()->RoundHasBeenWon() )
 		{
 			// hunt down the losers
 			return SuspendFor( new CFFBotAttack, "Chasing down the losers" );

@@ -120,7 +120,7 @@ void CFFBotEngineerMoveToBuild::CollectBuildAreas( CFFBot *me )
 			if ( visibleArea->GetIncursionDistance( myTeam ) < 0 || visibleArea->GetIncursionDistance( enemyTeam ) < 0 )
 				continue;
 
-			if ( TFGameRules()->IsInKothMode() )
+			if ( FFGameRules()->IsInKothMode() )
 			{
 				// ignore areas the enemy can reach first
 				if ( visibleArea->GetIncursionDistance( myTeam ) >= visibleArea->GetIncursionDistance( enemyTeam ) )
@@ -134,7 +134,7 @@ void CFFBotEngineerMoveToBuild::CollectBuildAreas( CFFBot *me )
 // 					continue;
 // 			}
 
-			if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+			if ( FFGameRules()->GetGameType() == TF_GAMETYPE_CP )
 			{
 				// don't build directly on the point
 				if ( visibleArea->HasAttributeTF( TF_NAV_CONTROL_POINT ) )
@@ -273,12 +273,12 @@ ActionResult< CFFBot >	CFFBotEngineerMoveToBuild::OnStart( CFFBot *me, Action< C
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 	{
-		if ( me->GetHomeArea() && TFGameRules()->GetRaidLogic() )
+		if ( me->GetHomeArea() && FFGameRules()->GetRaidLogic() )
 		{
 			// try to pick a new area
-			CTFNavArea *sentryArea = TFGameRules()->GetRaidLogic()->SelectRaidSentryArea();
+			CTFNavArea *sentryArea = FFGameRules()->GetRaidLogic()->SelectRaidSentryArea();
 			if ( sentryArea )
 			{
 				me->SetHomeArea( sentryArea );
@@ -334,7 +334,7 @@ ActionResult< CFFBot >	CFFBotEngineerMoveToBuild::Update( CFFBot *me, float inte
 	}
 
 	// offensive engineers need to place a forward teleporter
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP && !TFGameRules()->IsInKothMode() && me->GetTeamNumber() == FF_TEAM_BLUE )
+	if ( FFGameRules()->GetGameType() == TF_GAMETYPE_CP && !FFGameRules()->IsInKothMode() && me->GetTeamNumber() == FF_TEAM_BLUE )
 	{
 		CObjectTeleporter *myTeleportExit = (CObjectTeleporter *)me->GetObjectOfType( OBJ_TELEPORTER, MODE_TELEPORTER_EXIT );
 		int myTeam = me->GetTeamNumber();

@@ -1,4 +1,5 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+#include "tf/tf_shareddefs.h"
+//========= Copyright Â© 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: The TF Game rules object
 //
@@ -176,6 +177,7 @@ public:
 	// display game description on discord rich presence
 	// clients should not be able to use this, obviously
 	virtual void	SetGameDescription(const char* szGameDescription);
+        virtual int GetGameType( void ) const { return TF_GAMETYPE_CTF; }
 
 //private:
 //	CFFMapFilter	m_hMapFilter;

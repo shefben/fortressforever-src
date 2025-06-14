@@ -84,12 +84,12 @@ ActionResult< CFFBot >	CFFBotMainAction::OnStart( CFFBot *me, Action< CFFBot > *
 		return ChangeTo( new CFFBotDead, "I'm actually dead" );
 	}
 
-#ifdef TF_CREEP_MODE
-	if ( TFGameRules()->IsCreepWaveMode() )
+#ifdef FF_CREEP_MODE
+	if ( FFGameRules()->IsCreepWaveMode() )
 	{
 		return ChangeTo( new CFFBotCreepWave, "I'm a creep" );
 	}
-#endif // TF_CREEP_MODE
+#endif // FF_CREEP_MODE
 
 
 #ifdef STAGING_ONLY
@@ -130,7 +130,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 	me->GetVisionInterface()->SetFieldOfView( me->GetFOV() );
 
 	// teammates in training have infinite ammo
-	if ( TFGameRules()->IsInTraining() && me->GetTeamNumber() == FF_TEAM_BLUE )
+	if ( FFGameRules()->IsInTraining() && me->GetTeamNumber() == FF_TEAM_BLUE )
 	{
 		me->GiveAmmo( 1000, TF_AMMO_METAL, true );
 	}
@@ -160,7 +160,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 // 		}
 	}
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
+	if ( FFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		// infinite ammo
 		// me->GiveAmmo( 100, TF_AMMO_PRIMARY, true );
@@ -370,7 +370,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnContact( CFFBot *me, CBaseEntit
 		m_lastTouchTime = gpGlobals->curtime;
 
 		// Mini-bosses destroy non-Sentrygun objects they bump into (ie: Dispensers)
-		if ( TFGameRules()->IsMannVsMachineMode() && me->IsMiniBoss() )
+		if ( FFGameRules()->IsMannVsMachineMode() && me->IsMiniBoss() )
 		{
 			if ( other->IsBaseObject() )
 			{
@@ -436,7 +436,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnStuck( CFFBot *me )
 	}
 */
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( me->m_Shared.InCond( TF_COND_MVM_BOT_STUN_RADIOWAVE ) )
 		{
@@ -542,7 +542,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseC
 		{
 			bool isTaunting = !me->HasTheFlag() && RandomFloat( 0.0f, 100.0f ) <= ff_bot_taunt_victim_chance.GetFloat();
 
-			if ( TFGameRules()->IsMannVsMachineMode() && me->IsMiniBoss() )
+			if ( FFGameRules()->IsMannVsMachineMode() && me->IsMiniBoss() )
 			{
 				// Bosses don't taunt puny humans
 				isTaunting = false;
@@ -1045,7 +1045,7 @@ const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreatInternal( const I
 	// close range sentries are the most dangerous of all
 	bool shouldFearSentryGuns = true;
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		// MvM bots are not afraid of sentry guns and treat them like other enemy players
 		shouldFearSentryGuns = false;
@@ -1086,7 +1086,7 @@ const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreatInternal( const I
 	}
 
 	// enforce Spy hatred in MvM mode
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		const float spyHateRadius = 1000.0f;
 
@@ -1278,7 +1278,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	}
 
 	// if our target is uber'd, most weapons are useless - unless we're in MvM, where invuln tanking is valuable
-	if ( TFGameRules() && !TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && !FFGameRules()->IsMannVsMachineMode() )
 	{
 		CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 		if ( playerThreat && playerThreat->m_Shared.IsInvulnerable() )
@@ -1297,7 +1297,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	if ( me->GetIntentionInterface()->ShouldAttack( me, threat ) == ANSWER_NO )
 		return;
 
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 	{
 		// wait until the gates open
 		return;
@@ -1313,7 +1313,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	}
 
 	// limit range of hitscan weapon fire in MvM
-	if ( TFGameRules()->IsMannVsMachineMode() && !me->IsPlayerClass( CLASS_SNIPER ) && me->IsHitScanWeapon( myWeapon ) )
+	if ( FFGameRules()->IsMannVsMachineMode() && !me->IsPlayerClass( CLASS_SNIPER ) && me->IsHitScanWeapon( myWeapon ) )
 	{
 		if ( me->IsRangeGreaterThan( threat->GetEntity(), ff_bot_hitscan_range_limit.GetFloat() ) )
 		{
@@ -1358,7 +1358,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 			// only fire if zoomed in
 			if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
 			{
-				const float reactionTime = TFGameRules()->IsMannVsMachineMode() ? 0.5f : 0.1f;	// just a moment to stop headshots when obviously panning too fast to see
+				const float reactionTime = FFGameRules()->IsMannVsMachineMode() ? 0.5f : 0.1f;	// just a moment to stop headshots when obviously panning too fast to see
 				if ( m_steadyTimer.HasStarted() && m_steadyTimer.IsGreaterThen( reactionTime ) )
 				{
 					trace_t trace;
@@ -1494,7 +1494,7 @@ QueryResultType	CFFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 		return ANSWER_YES;
 
 	// don't retreat during setup time, since we're always safe
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 		return ANSWER_NO;
 
 
@@ -1546,7 +1546,7 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 		return;
 #endif // TF_RAID_MODE
 

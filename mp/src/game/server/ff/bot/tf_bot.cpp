@@ -268,13 +268,13 @@ void CreateBotName( int iTeam, int iClassIndex, CFFBot::DifficultyType skill, ch
 	const char *pFriendlyOrEnemyTitle = "";
 
 	// @note (Tom Bui): it is okay to get localized name in training, since we should be on a listen server
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 	{
 		// get the friendly/enemy title
 		const char *pBotTitle = NULL;
 		if ( iTeam != TEAM_UNASSIGNED )
 		{
-			int iHumanTeam = TFGameRules()->GetAssignedHumanTeam();
+			int iHumanTeam = FFGameRules()->GetAssignedHumanTeam();
 			if ( iHumanTeam != TEAM_ANY )
 			{
 				if ( iHumanTeam == iTeam )
@@ -387,7 +387,7 @@ CON_COMMAND_F( ff_bot_add, "Add a bot.", FCVAR_GAMEDLL )
 		iTeam = FF_TEAM_BLUE;
 	}
 
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 	{
 		skill = CFFBot::EASY;
 	}
@@ -427,7 +427,7 @@ CON_COMMAND_F( ff_bot_add, "Add a bot.", FCVAR_GAMEDLL )
 			pBot->HandleCommand_JoinClass( thisClassname );
 
 			// set up a proper name now that we are in training
-			if ( TFGameRules()->IsInTraining() )
+			if ( FFGameRules()->IsInTraining() )
 			{
 				CreateBotName( pBot->GetTeamNumber(), pBot->GetPlayerClass()->GetClassIndex(), skill, name, sizeof(name) );
 				engine->SetFakeClientConVarValue( pBot->edict(), "name", name );
@@ -788,11 +788,11 @@ const char *CFFBot::GetNextSpawnClassname( void ) const
 	// assume offense
 	ClassSelectionInfo *desiredRoster = offenseRoster;
 	
-	if ( TFGameRules()->IsMatchTypeCompetitive() )
+	if ( FFGameRules()->IsMatchTypeCompetitive() )
 	{
 		desiredRoster = compRoster;
 	}
-	else if ( TFGameRules()->IsInKothMode() )
+	else if ( FFGameRules()->IsInKothMode() )
 	{
 		CTeamControlPoint *point = GetMyControlPoint();
 		if ( point )
@@ -804,13 +804,13 @@ const char *CFFBot::GetNextSpawnClassname( void ) const
 			}
 		}
 	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+	else if ( FFGameRules()->GetGameType() == TF_GAMETYPE_CP )
 	{
 		CUtlVector< CTeamControlPoint * > captureVector;
-		TFGameRules()->CollectCapturePoints( const_cast< CFFBot * >( this ), &captureVector );
+		FFGameRules()->CollectCapturePoints( const_cast< CFFBot * >( this ), &captureVector );
 
 		CUtlVector< CTeamControlPoint * > defendVector;
-		TFGameRules()->CollectDefendPoints( const_cast< CFFBot * >( this ), &defendVector );
+		FFGameRules()->CollectDefendPoints( const_cast< CFFBot * >( this ), &defendVector );
 
 		// if we have any points we can capture, try to do so
 		if ( captureVector.Count() > 0 || defendVector.Count() == 0 )
@@ -822,7 +822,7 @@ const char *CFFBot::GetNextSpawnClassname( void ) const
 			desiredRoster = defenseRoster;
 		}
 	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
+	else if ( FFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
 	{
 		if ( GetTeamNumber() == FF_TEAM_RED )
 		{
@@ -838,7 +838,7 @@ const char *CFFBot::GetNextSpawnClassname( void ) const
 	{
 		ClassSelectionInfo *desiredClassInfo = &desiredRoster[ i ];
 
-		if ( TFGameRules()->CanBotChooseClass( const_cast< CFFBot * >( this ), desiredClassInfo->m_class ) == false )
+		if ( FFGameRules()->CanBotChooseClass( const_cast< CFFBot * >( this ), desiredClassInfo->m_class ) == false )
 		{
 			// not allowed to use this class
 			continue;
@@ -963,7 +963,7 @@ CFFBot::CFFBot()
 	m_attentionFocusEntity = NULL;
 	m_noisyTimer.Invalidate();
 
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 	{
 		m_difficulty = CFFBot::EASY;
 	}
@@ -1102,9 +1102,9 @@ void CFFBot::PhysicsSimulate( void )
 	// If we're dead, choose a new class.
 	// We need to do this outside of the behavior system, since changing class can
 	// sometimes force an immediate respawn, which will destroy the bot's existing actions out from under it.
-	if ( !IsAlive() && !m_didReselectClass && ff_bot_keep_class_after_death.GetBool() == false && TFGameRules()->CanBotChangeClass( this ) )
+	if ( !IsAlive() && !m_didReselectClass && ff_bot_keep_class_after_death.GetBool() == false && FFGameRules()->CanBotChangeClass( this ) )
 	{
-		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 			return;
 
 		const char *classname = FStrEq( ff_bot_force_class.GetString(), "" ) ? GetNextSpawnClassname() : ff_bot_force_class.GetString();
@@ -1148,7 +1148,7 @@ void CFFBot::AvoidPlayers( CUserCmd *pCmd )
 	Vector avoidVector = vec3_origin;
 
 	float tooClose = 50.0f;
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 	{
 		// bots stay farther apart in MvM mode
 		tooClose = 150.0f;
@@ -1242,7 +1242,7 @@ void CFFBot::ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent, bool bAutoB
 {
 	BaseClass::ChangeTeam( iTeamNum, bAutoTeam, bSilent, bAutoBalance );
 	
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		SetPrevMission( CFFBot::NO_MISSION );
 		ClearAllAttributes();
@@ -1256,7 +1256,7 @@ void CFFBot::ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent, bool bAutoB
 bool CFFBot::ShouldGib( const CTakeDamageInfo &info )
 {
 	// only gib giant/miniboss
-	if ( TFGameRules()->IsMannVsMachineMode() && ( IsMiniBoss() || GetModelScale() > 1.f ) )
+	if ( FFGameRules()->IsMannVsMachineMode() && ( IsMiniBoss() || GetModelScale() > 1.f ) )
 	{
 		return true;
 	}
@@ -1361,7 +1361,7 @@ void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 	}
 
 	// announce Spies
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( IsPlayerClass( CLASS_SPY ) )
 		{
@@ -1439,11 +1439,11 @@ void CFFBot::Event_Killed( const CTakeDamageInfo &info )
 
 				if ( bEngineerTeleporterInTheWorld )
 				{
-					TFGameRules()->BroadcastSound( 255, "Announcer.MVM_An_Engineer_Bot_Is_Dead_But_Not_Teleporter" );
+					FFGameRules()->BroadcastSound( 255, "Announcer.MVM_An_Engineer_Bot_Is_Dead_But_Not_Teleporter" );
 				}
 				else
 				{
-					TFGameRules()->BroadcastSound( 255, "Announcer.MVM_An_Engineer_Bot_Is_Dead" );
+					FFGameRules()->BroadcastSound( 255, "Announcer.MVM_An_Engineer_Bot_Is_Dead" );
 				}
 			}
 		}
@@ -1531,7 +1531,7 @@ CTeamControlPoint *CFFBot::SelectPointToCapture( CUtlVector< CTeamControlPoint *
 		bool alwaysUseClosest = false;
 
 #ifdef STAGING_ONLY
-		alwaysUseClosest = TFGameRules() && TFGameRules()->IsBountyMode();
+		alwaysUseClosest = FFGameRules() && FFGameRules()->IsBountyMode();
 #endif // STAGING_ONLY
 
 		if ( IsPointBeingCaptured( closestPoint ) || alwaysUseClosest )
@@ -1628,10 +1628,10 @@ CTeamControlPoint *CFFBot::GetMyControlPoint( void ) const
 
 
 	CUtlVector< CTeamControlPoint * > captureVector;
-	TFGameRules()->CollectCapturePoints( const_cast< CFFBot * >( this ), &captureVector );
+	FFGameRules()->CollectCapturePoints( const_cast< CFFBot * >( this ), &captureVector );
 
 	CUtlVector< CTeamControlPoint * > defendVector;
-	TFGameRules()->CollectDefendPoints( const_cast< CFFBot * >( this ), &defendVector );
+	FFGameRules()->CollectDefendPoints( const_cast< CFFBot * >( this ), &defendVector );
 
 	if ( IsPlayerClass( CLASS_ENGINEER ) || IsPlayerClass( CLASS_SNIPER ) || HasAttribute( CFFBot::PRIORITIZE_DEFENSE ) )
 	{
@@ -1664,7 +1664,7 @@ CCaptureFlag *CFFBot::GetFlagToFetch( void ) const
 	int nCarriedFlags = 0;
 
 	// MvM Engineer bot never pick up a flag
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( GetTeamNumber() == FF_TEAM_PVE_INVADERS && IsPlayerClass( CLASS_ENGINEER ) )
 		{
@@ -1676,7 +1676,7 @@ CCaptureFlag *CFFBot::GetFlagToFetch( void ) const
 			return NULL;
 		}
 
-		if ( TFGameRules()->IsMannVsMachineMode() && HasFlagTaget() )
+		if ( FFGameRules()->IsMannVsMachineMode() && HasFlagTaget() )
 		{
 			return GetFlagTarget();
 		}
@@ -1731,7 +1731,7 @@ CCaptureFlag *CFFBot::GetFlagToFetch( void ) const
 	CCaptureFlag *pClosestUncarriedFlag = NULL;
 	float flClosestUncarriedFlagDist = FLT_MAX;
 
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 	{
 		int nMinFollower = INT_MAX;
 
@@ -1922,16 +1922,16 @@ bool CFFBot::IsNearPoint( CTeamControlPoint *point ) const
 // Return time left to capture the point before we lose the game
 float CFFBot::GetTimeLeftToCapture( void ) const
 {
-	if ( TFGameRules()->IsInKothMode() )
+	if ( FFGameRules()->IsInKothMode() )
 	{
-		if ( TFGameRules()->GetKothTeamTimer( GetEnemyTeam( GetTeamNumber() ) ) )
+		if ( FFGameRules()->GetKothTeamTimer( GetEnemyTeam( GetTeamNumber() ) ) )
 		{
-			return TFGameRules()->GetKothTeamTimer( GetEnemyTeam( GetTeamNumber() ) )->GetTimeRemaining();
+			return FFGameRules()->GetKothTeamTimer( GetEnemyTeam( GetTeamNumber() ) )->GetTimeRemaining();
 		}
 	}
-	else if ( TFGameRules()->GetActiveRoundTimer() )
+	else if ( FFGameRules()->GetActiveRoundTimer() )
 	{
-		return TFGameRules()->GetActiveRoundTimer()->GetTimeRemaining();
+		return FFGameRules()->GetActiveRoundTimer()->GetTimeRemaining();
 	}
 
 	return 0.0f;
@@ -1946,7 +1946,7 @@ void CFFBot::SetupSniperSpotAccumulation( void )
 
 	CBaseEntity *goalEntity = NULL;
 
-       if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+       if ( FFGameRules()->GetGameType() == TF_GAMETYPE_CP )
        {
                goalEntity = GetMyControlPoint();
        }
@@ -1977,7 +1977,7 @@ void CFFBot::SetupSniperSpotAccumulation( void )
 	bool isDefendingPoint = false;
 	CTFNavArea *goalEntityArea = NULL;
 
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
+	if ( FFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
 	{
 		// the cart is owned by the invaders
 		isDefendingPoint = ( goalEntity->GetTeamNumber() != myTeam );
@@ -2764,7 +2764,7 @@ float CFFBot::GetMaxAttackRange( void ) const
 	
 	if ( myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) )
 	{
-		if ( TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules()->IsMannVsMachineMode() )
 		{
 			const float flameRange = 350.0f;
 
@@ -2830,7 +2830,7 @@ float CFFBot::GetDesiredAttackRange( void ) const
 		return FLT_MAX;
 	}
 
-	if ( myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER ) && !TFGameRules()->IsMannVsMachineMode() )
+	if ( myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER ) && !FFGameRules()->IsMannVsMachineMode() )
 	{
 		return 1250.0f;
 	}
@@ -2851,7 +2851,7 @@ bool CFFBot::EquipRequiredWeapon( void )
 		return Weapon_Switch( pWeapon );
 	}
 
-	if ( TheTFBots().IsMeleeOnly() || TFGameRules()->IsInMedievalMode() || HasWeaponRestriction( MELEE_ONLY ) )
+	if ( TheTFBots().IsMeleeOnly() || FFGameRules()->IsInMedievalMode() || HasWeaponRestriction( MELEE_ONLY ) )
 	{
 		// force use of melee weapons
 		Weapon_Switch( Weapon_GetSlot( TF_WPN_TYPE_MELEE ) );
@@ -2882,7 +2882,7 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 		return;
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 	{
 		if ( HasAttribute( CFFBot::AGGRESSIVE ) )
 		{
@@ -2912,7 +2912,7 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 	}
 
 	// no secondary weapons in MvM
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		if ( IsPlayerClass( CLASS_MEDIC ) && IsInASquad() && GetSquad() && !GetSquad()->IsLeader( this ) )
 		{
@@ -3059,7 +3059,7 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 bool CFFBot::EquipLongRangeWeapon( void )
 {
 	// no secondary weapons in MvM
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 		return false;
 
 	if ( IsPlayerClass( CLASS_SOLDIER ) || 
@@ -3686,7 +3686,7 @@ bool CFFBot::IsWeaponRestricted( CFFWeaponBase *weapon ) const
 //
 bool CFFBot::ShouldFireCompressionBlast( void )
 {
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 	{
 		// no reflection in training mode
 		return false;
@@ -3719,7 +3719,7 @@ bool CFFBot::ShouldFireCompressionBlast( void )
 		}
 	}
 
-	bool shouldPushPlayers = !TFGameRules()->IsMannVsMachineMode();
+	bool shouldPushPlayers = !FFGameRules()->IsMannVsMachineMode();
 
 	if ( shouldPushPlayers )
 	{
@@ -4167,7 +4167,7 @@ Action< CFFBot > *CFFBot::OpportunisticallyUseWeaponAbilities( void )
 	}
 
 	// don't use items if we have the flag, since most of them are unusable (unless we're a bomb carrier in MvM)
-	if ( HasTheFlag() && !TFGameRules()->IsMannVsMachineMode() )
+	if ( HasTheFlag() && !FFGameRules()->IsMannVsMachineMode() )
 	{
 		return NULL;
 	}
@@ -4259,7 +4259,7 @@ void CFFBot::StartIdleSound( void )
 {
 	StopIdleSound();
 
-	if ( TFGameRules() && !TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && !FFGameRules()->IsMannVsMachineMode() )
 		return;
 
 	// SHIELD YOUR EYES MIKEB!!!
@@ -4415,7 +4415,7 @@ void CFFBot::OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEv
 
 		SetMaxVisionRangeOverride( pEvent->m_maxVisionRange );
 
-		if ( TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules()->IsMannVsMachineMode() )
 		{
 			SetAttribute( CFFBot::BECOME_SPECTATOR_ON_DEATH );
 			SetAttribute( CFFBot::RETAIN_BUILDINGS );

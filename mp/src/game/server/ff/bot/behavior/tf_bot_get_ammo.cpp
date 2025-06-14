@@ -126,7 +126,7 @@ bool CFFBotGetAmmo::IsPossible( CFFBot *me )
 
 	CAmmoFilter ammoFilter( me );
 
-	const CUtlVector< CHandle< CBaseEntity > > &staticAmmoVector = TFGameRules()->GetAmmoEntityVector();
+	const CUtlVector< CHandle< CBaseEntity > > &staticAmmoVector = FFGameRules()->GetAmmoEntityVector();
 	CBaseEntity *closestAmmo = NULL;
 	float closestAmmoTravelDistance = FLT_MAX;
 

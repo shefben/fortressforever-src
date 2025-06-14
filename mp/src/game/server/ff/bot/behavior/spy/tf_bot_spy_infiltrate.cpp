@@ -82,7 +82,7 @@ ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 		m_findHidingSpotTimer.Start( 3.0f );
 	}
 
-	if ( !TFGameRules()->InSetup() )
+	if ( !FFGameRules()->InSetup() )
 	{
 		// go after victims we've gotten behind
 		if ( threat && threat->GetTimeSinceLastKnown() < 3.0f )
@@ -114,7 +114,7 @@ ActionResult< CFFBot >	CFFBotSpyInfiltrate::Update( CFFBot *me, float interval )
 		if ( myArea == m_hideArea )
 		{
 			// stay hidden during setup time
-			if ( TFGameRules()->InSetup() )
+			if ( FFGameRules()->InSetup() )
 			{
 				m_waitTimer.Start( RandomFloat( 0.0f, 5.0f ) );
 			}
@@ -183,7 +183,7 @@ bool CFFBotSpyInfiltrate::FindHidingSpot( CFFBot *me )
 {
 	m_hideArea = NULL;
 
-	if ( me->GetAliveDuration() < 5.0f && TFGameRules()->InSetup() )
+	if ( me->GetAliveDuration() < 5.0f && FFGameRules()->InSetup() )
 	{
 		// wait a bit until the nav mesh has updated itself
 		return false;
@@ -193,7 +193,7 @@ bool CFFBotSpyInfiltrate::FindHidingSpot( CFFBot *me )
 	const CUtlVector< CTFNavArea * > *enemySpawnExitVector = TheTFNavMesh()->GetSpawnRoomExitAreas( GetEnemyTeam( myTeam ) );
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 	{
 		// for now, just lurk where we are
 		return false;

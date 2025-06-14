@@ -108,7 +108,7 @@ ActionResult< CFFBot > CFFBotMvMDeployBomb::Update( CFFBot *me, float interval )
 			const char *pszSoundName = me->IsMiniBoss() ? "MVM.DeployBombGiant" : "MVM.DeployBombSmall";
 			me->EmitSound( pszSoundName );
 
-			TFGameRules()->PlayThrottledAlert( 255, "Announcer.MVM_Bomb_Alert_Deploying", 5.0f );
+			FFGameRules()->PlayThrottledAlert( 255, "Announcer.MVM_Bomb_Alert_Deploying", 5.0f );
 		}
 		break;
 
@@ -121,7 +121,7 @@ ActionResult< CFFBot > CFFBotMvMDeployBomb::Update( CFFBot *me, float interval )
 			}
 
 			m_timer.Start( 2.0f );
-			TFGameRules()->BroadcastSound( 255, "Announcer.MVM_Robots_Planted" );
+			FFGameRules()->BroadcastSound( 255, "Announcer.MVM_Robots_Planted" );
 			me->SetDeployingBombState( TF_BOMB_DEPLOYING_COMPLETE );
 			me->m_takedamage = DAMAGE_NO;
 			me->AddEffects( EF_NODRAW );

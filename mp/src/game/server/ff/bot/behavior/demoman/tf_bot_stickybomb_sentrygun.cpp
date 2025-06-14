@@ -150,7 +150,7 @@ ActionResult< CFFBot >	CFFBotStickybombSentrygun::Update( CFFBot *me, float inte
 
 	int requiredStickyBombs = 3;
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		// launch more stickies to make sure we take out beefed-up sentries
 		requiredStickyBombs = 5;

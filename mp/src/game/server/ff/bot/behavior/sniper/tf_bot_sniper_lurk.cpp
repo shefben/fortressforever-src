@@ -65,7 +65,7 @@ ActionResult< CFFBot >	CFFBotSniperLurk::OnStart( CFFBot *me, Action< CFFBot > *
 
 	m_priorHint = NULL;
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
+	if ( FFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		// mann vs machine snipers shouldn't stop until they reach their home
 		//m_isOpportunistic = false;
@@ -84,7 +84,7 @@ ActionResult< CFFBot >	CFFBotSniperLurk::OnStart( CFFBot *me, Action< CFFBot > *
 ActionResult< CFFBot >	CFFBotSniperLurk::Update( CFFBot *me, float interval )
 {
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 	{
 	}
 	else
@@ -442,7 +442,7 @@ bool CFFBotSniperLurk::FindNewHome( CFFBot *me )
 
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() )
+	if ( FFGameRules()->IsRaidMode() )
 	{
 		// stay put for now
 		return true;
@@ -509,7 +509,7 @@ QueryResultType CFFBotSniperLurk::ShouldAttack( const INextBot *bot, const CKnow
 
 	CTFNavArea *area = me->GetLastKnownArea();
 
-	if ( TFGameRules()->IsMannVsMachineMode() && area && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) )
+	if ( FFGameRules()->IsMannVsMachineMode() && area && area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) )
 	{
 		// don't fire while in the spawn area
 		return ANSWER_NO;
@@ -523,7 +523,7 @@ QueryResultType CFFBotSniperLurk::ShouldAttack( const INextBot *bot, const CKnow
 //---------------------------------------------------------------------------------------------
 QueryResultType CFFBotSniperLurk::ShouldRetreat( const INextBot *me ) const
 {
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetEntity()->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
+	if ( FFGameRules()->IsMannVsMachineMode() && me->GetEntity()->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		return ANSWER_NO;
 	}
@@ -538,7 +538,7 @@ const CKnownEntity *CFFBotSniperLurk::SelectMoreDangerousThreat( const INextBot 
 																 const CKnownEntity *threat1, 
 																 const CKnownEntity *threat2 ) const
 {
-	if ( TFGameRules()->IsMannVsMachineMode() && ff_mvm_bot_sniper_target_by_dps.GetBool() )
+	if ( FFGameRules()->IsMannVsMachineMode() && ff_mvm_bot_sniper_target_by_dps.GetBool() )
 	{
 		CFFBot *me = ToTFBot( meBot->GetEntity() );
 

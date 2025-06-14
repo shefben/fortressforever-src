@@ -38,7 +38,7 @@ ActionResult< CFFBot >	CFFBotCapturePoint::OnStart( CFFBot *me, Action< CFFBot >
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotCapturePoint::Update( CFFBot *me, float interval )
 {
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 	{
 		// wait until the gates open, then path
 		m_path.Invalidate();
@@ -70,9 +70,9 @@ ActionResult< CFFBot >	CFFBotCapturePoint::Update( CFFBot *me, float interval )
 	bool isPushingToCapture = ( me->IsPointBeingCaptured( point ) && !me->IsInCombat() ) ||			// a friend is capturing
 							   me->IsCapturingPoint() ||												// we're capturing
 							   // me->m_Shared.InCond( TF_COND_INVULNERABLE ) ||						// we're ubered
-							   TFGameRules()->InOvertime() ||											// the game is in overtime
+							   FFGameRules()->InOvertime() ||											// the game is in overtime
 							   me->GetTimeLeftToCapture() < ff_bot_offense_must_push_time.GetFloat() ||	// nearly out of tim
-							   TFGameRules()->IsInTraining() ||											// teach newbies to capture
+							   FFGameRules()->IsInTraining() ||											// teach newbies to capture
 							   me->IsNearPoint( point );
 
 
@@ -127,7 +127,7 @@ ActionResult< CFFBot >	CFFBotCapturePoint::Update( CFFBot *me, float interval )
 			m_repathTimer.Start( RandomFloat( 2.0f, 3.0f ) ); 
 		}
 
-		if ( TFGameRules()->IsInTraining() && !me->IsAnyPointBeingCaptured() )
+		if ( FFGameRules()->IsInTraining() && !me->IsAnyPointBeingCaptured() )
 		{
 			// stop short of capturing until the human trainee starts it
 			if ( m_path.GetLength() < 1000.0f )
