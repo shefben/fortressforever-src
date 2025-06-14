@@ -46,7 +46,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::OnStart( CFFBot *me, Action< CFFBot > *p
 class CSelectPrimaryPatient : public IVision::IForEachKnownEntity
 {
 public:
-	CSelectPrimaryPatient( CFFBot *me, CTFPlayer *currentPatient )
+	CSelectPrimaryPatient( CFFBot *me, CFFPlayer *currentPatient )
 	{
 		m_me = me;
 		m_medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
@@ -54,7 +54,7 @@ public:
 		m_selected = currentPatient;
 	}
 
-	CTFPlayer *SelectPreferred( CTFPlayer *current, CTFPlayer *contender )
+	CFFPlayer *SelectPreferred( CFFPlayer *current, CFFPlayer *contender )
 	{
 		// in order of preference
 		static int preferredClass[] = 
@@ -129,8 +129,8 @@ public:
 
 		// respond to calls for help
 		// NOTE: For now, only attend to HUMAN calls for help
-		CTFPlayer *currentCaller = NULL;
-		CTFPlayer *contenderCaller = NULL;
+		CFFPlayer *currentCaller = NULL;
+		CFFPlayer *contenderCaller = NULL;
 		CFFBotPathCost cost( m_me, FASTEST_ROUTE );
 		
 		if ( !current->IsBot() && current->IsCallingForMedic() && m_me->IsRangeLessThan( current, ff_bot_medic_max_call_response_range.GetFloat() ) )
@@ -212,7 +212,7 @@ public:
 		if ( !known.GetEntity() || !known.GetEntity()->IsPlayer() || !known.GetEntity()->IsAlive() || !m_me->IsFriend( known.GetEntity() ) )
 			return true;
 
-		CTFPlayer *player = dynamic_cast< CTFPlayer * >( known.GetEntity() );
+		CFFPlayer *player = dynamic_cast< CFFPlayer * >( known.GetEntity() );
 		if ( player == NULL )
 			return true;
 
@@ -241,12 +241,12 @@ public:
 
 	CFFBot *m_me;
 	CWeaponMedigun *m_medigun;
-	CTFPlayer *m_selected;
+	CFFPlayer *m_selected;
 };
 
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CTFPlayer *current )
+CFFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CFFPlayer *current )
 {
 	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
 
@@ -254,7 +254,7 @@ CTFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CTFPlayer *current )
 	{
 		if ( current == NULL || !current->IsAlive() )
 		{
-			current = ToTFPlayer( medigun->GetHealTarget() );
+			current = ToFFPlayer( medigun->GetHealTarget() );
 		}
 
 		if ( medigun->IsReleasingCharge() )
@@ -275,7 +275,7 @@ CTFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CTFPlayer *current )
 	if ( TFGameRules()->IsPVEModeActive() )
 	{
 		// assume perfect knowledge
-		CUtlVector< CTFPlayer * > livePlayerVector;
+		CUtlVector< CFFPlayer * > livePlayerVector;
 		CollectPlayers( &livePlayerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 		for( int i=0; i<livePlayerVector.Count(); ++i )
@@ -299,7 +299,7 @@ CTFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CTFPlayer *current )
 /**
  * Return true if the given patient is healthy and safe for now
  */
-bool CFFBotMedicHeal::IsStable( CTFPlayer *patient ) const
+bool CFFBotMedicHeal::IsStable( CFFPlayer *patient ) const
 {
 	const float safeTime = 3.0f;
 
@@ -339,7 +339,7 @@ public:
 	{
 		if ( known.GetEntity()->IsPlayer() )
 		{
-			CTFPlayer *player = ToTFPlayer( known.GetEntity() );
+			CFFPlayer *player = ToFFPlayer( known.GetEntity() );
 
 			if ( m_me->IsRangeGreaterThan( player, m_maxRange ) )
 				return true;
@@ -387,7 +387,7 @@ public:
 	}
 
 	CFFBot *m_me;
-	CTFPlayer *m_mostInjured;
+	CFFPlayer *m_mostInjured;
 	float m_injuredHealthRatio;
 	bool m_isOnFire;
 	float m_maxRange;
@@ -433,7 +433,7 @@ bool CFFBotMedicHeal::IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) cons
 
 
 //---------------------------------------------------------------------------------------------
-bool CFFBotMedicHeal::IsGoodUberTarget( CTFPlayer *who ) const
+bool CFFBotMedicHeal::IsGoodUberTarget( CFFPlayer *who ) const
 {
 	if ( who->IsPlayerClass( CLASS_MEDIC ) ||
 		 who->IsPlayerClass( CLASS_SNIPER ) ||
@@ -506,7 +506,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 			}
 
 			seenPatients.AddToTail( pTestPatient );
-			m_patient = ToTFPlayer( pTestPatient );
+			m_patient = ToFFPlayer( pTestPatient );
 		}
 	}
 
@@ -574,7 +574,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 	}
 
 
-	CTFPlayer *actualHealTarget = m_patient;
+	CFFPlayer *actualHealTarget = m_patient;
 	bool isHealTargetBlocked = true;
 	bool isActivelyHealing = false;
 	bool isUsingProjectileShield = false;
@@ -856,7 +856,7 @@ EventDesiredResult< CFFBot > CFFBotMedicHeal::OnActorEmoted( CFFBot *me, CBaseCo
 	if ( !emoter->IsPlayer() )
 		return TryContinue();
 	
-	CTFPlayer *emotingPlayer = ToTFPlayer( emoter );
+	CFFPlayer *emotingPlayer = ToFFPlayer( emoter );
 
 	switch( emote )
 	{

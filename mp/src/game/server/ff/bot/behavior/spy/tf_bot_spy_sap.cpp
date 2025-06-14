@@ -52,14 +52,14 @@ ActionResult< CFFBot >	CFFBotSpySap::Update( CFFBot *me, float interval )
 		return Done( "Sap target gone" );
 	}
 
-	CTFPlayer *victim = NULL;
+	CFFPlayer *victim = NULL;
 
 	CUtlVector< CKnownEntity > knownVector;
 	me->GetVisionInterface()->CollectKnownEntities( &knownVector );
 
 	for( int i=0; i<knownVector.Count(); ++i )
 	{
-		CTFPlayer *playerThreat = ToTFPlayer( knownVector[i].GetEntity() );
+		CFFPlayer *playerThreat = ToFFPlayer( knownVector[i].GetEntity() );
 		if ( playerThreat && me->IsEnemy( playerThreat ) )
 		{
 			victim = playerThreat;

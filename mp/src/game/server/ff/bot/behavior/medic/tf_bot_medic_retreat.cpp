@@ -49,7 +49,7 @@ public:
 	{
 		if ( entity && entity->IsPlayer() && entity->GetTeamNumber() == m_team )
 		{
-			return !ToTFPlayer( entity )->IsPlayerClass( CLASS_MEDIC ) && !ToTFPlayer( entity )->IsPlayerClass( CLASS_SNIPER );
+			return !ToFFPlayer( entity )->IsPlayerClass( CLASS_MEDIC ) && !ToFFPlayer( entity )->IsPlayerClass( CLASS_SNIPER );
 		}
 		return false;
 	}

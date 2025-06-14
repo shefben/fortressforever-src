@@ -24,7 +24,7 @@ int GetBotEscortCount( int team )
 {
 	int count = 0;
 
-	CUtlVector< CTFPlayer * > livePlayerVector;
+	CUtlVector< CFFPlayer * > livePlayerVector;
 	CollectPlayers( &livePlayerVector, team, COLLECT_ONLY_LIVING_PLAYERS );
 
 	int i;
@@ -74,7 +74,7 @@ ActionResult< CFFBot > CFFBotEscortFlagCarrier::Update( CFFBot *me, float interv
 		return Done( "No flag" );
 	}
 
-	CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+	CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 	if ( !carrier )
 	{
 		return Done( "Flag was dropped" );

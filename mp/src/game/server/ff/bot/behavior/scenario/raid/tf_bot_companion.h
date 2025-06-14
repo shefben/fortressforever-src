@@ -26,7 +26,7 @@ public:
 
 private:
 	ChasePath m_path;
-	CTFPlayer *GetLeader( void );
+	CFFPlayer *GetLeader( void );
 };
 
 

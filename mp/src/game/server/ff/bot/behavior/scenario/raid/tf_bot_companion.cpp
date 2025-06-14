@@ -33,15 +33,15 @@ ActionResult< CFFBot >	CFFBotCompanion::OnStart( CFFBot *me, Action< CFFBot > *p
 
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CFFBotCompanion::GetLeader( void )
+CFFPlayer *CFFBotCompanion::GetLeader( void )
 {
 	CTeam *raidingTeam = GetGlobalTeam( FF_TEAM_BLUE );
-	CTFPlayer *leader = NULL;
+	CFFPlayer *leader = NULL;
 	float leaderSpeed = FLT_MAX;
 
 	for( int i=0; i<raidingTeam->GetNumPlayers(); ++i )
 	{
-		CTFPlayer *player = (CTFPlayer *)raidingTeam->GetPlayer(i);
+		CFFPlayer *player = (CFFPlayer *)raidingTeam->GetPlayer(i);
 
 		if ( player->IsBot() && !ff_raid_companion_allow_bot_leader.GetBool() )
 			continue;
@@ -81,7 +81,7 @@ ActionResult< CFFBot >	CFFBotCompanion::Update( CFFBot *me, float interval )
 		}
 	}
 
-	CTFPlayer *leader = GetLeader();
+	CFFPlayer *leader = GetLeader();
 	if ( !leader )
 		return Continue();
 

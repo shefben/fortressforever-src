@@ -13,7 +13,7 @@
 extern bool IsSpaceToSpawnHere( const Vector &where );
 
 //---------------------------------------------------------------------------------------------
-bool TeleportNearVictim( CFFBot *me, CTFPlayer *victim, int attempt )
+bool TeleportNearVictim( CFFBot *me, CFFPlayer *victim, int attempt )
 {
 	VPROF_BUDGET( "CFFBotSpyLeaveSpawnRoom::TeleportNearVictim", "NextBot" );
 
@@ -108,13 +108,13 @@ ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::Update( CFFBot *me, float interv
 
 	if ( m_waitTimer.IsElapsed() )
 	{
-		CTFPlayer *victim = NULL;
+		CFFPlayer *victim = NULL;
 
-		CUtlVector< CTFPlayer * > enemyVector;
+		CUtlVector< CFFPlayer * > enemyVector;
 		CollectPlayers( &enemyVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 		// randomly shuffle our enemies
-		CUtlVector< CTFPlayer * > shuffleVector;
+		CUtlVector< CFFPlayer * > shuffleVector;
 		shuffleVector = enemyVector;
 		int n = shuffleVector.Count();
 		while( n > 1 )
@@ -122,7 +122,7 @@ ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::Update( CFFBot *me, float interv
 			int k = RandomInt( 0, n-1 );
 			n--;
 
-			CTFPlayer *tmp = shuffleVector[n];
+			CFFPlayer *tmp = shuffleVector[n];
 			shuffleVector[n] = shuffleVector[k];
 			shuffleVector[k] = tmp;
 		}

@@ -19,7 +19,7 @@ ConVar ff_bot_spy_change_target_range_threshold( "ff_bot_spy_change_target_range
 
 
 //---------------------------------------------------------------------------------------------
-CFFBotSpyAttack::CFFBotSpyAttack( CTFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
+CFFBotSpyAttack::CFFBotSpyAttack( CFFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
 {
 	m_victim = victim;
 }
@@ -54,7 +54,7 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 		m_isCoverBlown = false;
 		if ( closestThreat )
 		{
-			m_victim = ToTFPlayer( closestThreat->GetEntity() );
+			m_victim = ToFFPlayer( closestThreat->GetEntity() );
 		}
 	}
 	else if ( closestThreat && 
@@ -69,7 +69,7 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 			if ( closestThreat->GetEntity()->IsPlayer() )
 			{
 				threat = closestThreat;
-				m_victim = ToTFPlayer( closestThreat->GetEntity() );
+				m_victim = ToFFPlayer( closestThreat->GetEntity() );
 				m_isCoverBlown = false;
 			}
 		}
@@ -97,7 +97,7 @@ ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 		return ChangeTo( new CFFBotRetreatToCover, "Escaping sentry fire!" );
 	}
 
-	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 	if ( !playerThreat )
 	{
 		return Done( "Current 'threat' is not a player or a building?" );

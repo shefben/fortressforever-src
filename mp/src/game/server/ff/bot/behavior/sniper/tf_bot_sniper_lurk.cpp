@@ -74,16 +74,7 @@ ActionResult< CFFBot >	CFFBotSniperLurk::OnStart( CFFBot *me, Action< CFFBot > *
 		me->SetMission( CFFBot::MISSION_SNIPER, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
 	}
 
-#ifdef STAGING_ONLY
-	if ( ff_bot_use_items.GetInt() && ( RandomInt(0, 100) <= ff_bot_use_items.GetInt() ) )
-	{
-		CBaseCombatWeapon *myGun = me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
-		me->Weapon_Detach( myGun );
-		UTIL_Remove( myGun );
 
-		BotGenerateAndWearItem( me, "The Huntsman" );
-	}
-#endif // STAGING_ONLY
 
 	return Continue();
 }
@@ -362,7 +353,7 @@ bool CFFBotSniperLurk::FindHint( CFFBot *me )
 	else
 	{
 		// picking either our first hint, or we haven't seen a victim in a long time - pick a hint that can actually see someone
-		CUtlVector< CTFPlayer * > victimVector;
+		CUtlVector< CFFPlayer * > victimVector;
 		CollectPlayers( &victimVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 		CUtlVector< CFFBotHint * > hotHintVector;
@@ -566,8 +557,8 @@ const CKnownEntity *CFFBotSniperLurk::SelectMoreDangerousThreat( const INextBot 
 
 		// At this point, threat1 and threat2 are either both visible, or both not
 
-		CTFPlayer *playerThreat1 = ToTFPlayer( threat1->GetEntity() );
-		CTFPlayer *playerThreat2 = ToTFPlayer( threat2->GetEntity() );
+		CFFPlayer *playerThreat1 = ToFFPlayer( threat1->GetEntity() );
+		CFFPlayer *playerThreat2 = ToFFPlayer( threat2->GetEntity() );
 
 		if ( playerThreat1 && playerThreat2 )
 		{
