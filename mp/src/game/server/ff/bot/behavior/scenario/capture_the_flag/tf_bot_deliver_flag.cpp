@@ -74,7 +74,7 @@ ActionResult< CFFBot >	CFFBotDeliverFlag::OnStart( CFFBot *me, Action< CFFBot > 
 // In Mann Vs Machine, the flag carrier gets stronger the longer he carries the flag
 bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 {
-	if ( TFGameRules()->IsMannVsMachineMode() && m_upgradeLevel != DONT_UPGRADE )
+	if ( FFGameRules()->IsMannVsMachineMode() && m_upgradeLevel != DONT_UPGRADE )
 	{
 		CTFNavArea *myArea = me->GetLastKnownArea();
 		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
@@ -115,7 +115,7 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 			{
 				++m_upgradeLevel;
 				
-				TFGameRules()->BroadcastSound( 255, "MVM.Warning" );
+				FFGameRules()->BroadcastSound( 255, "MVM.Warning" );
 
 				switch( m_upgradeLevel )
 				{
@@ -131,7 +131,7 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 1 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( gpGlobals->curtime );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( gpGlobals->curtime + m_upgradeTimer.GetRemainingTime() );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE1, FF_TEAM_PVE_DEFENDERS );
+						FFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE1, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup1", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -162,7 +162,7 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 2 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( gpGlobals->curtime );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( gpGlobals->curtime + m_upgradeTimer.GetRemainingTime() );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE2, FF_TEAM_PVE_DEFENDERS );
+						FFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE2, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup2", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -179,7 +179,7 @@ bool CFFBotDeliverFlag::UpgradeOverTime( CFFBot *me )
 						TFObjectiveResource()->SetFlagCarrierUpgradeLevel( 3 );
 						TFObjectiveResource()->SetBaseMvMBombUpgradeTime( -1 );
 						TFObjectiveResource()->SetNextMvMBombUpgradeTime( -1 );
-						TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE3, FF_TEAM_PVE_DEFENDERS );
+						FFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_BOMB_CARRIER_UPGRADE3, FF_TEAM_PVE_DEFENDERS );
 						DispatchParticleEffect( "mvm_levelup3", PATTACH_POINT_FOLLOW, me, "head" );
 					}
 					return true;
@@ -208,7 +208,7 @@ ActionResult< CFFBot > CFFBotDeliverFlag::Update( CFFBot *me, float interval )
 		return Done( "I'm no longer carrying the flag" );
 	}
 
-	if ( TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules()->IsMannVsMachineMode() )
 	{
 		// let the bomb carrier use it's buff banners/etc
 		Action< CFFBot > *result = me->OpportunisticallyUseWeaponAbilities();
@@ -244,7 +244,7 @@ ActionResult< CFFBot > CFFBotDeliverFlag::Update( CFFBot *me, float interval )
 
 		if ( flOldTravelDistance != -1.0f && m_flTotalTravelDistance - flOldTravelDistance > 2000.0f )
 		{
-			TFGameRules()->BroadcastSound( 255, "Announcer.MVM_Bomb_Reset" );
+			FFGameRules()->BroadcastSound( 255, "Announcer.MVM_Bomb_Reset" );
 
 			// Look for players that helped with the reset and send an event
 			CUtlVector<CFFPlayer *> playerVector;
@@ -288,7 +288,7 @@ void CFFBotDeliverFlag::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	me->ClearAttribute( CFFBot::SUPPRESS_FIRE );
 
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 	{
 		me->m_Shared.ResetRageBuffs();
 	}
@@ -326,7 +326,7 @@ QueryResultType	CFFBotDeliverFlag::ShouldRetreat( const INextBot *me ) const
 //---------------------------------------------------------------------------------------------
 EventDesiredResult< CFFBot > CFFBotDeliverFlag::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
-	if ( TFGameRules()->IsMannVsMachineMode() && other && FClassnameIs( other, "func_capturezone" ) )
+	if ( FFGameRules()->IsMannVsMachineMode() && other && FClassnameIs( other, "func_capturezone" ) )
 	{
 		return TrySuspendFor( new CFFBotMvMDeployBomb, RESULT_CRITICAL, "Delivering the bomb!" );
 	}

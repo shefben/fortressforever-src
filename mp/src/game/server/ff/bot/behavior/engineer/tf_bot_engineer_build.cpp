@@ -26,7 +26,7 @@ ConVar ff_raid_engineer_infinte_metal( "ff_raid_engineer_infinte_metal", "1", FC
 //---------------------------------------------------------------------------------------------
 Action< CFFBot > *CFFBotEngineerBuild::InitialContainedAction( CFFBot *me )
 {
-	if ( TFGameRules()->IsPVEModeActive() )
+	if ( FFGameRules()->IsPVEModeActive() )
 	{
 		return new CFFBotEngineerMoveToBuild;
 	}
@@ -45,7 +45,7 @@ ActionResult< CFFBot >	CFFBotEngineerBuild::OnStart( CFFBot *me, Action< CFFBot 
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotEngineerBuild::Update( CFFBot *me, float interval )
 {
-	if ( TFGameRules()->IsPVEModeActive() && ff_raid_engineer_infinte_metal.GetBool() )
+	if ( FFGameRules()->IsPVEModeActive() && ff_raid_engineer_infinte_metal.GetBool() )
 	{
 		// infinite ammo
 		me->GiveAmmo( 1000, TF_AMMO_METAL, true );

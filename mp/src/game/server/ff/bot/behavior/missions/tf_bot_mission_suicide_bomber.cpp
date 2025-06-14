@@ -246,9 +246,9 @@ void CFFBotMissionSuicideBomber::Detonate( CFFBot *me )
 
 	if ( !m_bWasSuccessful )
 	{
-		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 		{
-			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
+			FFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
 
 			// ACHIEVEMENT_TF_MVM_KILL_SENTRY_BUSTER
 			for ( int iDamager = 0 ; iDamager < MAX_ACHIEVEMENT_HISTORY_SLOTS ; iDamager ++ )

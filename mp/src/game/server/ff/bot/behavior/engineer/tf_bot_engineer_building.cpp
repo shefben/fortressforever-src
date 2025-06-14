@@ -380,7 +380,7 @@ ActionResult< CFFBot >	CFFBotEngineerBuilding::Update( CFFBot *me, float interva
 */
 
 	// try to build a Dispenser (build after tele exit in training)
-	if ( !TFGameRules()->IsInTraining() || myTeleportExit )
+	if ( !FFGameRules()->IsInTraining() || myTeleportExit )
 	{
 		const float dispenserRebuildInterval = 10.0f;
 		if ( myDispenser )
@@ -397,7 +397,7 @@ ActionResult< CFFBot >	CFFBotEngineerBuilding::Update( CFFBot *me, float interva
 	}
 
 	// try to build a Teleporter Exit
-	const float exitRebuildInterval = TFGameRules()->IsInTraining() ? 5.0f : 30.0f;
+	const float exitRebuildInterval = FFGameRules()->IsInTraining() ? 5.0f : 30.0f;
 	if ( myTeleportExit )
 	{
 		// don't rebuild immediately after building is destroyed

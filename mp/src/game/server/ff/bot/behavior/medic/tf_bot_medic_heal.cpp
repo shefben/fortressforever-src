@@ -75,7 +75,7 @@ public:
 
 		int i;
 
-		if ( TFGameRules()->IsInTraining() )
+		if ( FFGameRules()->IsInTraining() )
 		{
 			// in training mode, stay on the human trainee
 			if ( !current || current->IsBot() )
@@ -272,7 +272,7 @@ CFFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CFFPlayer *current )
 
 	CSelectPrimaryPatient choose( me, current );
 
-	if ( TFGameRules()->IsPVEModeActive() )
+	if ( FFGameRules()->IsPVEModeActive() )
 	{
 		// assume perfect knowledge
 		CUtlVector< CFFPlayer * > livePlayerVector;
@@ -399,7 +399,7 @@ public:
 bool CFFBotMedicHeal::CanDeployUber( CFFBot *me, const CWeaponMedigun* pMedigun ) const
 {
 #ifdef STAGING_ONLY
-	if ( TFGameRules()->IsMannVsMachineMode() && 
+	if ( FFGameRules()->IsMannVsMachineMode() && 
 			me && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) && 
 			pMedigun && ( pMedigun->GetMedigunShield() != NULL ) && pMedigun->HasPermanentShield() && ( ( pMedigun->GetMedigunType() == MEDIGUN_STANDARD ) || ( pMedigun->GetMedigunType() == MEDIGUN_UBER ) ) )
 	{
@@ -425,7 +425,7 @@ bool CFFBotMedicHeal::IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) cons
 	if ( pMedigun->GetChargeLevel() < pMedigun->GetMinChargeAmount() )
 		return false;
 	
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 		return false;
 	
 	return true;
@@ -455,7 +455,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 	if ( me->IsInASquad() )
 	{
 		CFFBotSquad *squad = me->GetSquad();
-		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && squad->IsLeader( me ) )
+		if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() && squad->IsLeader( me ) )
 		{
 			return ChangeTo( new CFFBotFetchFlag, "I'm now a squad leader! Going for the flag!" );
 		}
@@ -493,7 +493,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 	m_patient = SelectPatient( me, m_patient );
 
 	// prevent a group of medic healing each other in a loop. always heal the top guy in the chain
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && m_patient != NULL && m_patient->IsPlayerClass( CLASS_MEDIC ) )
+	if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() && m_patient != NULL && m_patient->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		CUtlVector< CBaseEntity* > seenPatients;
 		seenPatients.AddToTail( m_patient );
@@ -514,13 +514,13 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 	{
 		// no patients
 
-		if ( TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules()->IsMannVsMachineMode() )
 		{
 			// no-one is left to heal - get the flag!
 			return ChangeTo( new CFFBotFetchFlag, "Everyone is gone! Going for the flag" );
 		}
 
-		if ( TFGameRules()->IsPVEModeActive() )
+		if ( FFGameRules()->IsPVEModeActive() )
 		{
 			// don't retreat, just wait
 			return Continue();
@@ -597,7 +597,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 		// if our primary patient is healthy and safe, heal others in our immediate vicinity who need it
 		// No opportunistic healing in training - focus on the trainee
 		// No opportunistic healing if I'm in a squad - stay on the leader
-		if ( !medigun->IsReleasingCharge() && IsStable( m_patient ) && !TFGameRules()->IsInTraining() && !me->IsInASquad() )
+		if ( !medigun->IsReleasingCharge() && IsStable( m_patient ) && !FFGameRules()->IsInTraining() && !me->IsInASquad() )
 		{
 			bool isInCombat = actualHealTarget ? actualHealTarget->GetTimeSinceWeaponFired() < 1.0f : false;
 
@@ -668,7 +668,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 				// uber if I'm getting low and have recently taken damage
 				if ( me->GetHealth() < me->GetUberHealthThreshold() )
 				{
-					if ( me->GetTimeSinceLastInjury( GetEnemyTeam( me->GetTeamNumber() ) ) < 1.0f || TFGameRules()->IsMannVsMachineMode() )
+					if ( me->GetTimeSinceLastInjury( GetEnemyTeam( me->GetTeamNumber() ) ) < 1.0f || FFGameRules()->IsMannVsMachineMode() )
 					{
 						useUber = true;
 					}
@@ -681,7 +681,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 				}
 
 				// special case for bots in mvm spawn zones
-				if ( TFGameRules()->IsMannVsMachineMode() )
+				if ( FFGameRules()->IsMannVsMachineMode() )
 				{
 					if ( m_patient->m_Shared.InCond( TF_COND_INVULNERABLE_HIDE_UNLESS_DAMAGED ) && 
 						 me->m_Shared.InCond( TF_COND_INVULNERABLE_HIDE_UNLESS_DAMAGED ) )
@@ -710,7 +710,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 		
 #ifdef STAGING_ONLY
 		// try to activate shield when I'm not using uber so I don't waste it
-		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) && medigun->GetMedigunShield() == NULL )
+		if ( FFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) && medigun->GetMedigunShield() == NULL )
 		{
 			// activate shield ASAP for permanent shield medigun
 			if ( medigun->HasPermanentShield() )
@@ -735,7 +735,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 		}
 #else // remove this when we ship medic shield MVM update
 		// try to activate shield when I'm not using uber so I don't waste it
-		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) )
+		if ( FFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) )
 		{
 			isUsingProjectileShield = me->m_Shared.IsRageDraining();
 			// when the rage is ready to deploy and we're not using uber
@@ -947,7 +947,7 @@ void CFFBotMedicHeal::ComputeFollowPosition( CFFBot *me )
 
 	bool isExposed;
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
+	if ( FFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		// robot medics in MvM don't care if the enemy sees them
 		isExposed = false;
@@ -971,7 +971,7 @@ void CFFBotMedicHeal::ComputeFollowPosition( CFFBot *me )
 		{
 			// if we haven't been in combat for awhile, move behind our patient if we're in front of him
 			Vector toPatient = m_patient->GetAbsOrigin() - me->GetAbsOrigin();
-			if ( !TFGameRules()->InSetup() && m_patient->GetTimeSinceWeaponFired() > 5.0f && DotProduct( patientForward, toPatient ) < 0.0f )
+			if ( !FFGameRules()->InSetup() && m_patient->GetTimeSinceWeaponFired() > 5.0f && DotProduct( patientForward, toPatient ) < 0.0f )
 			{
 				m_followGoal = m_patient->GetAbsOrigin() - ff_bot_medic_stop_follow_range.GetFloat() * patientForward;
 			}

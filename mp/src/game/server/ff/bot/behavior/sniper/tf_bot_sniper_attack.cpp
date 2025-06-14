@@ -209,7 +209,7 @@ bool CFFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 	}
 
 #ifdef TF_RAID_MODE
-	if ( !TFGameRules()->IsRaidMode() )
+	if ( !FFGameRules()->IsRaidMode() )
 	{
 	}
 	else

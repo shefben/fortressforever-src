@@ -63,7 +63,7 @@ ActionResult< CFFBot >	CFFBotMvMEngineerBuildTeleportExit::Update( CFFBot *me, f
 	if ( !m_delayBuildTime.HasStarted() )
 	{
 		m_delayBuildTime.Start( 0.1f );
-		TFGameRules()->PushAllPlayersAway( m_teleporterBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
+		FFGameRules()->PushAllPlayersAway( m_teleporterBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_delayBuildTime.IsElapsed() )
 	{

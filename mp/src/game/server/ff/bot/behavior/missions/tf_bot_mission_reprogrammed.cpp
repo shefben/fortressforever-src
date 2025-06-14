@@ -253,9 +253,9 @@ void CFFBotMissionReprogrammed::Detonate( CFFBot *me )
 
 	if ( !m_wasSuccessful )
 	{
-		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
+		if ( FFGameRules() && FFGameRules()->IsMannVsMachineMode() )
 		{
-			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
+			FFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
 		}
 	}
 

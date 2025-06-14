@@ -5,7 +5,7 @@
 
 #include "cbase.h"
 
-#ifdef TF_CREEP_MODE
+#ifdef FF_CREEP_MODE
 
 #include "team.h"
 #include "team_control_point_master.h"
@@ -83,7 +83,7 @@ ActionResult< CFFBot > CFFBotCreepWave::Update( CFFBot *me, float interval )
 	}
 
 	CUtlVector< CTeamControlPoint * > captureVector;
-	TFGameRules()->CollectCapturePoints( me, &captureVector );
+	FFGameRules()->CollectCapturePoints( me, &captureVector );
 
 	if ( captureVector.Count() == 0 )
 	{
@@ -237,4 +237,4 @@ ActionResult< CFFBot > CFFBotCreepAttack::Update( CFFBot *me, float interval )
 
 
 
-#endif // TF_CREEP_MODE
+#endif // FF_CREEP_MODE

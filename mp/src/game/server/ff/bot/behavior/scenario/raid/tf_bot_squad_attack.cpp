@@ -76,7 +76,7 @@ ActionResult< CFFBot > CFFBotSquadAttack::Update( CFFBot *me, float interval )
 	{
 		m_victimConsiderTimer.Start( 3.0f );
 
-		m_victim = TFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
+		m_victim = FFGameRules()->GetRaidLogic()->SelectRaiderToAttack();
 	}
 
 	if ( m_victim )

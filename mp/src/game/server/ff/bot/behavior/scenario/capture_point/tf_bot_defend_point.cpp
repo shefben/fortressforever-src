@@ -93,7 +93,7 @@ bool CFFBotDefendPoint::IsPointThreatened( CFFBot *me )
 // Are we smart enough to get on the point to block the cap
 bool CFFBotDefendPoint::WillBlockCapture( CFFBot *me ) const
 {
-	if ( TFGameRules()->IsInTraining() )
+	if ( FFGameRules()->IsInTraining() )
 		return false;
 	
 	if ( me->IsDifficulty( CFFBot::EASY ) )
@@ -164,7 +164,7 @@ ActionResult< CFFBot >	CFFBotDefendPoint::Update( CFFBot *me, float interval )
 		return SuspendFor( new CFFBotSeekAndDestroy( 15.0f ), "Seek and destroy - we have lots of time" );
 	}
 
-	if ( TFGameRules()->InSetup() )
+	if ( FFGameRules()->InSetup() )
 	{
 		// don't lose patience during setup time
 		m_idleTimer.Reset();
@@ -331,7 +331,7 @@ public:
 	{
 		CTFNavArea *area = (CTFNavArea *)baseArea;
 
-		if ( !TFGameRules()->IsInKothMode() )
+		if ( !FFGameRules()->IsInKothMode() )
 		{
 			// don't select areas that are beyond the point
 			if ( area->GetIncursionDistance( m_myTeam ) > m_incursionFlowLimit )
@@ -354,7 +354,7 @@ public:
 
 	virtual bool ShouldSearch( CNavArea *adjArea, CNavArea *currentArea, float travelDistanceSoFar )
 	{
-		if ( adjArea->IsBlocked( TFGameRules()->IsInKothMode() ? TEAM_ANY : m_myTeam ) )
+		if ( adjArea->IsBlocked( FFGameRules()->IsInKothMode() ? TEAM_ANY : m_myTeam ) )
 		{
 			return false;
 		}
@@ -395,7 +395,7 @@ CTFNavArea *CFFBotDefendPoint::SelectAreaToDefendFrom( CFFBot *me )
 	CUtlVector< CTFNavArea * > defenseAreas;
 
 /*
-	if ( !TFGameRules()->IsInKothMode() &&
+	if ( !FFGameRules()->IsInKothMode() &&
 		 point->GetTeamCapPercentage( me->GetTeamNumber() ) <= 0.0f &&	// point is currently safe
 		 ( ObjectiveResource()->GetPreviousPointForPoint( point->GetPointIndex(), me->GetTeamNumber(), 0 ) < 0 ||		 // this is the first cap point
 			me->IsPlayerClass( CLASS_PYRO ) ) )						// pyros are skirmishers
