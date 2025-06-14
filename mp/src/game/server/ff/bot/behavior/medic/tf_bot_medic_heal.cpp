@@ -49,7 +49,7 @@ public:
 	CSelectPrimaryPatient( CFFBot *me, CFFPlayer *currentPatient )
 	{
 		m_me = me;
-		m_medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+		m_medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 		m_selected = currentPatient;
 	}
@@ -248,7 +248,7 @@ public:
 //---------------------------------------------------------------------------------------------
 CFFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CFFPlayer *current )
 {
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 	if ( medigun )
 	{
@@ -580,7 +580,7 @@ ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 	bool isUsingProjectileShield = false;
 	const CKnownEntity *knownThreat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 	if ( medigun )
 	{
 		if( medigun->GetMedigunType() == MEDIGUN_RESIST )
@@ -870,7 +870,7 @@ EventDesiredResult< CFFBot > CFFBotMedicHeal::OnActorEmoted( CFFBot *me, CBaseCo
 		// if our patient said this, and we have charge, deploy it!
 		if ( m_patient && emotingPlayer && m_patient->entindex() == emotingPlayer->entindex() )
 		{
-			CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+			CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 			if ( IsReadyToDeployUber( medigun ) && CanDeployUber( me, medigun ) )
 			{
 				// start the uber
@@ -1003,7 +1003,7 @@ void CFFBotMedicHeal::ComputeFollowPosition( CFFBot *me )
 	float radius;
 	float radiusInc = 100.0f;
 	float maxRadius = ff_bot_medic_max_heal_range.GetFloat();
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 	if ( IsPatientRunning() || IsReadyToDeployUber( medigun ) )
 	{

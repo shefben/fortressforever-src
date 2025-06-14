@@ -86,11 +86,7 @@ bool TeleportNearVictim( CFFBot *me, CFFPlayer *victim, int attempt )
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	// disguise as enemy team
-	me->DisguiseAsMemberOfEnemyTeam();
 
-	// cloak
-	me->PressAltFireButton();
 
 	// wait a few moments to guarantee a minimum time between announcing Spies and their attack
 	m_waitTimer.Start( 2.0f + RandomFloat( 0.0f, 1.0f ) );

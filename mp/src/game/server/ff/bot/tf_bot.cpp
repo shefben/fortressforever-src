@@ -1145,7 +1145,7 @@ void CFFBot::Touch( CBaseEntity *pOther )
 		}
 
 		// always notice if we bump an enemy
-		TheNextBots().OnWeaponFired( them, them->GetActiveTFWeapon() );
+		TheNextBots().OnWeaponFired( them, them->GetActiveFFWeapon() );
 	}
 }
 
@@ -2277,7 +2277,7 @@ void CFFBot::SelectReachableObjects( const CUtlVector< CHandle< CBaseEntity > > 
 //---------------------------------------------------------------------------------------------
 bool CFFBot::IsAmmoLow( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( myWeapon->GetWeaponID() == FF_WEAPON_WRENCH )
@@ -2336,7 +2336,7 @@ bool CFFBot::IsAmmoFull( void ) const
 	return isPrimaryFull && isSecondaryFull;
 
 /*
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( myWeapon )
 	{
 		if ( IsPlayerClass( CLASS_ENGINEER ) )
@@ -2402,7 +2402,7 @@ void CFFBot::OnWeaponFired( CBaseCombatCharacter *whoFired, CBaseCombatWeapon *w
 
 	int noticeChance = 100;
 
-	if ( IsQuietWeapon( (CTFWeaponBase *)weapon ) )
+	if ( IsQuietWeapon( (CFFWeaponBase *)weapon ) )
 	{
 		if ( IsRangeGreaterThan( whoFired, ff_bot_notice_quiet_gunfire_range.GetFloat() ) )
 		{
@@ -2802,7 +2802,7 @@ float CFFBot::GetThreatDanger( CBaseCombatCharacter *who ) const
  */
 float CFFBot::GetMaxAttackRange( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( !myWeapon )
 		return 0.0f;
 
@@ -2853,7 +2853,7 @@ float CFFBot::GetMaxAttackRange( void ) const
  */
 float CFFBot::GetDesiredAttackRange( void ) const
 {
-	CTFWeaponBase *myWeapon = m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = GetActiveFFWeapon();
 	if ( !myWeapon )
 		return 0.0f;
 
@@ -2948,13 +2948,13 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 	}
 #endif // TF_RAID_MODE
 	 
-	CTFWeaponBase *primary = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_PRIMARY ) );
+	CFFWeaponBase *primary = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_PRIMARY ) );
 	if ( !IsCombatWeapon( primary ) )
 	{
 		primary = NULL;
 	}
 
-	CTFWeaponBase *secondary = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
+	CFFWeaponBase *secondary = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 	if ( !IsCombatWeapon( secondary ) )
 	{
 		secondary = NULL;
@@ -2973,13 +2973,13 @@ void CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
 		secondary = NULL;
 	}
 
-	CTFWeaponBase *melee = dynamic_cast< CTFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_MELEE ) );
+	CFFWeaponBase *melee = dynamic_cast< CFFWeaponBase *>( Weapon_GetSlot( TF_WPN_TYPE_MELEE ) );
 	if ( !IsCombatWeapon( melee ) )
 	{
 		melee = NULL;
 	}
 
-	CTFWeaponBase *gun = NULL;
+	CFFWeaponBase *gun = NULL;
 	if ( primary )
 	{
 		gun = primary;
@@ -3144,7 +3144,7 @@ bool CFFBot::EquipLongRangeWeapon( void )
 
 //-----------------------------------------------------------------------------------------------------
 // Force us to equip and use this weapon until popped off the required stack
-void CFFBot::PushRequiredWeapon( CTFWeaponBase *weapon )
+void CFFBot::PushRequiredWeapon( CFFWeaponBase *weapon )
 {
 	m_requiredWeaponStack.Push( weapon );
 }
@@ -3160,11 +3160,11 @@ void CFFBot::PopRequiredWeapon( void )
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon can be used to attack
-bool CFFBot::IsCombatWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsCombatWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )		// MY_CURRENT_GUN == NULL
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3192,11 +3192,11 @@ bool CFFBot::IsCombatWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon is a "hitscan" weapon
-bool CFFBot::IsHitScanWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsHitScanWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )		// MY_CURRENT_GUN == NULL
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3234,11 +3234,11 @@ bool CFFBot::IsHitScanWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
-bool CFFBot::IsContinuousFireWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsContinuousFireWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( !IsCombatWeapon( weapon ) )
@@ -3268,11 +3268,11 @@ bool CFFBot::IsContinuousFireWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon launches explosive projectiles with splash damage
-bool CFFBot::IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsExplosiveProjectileWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon )
@@ -3294,11 +3294,11 @@ bool CFFBot::IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
-bool CFFBot::IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsBarrageAndReloadWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon ) 
@@ -3320,11 +3320,11 @@ bool CFFBot::IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const
 
 //-----------------------------------------------------------------------------------------------------
 // Return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
-bool CFFBot::IsQuietWeapon( CTFWeaponBase *weapon ) const
+bool CFFBot::IsQuietWeapon( CFFWeaponBase *weapon ) const
 {
 	if ( weapon == MY_CURRENT_GUN )
 	{
-		weapon = m_Shared.GetActiveTFWeapon();
+		weapon = GetActiveFFWeapon();
 	}
 
 	if ( weapon ) 
@@ -3694,7 +3694,7 @@ void CFFBot::DeleteSquad( void )
 }
 
 //---------------------------------------------------------------------------------------------
-bool CFFBot::IsWeaponRestricted( CTFWeaponBase *weapon ) const
+bool CFFBot::IsWeaponRestricted( CFFWeaponBase *weapon ) const
 {
 	if ( !weapon )
 	{
@@ -4223,7 +4223,7 @@ Action< CFFBot > *CFFBot::OpportunisticallyUseWeaponAbilities( void )
 
 	for ( int w=0; w<MAX_WEAPONS; ++w )
 	{
-		CTFWeaponBase *weapon = ( CTFWeaponBase * )GetWeapon( w );
+		CFFWeaponBase *weapon = ( CFFWeaponBase * )GetWeapon( w );
 		if ( !weapon )
 			continue;
 

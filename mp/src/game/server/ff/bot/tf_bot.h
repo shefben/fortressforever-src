@@ -169,16 +169,16 @@ public:
 	void EquipBestWeaponForThreat( const CKnownEntity *threat );	// equip the best weapon we have to attack the given threat
 	bool EquipLongRangeWeapon( void );								// equip a weapon that can damage far-away targets
 
-	void PushRequiredWeapon( CTFWeaponBase *weapon );				// force us to equip and use this weapon until popped off the required stack
+	void PushRequiredWeapon( CFFWeaponBase *weapon );				// force us to equip and use this weapon until popped off the required stack
 	void PopRequiredWeapon( void );									// pop top required weapon off of stack and discard
 
 	#define MY_CURRENT_GUN NULL										// can be passed as weapon to following queries
-	bool IsCombatWeapon( CTFWeaponBase *weapon ) const;				// return true if given weapon can be used to attack
-	bool IsHitScanWeapon( CTFWeaponBase *weapon ) const;			// return true if given weapon is a "hitscan" weapon (scattered tracelines with instant damage)
-	bool IsContinuousFireWeapon( CTFWeaponBase *weapon ) const;		// return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
-	bool IsExplosiveProjectileWeapon( CTFWeaponBase *weapon ) const;// return true if given weapon launches explosive projectiles with splash damage
-	bool IsBarrageAndReloadWeapon( CTFWeaponBase *weapon ) const;	// return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
-	bool IsQuietWeapon( CTFWeaponBase *weapon ) const;				// return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
+	bool IsCombatWeapon( CFFWeaponBase *weapon ) const;				// return true if given weapon can be used to attack
+	bool IsHitScanWeapon( CFFWeaponBase *weapon ) const;			// return true if given weapon is a "hitscan" weapon (scattered tracelines with instant damage)
+	bool IsContinuousFireWeapon( CFFWeaponBase *weapon ) const;		// return true if given weapon "sprays" bullets/fire/etc continuously (ie: not individual rockets/etc)
+	bool IsExplosiveProjectileWeapon( CFFWeaponBase *weapon ) const;// return true if given weapon launches explosive projectiles with splash damage
+	bool IsBarrageAndReloadWeapon( CFFWeaponBase *weapon ) const;	// return true if given weapon has small clip and long reload cost (ie: rocket launcher, etc)
+	bool IsQuietWeapon( CFFWeaponBase *weapon ) const;				// return true if given weapon doesn't make much sound when used (ie: spy knife, etc)
 
 	bool IsEnvironmentNoisy( void ) const;							// return true if there are/have been loud noises (ie: non-quiet weapons) nearby very recently
 
@@ -192,7 +192,7 @@ public:
 	void ClearWeaponRestrictions( void );
 	void SetWeaponRestriction( int restrictionFlags );
 	bool HasWeaponRestriction( int restrictionFlags ) const;
-	bool IsWeaponRestricted( CTFWeaponBase *weapon ) const;
+	bool IsWeaponRestricted( CFFWeaponBase *weapon ) const;
 
 	bool ShouldFireCompressionBlast( void );
 
@@ -515,7 +515,7 @@ private:
 	CHandle< CBaseEntity > m_missionTarget;
 	CUtlString m_missionString;
 
-	CUtlStack< CHandle<CTFWeaponBase> > m_requiredWeaponStack;	// if non-empty, bot must equip the weapon on top of the stack
+	CUtlStack< CHandle<CFFWeaponBase> > m_requiredWeaponStack;	// if non-empty, bot must equip the weapon on top of the stack
 
 	CountdownTimer m_noisyTimer;
 

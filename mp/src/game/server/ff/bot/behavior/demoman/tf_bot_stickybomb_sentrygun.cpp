@@ -109,7 +109,7 @@ bool CFFBotStickybombSentrygun::IsAimOnTarget( CFFBot *me, float pitch, float ya
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotStickybombSentrygun::Update( CFFBot *me, float interval )
 {
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
 	if ( !myCurrentWeapon || !stickyLauncher )

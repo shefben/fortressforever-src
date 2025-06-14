@@ -22,14 +22,7 @@ extern ConVar ff_bot_debug_spy;
 //---------------------------------------------------------------------------------------------
 ActionResult< CFFBot >	CFFBotSpyLurk::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	// cloak 
-	if ( !me->m_Shared.IsStealthed() )
-	{
-		me->PressAltFireButton();
-	}
 
-	// disguise as the enemy team
-	me->DisguiseAsMemberOfEnemyTeam();
 
 	m_lurkTimer.Start( RandomFloat( 3.0f, 5.0f ) );
 

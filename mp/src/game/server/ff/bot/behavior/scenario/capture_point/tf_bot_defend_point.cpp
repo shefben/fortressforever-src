@@ -186,7 +186,7 @@ ActionResult< CFFBot >	CFFBotDefendPoint::Update( CFFBot *me, float interval )
 			return SuspendFor( new CFFBotSeekAndDestroy( 15.0f ), "Going after an enemy" );
 		}
 
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+		CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon && ( myWeapon->IsMeleeWeapon() || myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) ) )
 		{
 			// TODO: Check if threat is visible and if not, move to last known position

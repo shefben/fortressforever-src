@@ -98,7 +98,7 @@ ActionResult< CFFBot >	CFFBotNavEntDestroyEntity::Update( CFFBot *me, float inte
 			if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 			{
 				// demomen use stickybombs to destroy the barrier
-				CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+				CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 				CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
 				if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() != FF_WEAPON_PIPEBOMBLAUNCHER )

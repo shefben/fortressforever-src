@@ -10,7 +10,7 @@
 
 
 //---------------------------------------------------------------------------------------------
-CFFBotUseItem::CFFBotUseItem( CTFWeaponBase *item )
+CFFBotUseItem::CFFBotUseItem( CFFWeaponBase *item )
 {
 	m_item = item;
 }
@@ -36,7 +36,7 @@ ActionResult< CFFBot >	CFFBotUseItem::Update( CFFBot *me, float interval )
 		return Done( "NULL item" );
 	}
 
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 
 	if ( !myCurrentWeapon )
 	{

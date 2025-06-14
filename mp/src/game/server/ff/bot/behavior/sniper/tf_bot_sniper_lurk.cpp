@@ -197,7 +197,7 @@ ActionResult< CFFBot >	CFFBotSniperLurk::Update( CFFBot *me, float interval )
 	if ( isSightingRifle )
 	{
 		// switch to our sniper rifle
-		CTFWeaponBase *myGun = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+		CFFWeaponBase *myGun = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 		if ( myGun )
 		{
 			me->Weapon_Switch( myGun );
