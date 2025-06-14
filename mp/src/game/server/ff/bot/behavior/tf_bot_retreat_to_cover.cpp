@@ -217,20 +217,11 @@ ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval 
 			}
 		}
 
-		if ( me->IsPlayerClass( CLASS_SPY ) && !me->m_Shared.InCond( TF_COND_DISGUISED ) )
-		{
-			// don't leave cover until my disguise kicks in
-			return Continue();
-		}
-
-
 
 		if ( m_actionToChangeToOnceCoverReached )
 		{
 			return ChangeTo( m_actionToChangeToOnceCoverReached, "Doing given action now that I'm in cover" );
 		}
-
-
 
 		// stay in cover while we fully reload
 		if ( isDoingAFullReload )
