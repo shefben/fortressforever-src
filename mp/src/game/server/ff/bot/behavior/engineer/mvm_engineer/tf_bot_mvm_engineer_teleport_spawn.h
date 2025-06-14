@@ -9,13 +9,13 @@
 
 class CBaseTFBotHintEntity;
 
-class CTFBotMvMEngineerTeleportSpawn : public Action< CTFBot >
+class CFFBotMvMEngineerTeleportSpawn : public Action< CFFBot >
 {
 public:
-	CTFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEntity* pHint, bool bFirstTeleportSpawn );
+	CFFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEntity* pHint, bool bFirstTeleportSpawn );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "MvMEngineerTeleportSpawn"; };
 

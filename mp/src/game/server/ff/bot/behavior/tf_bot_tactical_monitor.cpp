@@ -41,21 +41,21 @@ extern ConVar ff_bot_health_critical_ratio;
 ConVar ff_bot_force_jump( "ff_bot_force_jump", "0", FCVAR_CHEAT, "Force bots to continuously jump" );
 
 
-Action< CTFBot > *CTFBotTacticalMonitor::InitialContainedAction( CTFBot *me )
+Action< CFFBot > *CFFBotTacticalMonitor::InitialContainedAction( CFFBot *me )
 {
-	return new CTFBotScenarioMonitor;
+	return new CFFBotScenarioMonitor;
 }
 
 
 //-----------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotTacticalMonitor::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotTacticalMonitor::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //-----------------------------------------------------------------------------------------
-void CTFBotTacticalMonitor::MonitorArmedStickyBombs( CTFBot *me )
+void CFFBotTacticalMonitor::MonitorArmedStickyBombs( CFFBot *me )
 {
 	if ( m_stickyBombCheckTimer.IsElapsed() )
 	{
@@ -115,25 +115,22 @@ void CTFBotTacticalMonitor::MonitorArmedStickyBombs( CTFBot *me )
 
 
 //-----------------------------------------------------------------------------------------
-void CTFBotTacticalMonitor::AvoidBumpingEnemies( CTFBot *me )
+void CFFBotTacticalMonitor::AvoidBumpingEnemies( CFFBot *me )
 {
-	if ( me->GetDifficulty() < CTFBot::HARD )
+	if ( me->GetDifficulty() < CFFBot::HARD )
 		return;
 
 	const float avoidRange = 200.0f;
 
-	CUtlVector< CTFPlayer * > enemyVector;
+	CUtlVector< CFFPlayer * > enemyVector;
 	CollectPlayers( &enemyVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
-	CTFPlayer *closestEnemy = NULL;
+	CFFPlayer *closestEnemy = NULL;
 	float closestRangeSq = avoidRange * avoidRange;
 
 	for( int i=0; i<enemyVector.Count(); ++i )
 	{
-		CTFPlayer *enemy = enemyVector[i];
-
-		if ( enemy->m_Shared.IsStealthed() || enemy->m_Shared.InCond( TF_COND_DISGUISED ) )
-			continue;
+		CFFPlayer *enemy = enemyVector[i];
 
 		float rangeSq = ( enemy->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
 		if ( rangeSq < closestRangeSq )
@@ -162,7 +159,7 @@ void CTFBotTacticalMonitor::AvoidBumpingEnemies( CTFBot *me )
 
 
 //-----------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotTacticalMonitor::Update( CFFBot *me, float interval )
 {
 	if ( TFGameRules()->RoundHasBeenWon() )
 	{
@@ -175,14 +172,14 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 		if ( TFGameRules()->GetWinningTeam() == me->GetTeamNumber() )
 		{
 			// we won - kill all losers we see
-			return SuspendFor( new CTFBotSeekAndDestroy, "Get the losers!" );
+			return SuspendFor( new CFFBotSeekAndDestroy, "Get the losers!" );
 		}
 		else
 		{
 			// lost - run and hide
 			if ( me->GetVisionInterface()->GetPrimaryKnownThreat( true ) )
 			{
-				return SuspendFor( new CTFBotRetreatToCover, "Run away from threat!" );
+				return SuspendFor( new CFFBotRetreatToCover, "Run away from threat!" );
 			}
 
 			me->PressCrouchButton();
@@ -205,7 +202,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 		me->GetLocomotionInterface()->ClearStuckStatus( "In preround" );
 	}
 
-	Action< CTFBot > *result = me->OpportunisticallyUseWeaponAbilities();
+	Action< CFFBot > *result = me->OpportunisticallyUseWeaponAbilities();
 	if ( result )
 	{
 		return SuspendFor( result, "Opportunistically using buff item" );
@@ -216,7 +213,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 		// if a human is staring at us, face them and taunt
 		if ( m_acknowledgeRetryTimer.IsElapsed() )
 		{
-			CTFPlayer *watcher = me->GetClosestHumanLookingAtMe();
+			CFFPlayer *watcher = me->GetClosestHumanLookingAtMe();
 			if ( watcher )
 			{
 				if ( !m_attentionTimer.HasStarted() )
@@ -238,7 +235,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 						// don't ack again for awhile
 						m_acknowledgeRetryTimer.Start( RandomFloat( 10.0f, 20.0f ) );
 
-						return SuspendFor( new CTFBotTaunt, "Acknowledging friendly human attention" );
+						return SuspendFor( new CFFBotTaunt, "Acknowledging friendly human attention" );
 					}
 				}
 			}
@@ -261,21 +258,21 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 
 	if ( shouldRetreat == ANSWER_YES )
 	{
-		return SuspendFor( new CTFBotRetreatToCover, "Backing off" );
+		return SuspendFor( new CFFBotRetreatToCover, "Backing off" );
 	}
 	else if ( shouldRetreat != ANSWER_NO )
 	{
 		// retreat if we need to do a full reload (ie: soldiers shot all their rockets)
 		if ( !me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
 		{
-			if ( me->IsDifficulty( CTFBot::HARD ) || me->IsDifficulty( CTFBot::EXPERT ) )
+			if ( me->IsDifficulty( CFFBot::HARD ) || me->IsDifficulty( CFFBot::EXPERT ) )
 			{
-				CTFWeaponBase *myPrimary = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+				CFFWeaponBase *myPrimary = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 				if ( myPrimary && me->GetAmmoCount( TF_AMMO_PRIMARY ) > 0 && me->IsBarrageAndReloadWeapon( myPrimary ) )
 				{
 					if ( myPrimary->Clip1() <= 1 )
 					{
-						return SuspendFor( new CTFBotRetreatToCover, "Moving to cover to reload" );
+						return SuspendFor( new CFFBotRetreatToCover, "Moving to cover to reload" );
 					}
 				}
 			}
@@ -296,7 +293,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 
 		bool isHurt = false;
 
-		if ( me->IsInCombat() || me->IsPlayerClass( TF_CLASS_SNIPER ) )
+		if ( me->IsInCombat() || me->IsPlayerClass( CLASS_SNIPER ) )
 		{
 			// stay in the fight until we're nearly dead
 			isHurt = ( (float)me->GetHealth() / (float)me->GetMaxHealth() ) < ff_bot_health_critical_ratio.GetFloat();
@@ -306,14 +303,14 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 			isHurt = me->m_Shared.InCond( TF_COND_BURNING ) || ( (float)me->GetHealth() / (float)me->GetMaxHealth() ) < ff_bot_health_ok_ratio.GetFloat();
 		}
 
-		if ( isHurt && CTFBotGetHealth::IsPossible( me ) )
+		if ( isHurt && CFFBotGetHealth::IsPossible( me ) )
 		{
-			return SuspendFor( new CTFBotGetHealth, "Grabbing nearby health" );
+			return SuspendFor( new CFFBotGetHealth, "Grabbing nearby health" );
 		}
 
-		if ( me->IsAmmoLow() && CTFBotGetAmmo::IsPossible( me ) )
+		if ( me->IsAmmoLow() && CFFBotGetAmmo::IsPossible( me ) )
 		{
-			return SuspendFor( new CTFBotGetAmmo, "Grabbing nearby ammo" );
+			return SuspendFor( new CFFBotGetAmmo, "Grabbing nearby ammo" );
 		}
 
 		bool shouldDestroySentries = true;
@@ -324,9 +321,9 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 		}
 
 		// destroy enemy sentry guns we've encountered
-		if ( shouldDestroySentries && me->GetEnemySentry() && CTFBotDestroyEnemySentry::IsPossible( me ) )
+		if ( shouldDestroySentries && me->GetEnemySentry() && CFFBotDestroyEnemySentry::IsPossible( me ) )
 		{
-			return SuspendFor( new CTFBotDestroyEnemySentry, "Going after an enemy sentry to destroy it" );
+			return SuspendFor( new CFFBotDestroyEnemySentry, "Going after an enemy sentry to destroy it" );
 		}
 	}
 
@@ -342,7 +339,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 			// only use teleporter if it is ahead of us
 			if ( teleporterArea && myArea && myArea->GetIncursionDistance( me->GetTeamNumber() ) < 350.0f + teleporterArea->GetIncursionDistance( me->GetTeamNumber() ) )
 			{
-				return SuspendFor( new CTFBotUseTeleporter( nearbyTeleporter ), "Using nearby teleporter" );
+				return SuspendFor( new CFFBotUseTeleporter( nearbyTeleporter ), "Using nearby teleporter" );
 			}
 		}
 	}
@@ -351,7 +348,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 	MonitorArmedStickyBombs( me );
 
 	// if we're a Spy, avoid bumping into enemies and giving ourselves away
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( me->IsPlayerClass( CLASS_SPY ) )
 	{
 		AvoidBumpingEnemies( me );
 	}
@@ -361,7 +358,7 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 	// if I'm a squad leader, wait for out of position squadmates
 	if ( me->IsInASquad() && me->GetSquad()->IsLeader( me ) && me->GetSquad()->ShouldSquadLeaderWaitForFormation() )
 	{
-		return SuspendFor( new CTFBotWaitForOutOfPositionSquadMember, "Waiting for squadmates to get back into formation" );
+		return SuspendFor( new CFFBotWaitForOutOfPositionSquadMember, "Waiting for squadmates to get back into formation" );
 	}
 
 
@@ -370,17 +367,17 @@ ActionResult< CTFBot >	CTFBotTacticalMonitor::Update( CTFBot *me, float interval
 
 
 //-----------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
 {
 	return TryContinue();
 }
 
 
 //-----------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnNavAreaChanged( CTFBot *me, CNavArea *newArea, CNavArea *oldArea )
+EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnNavAreaChanged( CFFBot *me, CNavArea *newArea, CNavArea *oldArea )
 {
 	// does the area we are entering have a prerequisite?
-	if ( newArea && newArea->HasPrerequisite( me ) && !me->HasAttribute( CTFBot::AGGRESSIVE ) )
+	if ( newArea && newArea->HasPrerequisite( me ) && !me->HasAttribute( CFFBot::AGGRESSIVE ) )
 	{
 		const CUtlVector< CHandle< CFuncNavPrerequisite > > &prereqVector = newArea->GetPrerequisiteVector();
 
@@ -392,11 +389,11 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnNavAreaChanged( CTFBot *me
 				// this prerequisite applies to me
 				if ( prereq->IsTask( CFuncNavPrerequisite::TASK_WAIT ) )
 				{
-					return TrySuspendFor( new CTFBotNavEntWait( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to wait" );
+					return TrySuspendFor( new CFFBotNavEntWait( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to wait" );
 				}
 				else if ( prereq->IsTask( CFuncNavPrerequisite::TASK_MOVE_TO_ENTITY ) )
 				{
-					return TrySuspendFor( new CTFBotNavEntMoveTo( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to move to an entity" );
+					return TrySuspendFor( new CFFBotNavEntMoveTo( prereq ), RESULT_IMPORTANT, "Prerequisite commands me to move to an entity" );
 				}
 			}
 		}
@@ -407,7 +404,7 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnNavAreaChanged( CTFBot *me
 }
 
 //-----------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me, const char *command )
+EventDesiredResult< CFFBot > CFFBotTacticalMonitor::OnCommandString( CFFBot *me, const char *command )
 {
 	if ( FStrEq( command, "goto action point" ) )
 	{
@@ -419,42 +416,18 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me,
 	}
 	else if ( FStrEq( command, "taunt" ) )
 	{
-		return TrySuspendFor( new CTFBotTaunt(), RESULT_TRY, "Received command to taunt" );
-	}
-	else if ( FStrEq( command, "cloak" ) )
-	{
-		if (  me->IsPlayerClass( TF_CLASS_SPY ) && me->m_Shared.IsStealthed() == false )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "uncloak" ) )
-	{
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) && me->m_Shared.IsStealthed() == true )
-		{
-			me->PressAltFireButton();
-		}
-	}
-	else if ( FStrEq( command, "disguise") )
-	{
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) )
-		{
-			if ( me->CanDisguise() )
-			{
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( TF_FIRST_NORMAL_CLASS, TF_LAST_NORMAL_CLASS-1 ) );
-			}
-		}
+		return TrySuspendFor( new CFFBotTaunt(), RESULT_TRY, "Received command to taunt" );
 	}
 	else if ( FStrEq( command, "build sentry at nearest sentry hint" ) )
 	{
-		if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+		if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		{
-			CTFBotHintSentrygun *bestSentryHint = NULL;
+			CFFBotHintSentrygun *bestSentryHint = NULL;
 			float bestDist2 = FLT_MAX;
-			CTFBotHintSentrygun *sentryHint;
-			for( sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
+			CFFBotHintSentrygun *sentryHint;
+			for( sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
 				 sentryHint;
-				 sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
+				 sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
 			{
 				// clear the previous owner if it is us
 				if ( sentryHint->GetPlayerOwner() == me )
@@ -475,7 +448,7 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me,
 			if ( bestSentryHint )
 			{
 				bestSentryHint->SetPlayerOwner( me );
-				return TrySuspendFor( new CTFBotEngineerBuilding( bestSentryHint ), RESULT_CRITICAL, "Building a Sentry at a hint location" );
+				return TrySuspendFor( new CFFBotEngineerBuilding( bestSentryHint ), RESULT_CRITICAL, "Building a Sentry at a hint location" );
 			}			
 		}
 	}
@@ -490,7 +463,7 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me,
 		me->SetIsMiniBoss( true );
 		me->SetScaleOverride( 1.75f );
 		me->ModifyMaxHealth( 5000 );
-		me->SetWeaponRestriction( CTFBot::PRIMARY_ONLY );
+		me->SetWeaponRestriction( CFFBot::PRIMARY_ONLY );
 		me->GetPlayerClass()->SetCustomModel( g_szBotBossModels[ me->GetPlayerClass()->GetClassIndex() ], USE_CLASS_ANIMATIONS );
 		me->UpdateModel();
 		me->SetBloodColor( DONT_BLEED );
@@ -532,12 +505,12 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me,
 		me->SetIsMiniBoss( true );
 		me->SetScaleOverride( 1.75f );
 		me->ModifyMaxHealth( 3300 );
-		me->SetWeaponRestriction( CTFBot::PRIMARY_ONLY );
+		me->SetWeaponRestriction( CFFBot::PRIMARY_ONLY );
 		me->GetPlayerClass()->SetCustomModel( g_szBotBossModels[ me->GetPlayerClass()->GetClassIndex() ], USE_CLASS_ANIMATIONS );
 		me->UpdateModel();
 		me->SetBloodColor( DONT_BLEED );
 		engine->SetFakeClientConVarValue( me->edict(), "name", "Guardian" );
-		me->SetAttribute( CTFBot::PRIORITIZE_DEFENSE );
+		me->SetAttribute( CFFBot::PRIORITIZE_DEFENSE );
 
 		// Custom attribs
 		struct botAttribs_t
@@ -577,10 +550,10 @@ EventDesiredResult< CTFBot > CTFBotTacticalMonitor::OnCommandString( CTFBot *me,
 
 
 //-----------------------------------------------------------------------------------------
-bool CTFBotTacticalMonitor::ShouldOpportunisticallyTeleport( CTFBot *me ) const
+bool CFFBotTacticalMonitor::ShouldOpportunisticallyTeleport( CFFBot *me ) const
 {
 	// if I'm an engineer who hasn't placed his teleport entrance yet, don't use friend's teleporter
-	if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 	{
 		CBaseObject *teleporterEntrance = me->GetObjectOfType( OBJ_TELEPORTER, MODE_TELEPORTER_ENTRANCE );
 
@@ -588,7 +561,7 @@ bool CTFBotTacticalMonitor::ShouldOpportunisticallyTeleport( CTFBot *me ) const
 	}
 
 	// Medics don't automatically take teleporters unless they actively decide to follow their patient through
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		return false;
 	}
@@ -598,7 +571,7 @@ bool CTFBotTacticalMonitor::ShouldOpportunisticallyTeleport( CTFBot *me ) const
 
 
 //-----------------------------------------------------------------------------------------
-CObjectTeleporter *CTFBotTacticalMonitor::FindNearbyTeleporter( CTFBot *me )
+CObjectTeleporter *CFFBotTacticalMonitor::FindNearbyTeleporter( CFFBot *me )
 {
 	if ( !m_findTeleporterTimer.IsElapsed() )
 	{

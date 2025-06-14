@@ -20,10 +20,10 @@ class PlaceStickyBombReply : public INextBotReply
 public:
 	virtual void OnSuccess( INextBot *bot )		// invoked when process completed successfully
 	{
-		CTFBot *me = ToTFBot( bot->GetEntity() );
+		CFFBot *me = ToTFBot( bot->GetEntity() );
 
-		CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
-		if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() == TF_WEAPON_PIPEBOMBLAUNCHER )
+		CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
+		if ( myCurrentWeapon && myCurrentWeapon->GetWeaponID() == FF_WEAPON_PIPEBOMBLAUNCHER )
 		{
 			// launch the sticky
 			me->PressFireButton( 0.1f );
@@ -51,12 +51,12 @@ public:
 	void ClearData()
 	{
 		// Be sure to clear all members here, as we can potentially get an OnSuccess() call
-		//  after the ~CTFBotPrepareStickybombTrap.
+		//  after the ~CFFBotPrepareStickybombTrap.
 		m_bombTargetArea = NULL;
 		m_pLaunchWaitTimer = NULL;
 	}
 
-	CTFBotPrepareStickybombTrap::BombTargetArea *m_bombTargetArea;
+	CFFBotPrepareStickybombTrap::BombTargetArea *m_bombTargetArea;
 	CountdownTimer *m_pLaunchWaitTimer;
 };
 
@@ -65,14 +65,14 @@ static PlaceStickyBombReply bombReply;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotPrepareStickybombTrap::CTFBotPrepareStickybombTrap( void )
+CFFBotPrepareStickybombTrap::CFFBotPrepareStickybombTrap( void )
 {
 	m_myArea = NULL;
 }
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotPrepareStickybombTrap::~CTFBotPrepareStickybombTrap( )
+CFFBotPrepareStickybombTrap::~CFFBotPrepareStickybombTrap( )
 {
 	bombReply.ClearData();
 }
@@ -80,7 +80,7 @@ CTFBotPrepareStickybombTrap::~CTFBotPrepareStickybombTrap( )
 
 //---------------------------------------------------------------------------------------------
 // Return true if this Action has what it needs to perform right now
-bool CTFBotPrepareStickybombTrap::IsPossible( CTFBot *me )
+bool CFFBotPrepareStickybombTrap::IsPossible( CFFBot *me )
 {
 	// don't lay a trap if we're in the midst of fighting
 	if ( /*me->IsInCombat() || */ me->GetTimeSinceLastInjury() < 1.0f )
@@ -88,7 +88,7 @@ bool CTFBotPrepareStickybombTrap::IsPossible( CTFBot *me )
 		return false;
 	}
 
-	if ( !me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( !me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
 		return false;
 	}
@@ -107,7 +107,7 @@ bool CTFBotPrepareStickybombTrap::IsPossible( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotPrepareStickybombTrap::InitBombTargetAreas( CTFBot *me )
+void CFFBotPrepareStickybombTrap::InitBombTargetAreas( CFFBot *me )
 {
 	const CUtlVector< CTFNavArea * > &invasionAreaVector = m_myArea->GetEnemyInvasionAreaVector( me->GetTeamNumber() );
 
@@ -146,7 +146,7 @@ void CTFBotPrepareStickybombTrap::InitBombTargetAreas( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	// detonate old set of stickies
 	// me->PressAltFireButton();
@@ -178,7 +178,7 @@ ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::OnStart( CTFBot *me, Action<
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotPrepareStickybombTrap::Update( CFFBot *me, float interval )
 {
 	if ( !TFGameRules()->InSetup() )
 	{
@@ -200,7 +200,7 @@ ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::Update( CTFBot *me, float in
 		InitBombTargetAreas( me );
 	}
 
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
 	if ( !myCurrentWeapon || !stickyLauncher )
@@ -208,7 +208,7 @@ ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::Update( CTFBot *me, float in
 		return Done( "Missing weapon" );
 	}
 
-	if ( myCurrentWeapon->GetWeaponID() != TF_WEAPON_PIPEBOMBLAUNCHER )
+	if ( myCurrentWeapon->GetWeaponID() != FF_WEAPON_PIPEBOMBLAUNCHER )
 	{
 		me->Weapon_Switch( stickyLauncher );
 	}
@@ -279,7 +279,7 @@ ActionResult< CTFBot >	CTFBotPrepareStickybombTrap::Update( CTFBot *me, float in
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotPrepareStickybombTrap::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotPrepareStickybombTrap::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	// clean up any in-flight AimHeadTowards() replies
 	me->GetBodyInterface()->ClearPendingAimReply();
@@ -289,7 +289,7 @@ void CTFBotPrepareStickybombTrap::OnEnd( CTFBot *me, Action< CTFBot > *nextActio
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotPrepareStickybombTrap::OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotPrepareStickybombTrap::OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	// this behavior is transitory - if we need to do something else, just give up
 	return Done();
@@ -297,14 +297,14 @@ ActionResult< CTFBot > CTFBotPrepareStickybombTrap::OnSuspend( CTFBot *me, Actio
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPrepareStickybombTrap::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotPrepareStickybombTrap::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	return TryDone( RESULT_IMPORTANT, "Ouch!" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotPrepareStickybombTrap::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotPrepareStickybombTrap::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

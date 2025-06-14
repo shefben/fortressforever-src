@@ -22,21 +22,21 @@ ConVar ff_bot_sniper_linger_time( "ff_bot_sniper_linger_time", "5", FCVAR_CHEAT,
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotSniperAttack::IsPossible( CTFBot *me )
+bool CFFBotSniperAttack::IsPossible( CFFBot *me )
 {
-	return me->IsPlayerClass( TF_CLASS_SNIPER ) && me->GetVisionInterface()->GetPrimaryKnownThreat() && me->GetVisionInterface()->GetPrimaryKnownThreat()->IsVisibleRecently();
+	return me->IsPlayerClass( CLASS_SNIPER ) && me->GetVisionInterface()->GetPrimaryKnownThreat() && me->GetVisionInterface()->GetPrimaryKnownThreat()->IsVisibleRecently();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSniperAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSniperAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSniperAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSniperAttack::Update( CFFBot *me, float interval )
 {
 	// switch to our sniper rifle
 	CBaseCombatWeapon *myGun = me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
@@ -73,12 +73,12 @@ ActionResult< CTFBot >	CTFBotSniperAttack::Update( CTFBot *me, float interval )
 
 	if ( me->IsDistanceBetweenLessThan( threat->GetLastKnownPosition(), ff_bot_sniper_flee_range.GetFloat() ) )
 	{
-		return SuspendFor( new CTFBotRetreatToCover, "Retreating from nearby enemy" );
+		return SuspendFor( new CFFBotRetreatToCover, "Retreating from nearby enemy" );
 	}
 
 	if ( me->GetTimeSinceLastInjury() < 1.0f )
 	{
-		return SuspendFor( new CTFBotRetreatToCover, "Retreating due to injury" );
+		return SuspendFor( new CFFBotRetreatToCover, "Retreating due to injury" );
 	}
 
 	// we have a target
@@ -94,7 +94,7 @@ ActionResult< CTFBot >	CTFBotSniperAttack::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotSniperAttack::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotSniperAttack::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
 	{
@@ -105,7 +105,7 @@ void CTFBotSniperAttack::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSniperAttack::OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotSniperAttack::OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
 	{
@@ -118,7 +118,7 @@ ActionResult< CTFBot >	CTFBotSniperAttack::OnSuspend( CTFBot *me, Action< CTFBot
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSniperAttack::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotSniperAttack::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	return Continue();
 }
@@ -126,9 +126,9 @@ ActionResult< CTFBot >	CTFBotSniperAttack::OnResume( CTFBot *me, Action< CTFBot 
 
 //---------------------------------------------------------------------------------------------
 // given a subject, return the world space position we should aim at
-Vector CTFBotSniperAttack::SelectTargetPoint( const INextBot *me, const CBaseCombatCharacter *subject ) const
+Vector CFFBotSniperAttack::SelectTargetPoint( const INextBot *me, const CBaseCombatCharacter *subject ) const
 {
-	VPROF_BUDGET( "CTFBotSniperAttack::SelectTargetPoint", "NextBot" );
+	VPROF_BUDGET( "CFFBotSniperAttack::SelectTargetPoint", "NextBot" );
 
 	Vector visibleSpot;
 
@@ -158,7 +158,7 @@ Vector CTFBotSniperAttack::SelectTargetPoint( const INextBot *me, const CBaseCom
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject, const CKnownEntity *threat ) const
+bool CFFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject, const CKnownEntity *threat ) const
 {
 	if ( subject->InSameTeam( threat->GetEntity() ) )
 		return false;
@@ -170,7 +170,7 @@ bool CTFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 	if ( !threat->WasEverVisible() || threat->GetTimeSinceLastSeen() > hiddenAwhile )
 		return false;
 
-	CTFPlayer *player = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *player = ToFFPlayer( threat->GetEntity() );
 
 	Vector to = subject->GetAbsOrigin() - threat->GetLastKnownPosition();
 	float threatRange = to.NormalizeInPlace();
@@ -196,7 +196,7 @@ bool CTFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 		return false;
 	}
 
-	if ( player->IsPlayerClass( TF_CLASS_SNIPER ) )
+	if ( player->IsPlayerClass( CLASS_SNIPER ) )
 	{
 		// is the sniper pointing at me?
 		Vector sniperForward;
@@ -215,7 +215,7 @@ bool CTFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 	else
 #endif // TF_RAID_MODE
 	{
-		if ( player->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( player->IsPlayerClass( CLASS_MEDIC ) )
 		{
 			// always try to kill these guys first
 			return true;
@@ -228,7 +228,7 @@ bool CTFBotSniperAttack::IsImmediateThreat( const CBaseCombatCharacter *subject,
 
 //---------------------------------------------------------------------------------------------
 // return the more dangerous of the two threats to 'subject', or NULL if we have no opinion
-const CKnownEntity *CTFBotSniperAttack::SelectMoreDangerousThreat( const INextBot *me, 
+const CKnownEntity *CFFBotSniperAttack::SelectMoreDangerousThreat( const INextBot *me, 
 																   const CBaseCombatCharacter *subject,
 																   const CKnownEntity *threat1, 
 																   const CKnownEntity *threat2 ) const

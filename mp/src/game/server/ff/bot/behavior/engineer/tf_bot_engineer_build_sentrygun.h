@@ -6,19 +6,19 @@
 #ifndef FF_BOT_ENGINEER_BUILD_SENTRYGUN_H
 #define FF_BOT_ENGINEER_BUILD_SENTRYGUN_H
 
-class CTFBotHintSentrygun;
+class CFFBotHintSentrygun;
 
 
-class CTFBotEngineerBuildSentryGun : public Action< CTFBot >
+class CFFBotEngineerBuildSentryGun : public Action< CFFBot >
 {
 public:
-	CTFBotEngineerBuildSentryGun( void );
-	CTFBotEngineerBuildSentryGun( CTFBotHintSentrygun *sentryBuildHint );
+	CFFBotEngineerBuildSentryGun( void );
+	CFFBotEngineerBuildSentryGun( CFFBotHintSentrygun *sentryBuildHint );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
 	virtual const char *GetName( void ) const	{ return "EngineerBuildSentryGun"; };
 
@@ -32,7 +32,7 @@ private:
 	int m_sentryTriesLeft;
 	PathFollower m_path;
 
-	CTFBotHintSentrygun *m_sentryBuildHint;
+	CFFBotHintSentrygun *m_sentryBuildHint;
 	Vector m_sentryBuildLocation;
 
 	int m_wanderWay;

@@ -18,7 +18,7 @@ ConVar ff_bot_sniper_choose_target_interval( "ff_bot_sniper_choose_target_interv
 
 //------------------------------------------------------------------------------------------
 // Update internal state
-void CTFBotVision::Update( void )
+void CFFBotVision::Update( void )
 {
 	if ( TFGameRules()->IsMannVsMachineMode() )
 	{
@@ -33,17 +33,17 @@ void CTFBotVision::Update( void )
 
 	IVision::Update();
 
-	CTFBot *me = (CTFBot *)GetBot()->GetEntity();
+	CFFBot *me = (CFFBot *)GetBot()->GetEntity();
 	if ( !me )
 		return;
 
 	// forget spies we have lost sight of
-	CUtlVector< CTFPlayer * > playerVector;
+	CUtlVector< CFFPlayer * > playerVector;
 	CollectPlayers( &playerVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 	for( int i=0; i<playerVector.Count(); ++i )
 	{
-		if ( !playerVector[i]->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( !playerVector[i]->IsPlayerClass( CLASS_SPY ) )
 			continue;
 
 		const CKnownEntity *known = GetKnown( playerVector[i] );
@@ -51,7 +51,6 @@ void CTFBotVision::Update( void )
 		if ( !known || !known->IsVisibleRecently() )
 		{
 			// if a hidden spy changes disguises, we no longer recognize him
-			if ( playerVector[i]->m_Shared.InCond( TF_COND_DISGUISING ) )
 			{
 				me->ForgetSpy( playerVector[i] );				
 			}
@@ -61,9 +60,9 @@ void CTFBotVision::Update( void )
 
 
 //------------------------------------------------------------------------------------------
-void CTFBotVision::CollectPotentiallyVisibleEntities( CUtlVector< CBaseEntity * > *potentiallyVisible )
+void CFFBotVision::CollectPotentiallyVisibleEntities( CUtlVector< CBaseEntity * > *potentiallyVisible )
 {
-	VPROF_BUDGET( "CTFBotVision::CollectPotentiallyVisibleEntities", "NextBot" );
+	VPROF_BUDGET( "CFFBotVision::CollectPotentiallyVisibleEntities", "NextBot" );
 
 	potentiallyVisible->RemoveAll();
 
@@ -101,7 +100,7 @@ void CTFBotVision::CollectPotentiallyVisibleEntities( CUtlVector< CBaseEntity * 
 
 
 //------------------------------------------------------------------------------------------
-void CTFBotVision::UpdatePotentiallyVisibleNPCVector( void )
+void CFFBotVision::UpdatePotentiallyVisibleNPCVector( void )
 {
 	if ( m_potentiallyVisibleUpdateTimer.IsElapsed() )
 	{
@@ -110,7 +109,7 @@ void CTFBotVision::UpdatePotentiallyVisibleNPCVector( void )
 		// collect list of active buildings
 		m_potentiallyVisibleNPCVector.RemoveAll();
 
-		bool bShouldSeeTeleporter = !TFGameRules()->IsMannVsMachineMode() || GetBot()->GetEntity()->GetTeamNumber() != TF_TEAM_PVE_INVADERS;
+		bool bShouldSeeTeleporter = !TFGameRules()->IsMannVsMachineMode() || GetBot()->GetEntity()->GetTeamNumber() != FF_TEAM_PVE_INVADERS;
 		for ( int i=0; i<IBaseObjectAutoList::AutoList().Count(); ++i )
 		{
 			CBaseObject* pObj = static_cast< CBaseObject* >( IBaseObjectAutoList::AutoList()[i] );
@@ -148,14 +147,14 @@ void CTFBotVision::UpdatePotentiallyVisibleNPCVector( void )
  * Return true to completely ignore this entity.
  * This is mostly for enemy spies.  If we don't ignore them, we will look at them.
  */
-bool CTFBotVision::IsIgnored( CBaseEntity *subject ) const
+bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 {
-	CTFBot *me = (CTFBot *)GetBot()->GetEntity();
+	CFFBot *me = (CFFBot *)GetBot()->GetEntity();
 
 #ifdef TF_RAID_MODE
 	if ( TFGameRules()->IsRaidMode() )
 	{
-		if ( me->IsPlayerClass( TF_CLASS_SCOUT ) )
+		if ( me->IsPlayerClass( CLASS_SCOUT ) )
 		{
 			// Scouts are wandering defenders, and aggro purely on proximity or damage, not vision
 			return true;
@@ -185,68 +184,68 @@ bool CTFBotVision::IsIgnored( CBaseEntity *subject ) const
 
 	if ( subject->IsPlayer() )
 	{
-		CTFPlayer *enemy = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *enemy = static_cast< CFFPlayer * >( subject );
 
 		// test for designer-defined ignorance
 		switch( enemy->GetPlayerClass()->GetClassIndex() )
 		{
-		case TF_CLASS_MEDIC:
+		case CLASS_MEDIC:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_MEDICS ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_ENGINEER:
+		case CLASS_ENGINEER:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_ENGINEERS ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_SNIPER:
+		case CLASS_SNIPER:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_SNIPERS ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_SCOUT:
+		case CLASS_SCOUT:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_SCOUTS ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_SPY:
+		case CLASS_SPY:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_SPIES ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_DEMOMAN:
+		case CLASS_DEMOMAN:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_DEMOMEN ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_SOLDIER:
+		case CLASS_SOLDIER:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_SOLDIERS ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_HEAVYWEAPONS:
+		case CLASS_HEAVYWEAPONS:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_HEAVIES ) )
 			{
 				return true;
 			}
 			break;
 
-		case TF_CLASS_PYRO:
+		case CLASS_PYRO:
 			if ( me->IsBehaviorFlagSet( TFBOT_IGNORE_ENEMY_PYROS ) )
 			{
 				return true;
@@ -283,9 +282,7 @@ bool CTFBotVision::IsIgnored( CBaseEntity *subject ) const
 			return true;
 		}
 
-		if ( enemy->m_Shared.IsStealthed() )
 		{
-			if ( enemy->m_Shared.GetPercentInvisible() < 0.75f )
 			{
 				// spy is partially cloaked, and therefore attracts our attention
 				return false;
@@ -300,12 +297,10 @@ bool CTFBotVision::IsIgnored( CBaseEntity *subject ) const
 			return false;
 		}
 
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISING ) )
 		{
 			return false;
 		}
 		
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISED ) && enemy->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 		{
 			// spy is disguised as a member of my team
 			return true;
@@ -348,13 +343,13 @@ bool CTFBotVision::IsIgnored( CBaseEntity *subject ) const
 
 //------------------------------------------------------------------------------------------
 // Return true if we 'notice' the subject, even though we have LOS to it
-bool CTFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
+bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 {
-	CTFBot *me = (CTFBot *)GetBot()->GetEntity();
+	CFFBot *me = (CFFBot *)GetBot()->GetEntity();
 
 	if ( subject->IsPlayer() && me->IsEnemy( subject ) )
 	{
-		CTFPlayer *player = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *player = static_cast< CFFPlayer * >( subject );
 
 		if ( player->m_Shared.InCond( TF_COND_BURNING ) ||
 			 player->m_Shared.InCond( TF_COND_URINE ) ||
@@ -385,9 +380,7 @@ bool CTFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 			return false;
 		}
 
-		if ( player->m_Shared.IsStealthed() )
 		{
-			if ( player->m_Shared.GetPercentInvisible() < 0.75f )
 			{
 				// spy is partially cloaked, and therefore attracts our attention
 				me->RealizeSpy( player );
@@ -401,11 +394,10 @@ bool CTFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 
 		if ( TFGameRules()->IsMannVsMachineMode() )	// in MvM mode, forget spies as soon as they are fully disguised
 		{
-			CTFBot::SuspectedSpyInfo_t* pSuspectInfo = me->IsSuspectedSpy( player );
+			CFFBot::SuspectedSpyInfo_t* pSuspectInfo = me->IsSuspectedSpy( player );
 			// But only if we aren't suspecting them currently.  This happens when we bump into them.
 			if( !pSuspectInfo || !pSuspectInfo->IsCurrentlySuspected() )
 			{
-				if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 				{
 					me->ForgetSpy( player );
 					return false;
@@ -429,14 +421,12 @@ bool CTFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 			}
 		}
 
-		if ( player->m_Shared.InCond( TF_COND_DISGUISING ) )
 		{
 			// spotted a spy!
 			me->RealizeSpy( player );
 			return true;
 		}
 
-		if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
 		{
 			// spy is disguised as a member of my team, don't notice him
 			return false;
@@ -449,16 +439,16 @@ bool CTFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 
 //------------------------------------------------------------------------------------------
 // Return VISUAL reaction time
-float CTFBotVision::GetMinRecognizeTime( void ) const
+float CFFBotVision::GetMinRecognizeTime( void ) const
 {
-	CTFBot *me = (CTFBot *)GetBot();
+	CFFBot *me = (CFFBot *)GetBot();
 
 	switch ( me->GetDifficulty() )
 	{
-	case CTFBot::EASY:		return 1.0f;
-	case CTFBot::NORMAL:	return 0.5f;
-	case CTFBot::HARD:		return 0.3f;
-	case CTFBot::EXPERT:	return 0.2f;
+	case CFFBot::EASY:		return 1.0f;
+	case CFFBot::NORMAL:	return 0.5f;
+	case CFFBot::HARD:		return 0.3f;
+	case CFFBot::EXPERT:	return 0.2f;
 	}
 
 	return 1.0f;
@@ -467,9 +457,9 @@ float CTFBotVision::GetMinRecognizeTime( void ) const
 
 
 //------------------------------------------------------------------------------------------
-float CTFBotVision::GetMaxVisionRange( void ) const
+float CFFBotVision::GetMaxVisionRange( void ) const
 {
-	CTFBot *me = (CTFBot *)GetBot();
+	CFFBot *me = (CFFBot *)GetBot();
 
 	if ( me->GetMaxVisionRangeOverride() > 0.0f )
 	{

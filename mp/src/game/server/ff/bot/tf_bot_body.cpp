@@ -13,28 +13,28 @@
 // Return how often we should sample our target's position and 
 // velocity to update our aim tracking, to allow realistic slop in tracking
 //
-float CTFBotBody::GetHeadAimTrackingInterval( void ) const
+float CFFBotBody::GetHeadAimTrackingInterval( void ) const
 {
-	CTFBot *me = (CTFBot *)GetBot();
+	CFFBot *me = (CFFBot *)GetBot();
 
 	// don't let Spies in MvM mode aim too precisely
-	if ( TFGameRules()->IsMannVsMachineMode() && me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( TFGameRules()->IsMannVsMachineMode() && me->IsPlayerClass( CLASS_SPY ) )
 	{
 		return 0.25f;
 	}
 
 	switch( me->GetDifficulty() )
 	{
-	case CTFBot::EXPERT:
+	case CFFBot::EXPERT:
 		return 0.05f;
 
-	case CTFBot::HARD:
+	case CFFBot::HARD:
 		return 0.1f;
 
-	case CTFBot::NORMAL:
+	case CFFBot::NORMAL:
 		return 0.25f;
 
-	case CTFBot::EASY:
+	case CFFBot::EASY:
 		return 1.0f;
 	}
 

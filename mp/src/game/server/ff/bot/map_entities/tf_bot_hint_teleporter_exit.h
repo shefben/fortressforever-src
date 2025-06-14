@@ -8,14 +8,14 @@
 
 #include "ff_bot_hint_entity.h"
 
-class CTFBotHintTeleporterExit : public CBaseTFBotHintEntity
+class CFFBotHintTeleporterExit : public CBaseTFBotHintEntity
 {
-	DECLARE_CLASS( CTFBotHintTeleporterExit, CBaseTFBotHintEntity );
+	DECLARE_CLASS( CFFBotHintTeleporterExit, CBaseTFBotHintEntity );
 public:
 	DECLARE_DATADESC();
 
-	CTFBotHintTeleporterExit( void );
-	virtual ~CTFBotHintTeleporterExit() { }
+	CFFBotHintTeleporterExit( void );
+	virtual ~CFFBotHintTeleporterExit() { }
 
 	virtual HintType GetHintType() const OVERRIDE { return HINT_TELEPORTER_EXIT; }
 };

@@ -20,13 +20,13 @@ extern ConVar ff_bot_suicide_bomb_range;
 ConVar ff_bot_reprogrammed_time( "ff_bot_reprogrammed_time", "8", FCVAR_CHEAT );
 
 //---------------------------------------------------------------------------------------------
-CTFBotMissionReprogrammed::CTFBotMissionReprogrammed( void )
+CFFBotMissionReprogrammed::CFFBotMissionReprogrammed( void )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMissionReprogrammed::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMissionReprogrammed::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_detonateTimer.Invalidate();
@@ -45,7 +45,7 @@ ActionResult< CTFBot >	CTFBotMissionReprogrammed::OnStart( CTFBot *me, Action< C
 	// Find nearest, accessible teammate
 	if ( !m_victim )
 	{
-		CTFPlayer *pTarget = FindNearestEnemy( me );
+		CFFPlayer *pTarget = FindNearestEnemy( me );
 		if ( pTarget )
 		{
 			me->SetMissionTarget( pTarget );
@@ -70,7 +70,7 @@ ActionResult< CTFBot >	CTFBotMissionReprogrammed::OnStart( CTFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMissionReprogrammed::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMissionReprogrammed::Update( CFFBot *me, float interval )
 {
 	bool bDetonate = false;
 
@@ -93,7 +93,7 @@ ActionResult< CTFBot >	CTFBotMissionReprogrammed::Update( CTFBot *me, float inte
 	{
 		m_victim.Set( NULL );
 
-		CTFPlayer *pTarget = FindNearestEnemy( me );
+		CFFPlayer *pTarget = FindNearestEnemy( me );
 		if ( pTarget )
 		{
 			me->SetMissionTarget( pTarget );
@@ -122,7 +122,7 @@ ActionResult< CTFBot >	CTFBotMissionReprogrammed::Update( CTFBot *me, float inte
 	{
 		m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, m_lastKnownVictimPosition, cost );
 
 		if ( m_path.Compute( me, m_lastKnownVictimPosition, cost ) == false )
@@ -173,7 +173,7 @@ ActionResult< CTFBot >	CTFBotMissionReprogrammed::Update( CTFBot *me, float inte
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionReprogrammed::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotMissionReprogrammed::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( me->IsAlive() )
 	{
@@ -183,7 +183,7 @@ void CTFBotMissionReprogrammed::OnEnd( CTFBot *me, Action< CTFBot > *nextAction 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMissionReprogrammed::OnKilled( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMissionReprogrammed::OnKilled( CFFBot *me, const CTakeDamageInfo &info )
 {
 	// Keep us alive, but run to nearest enemy
 	if ( !m_hasDetonated )
@@ -203,7 +203,7 @@ EventDesiredResult< CTFBot > CTFBotMissionReprogrammed::OnKilled( CTFBot *me, co
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMissionReprogrammed::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMissionReprogrammed::OnStuck( CFFBot *me )
 {
 	// we're stuck, decide to detonate now!
 	if ( !m_hasDetonated && !m_detonateTimer.HasStarted() )
@@ -216,7 +216,7 @@ EventDesiredResult< CTFBot > CTFBotMissionReprogrammed::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionReprogrammed::StartDetonate( CTFBot *me, bool wasSuccessful /* = false */ )
+void CFFBotMissionReprogrammed::StartDetonate( CFFBot *me, bool wasSuccessful /* = false */ )
 {
 	if ( m_detonateTimer.HasStarted() )
 		return;
@@ -239,7 +239,7 @@ void CTFBotMissionReprogrammed::StartDetonate( CTFBot *me, bool wasSuccessful /*
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionReprogrammed::Detonate( CTFBot *me )
+void CFFBotMissionReprogrammed::Detonate( CFFBot *me )
 {
 	// BLAST!
 	m_hasDetonated = true;
@@ -255,11 +255,11 @@ void CTFBotMissionReprogrammed::Detonate( CTFBot *me )
 	{
 		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
 		{
-			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, TF_TEAM_PVE_DEFENDERS );
+			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
 		}
 	}
 
-	CUtlVector< CTFPlayer* > playerVector;
+	CUtlVector< CFFPlayer* > playerVector;
 	CUtlVector< CBaseCombatCharacter* > victimVector;
 
 	// Only damage our original team (reprogramming switches team)
@@ -299,7 +299,7 @@ void CTFBotMissionReprogrammed::Detonate( CTFBot *me )
 	}
 
 	// Clear my mission before we have everyone take damage so I will die with the rest
-	me->SetMission( CTFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
+	me->SetMission( CFFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
 	me->m_takedamage = DAMAGE_YES;
 
 	// kill victims (including me)
@@ -335,13 +335,13 @@ void CTFBotMissionReprogrammed::Detonate( CTFBot *me )
 }
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CTFBotMissionReprogrammed::FindNearestEnemy( CTFBot *me )
+CFFPlayer *CFFBotMissionReprogrammed::FindNearestEnemy( CFFBot *me )
 {
-	CUtlVector< CTFPlayer* > playerVector;
+	CUtlVector< CFFPlayer* > playerVector;
 
 	CollectPlayers( &playerVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
-	CTFPlayer *pClosestPlayer = NULL;
+	CFFPlayer *pClosestPlayer = NULL;
 	float flClosestPlayerDist = FLT_MAX;
 
 	FOR_EACH_VEC( playerVector, i )
@@ -368,7 +368,7 @@ CTFPlayer *CTFBotMissionReprogrammed::FindNearestEnemy( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMissionReprogrammed::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotMissionReprogrammed::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ( m_detonateTimer.HasStarted() ) ? ANSWER_NO : ANSWER_YES;
 }

@@ -13,14 +13,14 @@
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotFetchFlag::CTFBotFetchFlag( bool isTemporary )
+CFFBotFetchFlag::CFFBotFetchFlag( bool isTemporary )
 {
 	m_isTemporary = isTemporary;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotFetchFlag::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotFetchFlag::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -29,7 +29,7 @@ ActionResult< CTFBot >	CTFBotFetchFlag::OnStart( CTFBot *me, Action< CTFBot > *p
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotFetchFlag::Update( CFFBot *me, float interval )
 {
 	CCaptureFlag *flag = me->GetFlagToFetch();
 
@@ -37,17 +37,13 @@ ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
 	{
 		if ( TFGameRules()->IsMannVsMachineMode() )
 		{
-			return SuspendFor( new CTFBotAttackFlagDefenders, "Flag flag exists - Attacking the enemy flag defenders" );
+			return SuspendFor( new CFFBotAttackFlagDefenders, "Flag flag exists - Attacking the enemy flag defenders" );
 		}
 
 		return Done( "No flag" );
 	}
 
-	// uncloak so we can attack
-	if ( me->m_Shared.IsStealthed() )
-	{
-		me->PressAltFireButton();
-	}
+
 
 	if ( TFGameRules()->IsMannVsMachineMode() && flag->IsHome() )
 	{
@@ -64,7 +60,7 @@ ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
 			}
 
 			// flag is at home and we're out in the world - can't reach it
-			return SuspendFor( new CTFBotAttackFlagDefenders, "Flag unreachable at home - Attacking the enemy flag defenders" );
+			return SuspendFor( new CFFBotAttackFlagDefenders, "Flag unreachable at home - Attacking the enemy flag defenders" );
 		}
 	}
 
@@ -74,7 +70,7 @@ ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
 		me->EquipBestWeaponForThreat( threat );
 	}
 
-	CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+	CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 	if ( carrier )
 	{
 		if ( m_isTemporary )
@@ -83,20 +79,20 @@ ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
 		}
 
 		// NOTE: if I've picked up the flag, the ScenarioMonitor will handle it
-		return SuspendFor( new CTFBotAttackFlagDefenders, "Someone has the flag - attacking the enemy defenders" );
+		return SuspendFor( new CFFBotAttackFlagDefenders, "Someone has the flag - attacking the enemy defenders" );
 	}
 
 	// go pick up the flag
 	if ( m_repathTimer.IsElapsed() )
 	{
-		CTFBotPathCost cost( me, DEFAULT_ROUTE );
+		CFFBotPathCost cost( me, DEFAULT_ROUTE );
 		float maxPathLength = TFGameRules()->IsMannVsMachineMode() ? TFBOT_MVM_MAX_PATH_LENGTH : 0.0f;
 		if ( m_path.Compute( me, flag->WorldSpaceCenter(), cost, maxPathLength ) == false )
 		{
 			if ( flag->IsDropped() )
 			{
 				// flag is unreachable - attack for awhile and hope someone else can dislodge it
-				return SuspendFor( new CTFBotAttackFlagDefenders( RandomFloat( 5.0f, 10.0f ) ), "Flag unreachable - Attacking" );
+				return SuspendFor( new CFFBotAttackFlagDefenders( RandomFloat( 5.0f, 10.0f ) ), "Flag unreachable - Attacking" );
 
 				// just give it to me
 				// flag->PickUp( me, true );
@@ -114,7 +110,7 @@ ActionResult< CTFBot > CTFBotFetchFlag::Update( CTFBot *me, float interval )
 
 //---------------------------------------------------------------------------------------------
 // are we in a hurry?
-QueryResultType CTFBotFetchFlag::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotFetchFlag::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
@@ -122,7 +118,7 @@ QueryResultType CTFBotFetchFlag::ShouldHurry( const INextBot *me ) const
 
 //---------------------------------------------------------------------------------------------
 // is it time to retreat?
-QueryResultType	CTFBotFetchFlag::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotFetchFlag::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }

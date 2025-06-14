@@ -10,17 +10,17 @@
 
 class CWeaponMedigun;
 
-class CTFBotMedicHeal : public Action< CTFBot >
+class CFFBotMedicHeal : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnMoveToSuccess( CTFBot *me, const Path *path );
-	virtual EventDesiredResult< CTFBot > OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason );
-	virtual EventDesiredResult< CTFBot > OnActorEmoted( CTFBot *me, CBaseCombatCharacter *emoter, int emote );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnMoveToSuccess( CFFBot *me, const Path *path );
+	virtual EventDesiredResult< CFFBot > OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason );
+	virtual EventDesiredResult< CFFBot > OnActorEmoted( CFFBot *me, CBaseCombatCharacter *emoter, int emote );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;					// are we in a hurry?
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;	// should we attack "them"?
@@ -31,36 +31,36 @@ public:
 private:
 	ChasePath m_chasePath;
 
-	CTFPlayer *SelectPatient( CTFBot *me, CTFPlayer *current );
+	CFFPlayer *SelectPatient( CFFBot *me, CFFPlayer *current );
 	CountdownTimer m_changePatientTimer;
 
 	CountdownTimer m_delayUberTimer;
 
-	CHandle< CTFPlayer > m_patient;
+	CHandle< CFFPlayer > m_patient;
 	Vector m_patientAnchorPos;							// a spot where the patient was, to track if they are moving
 	CountdownTimer m_isPatientRunningTimer;
 	bool IsPatientRunning( void ) const;
 
-	bool IsStable( CTFPlayer *patient ) const;			// return true if the given patient is healthy and safe for now
+	bool IsStable( CFFPlayer *patient ) const;			// return true if the given patient is healthy and safe for now
 
-	CTFNavArea *FindCoverArea( CTFBot *me );
+	CTFNavArea *FindCoverArea( CFFBot *me );
 	CTFNavArea *m_coverArea;
 	CountdownTimer m_coverTimer;
 	PathFollower m_coverPath;
 
-	void ComputeFollowPosition( CTFBot *me );
+	void ComputeFollowPosition( CFFBot *me );
 	Vector m_followGoal;
 
-	bool IsVisibleToEnemy( CTFBot *me, const Vector &where ) const;
+	bool IsVisibleToEnemy( CFFBot *me, const Vector &where ) const;
 
 	bool IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) const;
 
-	bool IsGoodUberTarget( CTFPlayer *who ) const;
+	bool IsGoodUberTarget( CFFPlayer *who ) const;
 
-	bool CanDeployUber( CTFBot *me, const CWeaponMedigun* pMedigun ) const;
+	bool CanDeployUber( CFFBot *me, const CWeaponMedigun* pMedigun ) const;
 };
 
-inline bool CTFBotMedicHeal::IsPatientRunning( void ) const
+inline bool CFFBotMedicHeal::IsPatientRunning( void ) const
 {
 	return m_isPatientRunningTimer.IsElapsed() ? false : true;
 }

@@ -6,14 +6,14 @@
 #define FF_BOT_MVM_DEPLOY_BOMB_H
 
 //-----------------------------------------------------------------------------
-class CTFBotMvMDeployBomb : public Action< CTFBot >
+class CFFBotMvMDeployBomb : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
-	EventDesiredResult< CTFBot >	OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result );
+	EventDesiredResult< CFFBot >	OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result );
 	QueryResultType					ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;
 
 	virtual const char *GetName( void ) const	{ return "MvMDeployBomb"; };

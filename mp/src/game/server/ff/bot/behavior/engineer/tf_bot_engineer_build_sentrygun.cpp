@@ -21,21 +21,21 @@ extern ConVar ff_bot_path_lookahead_range;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuildSentryGun::CTFBotEngineerBuildSentryGun( void )
+CFFBotEngineerBuildSentryGun::CFFBotEngineerBuildSentryGun( void )
 {
 	m_sentryBuildHint = NULL;
 }
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuildSentryGun::CTFBotEngineerBuildSentryGun( CTFBotHintSentrygun *sentryBuildHint )
+CFFBotEngineerBuildSentryGun::CFFBotEngineerBuildSentryGun( CFFBotHintSentrygun *sentryBuildHint )
 {
 	m_sentryBuildHint = sentryBuildHint;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuildSentryGun::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_sentryTriesLeft = 5;
 	m_giveUpTimer.Invalidate();
@@ -51,7 +51,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::OnStart( CTFBot *me, Action
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuildSentryGun::Update( CFFBot *me, float interval )
 {
 	if ( me->GetTimeSinceLastInjury() < 1.0f )
 	{
@@ -67,11 +67,11 @@ ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::Update( CTFBot *me, float i
 	// collect metal as we move to our build location
 	if ( me->CanBuild( OBJ_SENTRYGUN ) == CB_NEED_RESOURCES )
 	{
-		if ( m_getAmmoTimer.IsElapsed() && CTFBotGetAmmo::IsPossible( me ) )
+		if ( m_getAmmoTimer.IsElapsed() && CFFBotGetAmmo::IsPossible( me ) )
 		{
 			// need more metal - get some
 			m_getAmmoTimer.Start( 1.0f );
-			return SuspendFor( new CTFBotGetAmmo, "Need more metal to build my Sentry" );
+			return SuspendFor( new CFFBotGetAmmo, "Need more metal to build my Sentry" );
 		}
 	}
 
@@ -82,7 +82,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::Update( CTFBot *me, float i
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, m_sentryBuildLocation, cost );
 		}
 
@@ -124,7 +124,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::Update( CTFBot *me, float i
 	{
 		// no precise build location - go through the normal build process
 
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( me->GetActiveTFWeapon() );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( me->GetActiveFFWeapon() );
 		if ( !builder || builder->GetType() != OBJ_SENTRYGUN || builder->m_hObjectBeingBuilt == NULL )
 		{
 			// at home position, build a sentry (switch to the sentry builder "gun")
@@ -185,7 +185,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildSentryGun::Update( CTFBot *me, float i
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEngineerBuildSentryGun::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotEngineerBuildSentryGun::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	m_repathTimer.Invalidate();

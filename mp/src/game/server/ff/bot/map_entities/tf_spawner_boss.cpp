@@ -128,11 +128,11 @@ void CTFSpawnerBoss::SpawnerThink( void )
 		int iTeam = TEAM_UNASSIGNED;
 		if ( FStrEq( m_teamName.ToCStr(), "red" ) )
 		{
-			iTeam = TF_TEAM_RED;
+			iTeam = FF_TEAM_RED;
 		}
 		else if ( FStrEq( m_teamName.ToCStr(), "blue" ) )
 		{
-			iTeam = TF_TEAM_BLUE;
+			iTeam = FF_TEAM_BLUE;
 		}
 		bot->ChangeTeam( iTeam );
 

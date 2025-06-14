@@ -26,7 +26,7 @@ ConVar ff_bot_medic_max_call_response_range( "ff_bot_medic_max_call_response_ran
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicHeal::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMedicHeal::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_chasePath.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_patient = NULL;
@@ -46,31 +46,31 @@ ActionResult< CTFBot >	CTFBotMedicHeal::OnStart( CTFBot *me, Action< CTFBot > *p
 class CSelectPrimaryPatient : public IVision::IForEachKnownEntity
 {
 public:
-	CSelectPrimaryPatient( CTFBot *me, CTFPlayer *currentPatient )
+	CSelectPrimaryPatient( CFFBot *me, CFFPlayer *currentPatient )
 	{
 		m_me = me;
-		m_medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+		m_medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 		m_selected = currentPatient;
 	}
 
-	CTFPlayer *SelectPreferred( CTFPlayer *current, CTFPlayer *contender )
+	CFFPlayer *SelectPreferred( CFFPlayer *current, CFFPlayer *contender )
 	{
 		// in order of preference
 		static int preferredClass[] = 
 		{
-			TF_CLASS_HEAVYWEAPONS,
-			TF_CLASS_SOLDIER,
-			TF_CLASS_PYRO,
-			TF_CLASS_DEMOMAN,
+			CLASS_HEAVYWEAPONS,
+			CLASS_SOLDIER,
+			CLASS_PYRO,
+			CLASS_DEMOMAN,
 
-//			TF_CLASS_SCOUT,
-// 			TF_CLASS_ENGINEER,		
-// 			TF_CLASS_SNIPER,
-// 			TF_CLASS_SPY,
-// 			TF_CLASS_MEDIC,
+//			CLASS_SCOUT,
+// 			CLASS_ENGINEER,		
+// 			CLASS_SNIPER,
+// 			CLASS_SPY,
+// 			CLASS_MEDIC,
 
-			TF_CLASS_UNDEFINED
+			CLASS_UNDEFINED
 		};
 
 		int i;
@@ -129,9 +129,9 @@ public:
 
 		// respond to calls for help
 		// NOTE: For now, only attend to HUMAN calls for help
-		CTFPlayer *currentCaller = NULL;
-		CTFPlayer *contenderCaller = NULL;
-		CTFBotPathCost cost( m_me, FASTEST_ROUTE );
+		CFFPlayer *currentCaller = NULL;
+		CFFPlayer *contenderCaller = NULL;
+		CFFBotPathCost cost( m_me, FASTEST_ROUTE );
 		
 		if ( !current->IsBot() && current->IsCallingForMedic() && m_me->IsRangeLessThan( current, ff_bot_medic_max_call_response_range.GetFloat() ) )
 		{
@@ -177,7 +177,7 @@ public:
 
 
 		int currentRank = 999, contenderRank = 999;
-		for( i=0; preferredClass[i] != TF_CLASS_UNDEFINED; ++i )
+		for( i=0; preferredClass[i] != CLASS_UNDEFINED; ++i )
 		{
 			// for now, heavy, solider, and pyro are equivalent choices
 			if ( current->GetPlayerClass()->GetClassIndex() == preferredClass[i] )
@@ -212,7 +212,7 @@ public:
 		if ( !known.GetEntity() || !known.GetEntity()->IsPlayer() || !known.GetEntity()->IsAlive() || !m_me->IsFriend( known.GetEntity() ) )
 			return true;
 
-		CTFPlayer *player = dynamic_cast< CTFPlayer * >( known.GetEntity() );
+		CFFPlayer *player = dynamic_cast< CFFPlayer * >( known.GetEntity() );
 		if ( player == NULL )
 			return true;
 
@@ -223,10 +223,10 @@ public:
 		// squads always heal the leader
 		if ( !player->HasTheFlag() && !m_me->IsInASquad() )
 		{
-			if ( player->IsPlayerClass( TF_CLASS_MEDIC ) ||
-				 player->IsPlayerClass( TF_CLASS_SNIPER ) ||
-				 player->IsPlayerClass( TF_CLASS_ENGINEER ) ||
-				 player->IsPlayerClass( TF_CLASS_SPY ) )
+			if ( player->IsPlayerClass( CLASS_MEDIC ) ||
+				 player->IsPlayerClass( CLASS_SNIPER ) ||
+				 player->IsPlayerClass( CLASS_ENGINEER ) ||
+				 player->IsPlayerClass( CLASS_SPY ) )
 			{
 				// these classes can't be our primary heal target (although they will get opportunistic healing
 				return true;
@@ -239,22 +239,22 @@ public:
 		return true;
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CWeaponMedigun *m_medigun;
-	CTFPlayer *m_selected;
+	CFFPlayer *m_selected;
 };
 
 
 //---------------------------------------------------------------------------------------------
-CTFPlayer *CTFBotMedicHeal::SelectPatient( CTFBot *me, CTFPlayer *current )
+CFFPlayer *CFFBotMedicHeal::SelectPatient( CFFBot *me, CFFPlayer *current )
 {
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 	if ( medigun )
 	{
 		if ( current == NULL || !current->IsAlive() )
 		{
-			current = ToTFPlayer( medigun->GetHealTarget() );
+			current = ToFFPlayer( medigun->GetHealTarget() );
 		}
 
 		if ( medigun->IsReleasingCharge() )
@@ -275,7 +275,7 @@ CTFPlayer *CTFBotMedicHeal::SelectPatient( CTFBot *me, CTFPlayer *current )
 	if ( TFGameRules()->IsPVEModeActive() )
 	{
 		// assume perfect knowledge
-		CUtlVector< CTFPlayer * > livePlayerVector;
+		CUtlVector< CFFPlayer * > livePlayerVector;
 		CollectPlayers( &livePlayerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 		for( int i=0; i<livePlayerVector.Count(); ++i )
@@ -299,7 +299,7 @@ CTFPlayer *CTFBotMedicHeal::SelectPatient( CTFBot *me, CTFPlayer *current )
 /**
  * Return true if the given patient is healthy and safe for now
  */
-bool CTFBotMedicHeal::IsStable( CTFPlayer *patient ) const
+bool CFFBotMedicHeal::IsStable( CFFPlayer *patient ) const
 {
 	const float safeTime = 3.0f;
 
@@ -325,7 +325,7 @@ bool CTFBotMedicHeal::IsStable( CTFPlayer *patient ) const
 class CFindMostInjuredNeighbor : public IVision::IForEachKnownEntity
 {
 public:
-	CFindMostInjuredNeighbor( CTFBot *me, float maxRange, bool isInCombat )
+	CFindMostInjuredNeighbor( CFFBot *me, float maxRange, bool isInCombat )
 	{
 		m_me = me;
 		m_mostInjured = NULL;
@@ -339,7 +339,7 @@ public:
 	{
 		if ( known.GetEntity()->IsPlayer() )
 		{
-			CTFPlayer *player = ToTFPlayer( known.GetEntity() );
+			CFFPlayer *player = ToFFPlayer( known.GetEntity() );
 
 			if ( m_me->IsRangeGreaterThan( player, m_maxRange ) )
 				return true;
@@ -386,8 +386,8 @@ public:
 		return true;
 	}
 
-	CTFBot *m_me;
-	CTFPlayer *m_mostInjured;
+	CFFBot *m_me;
+	CFFPlayer *m_mostInjured;
 	float m_injuredHealthRatio;
 	bool m_isOnFire;
 	float m_maxRange;
@@ -396,11 +396,11 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotMedicHeal::CanDeployUber( CTFBot *me, const CWeaponMedigun* pMedigun ) const
+bool CFFBotMedicHeal::CanDeployUber( CFFBot *me, const CWeaponMedigun* pMedigun ) const
 {
 #ifdef STAGING_ONLY
 	if ( TFGameRules()->IsMannVsMachineMode() && 
-			me && me->HasAttribute( CTFBot::PROJECTILE_SHIELD ) && 
+			me && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) && 
 			pMedigun && ( pMedigun->GetMedigunShield() != NULL ) && pMedigun->HasPermanentShield() && ( ( pMedigun->GetMedigunType() == MEDIGUN_STANDARD ) || ( pMedigun->GetMedigunType() == MEDIGUN_UBER ) ) )
 	{
 		return false;
@@ -417,7 +417,7 @@ bool CTFBotMedicHeal::CanDeployUber( CTFBot *me, const CWeaponMedigun* pMedigun 
 // Don't use uber in setup.
 // We don't pay attention to our patient here, because we might need to pop uber to save ourselves.
 //
-bool CTFBotMedicHeal::IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) const
+bool CFFBotMedicHeal::IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) const
 {
 	if( !pMedigun )
 		return false;
@@ -433,13 +433,13 @@ bool CTFBotMedicHeal::IsReadyToDeployUber( const CWeaponMedigun* pMedigun ) cons
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotMedicHeal::IsGoodUberTarget( CTFPlayer *who ) const
+bool CFFBotMedicHeal::IsGoodUberTarget( CFFPlayer *who ) const
 {
-	if ( who->IsPlayerClass( TF_CLASS_MEDIC ) ||
-		 who->IsPlayerClass( TF_CLASS_SNIPER ) ||
-		 who->IsPlayerClass( TF_CLASS_ENGINEER ) ||
-		 who->IsPlayerClass( TF_CLASS_SCOUT ) ||
-		 who->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( who->IsPlayerClass( CLASS_MEDIC ) ||
+		 who->IsPlayerClass( CLASS_SNIPER ) ||
+		 who->IsPlayerClass( CLASS_ENGINEER ) ||
+		 who->IsPlayerClass( CLASS_SCOUT ) ||
+		 who->IsPlayerClass( CLASS_SPY ) )
 	{
 		return false;
 	}
@@ -449,26 +449,26 @@ bool CTFBotMedicHeal::IsGoodUberTarget( CTFPlayer *who ) const
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMedicHeal::Update( CFFBot *me, float interval )
 {
 	// if we're in a squad, and the only other members are medics, disband the squad
 	if ( me->IsInASquad() )
 	{
-		CTFBotSquad *squad = me->GetSquad();
+		CFFBotSquad *squad = me->GetSquad();
 		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && squad->IsLeader( me ) )
 		{
-			return ChangeTo( new CTFBotFetchFlag, "I'm now a squad leader! Going for the flag!" );
+			return ChangeTo( new CFFBotFetchFlag, "I'm now a squad leader! Going for the flag!" );
 		}
 
 		if ( !squad->ShouldPreserveSquad() )
 		{
-			CUtlVector< CTFBot * > memberVector;
+			CUtlVector< CFFBot * > memberVector;
 			squad->CollectMembers( &memberVector );
 
 			int i;
 			for( i=0; i<memberVector.Count(); ++i )
 			{
-				if ( !memberVector[i]->IsPlayerClass( TF_CLASS_MEDIC ) )
+				if ( !memberVector[i]->IsPlayerClass( CLASS_MEDIC ) )
 				{
 					break;
 				}
@@ -487,13 +487,13 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 	else
 	{
 		// not in a squad - for now, assume whatever mission I was on is over
-		me->SetMission( CTFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
+		me->SetMission( CFFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
 	}
 
 	m_patient = SelectPatient( me, m_patient );
 
 	// prevent a group of medic healing each other in a loop. always heal the top guy in the chain
-	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && m_patient != NULL && m_patient->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() && m_patient != NULL && m_patient->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		CUtlVector< CBaseEntity* > seenPatients;
 		seenPatients.AddToTail( m_patient );
@@ -506,7 +506,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 			}
 
 			seenPatients.AddToTail( pTestPatient );
-			m_patient = ToTFPlayer( pTestPatient );
+			m_patient = ToFFPlayer( pTestPatient );
 		}
 	}
 
@@ -517,7 +517,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 		if ( TFGameRules()->IsMannVsMachineMode() )
 		{
 			// no-one is left to heal - get the flag!
-			return ChangeTo( new CTFBotFetchFlag, "Everyone is gone! Going for the flag" );
+			return ChangeTo( new CFFBotFetchFlag, "Everyone is gone! Going for the flag" );
 		}
 
 		if ( TFGameRules()->IsPVEModeActive() )
@@ -527,7 +527,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 		}
 
 		// no patients - retreat to spawn to find another one
-		return SuspendFor( new CTFBotMedicRetreat, "Retreating to find another patient to heal" );
+		return SuspendFor( new CFFBotMedicRetreat, "Retreating to find another patient to heal" );
 	}
 
 	const float anchorRadius = 200.0f;
@@ -569,26 +569,26 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 
 		if ( closeTeleporter )
 		{
-			return SuspendFor( new CTFBotUseTeleporter( closeTeleporter, CTFBotUseTeleporter::ALWAYS_USE ), "Following my patient through a teleporter" );
+			return SuspendFor( new CFFBotUseTeleporter( closeTeleporter, CFFBotUseTeleporter::ALWAYS_USE ), "Following my patient through a teleporter" );
 		}
 	}
 
 
-	CTFPlayer *actualHealTarget = m_patient;
+	CFFPlayer *actualHealTarget = m_patient;
 	bool isHealTargetBlocked = true;
 	bool isActivelyHealing = false;
 	bool isUsingProjectileShield = false;
 	const CKnownEntity *knownThreat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 	if ( medigun )
 	{
 		if( medigun->GetMedigunType() == MEDIGUN_RESIST )
 		{
 			// If I'm a Vaccinnator medic and am told to prefer a certain type of resist, then cycle to that resist
-			while( ( me->HasAttribute( CTFBot::PREFER_VACCINATOR_BULLETS )	&& medigun->GetResistType() != MEDIGUN_BULLET_RESIST )
-				|| ( me->HasAttribute( CTFBot::PREFER_VACCINATOR_BLAST )	&& medigun->GetResistType() != MEDIGUN_BLAST_RESIST )
-				|| ( me->HasAttribute( CTFBot::PREFER_VACCINATOR_FIRE )		&& medigun->GetResistType() != MEDIGUN_FIRE_RESIST ) )
+			while( ( me->HasAttribute( CFFBot::PREFER_VACCINATOR_BULLETS )	&& medigun->GetResistType() != MEDIGUN_BULLET_RESIST )
+				|| ( me->HasAttribute( CFFBot::PREFER_VACCINATOR_BLAST )	&& medigun->GetResistType() != MEDIGUN_BLAST_RESIST )
+				|| ( me->HasAttribute( CFFBot::PREFER_VACCINATOR_FIRE )		&& medigun->GetResistType() != MEDIGUN_FIRE_RESIST ) )
 			{
 				medigun->CycleResistType();
 			}
@@ -710,7 +710,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 		
 #ifdef STAGING_ONLY
 		// try to activate shield when I'm not using uber so I don't waste it
-		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CTFBot::PROJECTILE_SHIELD ) && medigun->GetMedigunShield() == NULL )
+		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) && medigun->GetMedigunShield() == NULL )
 		{
 			// activate shield ASAP for permanent shield medigun
 			if ( medigun->HasPermanentShield() )
@@ -735,7 +735,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 		}
 #else // remove this when we ship medic shield MVM update
 		// try to activate shield when I'm not using uber so I don't waste it
-		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CTFBot::PROJECTILE_SHIELD ) )
+		if ( TFGameRules()->IsMannVsMachineMode() && me->HasAttribute( CFFBot::PROJECTILE_SHIELD ) )
 		{
 			isUsingProjectileShield = me->m_Shared.IsRageDraining();
 			// when the rage is ready to deploy and we're not using uber
@@ -796,7 +796,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 		// if we're not close or can't see our patient, move closer, otherwise we're good where we are
 		if ( me->IsRangeGreaterThan( m_patient, ff_bot_medic_stop_follow_range.GetFloat() ) || !me->IsAbleToSee( m_patient, CBaseCombatCharacter::DISREGARD_FOV ) )
 		{
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_chasePath.Update( me, m_patient, cost );
 		}
 	}
@@ -809,7 +809,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 
 			ComputeFollowPosition( me );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_coverPath.Compute( me, m_followGoal, cost );
 		}
 
@@ -821,7 +821,7 @@ ActionResult< CTFBot >	CTFBotMedicHeal::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicHeal::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotMedicHeal::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_chasePath.Invalidate();
 
@@ -830,33 +830,33 @@ ActionResult< CTFBot >	CTFBotMedicHeal::OnResume( CTFBot *me, Action< CTFBot > *
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicHeal::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMedicHeal::OnStuck( CFFBot *me )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicHeal::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotMedicHeal::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicHeal::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotMedicHeal::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicHeal::OnActorEmoted( CTFBot *me, CBaseCombatCharacter *emoter, int emote )
+EventDesiredResult< CFFBot > CFFBotMedicHeal::OnActorEmoted( CFFBot *me, CBaseCombatCharacter *emoter, int emote )
 {
 	if ( !emoter->IsPlayer() )
 		return TryContinue();
 	
-	CTFPlayer *emotingPlayer = ToTFPlayer( emoter );
+	CFFPlayer *emotingPlayer = ToFFPlayer( emoter );
 
 	switch( emote )
 	{
@@ -870,7 +870,7 @@ EventDesiredResult< CTFBot > CTFBotMedicHeal::OnActorEmoted( CTFBot *me, CBaseCo
 		// if our patient said this, and we have charge, deploy it!
 		if ( m_patient && emotingPlayer && m_patient->entindex() == emotingPlayer->entindex() )
 		{
-			CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+			CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 			if ( IsReadyToDeployUber( medigun ) && CanDeployUber( me, medigun ) )
 			{
 				// start the uber
@@ -886,7 +886,7 @@ EventDesiredResult< CTFBot > CTFBotMedicHeal::OnActorEmoted( CTFBot *me, CBaseCo
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMedicHeal::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotMedicHeal::ShouldHurry( const INextBot *me ) const
 {
 	// never abandon our patient
 	return ANSWER_YES;
@@ -894,9 +894,9 @@ QueryResultType CTFBotMedicHeal::ShouldHurry( const INextBot *me ) const
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMedicHeal::ShouldAttack( const INextBot *bot, const CKnownEntity *them ) const
+QueryResultType CFFBotMedicHeal::ShouldAttack( const INextBot *bot, const CKnownEntity *them ) const
 {
-	CTFBot *me = (CTFBot *)bot->GetEntity();
+	CFFBot *me = (CFFBot *)bot->GetEntity();
 
 	// only attack if we're not wielding the medigun
 	return me->IsCombatWeapon( MY_CURRENT_GUN ) ? ANSWER_YES : ANSWER_NO;
@@ -904,9 +904,9 @@ QueryResultType CTFBotMedicHeal::ShouldAttack( const INextBot *bot, const CKnown
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMedicHeal::ShouldRetreat( const INextBot *bot ) const
+QueryResultType CFFBotMedicHeal::ShouldRetreat( const INextBot *bot ) const
 {
-	CTFBot *me = (CTFBot *)bot->GetEntity();
+	CFFBot *me = (CFFBot *)bot->GetEntity();
 
 	// retreat if stunned
 	if ( me->m_Shared.IsControlStunned() || me->m_Shared.IsLoserStateStunned() )
@@ -934,9 +934,9 @@ public:
 //---------------------------------------------------------------------------------------------
 ConVar ff_bot_medic_cover_test_resolution( "ff_bot_medic_cover_test_resolution", "8", FCVAR_CHEAT );
 
-void CTFBotMedicHeal::ComputeFollowPosition( CTFBot *me )
+void CFFBotMedicHeal::ComputeFollowPosition( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotMedicHeal::ComputeFollowPosition", "NextBot" );
+	VPROF_BUDGET( "CFFBotMedicHeal::ComputeFollowPosition", "NextBot" );
 
 	m_followGoal = me->GetAbsOrigin();
 
@@ -947,7 +947,7 @@ void CTFBotMedicHeal::ComputeFollowPosition( CTFBot *me )
 
 	bool isExposed;
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == TF_TEAM_PVE_INVADERS )
+	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		// robot medics in MvM don't care if the enemy sees them
 		isExposed = false;
@@ -1003,7 +1003,7 @@ void CTFBotMedicHeal::ComputeFollowPosition( CTFBot *me )
 	float radius;
 	float radiusInc = 100.0f;
 	float maxRadius = ff_bot_medic_max_heal_range.GetFloat();
-	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->m_Shared.GetActiveTFWeapon() );
+	CWeaponMedigun *medigun = dynamic_cast< CWeaponMedigun * >( me->GetActiveFFWeapon() );
 
 	if ( IsPatientRunning() || IsReadyToDeployUber( medigun ) )
 	{
@@ -1084,7 +1084,7 @@ void CTFBotMedicHeal::ComputeFollowPosition( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotMedicHeal::IsVisibleToEnemy( CTFBot *me, const Vector &where ) const
+bool CFFBotMedicHeal::IsVisibleToEnemy( CFFBot *me, const Vector &where ) const
 {
 	CKnownCollector known;
 	me->GetVisionInterface()->ForEachKnownEntity( known );

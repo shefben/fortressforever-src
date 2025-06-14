@@ -12,25 +12,25 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotMobRush : public Action< CTFBot >
+class CFFBotMobRush : public Action< CFFBot >
 {
 public:
-	CTFBotMobRush( CTFPlayer *victim, float reactionTime = 0.0f );
+	CFFBotMobRush( CFFPlayer *victim, float reactionTime = 0.0f );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
-	virtual EventDesiredResult< CTFBot > OnInjured( CTFBot *me, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
+	virtual EventDesiredResult< CFFBot > OnInjured( CFFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
 
 	QueryResultType	ShouldRetreat( const INextBot *me ) const;
 
 	virtual const char *GetName( void ) const	{ return "MobRush"; };
 
 private:
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 	CountdownTimer m_reactionTimer;
 	CountdownTimer m_tauntTimer;
 	CountdownTimer m_vocalizeTimer;

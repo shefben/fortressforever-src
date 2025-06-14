@@ -8,26 +8,26 @@
 
 #include "NextBot/NextBotEventResponderInterface.h"
 
-class CTFBot;
+class CFFBot;
 
-class CTFBotSquad : public INextBotEventResponder
+class CFFBotSquad : public INextBotEventResponder
 {
 public:
-	CTFBotSquad( void );
-	virtual ~CTFBotSquad() { }		
+	CFFBotSquad( void );
+	virtual ~CFFBotSquad() { }		
 
 	// EventResponder ------
 	virtual INextBotEventResponder *FirstContainedResponder( void ) const;
 	virtual INextBotEventResponder *NextContainedResponder( INextBotEventResponder *current ) const;
 	//----------------------
 
-	bool IsMember( CTFBot *bot ) const;		// is the given bot in this squad?
-	bool IsLeader( CTFBot *bot ) const;		// is the given bot the leader of this squad?
+	bool IsMember( CFFBot *bot ) const;		// is the given bot in this squad?
+	bool IsLeader( CFFBot *bot ) const;		// is the given bot the leader of this squad?
 
-// 	CTFBot *GetMember( int i );
+// 	CFFBot *GetMember( int i );
  	int GetMemberCount( void ) const;
 
-	CTFBot *GetLeader( void ) const;
+	CFFBot *GetLeader( void ) const;
 
 	class Iterator
 	{
@@ -38,13 +38,13 @@ public:
 			m_index = -1;
 		}
 
-		Iterator( CTFBot *bot, int index )
+		Iterator( CFFBot *bot, int index )
 		{
 			m_bot = bot;
 			m_index = index;
 		}
 
-		CTFBot *operator() ( void )
+		CFFBot *operator() ( void )
 		{
 			return m_bot;
 		}
@@ -52,7 +52,7 @@ public:
 		bool operator==( const Iterator &it ) const	{ return m_bot == it.m_bot && m_index == it.m_index; }
 		bool operator!=( const Iterator &it ) const	{ return m_bot != it.m_bot || m_index != it.m_index; }
 
-		CTFBot *m_bot;
+		CFFBot *m_bot;
 		int m_index;
 	};
 
@@ -60,7 +60,7 @@ public:
 	Iterator GetNextMember( const Iterator &it ) const;
 	Iterator InvalidIterator() const;
 
-	void CollectMembers( CUtlVector< CTFBot * > *memberVector ) const;
+	void CollectMembers( CUtlVector< CFFBot * > *memberVector ) const;
 
 	#define EXCLUDE_LEADER false
 	float GetSlowestMemberSpeed( bool includeLeader = true ) const;
@@ -79,39 +79,39 @@ public:
 	bool ShouldPreserveSquad() const { return m_bShouldPreserveSquad; }
 
 private:
-	friend class CTFBot;
+	friend class CFFBot;
 
-	void Join( CTFBot *bot );
-	void Leave( CTFBot *bot );
+	void Join( CFFBot *bot );
+	void Leave( CFFBot *bot );
 
-	CUtlVector< CHandle< CTFBot > > m_roster;
-	CHandle< CTFBot > m_leader;
+	CUtlVector< CHandle< CFFBot > > m_roster;
+	CHandle< CFFBot > m_leader;
 
 	float m_formationSize;
 	bool m_bShouldPreserveSquad;
 };
 
-inline bool CTFBotSquad::IsMember( CTFBot *bot ) const
+inline bool CFFBotSquad::IsMember( CFFBot *bot ) const
 {
 	return m_roster.HasElement( bot );
 }
 
-inline bool CTFBotSquad::IsLeader( CTFBot *bot ) const
+inline bool CFFBotSquad::IsLeader( CFFBot *bot ) const
 {
 	return m_leader == bot;
 }
 
-inline CTFBotSquad::Iterator CTFBotSquad::InvalidIterator() const
+inline CFFBotSquad::Iterator CFFBotSquad::InvalidIterator() const
 {
 	return Iterator( NULL, -1 );
 }
 
-inline float CTFBotSquad::GetFormationSize( void ) const
+inline float CFFBotSquad::GetFormationSize( void ) const
 {
 	return m_formationSize;
 }
 
-inline void CTFBotSquad::SetFormationSize( float size )
+inline void CFFBotSquad::SetFormationSize( float size )
 {
 	m_formationSize = size;
 }

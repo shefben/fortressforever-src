@@ -24,26 +24,26 @@ ConVar ff_raid_engineer_infinte_metal( "ff_raid_engineer_infinte_metal", "1", FC
 
 
 //---------------------------------------------------------------------------------------------
-Action< CTFBot > *CTFBotEngineerBuild::InitialContainedAction( CTFBot *me )
+Action< CFFBot > *CFFBotEngineerBuild::InitialContainedAction( CFFBot *me )
 {
 	if ( TFGameRules()->IsPVEModeActive() )
 	{
-		return new CTFBotEngineerMoveToBuild;
+		return new CFFBotEngineerMoveToBuild;
 	}
 
-	return new CTFBotEngineerBuildTeleportEntrance;
+	return new CFFBotEngineerBuildTeleportEntrance;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuild::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuild::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuild::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuild::Update( CFFBot *me, float interval )
 {
 	if ( TFGameRules()->IsPVEModeActive() && ff_raid_engineer_infinte_metal.GetBool() )
 	{
@@ -56,14 +56,14 @@ ActionResult< CTFBot >	CTFBotEngineerBuild::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEngineerBuild::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotEngineerBuild::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerBuild::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotEngineerBuild::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
@@ -71,14 +71,14 @@ EventDesiredResult< CTFBot > CTFBotEngineerBuild::OnTerritoryLost( CTFBot *me, i
 
 //---------------------------------------------------------------------------------------------
 // Hack to disable ammo/health gathering elsewhere
-QueryResultType CTFBotEngineerBuild::ShouldHurry( const INextBot *meBot ) const
+QueryResultType CFFBotEngineerBuild::ShouldHurry( const INextBot *meBot ) const
 {
-	CTFBot *me = (CTFBot *)meBot->GetEntity();
+	CFFBot *me = (CFFBot *)meBot->GetEntity();
 
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 	CObjectDispenser *myDispenser = (CObjectDispenser *)me->GetObjectOfType( OBJ_DISPENSER );
 
-	if ( mySentry && myDispenser && !mySentry->IsBuilding() && !myDispenser->IsBuilding() && me->GetActiveTFWeapon() && me->GetActiveTFWeapon()->GetWeaponID() == TF_WEAPON_WRENCH )
+	if ( mySentry && myDispenser && !mySentry->IsBuilding() && !myDispenser->IsBuilding() && me->GetActiveFFWeapon() && me->GetActiveFFWeapon()->GetWeaponID() == FF_WEAPON_WRENCH )
 	{
 		if ( me->IsAmmoLow() && myDispenser->GetAvailableMetal() <= 0 )
 		{
@@ -95,14 +95,14 @@ QueryResultType CTFBotEngineerBuild::ShouldHurry( const INextBot *meBot ) const
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotEngineerBuild::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
+QueryResultType CFFBotEngineerBuild::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
-	CTFBot *me = (CTFBot *)meBot->GetEntity();
+	CFFBot *me = (CFFBot *)meBot->GetEntity();
 	CObjectSentrygun *mySentry = (CObjectSentrygun *)me->GetObjectOfType( OBJ_SENTRYGUN );
 
-	CTFPlayer *themPlayer = ToTFPlayer( them->GetEntity() );
+	CFFPlayer *themPlayer = ToFFPlayer( them->GetEntity() );
 
-	if ( themPlayer && themPlayer->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( themPlayer && themPlayer->IsPlayerClass( CLASS_SPY ) )
 	{
 		// Engineers hate Spies
 		return ANSWER_YES;

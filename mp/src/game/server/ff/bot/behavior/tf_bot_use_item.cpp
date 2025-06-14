@@ -10,14 +10,14 @@
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotUseItem::CTFBotUseItem( CTFWeaponBase *item )
+CFFBotUseItem::CFFBotUseItem( CFFWeaponBase *item )
 {
 	m_item = item;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotUseItem::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotUseItem::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	// force-equip the item we're going to use
 	me->PushRequiredWeapon( m_item );
@@ -29,14 +29,14 @@ ActionResult< CTFBot >	CTFBotUseItem::OnStart( CTFBot *me, Action< CTFBot > *pri
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotUseItem::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotUseItem::Update( CFFBot *me, float interval )
 {
 	if ( m_item == NULL )
 	{
 		return Done( "NULL item" );
 	}
 
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 
 	if ( !myCurrentWeapon )
 	{
@@ -66,7 +66,7 @@ ActionResult< CTFBot >	CTFBotUseItem::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotUseItem::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotUseItem::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	me->PopRequiredWeapon();
 }

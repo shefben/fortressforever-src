@@ -24,9 +24,9 @@ ConVar ff_bot_capture_seek_and_destroy_max_duration( "ff_bot_capture_seek_and_de
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCapturePoint::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotCapturePoint::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	VPROF_BUDGET( "CTFBotCapturePoint::OnStart", "NextBot" );
+	VPROF_BUDGET( "CFFBotCapturePoint::OnStart", "NextBot" );
 
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_path.Invalidate();
@@ -36,7 +36,7 @@ ActionResult< CTFBot >	CTFBotCapturePoint::OnStart( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotCapturePoint::Update( CFFBot *me, float interval )
 {
 	if ( TFGameRules()->InSetup() )
 	{
@@ -52,12 +52,12 @@ ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
 	if ( point == NULL )
 	{
 		const float roamTime = 10.0f;
-		return SuspendFor( new CTFBotSeekAndDestroy( roamTime ), "Seek and destroy until a point becomes available" );
+		return SuspendFor( new CFFBotSeekAndDestroy( roamTime ), "Seek and destroy until a point becomes available" );
 	}
 
 	if ( point->GetTeamNumber() == me->GetTeamNumber() )
 	{
-		return ChangeTo( new CTFBotDefendPoint, "We need to defend our point(s)" );
+		return ChangeTo( new CFFBotDefendPoint, "We need to defend our point(s)" );
 	}
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
@@ -81,7 +81,7 @@ ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
 	{
 		if ( threat && threat->IsVisibleRecently() )
 		{
-			return SuspendFor( new CTFBotSeekAndDestroy( RandomFloat( ff_bot_capture_seek_and_destroy_min_duration.GetFloat(), ff_bot_capture_seek_and_destroy_max_duration.GetFloat() ) ), "Too early to capture - hunting" );
+			return SuspendFor( new CFFBotSeekAndDestroy( RandomFloat( ff_bot_capture_seek_and_destroy_min_duration.GetFloat(), ff_bot_capture_seek_and_destroy_max_duration.GetFloat() ) ), "Too early to capture - hunting" );
 		}
 	}
 
@@ -107,7 +107,7 @@ ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
 				CTFNavArea *goalArea = controlPointAreas->Element( which );
 				if ( goalArea )
 				{
-					CTFBotPathCost cost( me, DEFAULT_ROUTE );
+					CFFBotPathCost cost( me, DEFAULT_ROUTE );
 					m_path.Compute( me, goalArea->GetRandomPoint(), cost );
 				}
 			}
@@ -120,9 +120,9 @@ ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
 		// move toward the point, periodically repathing to account for changing situation
 		if ( m_repathTimer.IsElapsed() )
 		{
-			VPROF_BUDGET( "CTFBotCapturePoint::Update( repath )", "NextBot" );
+			VPROF_BUDGET( "CFFBotCapturePoint::Update( repath )", "NextBot" );
 
-			CTFBotPathCost cost( me, SAFEST_ROUTE );
+			CFFBotPathCost cost( me, SAFEST_ROUTE );
 			m_path.Compute( me, point->GetAbsOrigin(), cost );
 			m_repathTimer.Start( RandomFloat( 2.0f, 3.0f ) ); 
 		}
@@ -148,7 +148,7 @@ ActionResult< CTFBot >	CTFBotCapturePoint::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotCapturePoint::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotCapturePoint::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_repathTimer.Invalidate();
 	return Continue();
@@ -156,7 +156,7 @@ ActionResult< CTFBot > CTFBotCapturePoint::OnResume( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnStuck( CFFBot *me )
 {
 	m_repathTimer.Invalidate();
 	me->GetLocomotionInterface()->ClearStuckStatus();
@@ -166,14 +166,14 @@ EventDesiredResult< CTFBot > CTFBotCapturePoint::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_repathTimer.Invalidate();
 	return TryContinue();
@@ -181,14 +181,14 @@ EventDesiredResult< CTFBot > CTFBotCapturePoint::OnMoveToFailure( CTFBot *me, co
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnTerritoryContested( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnTerritoryContested( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	// we got it, move on
 	m_repathTimer.Invalidate();
@@ -198,16 +198,16 @@ EventDesiredResult< CTFBot > CTFBotCapturePoint::OnTerritoryCaptured( CTFBot *me
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCapturePoint::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotCapturePoint::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotCapturePoint::ShouldRetreat( const INextBot *bot ) const
+QueryResultType	CFFBotCapturePoint::ShouldRetreat( const INextBot *bot ) const
 {
-	CTFBot *me = (CTFBot *)bot->GetEntity();
+	CFFBot *me = (CFFBot *)bot->GetEntity();
 
 	// if we're running out of time, we have to go for it
 	if ( me->GetTimeLeftToCapture() < ff_bot_offense_must_push_time.GetFloat() )
@@ -218,9 +218,9 @@ QueryResultType	CTFBotCapturePoint::ShouldRetreat( const INextBot *bot ) const
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotCapturePoint::ShouldHurry( const INextBot *bot ) const
+QueryResultType CFFBotCapturePoint::ShouldHurry( const INextBot *bot ) const
 {
-	CTFBot *me = (CTFBot *)bot->GetEntity();
+	CFFBot *me = (CFFBot *)bot->GetEntity();
 
 	// if we're running out of time, we have to go for it
 	if ( me->GetTimeLeftToCapture() < ff_bot_offense_must_push_time.GetFloat() )

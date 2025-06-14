@@ -11,11 +11,11 @@
 
 
 //-----------------------------------------------------------------------------------------
-void CTFBotLocomotion::Update( void )
+void CFFBotLocomotion::Update( void )
 {
 	BaseClass::Update();
 
-	CTFBot *me = ToTFBot( GetBot()->GetEntity() );
+	CFFBot *me = ToTFBot( GetBot()->GetEntity() );
 	if ( !me )
 	{
 		return;
@@ -24,7 +24,7 @@ void CTFBotLocomotion::Update( void )
 	// always 'crouch jump'
 	if ( IsOnGround() )
 	{
-		if ( !me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+		if ( !me->IsPlayerClass( CLASS_ENGINEER ) )
 		{
 			// engineers need to crouch behind their guns
 			me->ReleaseCrouchButton();
@@ -39,7 +39,7 @@ void CTFBotLocomotion::Update( void )
 
 //-----------------------------------------------------------------------------------------
 // Move directly towards the given position
-void CTFBotLocomotion::Approach( const Vector &pos, float goalWeight )
+void CFFBotLocomotion::Approach( const Vector &pos, float goalWeight )
 {
 	if ( TFGameRules()->IsMannVsMachineMode() )
 	{
@@ -56,7 +56,7 @@ void CTFBotLocomotion::Approach( const Vector &pos, float goalWeight )
 
 //-----------------------------------------------------------------------------------------
 // Distance at which we will die if we fall
-float CTFBotLocomotion::GetDeathDropHeight( void ) const
+float CFFBotLocomotion::GetDeathDropHeight( void ) const
 {
 	return 1000.0f;
 }
@@ -64,18 +64,18 @@ float CTFBotLocomotion::GetDeathDropHeight( void ) const
 
 //-----------------------------------------------------------------------------------------
 // Get maximum running speed
-float CTFBotLocomotion::GetRunSpeed( void ) const
+float CFFBotLocomotion::GetRunSpeed( void ) const
 {
-	CTFBot *me = (CTFBot *)GetBot()->GetEntity();
+	CFFBot *me = (CFFBot *)GetBot()->GetEntity();
 	return me->GetPlayerClass()->GetMaxSpeed();
 }
 
 
 //-----------------------------------------------------------------------------------------
 // Return true if given area can be used for navigation
-bool CTFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
+bool CFFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
 {
-	CTFBot *me = (CTFBot *)GetBot()->GetEntity();
+	CFFBot *me = (CFFBot *)GetBot()->GetEntity();
 	CTFNavArea *area = (CTFNavArea *)baseArea;
 
 	if ( area->IsBlocked( me->GetTeamNumber() ) )
@@ -85,12 +85,12 @@ bool CTFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
 
 	if ( !TFGameRules()->RoundHasBeenWon() || TFGameRules()->GetWinningTeam() != me->GetTeamNumber() )
 	{
-		if ( area->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) && me->GetTeamNumber() == TF_TEAM_BLUE )
+		if ( area->HasAttributeTF( TF_NAV_SPAWN_ROOM_RED ) && me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
 			return false;
 		}
 
-		if ( area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) && me->GetTeamNumber() == TF_TEAM_RED )
+		if ( area->HasAttributeTF( TF_NAV_SPAWN_ROOM_BLUE ) && me->GetTeamNumber() == FF_TEAM_RED )
 		{
 			return false;
 		}
@@ -101,7 +101,7 @@ bool CTFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
 
 
 //-----------------------------------------------------------------------------------------
-bool CTFBotLocomotion::IsEntityTraversable( CBaseEntity *obstacle, TraverseWhenType when ) const
+bool CFFBotLocomotion::IsEntityTraversable( CBaseEntity *obstacle, TraverseWhenType when ) const
 {
 	// assume all players are "traversable" in that they will move or can be killed
 	if ( obstacle && obstacle->IsPlayer() )
@@ -113,11 +113,11 @@ bool CTFBotLocomotion::IsEntityTraversable( CBaseEntity *obstacle, TraverseWhenT
 }
 
 
-void CTFBotLocomotion::Jump( void )
+void CFFBotLocomotion::Jump( void )
 {
 	BaseClass::Jump();
 
-	CTFBot *me = ToTFBot( GetBot()->GetEntity() );
+	CFFBot *me = ToTFBot( GetBot()->GetEntity() );
 	if ( !me )
 	{
 		return;

@@ -13,9 +13,9 @@
 extern bool IsSpaceToSpawnHere( const Vector &where );
 
 //---------------------------------------------------------------------------------------------
-bool TeleportNearVictim( CTFBot *me, CTFPlayer *victim, int attempt )
+bool TeleportNearVictim( CFFBot *me, CFFPlayer *victim, int attempt )
 {
-	VPROF_BUDGET( "CTFBotSpyLeaveSpawnRoom::TeleportNearVictim", "NextBot" );
+	VPROF_BUDGET( "CFFBotSpyLeaveSpawnRoom::TeleportNearVictim", "NextBot" );
 
 	if ( !victim )
 	{
@@ -84,13 +84,9 @@ bool TeleportNearVictim( CTFBot *me, CTFPlayer *victim, int attempt )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	// disguise as enemy team
-	me->DisguiseAsMemberOfEnemyTeam();
 
-	// cloak
-	me->PressAltFireButton();
 
 	// wait a few moments to guarantee a minimum time between announcing Spies and their attack
 	m_waitTimer.Start( 2.0f + RandomFloat( 0.0f, 1.0f ) );
@@ -102,19 +98,19 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::OnStart( CTFBot *me, Action< CTF
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyLeaveSpawnRoom::Update( CFFBot *me, float interval )
 {
-	VPROF_BUDGET( "CTFBotSpyLeaveSpawnRoom::Update", "NextBot" );
+	VPROF_BUDGET( "CFFBotSpyLeaveSpawnRoom::Update", "NextBot" );
 
 	if ( m_waitTimer.IsElapsed() )
 	{
-		CTFPlayer *victim = NULL;
+		CFFPlayer *victim = NULL;
 
-		CUtlVector< CTFPlayer * > enemyVector;
+		CUtlVector< CFFPlayer * > enemyVector;
 		CollectPlayers( &enemyVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
 
 		// randomly shuffle our enemies
-		CUtlVector< CTFPlayer * > shuffleVector;
+		CUtlVector< CFFPlayer * > shuffleVector;
 		shuffleVector = enemyVector;
 		int n = shuffleVector.Count();
 		while( n > 1 )
@@ -122,7 +118,7 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interv
 			int k = RandomInt( 0, n-1 );
 			n--;
 
-			CTFPlayer *tmp = shuffleVector[n];
+			CFFPlayer *tmp = shuffleVector[n];
 			shuffleVector[n] = shuffleVector[k];
 			shuffleVector[k] = tmp;
 		}
@@ -146,7 +142,7 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interv
 			return Continue();
 		}
 
-		return ChangeTo( new CTFBotSpyHide( victim ), "Hiding!" );
+		return ChangeTo( new CFFBotSpyHide( victim ), "Hiding!" );
 	}
 
 	return Continue();
@@ -154,7 +150,7 @@ ActionResult< CTFBot >	CTFBotSpyLeaveSpawnRoom::Update( CTFBot *me, float interv
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyLeaveSpawnRoom::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyLeaveSpawnRoom::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

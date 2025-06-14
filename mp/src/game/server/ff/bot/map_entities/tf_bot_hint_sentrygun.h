@@ -8,29 +8,29 @@
 
 #include "ff_bot_hint_entity.h"
 
-class CTFPlayer;
+class CFFPlayer;
 
-class CTFBotHintSentrygun : public CBaseTFBotHintEntity
+class CFFBotHintSentrygun : public CBaseTFBotHintEntity
 {
 public:
-	DECLARE_CLASS( CTFBotHintSentrygun, CBaseTFBotHintEntity );
+	DECLARE_CLASS( CFFBotHintSentrygun, CBaseTFBotHintEntity );
 	DECLARE_DATADESC();
 
-	CTFBotHintSentrygun( void );
-	virtual ~CTFBotHintSentrygun() { }
+	CFFBotHintSentrygun( void );
+	virtual ~CFFBotHintSentrygun() { }
 
 	bool IsSticky() const;
 	bool IsInUse() const;
 
-	CTFPlayer *GetPlayerOwner() const;
-	void SetPlayerOwner( CTFPlayer *pPlayerOwner );
+	CFFPlayer *GetPlayerOwner() const;
+	void SetPlayerOwner( CFFPlayer *pPlayerOwner );
 
 	void IncrementUseCount();
 	void DecrementUseCount();
 
 	void OnSentryGunDestroyed( CBaseEntity *pBaseEntity );
 
-	bool IsAvailableForSelection( CTFPlayer *pRequestingPlayer ) const;
+	bool IsAvailableForSelection( CFFPlayer *pRequestingPlayer ) const;
 
 	virtual HintType GetHintType() const OVERRIDE { return HINT_SENTRYGUN; }
 
@@ -39,35 +39,35 @@ private:
 	int m_iUseCount;
 	COutputEvent m_outputOnSentryGunDestroyed;
 
-	CHandle< CTFPlayer > m_playerOwner;
+	CHandle< CFFPlayer > m_playerOwner;
 };
 
-inline bool CTFBotHintSentrygun::IsSticky() const
+inline bool CFFBotHintSentrygun::IsSticky() const
 {
 	return m_isSticky;
 }
 
-inline bool CTFBotHintSentrygun::IsInUse() const
+inline bool CFFBotHintSentrygun::IsInUse() const
 {
 	return m_iUseCount != 0;
 }
 
-inline CTFPlayer *CTFBotHintSentrygun::GetPlayerOwner() const
+inline CFFPlayer *CFFBotHintSentrygun::GetPlayerOwner() const
 {
 	return m_playerOwner;
 }
 
-inline void CTFBotHintSentrygun::SetPlayerOwner( CTFPlayer *pPlayerOwner )
+inline void CFFBotHintSentrygun::SetPlayerOwner( CFFPlayer *pPlayerOwner )
 {
 	m_playerOwner = pPlayerOwner;
 }
 
-inline void CTFBotHintSentrygun::IncrementUseCount()
+inline void CFFBotHintSentrygun::IncrementUseCount()
 {
 	++m_iUseCount;
 }
 
-inline void CTFBotHintSentrygun::DecrementUseCount()
+inline void CFFBotHintSentrygun::DecrementUseCount()
 {
 	--m_iUseCount;
 }

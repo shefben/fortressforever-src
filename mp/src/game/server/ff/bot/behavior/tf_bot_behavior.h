@@ -8,20 +8,20 @@
 
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotMainAction : public Action< CTFBot >
+class CFFBotMainAction : public Action< CFFBot >
 {
 public:
-	virtual Action< CTFBot > *InitialContainedAction( CTFBot *me );
+	virtual Action< CFFBot > *InitialContainedAction( CFFBot *me );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnKilled( CTFBot *me, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnInjured( CTFBot *me, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnKilled( CFFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnInjured( CFFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
 
-	virtual EventDesiredResult< CTFBot > OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
 
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;							// is it time to retreat?
@@ -51,13 +51,13 @@ private:
 
 	bool m_isWaitingForFullReload;
 
-	void FireWeaponAtEnemy( CTFBot *me );
+	void FireWeaponAtEnemy( CFFBot *me );
 
 	CHandle< CBaseEntity > m_lastTouch;
 	float m_lastTouchTime;
 
 	bool IsImmediateThreat( const CBaseCombatCharacter *subject, const CKnownEntity *threat ) const;
-	const CKnownEntity *SelectCloserThreat( CTFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 ) const;
+	const CKnownEntity *SelectCloserThreat( CFFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 ) const;
 	const CKnownEntity *GetHealerOfThreat( const CKnownEntity *threat ) const;
 
 	const CKnownEntity *SelectMoreDangerousThreatInternal( const INextBot *me, 
@@ -66,7 +66,7 @@ private:
 														   const CKnownEntity *threat2 ) const;
 
 
-	void Dodge( CTFBot *me );
+	void Dodge( CFFBot *me );
 
 	IntervalTimer m_undergroundTimer;
 };

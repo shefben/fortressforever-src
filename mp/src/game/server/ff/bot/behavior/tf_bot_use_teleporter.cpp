@@ -12,7 +12,7 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-CTFBotUseTeleporter::CTFBotUseTeleporter( CObjectTeleporter *teleporter, UseHowType how )
+CFFBotUseTeleporter::CFFBotUseTeleporter( CObjectTeleporter *teleporter, UseHowType how )
 {
 	m_teleporter = teleporter;
 	m_how = how;
@@ -21,7 +21,7 @@ CTFBotUseTeleporter::CTFBotUseTeleporter( CObjectTeleporter *teleporter, UseHowT
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotUseTeleporter::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotUseTeleporter::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -33,7 +33,7 @@ ActionResult< CTFBot >	CTFBotUseTeleporter::OnStart( CTFBot *me, Action< CTFBot 
 // We could compute the time it would take to walk from the tele entrance to exit
 // and compare that to the time needed to wait for the tele to be ready to send us,
 // but players tend to use the tele only if it is ready NOW (or very soon).
-bool CTFBotUseTeleporter::IsTeleporterAvailable( void ) const
+bool CFFBotUseTeleporter::IsTeleporterAvailable( void ) const
 {
 	if ( m_teleporter != NULL )
 	{
@@ -61,7 +61,7 @@ bool CTFBotUseTeleporter::IsTeleporterAvailable( void ) const
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotUseTeleporter::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotUseTeleporter::Update( CFFBot *me, float interval )
 {
 	if ( m_teleporter == NULL )
 	{
@@ -104,7 +104,7 @@ ActionResult< CTFBot >	CTFBotUseTeleporter::Update( CTFBot *me, float interval )
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		if ( m_path.Compute( me, m_teleporter->GetAbsOrigin(), cost ) == false )
 		{
 			// no path to teleporter

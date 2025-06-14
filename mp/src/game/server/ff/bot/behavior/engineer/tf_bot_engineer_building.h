@@ -6,23 +6,23 @@
 #ifndef FF_BOT_ENGINEER_BUILDING_H
 #define FF_BOT_ENGINEER_BUILDING_H
 
-class CTFBotHintSentrygun;
+class CFFBotHintSentrygun;
 
 
-class CTFBotEngineerBuilding : public Action< CTFBot >
+class CFFBotEngineerBuilding : public Action< CFFBot >
 {
 public:
-	CTFBotEngineerBuilding( void );
-	CTFBotEngineerBuilding( CTFBotHintSentrygun *sentryBuildHint );
+	CFFBotEngineerBuilding( void );
+	CFFBotEngineerBuilding( CFFBotHintSentrygun *sentryBuildHint );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnTerritoryLost( CTFBot *me, int territoryID );
-	virtual EventDesiredResult< CTFBot > OnTerritoryCaptured( CTFBot *me, int territoryID );
+	virtual EventDesiredResult< CFFBot > OnTerritoryLost( CFFBot *me, int territoryID );
+	virtual EventDesiredResult< CFFBot > OnTerritoryCaptured( CFFBot *me, int territoryID );
 
 	virtual const char *GetName( void ) const	{ return "EngineerBuilding"; };
 
@@ -39,7 +39,7 @@ private:
 
 	PathFollower m_path;
 
-	CHandle< CTFBotHintSentrygun > m_sentryBuildHint;
+	CHandle< CFFBotHintSentrygun > m_sentryBuildHint;
 
 	bool m_hasBuiltSentry;
 
@@ -54,10 +54,10 @@ private:
 
 	CountdownTimer m_territoryRangeTimer;
 	bool m_isSentryOutOfPosition;
-	bool CheckIfSentryIsOutOfPosition( CTFBot *me ) const;
+	bool CheckIfSentryIsOutOfPosition( CFFBot *me ) const;
 
-	void UpgradeAndMaintainBuildings( CTFBot *me );
-	bool IsMetalSourceNearby( CTFBot *me ) const;
+	void UpgradeAndMaintainBuildings( CFFBot *me );
+	bool IsMetalSourceNearby( CFFBot *me ) const;
 };
 
 

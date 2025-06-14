@@ -16,7 +16,7 @@ ConVar ff_bot_wait_in_cover_max_time( "ff_bot_wait_in_cover_max_time", "2", FCVA
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotRetreatToCover::CTFBotRetreatToCover( float hideDuration )
+CFFBotRetreatToCover::CFFBotRetreatToCover( float hideDuration )
 {
 	m_hideDuration = hideDuration;
 	m_actionToChangeToOnceCoverReached = NULL;
@@ -24,7 +24,7 @@ CTFBotRetreatToCover::CTFBotRetreatToCover( float hideDuration )
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotRetreatToCover::CTFBotRetreatToCover( Action< CTFBot > *actionToChangeToOnceCoverReached )
+CFFBotRetreatToCover::CFFBotRetreatToCover( Action< CFFBot > *actionToChangeToOnceCoverReached )
 {
 	m_hideDuration = -1.0f;
 	m_actionToChangeToOnceCoverReached = actionToChangeToOnceCoverReached;
@@ -36,7 +36,7 @@ CTFBotRetreatToCover::CTFBotRetreatToCover( Action< CTFBot > *actionToChangeToOn
 class CTestAreaAgainstThreats :  public IVision::IForEachKnownEntity
 {
 public:
-	CTestAreaAgainstThreats( CTFBot *me, CTFNavArea *area )
+	CTestAreaAgainstThreats( CFFBot *me, CTFNavArea *area )
 	{
 		m_me = me;
 		m_area = area;
@@ -62,7 +62,7 @@ public:
 		return true;
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CTFNavArea *m_area;
 	int m_exposedThreatCount;
 };
@@ -72,7 +72,7 @@ public:
 class CSearchForCover : public ISearchSurroundingAreasFunctor
 {
 public:
-	CSearchForCover( CTFBot *me )
+	CSearchForCover( CFFBot *me )
 	{
 		m_me = me;
 		m_minExposureCount = 9999;
@@ -125,16 +125,16 @@ public:
 		}
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CUtlVector< CTFNavArea * > m_coverAreaVector;
 	int m_minExposureCount;
 };
 
 
 //---------------------------------------------------------------------------------------------
-CTFNavArea *CTFBotRetreatToCover::FindCoverArea( CTFBot *me )
+CTFNavArea *CFFBotRetreatToCover::FindCoverArea( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotRetreatToCover::FindCoverArea", "NextBot" );
+	VPROF_BUDGET( "CFFBotRetreatToCover::FindCoverArea", "NextBot" );
 
 	CSearchForCover search( me );
 	SearchSurroundingAreas( me->GetLastKnownArea(), search );
@@ -153,7 +153,7 @@ CTFNavArea *CTFBotRetreatToCover::FindCoverArea( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotRetreatToCover::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotRetreatToCover::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -169,26 +169,18 @@ ActionResult< CTFBot >	CTFBotRetreatToCover::OnStart( CTFBot *me, Action< CTFBot
 
 	m_waitInCoverTimer.Start( m_hideDuration );
 
-	// if I'm a spy, cloak and disguise while I retreat
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
-	{
-		if ( !me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
-	}
+
 
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotRetreatToCover::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotRetreatToCover::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat( true );
 
-	if ( me->m_Shared.InCond( TF_COND_INVULNERABLE ) )
-		return Done( "I'm invulnerable - no need to retreat!" );
+
 
 	if ( ShouldRetreat( me ) == ANSWER_NO )
 		return Done( "No longer need to retreat" );
@@ -198,7 +190,7 @@ ActionResult< CTFBot >	CTFBotRetreatToCover::Update( CTFBot *me, float interval 
 
 	// reload while moving to cover
 	bool isDoingAFullReload = false;
-	CTFWeaponBase *myPrimary = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+	CFFWeaponBase *myPrimary = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 	if ( myPrimary && me->GetAmmoCount( TF_AMMO_PRIMARY ) > 0 && me->IsBarrageAndReloadWeapon( myPrimary ) )
 	{
 		if ( myPrimary->Clip1() < myPrimary->GetMaxClip1() )
@@ -225,35 +217,15 @@ ActionResult< CTFBot >	CTFBotRetreatToCover::Update( CTFBot *me, float interval 
 			}
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) && !me->m_Shared.InCond( TF_COND_DISGUISED ) )
-		{
-			// don't leave cover until my disguise kicks in
-			return Continue();
-		}
 
-		// uncloak so we can attack when we leave cover
-		if ( me->m_Shared.IsStealthed() )
-		{
-			me->PressAltFireButton();
-		}
+
 
 		if ( m_actionToChangeToOnceCoverReached )
 		{
 			return ChangeTo( m_actionToChangeToOnceCoverReached, "Doing given action now that I'm in cover" );
 		}
 
-		// if I'm being healed by a medic who nearly has his charge built up, wait in cover until his charge is ready
-		int numHealers = me->m_Shared.GetNumHealers();
-		for ( int i=0; i<numHealers; ++i )
-		{
-			CTFPlayer *medic = ToTFPlayer( me->m_Shared.GetHealerByIndex( i ) );
 
-			if ( medic && medic->MedicGetChargeLevel() > 0.9f )
-			{
-				// wait for uber to finish
-				return Continue();
-			}
-		}
 
 		// stay in cover while we fully reload
 		if ( isDoingAFullReload )
@@ -275,7 +247,7 @@ ActionResult< CTFBot >	CTFBotRetreatToCover::Update( CTFBot *me, float interval 
 		{
 			m_repathTimer.Start( RandomFloat( 0.3f, 0.5f ) );
 
-			CTFBotPathCost cost( me, RETREAT_ROUTE );
+			CFFBotPathCost cost( me, RETREAT_ROUTE );
 			m_path.Compute( me, m_coverArea->GetCenter(), cost );
 		}
 
@@ -287,21 +259,21 @@ ActionResult< CTFBot >	CTFBotRetreatToCover::Update( CTFBot *me, float interval 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotRetreatToCover::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotRetreatToCover::OnStuck( CFFBot *me )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotRetreatToCover::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotRetreatToCover::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotRetreatToCover::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotRetreatToCover::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	return TryContinue();
 }
@@ -309,7 +281,7 @@ EventDesiredResult< CTFBot > CTFBotRetreatToCover::OnMoveToFailure( CTFBot *me, 
 
 //---------------------------------------------------------------------------------------------
 // Hustle yer butt to safety!
-QueryResultType CTFBotRetreatToCover::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotRetreatToCover::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }

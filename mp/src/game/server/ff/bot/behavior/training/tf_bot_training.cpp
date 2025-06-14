@@ -13,7 +13,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ActionResult< CTFBot > CTFDespawn::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CTFDespawn::Update( CFFBot *me, float interval )
 {
 	// players need to be kicked, not deleted
 	if ( me->GetEntity()->IsPlayer() )
@@ -30,9 +30,9 @@ ActionResult< CTFBot > CTFDespawn::Update( CTFBot *me, float interval )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ActionResult< CTFBot > CTFTrainingAttackSentryActionPoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CTFTrainingAttackSentryActionPoint::Update( CFFBot *me, float interval )
 {
-	CTFBotActionPoint* pActionPoint = me->GetActionPoint();
+	CFFBotActionPoint* pActionPoint = me->GetActionPoint();
 	if ( pActionPoint == NULL )
 	{
 		return Done();
@@ -63,7 +63,7 @@ ActionResult< CTFBot > CTFTrainingAttackSentryActionPoint::Update( CTFBot *me, f
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 			
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, pActionPoint->GetAbsOrigin(), cost );
 		}
 		
@@ -75,7 +75,7 @@ ActionResult< CTFBot > CTFTrainingAttackSentryActionPoint::Update( CTFBot *me, f
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ActionResult< CTFBot > CTFGotoActionPoint::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot > CTFGotoActionPoint::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_stayTimer.Invalidate();
 	m_wasTeleported = false;
@@ -83,9 +83,9 @@ ActionResult< CTFBot > CTFGotoActionPoint::OnStart( CTFBot *me, Action< CTFBot >
 	return Continue();
 }
 
-ActionResult< CTFBot > CTFGotoActionPoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CTFGotoActionPoint::Update( CFFBot *me, float interval )
 {
-	CTFBotActionPoint* pActionPoint = me->GetActionPoint();
+	CFFBotActionPoint* pActionPoint = me->GetActionPoint();
 	if ( pActionPoint == NULL )
 	{
 		return Done();
@@ -106,7 +106,7 @@ ActionResult< CTFBot > CTFGotoActionPoint::Update( CTFBot *me, float interval )
 		}
 		else if ( m_stayTimer.IsElapsed() )
 		{
-			me->SetActionPoint( dynamic_cast< CTFBotActionPoint * >( pActionPoint->m_moveGoal.Get() ) );
+			me->SetActionPoint( dynamic_cast< CFFBotActionPoint * >( pActionPoint->m_moveGoal.Get() ) );
 			return ChangeTo( new CTFGotoActionPoint, "Reached point, going to next" );
 		}		
 	}
@@ -114,7 +114,7 @@ ActionResult< CTFBot > CTFGotoActionPoint::Update( CTFBot *me, float interval )
 	{
 		// we reached our action point, but were teleported far away.
 		// presumably we've resumed, so just go to the next action point.
-		me->SetActionPoint( dynamic_cast< CTFBotActionPoint * >( pActionPoint->m_moveGoal.Get() ) );
+		me->SetActionPoint( dynamic_cast< CFFBotActionPoint * >( pActionPoint->m_moveGoal.Get() ) );
 		return ChangeTo( new CTFGotoActionPoint, "Reached point, going to next" );
 	}
 	else
@@ -123,7 +123,7 @@ ActionResult< CTFBot > CTFGotoActionPoint::Update( CTFBot *me, float interval )
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 			
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, pActionPoint->GetAbsOrigin(), cost );
 		}
 		

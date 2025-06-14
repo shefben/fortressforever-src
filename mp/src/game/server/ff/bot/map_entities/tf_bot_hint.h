@@ -5,20 +5,20 @@
 #ifndef FF_BOT_HINT_H
 #define FF_BOT_HINT_H
 
-class CTFBot;
+class CFFBot;
 
 //-----------------------------------------------------------------------------------------------------
 /**
  * An entity that specifies TFBot behavior hints.
  */
-class CTFBotHint : public CBaseEntity
+class CFFBotHint : public CBaseEntity
 {
 public:
 	DECLARE_DATADESC();
-	DECLARE_CLASS( CTFBotHint, CBaseEntity );
+	DECLARE_CLASS( CFFBotHint, CBaseEntity );
 
-	CTFBotHint( void );
-	virtual ~CTFBotHint() { }
+	CFFBotHint( void );
+	virtual ~CFFBotHint() { }
 
 	enum HintType
 	{
@@ -28,7 +28,7 @@ public:
 
 	bool IsA( HintType type ) const;
 
-	bool IsFor( CTFBot *who ) const;				// return true if this hint applies to the given entity
+	bool IsFor( CFFBot *who ) const;				// return true if this hint applies to the given entity
 
 	virtual void Spawn( void );
 	virtual void UpdateOnRemove( void );
@@ -45,7 +45,7 @@ protected:
 	void UpdateNavDecoration( void );
 };
 
-inline bool CTFBotHint::IsA( HintType type ) const
+inline bool CFFBotHint::IsA( HintType type ) const
 {
 	return ( m_hint == type );
 }

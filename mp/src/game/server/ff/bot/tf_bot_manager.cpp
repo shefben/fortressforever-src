@@ -19,8 +19,8 @@
 
 //----------------------------------------------------------------------------------------------------------------
 
-// Creates and sets CTFBotManager as the NextBotManager singleton
-static CTFBotManager sTFBotManager;
+// Creates and sets CFFBotManager as the NextBotManager singleton
+static CFFBotManager sTFBotManager;
 
 extern ConVar ff_bot_force_class;
 ConVar ff_bot_difficulty( "ff_bot_difficulty", "1", FCVAR_NONE, "Defines the skill of bots joining the game.  Values are: 0=easy, 1=normal, 2=hard, 3=expert." );
@@ -32,7 +32,7 @@ ConVar ff_bot_offline_practice( "ff_bot_offline_practice", "0", FCVAR_NONE, "Tel
 ConVar ff_bot_melee_only( "ff_bot_melee_only", "0", FCVAR_GAMEDLL, "If nonzero, TFBots will only use melee weapons" );
 
 extern const char *GetRandomBotName( void );
-extern void CreateBotName( int iTeam, int iClassIndex, CTFBot::DifficultyType skill, char* pBuffer, int iBufferSize );
+extern void CreateBotName( int iTeam, int iClassIndex, CFFBot::DifficultyType skill, char* pBuffer, int iBufferSize );
 
 static bool UTIL_KickBotFromTeam( int kickTeam )
 {
@@ -41,13 +41,13 @@ static bool UTIL_KickBotFromTeam( int kickTeam )
 	// try to kick a dead bot first
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
-		CTFBot* pBot = dynamic_cast<CTFBot*>(pPlayer);
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)
 			continue;
 
-		if ( pBot->HasAttribute( CTFBot::QUOTA_MANANGED ) == false )
+		if ( pBot->HasAttribute( CFFBot::QUOTA_MANANGED ) == false )
 			continue;
 
 		if ( ( pPlayer->GetFlags() & FL_FAKECLIENT ) == 0 )
@@ -65,13 +65,13 @@ static bool UTIL_KickBotFromTeam( int kickTeam )
 	// no dead bots, kick any bot on the given team
 	for ( i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
-		CTFBot* pBot = dynamic_cast<CTFBot*>(pPlayer);
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)
 			continue;
 
-		if ( pBot->HasAttribute( CTFBot::QUOTA_MANANGED ) == false )
+		if ( pBot->HasAttribute( CFFBot::QUOTA_MANANGED ) == false )
 			continue;
 
 		if ( ( pPlayer->GetFlags() & FL_FAKECLIENT ) == 0 )
@@ -91,7 +91,7 @@ static bool UTIL_KickBotFromTeam( int kickTeam )
 
 //----------------------------------------------------------------------------------------------------------------
 
-CTFBotManager::CTFBotManager()
+CFFBotManager::CFFBotManager()
 	: NextBotManager()
 	, m_flNextPeriodicThink( 0 )
 {
@@ -100,14 +100,14 @@ CTFBotManager::CTFBotManager()
 
 
 //----------------------------------------------------------------------------------------------------------------
-CTFBotManager::~CTFBotManager()
+CFFBotManager::~CFFBotManager()
 {
 	NextBotManager::SetInstance( NULL );
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::OnMapLoaded( void )
+void CFFBotManager::OnMapLoaded( void )
 {
 	NextBotManager::OnMapLoaded();
 
@@ -116,33 +116,33 @@ void CTFBotManager::OnMapLoaded( void )
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::OnRoundRestart( void )
+void CFFBotManager::OnRoundRestart( void )
 {
 	NextBotManager::OnRoundRestart();
 
 	// clear all hint ownership
-	CTFBotHint *hint = NULL;
-	while( ( hint = (CTFBotHint *)( gEntList.FindEntityByClassname( hint, "func_tfbot_hint" ) ) ) != NULL )
+	CFFBotHint *hint = NULL;
+	while( ( hint = (CFFBotHint *)( gEntList.FindEntityByClassname( hint, "func_tfbot_hint" ) ) ) != NULL )
 	{
 		hint->SetOwnerEntity( NULL );
 	}
 
-	CTFBotHintSentrygun *sentryHint = NULL;
-	while( ( sentryHint = (CTFBotHintSentrygun *)( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) ) != NULL )
+	CFFBotHintSentrygun *sentryHint = NULL;
+	while( ( sentryHint = (CFFBotHintSentrygun *)( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) ) != NULL )
 	{
 		sentryHint->SetOwnerEntity( NULL );
 	}
 
-	CTFBotHintTeleporterExit *teleporterHint = NULL;
-	while( ( teleporterHint = (CTFBotHintTeleporterExit *)( gEntList.FindEntityByClassname( teleporterHint, "bot_hint_teleporter_exit" ) ) ) != NULL )
+	CFFBotHintTeleporterExit *teleporterHint = NULL;
+	while( ( teleporterHint = (CFFBotHintTeleporterExit *)( gEntList.FindEntityByClassname( teleporterHint, "bot_hint_teleporter_exit" ) ) ) != NULL )
 	{
 		teleporterHint->SetOwnerEntity( NULL );
 	}
 
 
 #ifdef TF_CREEP_MODE
-	m_creepExperience[ TF_TEAM_RED ] = 0;
-	m_creepExperience[ TF_TEAM_BLUE ] = 0;
+	m_creepExperience[ FF_TEAM_RED ] = 0;
+	m_creepExperience[ FF_TEAM_BLUE ] = 0;
 #endif
 
 	m_isMedeivalBossScenarioSetup = false;
@@ -150,7 +150,7 @@ void CTFBotManager::OnRoundRestart( void )
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::Update()
+void CFFBotManager::Update()
 {
 	MaintainBotQuota();
 
@@ -173,7 +173,7 @@ ConVar ff_creep_level_up( "ff_creep_level_up", "6" );
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::UpdateCreepWaves()
+void CFFBotManager::UpdateCreepWaves()
 {
 	if ( !TFGameRules()->IsCreepWaveMode() )
 		return;
@@ -200,8 +200,8 @@ void CTFBotManager::UpdateCreepWaves()
 			if ( FNullEnt( player->edict() ) )
 				continue;
 
-			CTFBot *creep = ToTFBot( player );
-			if ( !creep || !creep->HasAttribute( CTFBot::IS_NPC ) )
+			CFFBot *creep = ToTFBot( player );
+			if ( !creep || !creep->HasAttribute( CFFBot::IS_NPC ) )
 				continue;
 
 			engine->ServerCommand( UTIL_VarArgs( "kickid %d\n", player->GetUserID() ) );
@@ -214,16 +214,16 @@ void CTFBotManager::UpdateCreepWaves()
 	{
 		m_creepWaveTimer.Start( ff_creep_wave_interval.GetFloat() );
 
-		SpawnCreepWave( TF_TEAM_RED );
-		SpawnCreepWave( TF_TEAM_BLUE );
+		SpawnCreepWave( FF_TEAM_RED );
+		SpawnCreepWave( FF_TEAM_BLUE );
 	}
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::SpawnCreepWave( int team )
+void CFFBotManager::SpawnCreepWave( int team )
 {
-	CTFBotSquad *squad = new CTFBotSquad;
+	CFFBotSquad *squad = new CFFBotSquad;
 
 	for( int i=0; i<ff_creep_wave_count.GetInt(); ++i )
 	{
@@ -233,28 +233,27 @@ void CTFBotManager::SpawnCreepWave( int team )
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::SpawnCreep( int team, CTFBotSquad *squad )
+void CFFBotManager::SpawnCreep( int team, CFFBotSquad *squad )
 {
-	CTFBot *bot = NextBotCreatePlayerBot< CTFBot >( "Creep" );
+	CFFBot *bot = NextBotCreatePlayerBot< CFFBot >( "Creep" );
 
 	if ( !bot ) 
 		return;
 
-	bot->SetAttribute( CTFBot::IS_NPC );
-	bot->HandleCommand_JoinTeam( team == TF_TEAM_RED ? "red" : "blue" );
-	bot->SetDifficulty( CTFBot::NORMAL );
+	bot->SetAttribute( CFFBot::IS_NPC );
+	bot->HandleCommand_JoinTeam( team == FF_TEAM_RED ? "red" : "blue" );
+	bot->SetDifficulty( CFFBot::NORMAL );
 	bot->HandleCommand_JoinClass( ff_creep_class.GetString() );
 	bot->JoinSquad( squad );
 	bot->AddGlowEffect();
-	//BotGenerateAndWearItem( bot, "Honest Halo" );
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::OnCreepKilled( CTFPlayer *killer )
+void CFFBotManager::OnCreepKilled( CFFPlayer *killer )
 {
-	CTFBot *bot = ToTFBot( killer );
-	if ( bot && bot->HasAttribute( CTFBot::IS_NPC ) )
+	CFFBot *bot = ToTFBot( killer );
+	if ( bot && bot->HasAttribute( CFFBot::IS_NPC ) )
 		return;
 
 	++m_creepExperience[ killer->GetTeamNumber() ];
@@ -267,7 +266,7 @@ void CTFBotManager::OnCreepKilled( CTFPlayer *killer )
 	char text[256];
 	Q_snprintf( text, sizeof(text), "%s killed a creep. %s team LVL = %d+%d/%d\n", 
 				killer->GetPlayerName(), 
-				killer->GetTeamNumber() == TF_TEAM_RED ? "Red" : "Blue", 
+				killer->GetTeamNumber() == FF_TEAM_RED ? "Red" : "Blue", 
 				level+1, left, ff_creep_level_up.GetInt() );
 
 	UTIL_ClientPrintAll( HUD_PRINTTALK, text );
@@ -279,14 +278,14 @@ void CTFBotManager::OnCreepKilled( CTFPlayer *killer )
 #endif // TF_CREEP_MODE
 
 //----------------------------------------------------------------------------------------------------------------
-bool CTFBotManager::RemoveBotFromTeamAndKick( int nTeam )
+bool CFFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 {
-	CUtlVector< CTFPlayer* > vecCandidates;
+	CUtlVector< CFFPlayer* > vecCandidates;
 
 	// Gather potential candidates
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 
 		if ( pPlayer == NULL )
 			continue;
@@ -297,8 +296,8 @@ bool CTFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 		if ( !pPlayer->IsConnected() )
 			continue;
 
-		CTFBot* pBot = dynamic_cast<CTFBot*>( pPlayer );
-		if ( pBot && pBot->HasAttribute( CTFBot::QUOTA_MANANGED ) )
+		CFFBot* pBot = dynamic_cast<CFFBot*>( pPlayer );
+		if ( pBot && pBot->HasAttribute( CFFBot::QUOTA_MANANGED ) )
 		{
 			if ( pBot->GetTeamNumber() == nTeam )
 			{
@@ -307,13 +306,13 @@ bool CTFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 		}
 	}
 	
-	CTFPlayer *pVictim = NULL;
+	CFFPlayer *pVictim = NULL;
 	if ( vecCandidates.Count() > 0 )
 	{
 		// first look for bots that are currently dead
 		FOR_EACH_VEC( vecCandidates, i )
 		{
-			CTFPlayer *pPlayer = vecCandidates[i];
+			CFFPlayer *pPlayer = vecCandidates[i];
 			if ( pPlayer && !pPlayer->IsAlive() )
 			{
 				pVictim = pPlayer;
@@ -326,7 +325,7 @@ bool CTFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 		{
 			FOR_EACH_VEC( vecCandidates, i )
 			{
-				CTFPlayer *pPlayer = vecCandidates[i];
+				CFFPlayer *pPlayer = vecCandidates[i];
 				if ( pPlayer )
 				{
 					pVictim = pPlayer;
@@ -351,7 +350,7 @@ bool CTFBotManager::RemoveBotFromTeamAndKick( int nTeam )
 }
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::MaintainBotQuota()
+void CFFBotManager::MaintainBotQuota()
 {
 	if ( TheNavMesh->IsGenerating() )
 		return;
@@ -390,7 +389,7 @@ void CTFBotManager::MaintainBotQuota()
 	int nSpectators = 0;
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
 
 		if ( pPlayer == NULL )
 			continue;
@@ -401,18 +400,18 @@ void CTFBotManager::MaintainBotQuota()
 		if ( !pPlayer->IsConnected() )
 			continue;
 
-		CTFBot* pBot = dynamic_cast<CTFBot*>( pPlayer );
-		if ( pBot && pBot->HasAttribute( CTFBot::QUOTA_MANANGED ) )
+		CFFBot* pBot = dynamic_cast<CFFBot*>( pPlayer );
+		if ( pBot && pBot->HasAttribute( CFFBot::QUOTA_MANANGED ) )
 		{
 			nTFBots++;
-			if ( pPlayer->GetTeamNumber() == TF_TEAM_RED || pPlayer->GetTeamNumber() == TF_TEAM_BLUE )
+			if ( pPlayer->GetTeamNumber() == FF_TEAM_RED || pPlayer->GetTeamNumber() == FF_TEAM_BLUE )
 			{
 				nTFBotsOnGameTeams++;
 			}
 		}
 		else
 		{
-			if ( pPlayer->GetTeamNumber() == TF_TEAM_RED || pPlayer->GetTeamNumber() == TF_TEAM_BLUE )
+			if ( pPlayer->GetTeamNumber() == FF_TEAM_RED || pPlayer->GetTeamNumber() == FF_TEAM_BLUE )
 			{
 				nNonTFBotsOnGameTeams++;
 			}
@@ -461,17 +460,17 @@ void CTFBotManager::MaintainBotQuota()
 	if ( desiredBotCount > nTFBotsOnGameTeams )
 	{
 		// don't try to add a bot if it would unbalance
-		if ( !TFGameRules()->WouldChangeUnbalanceTeams( TF_TEAM_BLUE, TEAM_UNASSIGNED ) ||
-			 !TFGameRules()->WouldChangeUnbalanceTeams( TF_TEAM_RED, TEAM_UNASSIGNED ) )
+		if ( !TFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_BLUE, TEAM_UNASSIGNED ) ||
+			 !TFGameRules()->WouldChangeUnbalanceTeams( FF_TEAM_RED, TEAM_UNASSIGNED ) )
 		{
-			CTFBot *pBot = GetAvailableBotFromPool();
+			CFFBot *pBot = GetAvailableBotFromPool();
 			if ( pBot == NULL )
 			{
-				pBot = NextBotCreatePlayerBot< CTFBot >( GetRandomBotName() );
+				pBot = NextBotCreatePlayerBot< CFFBot >( GetRandomBotName() );
 			}
 			if ( pBot )
 			{
-				pBot->SetAttribute( CTFBot::QUOTA_MANANGED );
+				pBot->SetAttribute( CFFBot::QUOTA_MANANGED );
 
 				// join a team before we pick our class, since we use our teammates to decide what class to be
 				pBot->HandleCommand_JoinTeam( "auto" );
@@ -481,7 +480,7 @@ void CTFBotManager::MaintainBotQuota()
 
 				// give the bot a proper name
 				char name[256];
-				CTFBot::DifficultyType skill = pBot->GetDifficulty();
+				CFFBot::DifficultyType skill = pBot->GetDifficulty();
 				CreateBotName( pBot->GetTeamNumber(), pBot->GetPlayerClass()->GetClassIndex(), skill, name, sizeof( name ) );
 				engine->SetFakeClientConVarValue( pBot->edict(), "name", name );
 				
@@ -504,31 +503,31 @@ void CTFBotManager::MaintainBotQuota()
 
 		int kickTeam;
 
-		CTeam *pRed = GetGlobalTeam( TF_TEAM_RED );
-		CTeam *pBlue = GetGlobalTeam( TF_TEAM_BLUE );
+		CTeam *pRed = GetGlobalTeam( FF_TEAM_RED );
+		CTeam *pBlue = GetGlobalTeam( FF_TEAM_BLUE );
 
 		// remove from the team that has more players
 		if ( pBlue->GetNumPlayers() > pRed->GetNumPlayers() )
 		{
-			kickTeam = TF_TEAM_BLUE;
+			kickTeam = FF_TEAM_BLUE;
 		}
 		else if ( pBlue->GetNumPlayers() < pRed->GetNumPlayers() )
 		{
-			kickTeam = TF_TEAM_RED;
+			kickTeam = FF_TEAM_RED;
 		}
 		// remove from the team that's winning
 		else if ( pBlue->GetScore() > pRed->GetScore() )
 		{
-			kickTeam = TF_TEAM_BLUE;
+			kickTeam = FF_TEAM_BLUE;
 		}
 		else if ( pBlue->GetScore() < pRed->GetScore() )
 		{
-			kickTeam = TF_TEAM_RED;
+			kickTeam = FF_TEAM_RED;
 		}
 		else
 		{
 			// teams and scores are equal, pick a team at random
-			kickTeam = (RandomInt( 0, 1 ) == 0) ? TF_TEAM_BLUE : TF_TEAM_RED;
+			kickTeam = (RandomInt( 0, 1 ) == 0) ? FF_TEAM_BLUE : FF_TEAM_RED;
 		}
 
 		// attempt to kick a bot from the given team
@@ -536,13 +535,13 @@ void CTFBotManager::MaintainBotQuota()
 			return;
 
 		// if there were no bots on the team, kick a bot from the other team
-		UTIL_KickBotFromTeam( kickTeam == TF_TEAM_BLUE ? TF_TEAM_RED : TF_TEAM_BLUE );
+		UTIL_KickBotFromTeam( kickTeam == FF_TEAM_BLUE ? FF_TEAM_RED : FF_TEAM_BLUE );
 	}
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-bool CTFBotManager::IsAllBotTeam( int iTeam )
+bool CFFBotManager::IsAllBotTeam( int iTeam )
 {
 	CTeam *pTeam = GetGlobalTeam( iTeam );
 	if ( pTeam == NULL )
@@ -553,7 +552,7 @@ bool CTFBotManager::IsAllBotTeam( int iTeam )
 	// check to see if any players on the team are humans
 	for ( int i = 0, n = pTeam->GetNumPlayers(); i < n; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( pTeam->GetPlayer( i ) );
+		CFFPlayer *pPlayer = ToFFPlayer( pTeam->GetPlayer( i ) );
 		if ( pPlayer == NULL )
 		{
 			continue;
@@ -577,28 +576,28 @@ bool CTFBotManager::IsAllBotTeam( int iTeam )
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::SetIsInOfflinePractice(bool bIsInOfflinePractice)
+void CFFBotManager::SetIsInOfflinePractice(bool bIsInOfflinePractice)
 {
 	ff_bot_offline_practice.SetValue( bIsInOfflinePractice ? 1 : 0 );
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-bool CTFBotManager::IsInOfflinePractice() const
+bool CFFBotManager::IsInOfflinePractice() const
 {
 	return ff_bot_offline_practice.GetInt() != 0;
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-bool CTFBotManager::IsMeleeOnly() const
+bool CFFBotManager::IsMeleeOnly() const
 {
 	return ff_bot_melee_only.GetBool();
 }
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::RevertOfflinePracticeConvars()
+void CFFBotManager::RevertOfflinePracticeConvars()
 {
 	ff_bot_quota.Revert();
 	ff_bot_quota_mode.Revert();
@@ -609,7 +608,7 @@ void CTFBotManager::RevertOfflinePracticeConvars()
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::LevelShutdown()
+void CFFBotManager::LevelShutdown()
 {
 	m_flNextPeriodicThink = 0.0f;
 	if ( IsInOfflinePractice() )
@@ -621,12 +620,12 @@ void CTFBotManager::LevelShutdown()
 
 
 //----------------------------------------------------------------------------------------------------------------
-CTFBot* CTFBotManager::GetAvailableBotFromPool()
+CFFBot* CFFBotManager::GetAvailableBotFromPool()
 {
 	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
 	{
-		CTFPlayer *pPlayer = ToTFPlayer( UTIL_PlayerByIndex( i ) );
-		CTFBot* pBot = dynamic_cast<CTFBot*>(pPlayer);
+		CFFPlayer *pPlayer = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+		CFFBot* pBot = dynamic_cast<CFFBot*>(pPlayer);
 
 		if (pBot == NULL)
 			continue;
@@ -636,7 +635,7 @@ CTFBot* CTFBotManager::GetAvailableBotFromPool()
 
 		if ( pBot->GetTeamNumber() == TEAM_SPECTATOR || pBot->GetTeamNumber() == TEAM_UNASSIGNED )
 		{
-			pBot->ClearAttribute( CTFBot::QUOTA_MANANGED );
+			pBot->ClearAttribute( CFFBot::QUOTA_MANANGED );
 			return pBot;
 		}
 	}
@@ -645,7 +644,7 @@ CTFBot* CTFBotManager::GetAvailableBotFromPool()
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::OnForceAddedBots( int iNumAdded )
+void CFFBotManager::OnForceAddedBots( int iNumAdded )
 {
 	ff_bot_quota.SetValue( ff_bot_quota.GetInt() + iNumAdded );
 	m_flNextPeriodicThink = gpGlobals->curtime + 1.0f;
@@ -653,7 +652,7 @@ void CTFBotManager::OnForceAddedBots( int iNumAdded )
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::OnForceKickedBots( int iNumKicked )
+void CFFBotManager::OnForceKickedBots( int iNumKicked )
 {
 	ff_bot_quota.SetValue( MAX( ff_bot_quota.GetInt() - iNumKicked, 0 ) );
 	// allow time for the bots to be kicked
@@ -662,9 +661,9 @@ void CTFBotManager::OnForceKickedBots( int iNumKicked )
 
 
 //----------------------------------------------------------------------------------------------------------------
-CTFBotManager &TheTFBots( void )
+CFFBotManager &TheTFBots( void )
 {
-	return static_cast<CTFBotManager&>( TheNextBots() );
+	return static_cast<CFFBotManager&>( TheNextBots() );
 }
 
 
@@ -805,7 +804,7 @@ CON_COMMAND_F( ff_bot_debug_stuck_log_clear, "Clear currently loaded bot stuck d
 
 //----------------------------------------------------------------------------------------------------------------
 // for parsing and debugging stuck bot server logs
-void CTFBotManager::ClearStuckBotData()
+void CFFBotManager::ClearStuckBotData()
 {
 	m_stuckBotVector.PurgeAndDeleteElements();
 }
@@ -813,7 +812,7 @@ void CTFBotManager::ClearStuckBotData()
 
 //----------------------------------------------------------------------------------------------------------------
 // for parsing and debugging stuck bot server logs
-CStuckBot *CTFBotManager::FindOrCreateStuckBot( int id, const char *playerClass )
+CStuckBot *CFFBotManager::FindOrCreateStuckBot( int id, const char *playerClass )
 {
 	for( int i=0; i<m_stuckBotVector.Count(); ++i )
 	{
@@ -834,7 +833,7 @@ CStuckBot *CTFBotManager::FindOrCreateStuckBot( int id, const char *playerClass 
 
 
 //----------------------------------------------------------------------------------------------------------------
-void CTFBotManager::DrawStuckBotData( float deltaT )
+void CFFBotManager::DrawStuckBotData( float deltaT )
 {
 	if ( engine->IsDedicatedServer() )
 		return;

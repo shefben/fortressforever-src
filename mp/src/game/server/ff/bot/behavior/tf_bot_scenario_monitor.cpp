@@ -62,7 +62,7 @@ extern ConVar ff_bot_health_critical_ratio;
 
 //-----------------------------------------------------------------------------------------
 // Returns the initial Action we will run concurrently as a child to us
-Action< CTFBot > *CTFBotScenarioMonitor::InitialContainedAction( CTFBot *me )
+Action< CFFBot > *CFFBotScenarioMonitor::InitialContainedAction( CFFBot *me )
 {
 	if ( me->IsInASquad() )
 	{
@@ -73,14 +73,14 @@ Action< CTFBot > *CTFBotScenarioMonitor::InitialContainedAction( CTFBot *me )
 		}
 
 		// Medics are the exception - they always heal, and have special squad logic in their heal logic
-		if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( me->IsPlayerClass( CLASS_MEDIC ) )
 		{
-			return new CTFBotMedicHeal;
+			return new CFFBotMedicHeal;
 		}
 
 		// I'm in a Squad but not the leader, do "escort and support" Squad behavior
 		// until the Squad disbands, and then do my normal thing
-		return new CTFBotEscortSquadLeader( DesiredScenarioAndClassAction( me ) );
+		return new CFFBotEscortSquadLeader( DesiredScenarioAndClassAction( me ) );
 	}
 
 	return DesiredScenarioAndClassAction( me );
@@ -89,105 +89,105 @@ Action< CTFBot > *CTFBotScenarioMonitor::InitialContainedAction( CTFBot *me )
 
 //-----------------------------------------------------------------------------------------
 // Returns Action specific to the scenario and my class
-Action< CTFBot > *CTFBotScenarioMonitor::DesiredScenarioAndClassAction( CTFBot *me )
+Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *me )
 {
 	switch( me->GetMission() )
 	{
-	case CTFBot::MISSION_SEEK_AND_DESTROY:
+	case CFFBot::MISSION_SEEK_AND_DESTROY:
 		break;
 
-	case CTFBot::MISSION_DESTROY_SENTRIES:
-		return new CTFBotMissionSuicideBomber;
+	case CFFBot::MISSION_DESTROY_SENTRIES:
+		return new CFFBotMissionSuicideBomber;
 
-	case CTFBot::MISSION_SNIPER:
-		return new CTFBotSniperLurk;
+	case CFFBot::MISSION_SNIPER:
+		return new CFFBotSniperLurk;
 
 #ifdef STAGING_ONLY
-	case CTFBot::MISSION_REPROGRAMMED:
-		return new CTFBotMissionReprogrammed;
+	case CFFBot::MISSION_REPROGRAMMED:
+		return new CFFBotMissionReprogrammed;
 #endif
 	}
 
 #ifdef TF_RAID_MODE
-	if ( me->HasAttribute( CTFBot::IS_NPC ) )
+	if ( me->HasAttribute( CFFBot::IS_NPC ) )
 	{
 		// map-spawned guardians
-		return new CTFBotGuardian;
+		return new CFFBotGuardian;
 	}
 #endif // TF_RAID_MODE
 
 #ifdef TF_RAID_MODE
 	if ( TFGameRules()->IsBossBattleMode() )
 	{
-		if ( me->GetTeamNumber() == TF_TEAM_BLUE )
+		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
 			// bot teammates
-			return new CTFBotCompanion;
+			return new CFFBotCompanion;
 		}
 		
-		if ( me->IsPlayerClass( TF_CLASS_SNIPER ) )
+		if ( me->IsPlayerClass( CLASS_SNIPER ) )
 		{
-			return new CTFBotSniperLurk;
+			return new CFFBotSniperLurk;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( me->IsPlayerClass( CLASS_SPY ) )
 		{
-			return new CTFBotSpyInfiltrate;
+			return new CFFBotSpyInfiltrate;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( me->IsPlayerClass( CLASS_MEDIC ) )
 		{
-			return new CTFBotMedicHeal;
+			return new CFFBotMedicHeal;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+		if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		{
-			return new CTFBotEngineerBuild;
+			return new CFFBotEngineerBuild;
 		}
 
-		return new CTFBotEscort( TFGameRules()->GetActiveBoss() );
+		return new CFFBotEscort( TFGameRules()->GetActiveBoss() );
 	}
 	else if ( TFGameRules()->IsRaidMode() )
 	{
-		if ( me->GetTeamNumber() == TF_TEAM_BLUE )
+		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
 			// bot teammates
-			return new CTFBotCompanion;
+			return new CFFBotCompanion;
 		}
 
 		if ( me->IsInASquad() )
 		{
 			// squad behavior
-			return new CTFBotSquadAttack;
+			return new CFFBotSquadAttack;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_SCOUT ) || me->HasAttribute( CTFBot::AGGRESSIVE ) )
+		if ( me->IsPlayerClass( CLASS_SCOUT ) || me->HasAttribute( CFFBot::AGGRESSIVE ) )
 		{
-			return new CTFBotWander;
+			return new CFFBotWander;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_SNIPER ) )
+		if ( me->IsPlayerClass( CLASS_SNIPER ) )
 		{
-			return new CTFBotSniperLurk;
+			return new CFFBotSniperLurk;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( me->IsPlayerClass( CLASS_SPY ) )
 		{
-			return new CTFBotSpyInfiltrate;
+			return new CFFBotSpyInfiltrate;
 		}
 
-		return new CTFBotGuardArea;
+		return new CFFBotGuardArea;
 	}
 #endif // TF_RAID_MODE	
 
 	if ( TFGameRules()->IsMannVsMachineMode() )
 	{
-		if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( me->IsPlayerClass( CLASS_SPY ) )
 		{
-			return new CTFBotSpyLeaveSpawnRoom;
+			return new CFFBotSpyLeaveSpawnRoom;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( me->IsPlayerClass( CLASS_MEDIC ) )
 		{
 			// if I'm being healed by another medic, I should do something else other than healing
 			bool bIsBeingHealedByAMedic = false;
@@ -204,67 +204,67 @@ Action< CTFBot > *CTFBotScenarioMonitor::DesiredScenarioAndClassAction( CTFBot *
 
 			if ( !bIsBeingHealedByAMedic )
 			{
-				return new CTFBotMedicHeal;
+				return new CFFBotMedicHeal;
 			}
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+		if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		{
-			return new CTFBotMvMEngineerIdle;
+			return new CFFBotMvMEngineerIdle;
 		}
 
 		// NOTE: Snipers are intentionally left out so they go after the flag. Actual sniping behavior is done as a mission.
 
-		if ( me->HasAttribute( CTFBot::AGGRESSIVE ) )
+		if ( me->HasAttribute( CFFBot::AGGRESSIVE ) )
 		{
 			// push for the point first, then attack
-			return new CTFBotPushToCapturePoint( new CTFBotFetchFlag );
+			return new CFFBotPushToCapturePoint( new CFFBotFetchFlag );
 		}
 
 		// capture the flag
-		return new CTFBotFetchFlag;
+		return new CFFBotFetchFlag;
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( me->IsPlayerClass( CLASS_SPY ) )
 	{
-		return new CTFBotSpyInfiltrate;
+		return new CFFBotSpyInfiltrate;
 	}
 
 	if ( !TheTFBots().IsMeleeOnly() )
 	{
-		if ( me->IsPlayerClass( TF_CLASS_SNIPER ) )
+		if ( me->IsPlayerClass( CLASS_SNIPER ) )
 		{
-			return new CTFBotSniperLurk;
+			return new CFFBotSniperLurk;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( me->IsPlayerClass( CLASS_MEDIC ) )
 		{
-			return new CTFBotMedicHeal;
+			return new CFFBotMedicHeal;
 		}
 
-		if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+		if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		{
-			return new CTFBotEngineerBuild;
+			return new CFFBotEngineerBuild;
 		}
 	}
 
 	if ( me->GetFlagToFetch() )
 	{
 		// capture the flag
-		return new CTFBotFetchFlag;
+		return new CFFBotFetchFlag;
 	}
 	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
 	{
 		// push the cart
-		if ( me->GetTeamNumber() == TF_TEAM_BLUE )
+		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
 		{
 			// blu is pushing
-			return new CTFBotPayloadPush;
+			return new CFFBotPayloadPush;
 		}
-		else if ( me->GetTeamNumber() == TF_TEAM_RED )
+		else if ( me->GetTeamNumber() == FF_TEAM_RED )
 		{
 			// red is blocking
-			return new CTFBotPayloadGuard;
+			return new CFFBotPayloadGuard;
 		}
 	}
 	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
@@ -275,7 +275,7 @@ Action< CTFBot > *CTFBotScenarioMonitor::DesiredScenarioAndClassAction( CTFBot *
 
 		if ( captureVector.Count() > 0 )
 		{
-			return new CTFBotCapturePoint;
+			return new CFFBotCapturePoint;
 		}
 
 		// otherwise, defend our point(s) from capture
@@ -284,17 +284,17 @@ Action< CTFBot > *CTFBotScenarioMonitor::DesiredScenarioAndClassAction( CTFBot *
 
 		if ( defendVector.Count() > 0 )
 		{
-			return new CTFBotDefendPoint;
+			return new CFFBotDefendPoint;
 		}
 
 		// likely KotH mode and/or all points are locked - assume capture
 		DevMsg( "%3.2f: %s: Gametype is CP, but I can't find a point to capture or defend!\n", gpGlobals->curtime, me->GetDebugIdentifier() );
-		return new CTFBotCapturePoint;
+		return new CFFBotCapturePoint;
 	}
 	else
 	{
 		// scenario not implemented yet - just fight
-		return new CTFBotSeekAndDestroy;
+		return new CFFBotSeekAndDestroy;
 	}
 
 	return NULL;
@@ -302,7 +302,7 @@ Action< CTFBot > *CTFBotScenarioMonitor::DesiredScenarioAndClassAction( CTFBot *
 
 
 //-----------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotScenarioMonitor::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotScenarioMonitor::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_ignoreLostFlagTimer.Start( 20.0f );
 	m_lostFlagTimer.Invalidate();
@@ -315,7 +315,7 @@ ConVar ff_bot_flag_kill_on_touch( "ff_bot_flag_kill_on_touch", "0", FCVAR_CHEAT,
 
 
 //-----------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotScenarioMonitor::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotScenarioMonitor::Update( CFFBot *me, float interval )
 {
 	// CTF Scenario
 	if ( me->HasTheFlag() )
@@ -327,16 +327,16 @@ ActionResult< CTFBot >	CTFBotScenarioMonitor::Update( CTFBot *me, float interval
 		}
 
 		// we just picked up the flag - drop what we're doing and take it in
-		return SuspendFor( new CTFBotDeliverFlag, "I've picked up the flag! Running it in..." );
+		return SuspendFor( new CFFBotDeliverFlag, "I've picked up the flag! Running it in..." );
 	}
 
-	if ( me->HasMission( CTFBot::NO_MISSION ) && m_ignoreLostFlagTimer.IsElapsed() && me->IsAllowedToPickUpFlag() )
+	if ( me->HasMission( CFFBot::NO_MISSION ) && m_ignoreLostFlagTimer.IsElapsed() && me->IsAllowedToPickUpFlag() )
 	{
 		CCaptureFlag *flag = me->GetFlagToFetch();
 
 		if ( flag )
 		{
-			CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+			CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 			if ( carrier )
 			{
 				m_lostFlagTimer.Invalidate();
@@ -356,7 +356,7 @@ ActionResult< CTFBot >	CTFBotScenarioMonitor::Update( CTFBot *me, float interval
 					if ( !me->MedicGetHealTarget() )
 					{
 						// we better go get the flag
-						return SuspendFor( new CTFBotFetchFlag( TEMPORARY_FLAG_FETCH ), "Fetching lost flag..." );
+						return SuspendFor( new CFFBotFetchFlag( TEMPORARY_FLAG_FETCH ), "Fetching lost flag..." );
 					}
 				}
 			}

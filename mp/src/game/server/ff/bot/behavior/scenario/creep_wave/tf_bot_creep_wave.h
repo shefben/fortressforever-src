@@ -12,19 +12,19 @@
 #include "Path/NextBotChasePath.h"
 
 
-CTFBot *FindNearestEnemyCreep( CTFBot *me );
+CFFBot *FindNearestEnemyCreep( CFFBot *me );
 
 
 //-----------------------------------------------------------------------------
-class CTFBotCreepWave : public Action< CTFBot >
+class CFFBotCreepWave : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnKilled( CTFBot *me, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnUnStuck( CTFBot *me );
+	virtual EventDesiredResult< CFFBot > OnKilled( CFFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnUnStuck( CFFBot *me );
 
 	virtual const char *GetName( void ) const	{ return "CreepWave"; };
 
@@ -37,18 +37,18 @@ private:
 
 
 //-----------------------------------------------------------------------------
-class CTFBotCreepAttack : public Action< CTFBot >
+class CFFBotCreepAttack : public Action< CFFBot >
 {
 public:
-	CTFBotCreepAttack( CTFPlayer *victim );
+	CFFBotCreepAttack( CFFPlayer *victim );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "CreepAttack"; };
 
 private:
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 };
 
 

@@ -18,7 +18,7 @@ extern ConVar ff_bot_force_class;
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicRetreat::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMedicRetreat::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	CTFNavArea *homeArea = me->GetSpawnArea();
 
@@ -29,7 +29,7 @@ ActionResult< CTFBot >	CTFBotMedicRetreat::OnStart( CTFBot *me, Action< CTFBot >
 
 	m_path.SetMinLookAheadDistance( ff_bot_path_lookahead_range.GetFloat() );
 
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Compute( me, homeArea->GetCenter(), cost );
 
 	return Continue();
@@ -49,7 +49,7 @@ public:
 	{
 		if ( entity && entity->IsPlayer() && entity->GetTeamNumber() == m_team )
 		{
-			return !ToTFPlayer( entity )->IsPlayerClass( TF_CLASS_MEDIC ) && !ToTFPlayer( entity )->IsPlayerClass( TF_CLASS_SNIPER );
+			return !ToFFPlayer( entity )->IsPlayerClass( CLASS_MEDIC ) && !ToFFPlayer( entity )->IsPlayerClass( CLASS_SNIPER );
 		}
 		return false;
 	}
@@ -59,13 +59,13 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicRetreat::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMedicRetreat::Update( CFFBot *me, float interval )
 {
 	// equip the syringegun and defend ourselves!
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( myWeapon )
 	{
-		if ( myWeapon->GetWeaponID() != TF_WEAPON_SYRINGEGUN_MEDIC )
+		if ( myWeapon->GetWeaponID() != FF_WEAPON_SYRINGEGUN_MEDIC )
 		{
 			CBaseCombatWeapon *syringeGun = me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 
@@ -107,9 +107,9 @@ ActionResult< CTFBot >	CTFBotMedicRetreat::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMedicRetreat::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotMedicRetreat::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Compute( me, me->GetSpawnArea()->GetCenter(), cost );
 
 	return Continue();
@@ -117,9 +117,9 @@ ActionResult< CTFBot >	CTFBotMedicRetreat::OnResume( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicRetreat::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMedicRetreat::OnStuck( CFFBot *me )
 {
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Compute( me, me->GetSpawnArea()->GetCenter(), cost );
 
 	return TryContinue();
@@ -127,9 +127,9 @@ EventDesiredResult< CTFBot > CTFBotMedicRetreat::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMedicRetreat::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotMedicRetreat::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
-	CTFBotPathCost cost( me, FASTEST_ROUTE );
+	CFFBotPathCost cost( me, FASTEST_ROUTE );
 	m_path.Compute( me, me->GetSpawnArea()->GetCenter(), cost );
 
 	return TryContinue();
@@ -137,7 +137,7 @@ EventDesiredResult< CTFBot > CTFBotMedicRetreat::OnMoveToFailure( CTFBot *me, co
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMedicRetreat::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotMedicRetreat::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	// defend ourselves!
 	return ANSWER_YES;

@@ -11,21 +11,21 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotAttackFlagDefenders : public CTFBotAttack
+class CFFBotAttackFlagDefenders : public CFFBotAttack
 {
 public:
-	CTFBotAttackFlagDefenders( float minDuration = -1.0f );
-	virtual ~CTFBotAttackFlagDefenders() { }
+	CFFBotAttackFlagDefenders( float minDuration = -1.0f );
+	virtual ~CFFBotAttackFlagDefenders() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "AttackFlagDefenders"; }
 
 private:
 	CountdownTimer m_minDurationTimer;
 	CountdownTimer m_watchFlagTimer;
-	CHandle< CTFPlayer > m_chasePlayer;
+	CHandle< CFFPlayer > m_chasePlayer;
 	PathFollower m_path;
 	CountdownTimer m_repathTimer;
 };

@@ -8,13 +8,13 @@
 
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotApproachObject : public Action< CTFBot >
+class CFFBotApproachObject : public Action< CFFBot >
 {
 public:
-	CTFBotApproachObject( CBaseEntity *loot, float range = 10.0f );
+	CFFBotApproachObject( CBaseEntity *loot, float range = 10.0f );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "ApproachObject"; };
 

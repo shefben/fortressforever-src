@@ -17,14 +17,14 @@ extern ConVar ff_bot_path_lookahead_range;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuildTeleportExit::CTFBotEngineerBuildTeleportExit( void )
+CFFBotEngineerBuildTeleportExit::CFFBotEngineerBuildTeleportExit( void )
 {
 	m_hasPreciseBuildLocation = false;
 }
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotEngineerBuildTeleportExit::CTFBotEngineerBuildTeleportExit( const Vector &buildLocation, float buildAngle )
+CFFBotEngineerBuildTeleportExit::CFFBotEngineerBuildTeleportExit( const Vector &buildLocation, float buildAngle )
 {
 	m_hasPreciseBuildLocation = true;
 	m_buildLocation = buildLocation;
@@ -33,7 +33,7 @@ CTFBotEngineerBuildTeleportExit::CTFBotEngineerBuildTeleportExit( const Vector &
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuildTeleportExit::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	if ( !m_hasPreciseBuildLocation )
 	{
@@ -49,7 +49,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::OnStart( CTFBot *me, Act
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuildTeleportExit::Update( CFFBot *me, float interval )
 {
 	if ( me->GetTimeSinceLastInjury() < 1.0f )
 	{
@@ -67,11 +67,11 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::Update( CTFBot *me, floa
 	// collect metal as we move to our build location
 	if ( me->CanBuild( OBJ_TELEPORTER, MODE_TELEPORTER_EXIT ) == CB_NEED_RESOURCES )
 	{
-		if ( m_getAmmoTimer.IsElapsed() && CTFBotGetAmmo::IsPossible( me ) )
+		if ( m_getAmmoTimer.IsElapsed() && CFFBotGetAmmo::IsPossible( me ) )
 		{
 			// need more metal - get some
 			m_getAmmoTimer.Start( 1.0f );
-			return SuspendFor( new CTFBotGetAmmo, "Need more metal to build my Teleporter Exit" );
+			return SuspendFor( new CFFBotGetAmmo, "Need more metal to build my Teleporter Exit" );
 		}
 	}
 
@@ -82,7 +82,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::Update( CTFBot *me, floa
 		// move into position
 		if ( !m_path.IsValid() || m_repathTimer.IsElapsed() )
 		{
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, m_buildLocation, cost );
 
 			m_repathTimer.Start( RandomFloat( 2.0f, 3.0f ) );
@@ -133,10 +133,10 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::Update( CTFBot *me, floa
 
 
 	// build exit roughly at this spot
-	CTFWeaponBase *myGun = me->GetActiveTFWeapon();
+	CFFWeaponBase *myGun = me->GetActiveFFWeapon();
 	if ( myGun )
 	{
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( myGun );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( myGun );
 		if ( builder )
 		{
 			if ( builder->IsValidPlacement() )
@@ -170,7 +170,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::Update( CTFBot *me, floa
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot >	CFFBotEngineerBuildTeleportExit::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_giveUpTimer.Reset();
 	m_path.Invalidate();
@@ -180,7 +180,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportExit::OnResume( CTFBot *me, Ac
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerBuildTeleportExit::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotEngineerBuildTeleportExit::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 

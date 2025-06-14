@@ -19,14 +19,14 @@ ConVar ff_bot_max_teleport_entrance_travel( "ff_bot_max_teleport_entrance_travel
 ConVar ff_bot_teleport_build_surface_normal_limit( "ff_bot_teleport_build_surface_normal_limit", "0.99", FCVAR_CHEAT, "If the ground normal Z component is less that this value, Engineer bots won't place their entrance teleporter" );
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildTeleportEntrance::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuildTeleportEntrance::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildTeleportEntrance::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuildTeleportEntrance::Update( CFFBot *me, float interval )
 {
 	CTeamControlPoint *point = me->GetMyControlPoint();
 	if ( !point )
@@ -44,36 +44,36 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportEntrance::Update( CTFBot *me, 
 
 	if ( myArea->GetIncursionDistance( me->GetTeamNumber() ) > ff_bot_max_teleport_entrance_travel.GetFloat() )
 	{
-		return ChangeTo( new CTFBotEngineerMoveToBuild, "Too far from our spawn room to build teleporter entrance" );
+		return ChangeTo( new CFFBotEngineerMoveToBuild, "Too far from our spawn room to build teleporter entrance" );
 	}
 
 	// make sure we go back to our resupply cabinet after planting the teleporter entrance before we move on
-	if ( !me->IsAmmoFull() && CTFBotGetAmmo::IsPossible( me ) )
+	if ( !me->IsAmmoFull() && CFFBotGetAmmo::IsPossible( me ) )
 	{
-		return SuspendFor( new CTFBotGetAmmo, "Refilling ammo" );
+		return SuspendFor( new CFFBotGetAmmo, "Refilling ammo" );
 	}
 
 	CBaseObject	*myTeleportEntrance = me->GetObjectOfType( OBJ_TELEPORTER, MODE_TELEPORTER_ENTRANCE );
 	if ( myTeleportEntrance )
 	{
 		// successfully built
-		return ChangeTo( new CTFBotEngineerMoveToBuild, "Teleport entrance built" );
+		return ChangeTo( new CFFBotEngineerMoveToBuild, "Teleport entrance built" );
 	}
 
 	// head towards the control point and build as soon as we can
 	if ( !m_path.IsValid() )
 	{
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, point->GetAbsOrigin(), cost );
 	}
 
 	m_path.Update( me );
 
 	// build
-	CTFWeaponBase *myGun = me->GetActiveTFWeapon();
+	CFFWeaponBase *myGun = me->GetActiveFFWeapon();
 	if ( myGun )
 	{
-		CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( myGun );
+		CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( myGun );
 		if ( builder )
 		{
 			// don't build on slopes - causes player blockages
@@ -104,7 +104,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildTeleportEntrance::Update( CTFBot *me, 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerBuildTeleportEntrance::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotEngineerBuildTeleportEntrance::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 

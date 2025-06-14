@@ -9,9 +9,9 @@
 #include "NextBotManager.h"
 #include "ff_team.h"
 
-class CTFBot;
-class CTFPlayer;
-class CTFBotSquad;
+class CFFBot;
+class CFFPlayer;
+class CFFBotSquad;
 class CStuckBotEvent;
 
 
@@ -74,11 +74,11 @@ public:
 
 
 //----------------------------------------------------------------------------------------------
-class CTFBotManager : public NextBotManager
+class CFFBotManager : public NextBotManager
 {
 public:
-	CTFBotManager();
-	virtual ~CTFBotManager();
+	CFFBotManager();
+	virtual ~CFFBotManager();
 
 	virtual void Update();
 	void LevelShutdown();
@@ -90,7 +90,7 @@ public:
 	bool IsInOfflinePractice() const;
 	bool IsMeleeOnly() const;
 
-	CTFBot* GetAvailableBotFromPool();
+	CFFBot* GetAvailableBotFromPool();
 	
 	void OnForceAddedBots( int iNumAdded );
 	void OnForceKickedBots( int iNumKicked );
@@ -100,7 +100,7 @@ public:
 	void DrawStuckBotData( float deltaT = 0.1f );
 
 #ifdef FF_CREEP_MODE
-	void OnCreepKilled( CTFPlayer *killer );
+	void OnCreepKilled( CFFPlayer *killer );
 #endif
 
 	bool RemoveBotFromTeamAndKick( int nTeam );
@@ -116,7 +116,7 @@ protected:
 	void UpdateCreepWaves();
 	CountdownTimer m_creepWaveTimer;
 
-	void SpawnCreep( int team, CTFBotSquad *squad );
+	void SpawnCreep( int team, CFFBotSquad *squad );
 	void SpawnCreepWave( int team );
 
 	int m_creepExperience[ FF_TEAM_COUNT ];
@@ -142,6 +142,6 @@ protected:
 };
 
 // singleton accessor
-CTFBotManager &TheTFBots( void );
+CFFBotManager &TheTFBots( void );
 
 #endif // FF_BOT_MANAGER_H

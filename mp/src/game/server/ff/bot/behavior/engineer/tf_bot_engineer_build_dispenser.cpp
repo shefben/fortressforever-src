@@ -21,7 +21,7 @@ extern ConVar ff_bot_path_lookahead_range;
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerBuildDispenser::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_placementTriesLeft = 3;
 	return Continue();
@@ -37,7 +37,7 @@ public:
 		m_builder = NULL;
 	}
 		
-	void SetBuilder( CTFWeaponBuilder *builder )
+	void SetBuilder( CFFWeaponBase *builder )
 	{
 		m_builder = builder;
 	}
@@ -55,12 +55,12 @@ public:
 		}
 	}
 
-	CTFWeaponBuilder *m_builder;
+	CFFWeaponBase *m_builder;
 };
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerBuildDispenser::Update( CFFBot *me, float interval )
 {
 	if ( me->GetTimeSinceLastInjury() < 1.0f )
 	{
@@ -91,11 +91,11 @@ ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::Update( CTFBot *me, float i
 
 	if ( me->CanBuild( OBJ_DISPENSER ) == CB_NEED_RESOURCES )
 	{
-		if ( m_getAmmoTimer.IsElapsed() && CTFBotGetAmmo::IsPossible( me ) )
+		if ( m_getAmmoTimer.IsElapsed() && CFFBotGetAmmo::IsPossible( me ) )
 		{
 			// need more metal - get some
 			m_getAmmoTimer.Start( 1.0f );
-			return SuspendFor( new CTFBotGetAmmo, "Need more metal to build" );
+			return SuspendFor( new CFFBotGetAmmo, "Need more metal to build" );
 		}
 /*
 		else
@@ -147,7 +147,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::Update( CTFBot *me, float i
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, buildSpot, cost );
 		}
 
@@ -157,7 +157,7 @@ ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::Update( CTFBot *me, float i
 	}
 
 	// we're at our build spot behind our sentry now - build a Dispenser
-	CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( me->GetActiveTFWeapon() );
+	CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( me->GetActiveFFWeapon() );
 	if ( !builder || builder->GetType() != OBJ_DISPENSER || builder->m_hObjectBeingBuilt == NULL )
 	{
 		// at home position, build the object
@@ -194,14 +194,14 @@ ActionResult< CTFBot >	CTFBotEngineerBuildDispenser::Update( CTFBot *me, float i
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotEngineerBuildDispenser::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotEngineerBuildDispenser::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	me->GetBodyInterface()->ClearPendingAimReply();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotEngineerBuildDispenser::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotEngineerBuildDispenser::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 	m_repathTimer.Invalidate();

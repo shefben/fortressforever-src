@@ -9,14 +9,14 @@
 #include "NextBot/Player/NextBotPlayerBody.h"
 
 //----------------------------------------------------------------------------
-class CTFBotBody : public PlayerBody
+class CFFBotBody : public PlayerBody
 {
 public:
-	CTFBotBody( INextBot *bot ) : PlayerBody( bot )
+	CFFBotBody( INextBot *bot ) : PlayerBody( bot )
 	{
 	}
 
-	virtual ~CTFBotBody() { }
+	virtual ~CFFBotBody() { }
 
 	virtual float GetHeadAimTrackingInterval( void ) const;			// return how often we should sample our target's position and velocity to update our aim tracking, to allow realistic slop in tracking
 };

@@ -17,7 +17,7 @@ ConVar ff_creep_aggro_range( "ff_creep_aggro_range", "250" );
 ConVar ff_creep_give_up_range( "ff_creep_give_up_range", "300" );
 
 
-CTFPlayer *FindNearestEnemy( CTFBot *me, float maxRange )
+CFFPlayer *FindNearestEnemy( CFFBot *me, float maxRange )
 {
 	CBasePlayer *closest = NULL;
 	float closeRangeSq = maxRange * maxRange;
@@ -49,13 +49,13 @@ CTFPlayer *FindNearestEnemy( CTFBot *me, float maxRange )
 		}
 	}
 
-	return (CTFPlayer *)closest;
+	return (CFFPlayer *)closest;
 }
 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCreepWave::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotCreepWave::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	me->StopLookingAroundForEnemies();
 	m_stuckTimer.Invalidate();
@@ -68,7 +68,7 @@ ActionResult< CTFBot >	CTFBotCreepWave::OnStart( CTFBot *me, Action< CTFBot > *p
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotCreepWave::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotCreepWave::Update( CFFBot *me, float interval )
 {
 	if ( !me->IsAlive() && me->StateGet() != TF_STATE_DYING )
 	{
@@ -94,7 +94,7 @@ ActionResult< CTFBot > CTFBotCreepWave::Update( CTFBot *me, float interval )
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		m_path.Compute( me, captureVector[0]->WorldSpaceCenter(), cost );
 	}
 
@@ -112,11 +112,11 @@ ActionResult< CTFBot > CTFBotCreepWave::Update( CTFBot *me, float interval )
 		}
 	}
 
-	CTFPlayer *enemy = FindNearestEnemy( me, ff_creep_aggro_range.GetFloat() );
+	CFFPlayer *enemy = FindNearestEnemy( me, ff_creep_aggro_range.GetFloat() );
 	if ( enemy )
 	{
 		me->SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_INCOMING );
-		return SuspendFor( new CTFBotCreepAttack( enemy ), "Attacking nearby enemy" );
+		return SuspendFor( new CFFBotCreepAttack( enemy ), "Attacking nearby enemy" );
 	}
 
 	return Continue();
@@ -124,11 +124,11 @@ ActionResult< CTFBot > CTFBotCreepWave::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCreepWave::OnKilled( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotCreepWave::OnKilled( CFFBot *me, const CTakeDamageInfo &info )
 {
 	if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && me->IsEnemy( info.GetAttacker() ) )
 	{
-		TheTFBots().OnCreepKilled( ToTFPlayer( info.GetAttacker() ) );
+		TheTFBots().OnCreepKilled( ToFFPlayer( info.GetAttacker() ) );
 	}
 
 	return TryContinue();
@@ -136,7 +136,7 @@ EventDesiredResult< CTFBot > CTFBotCreepWave::OnKilled( CTFBot *me, const CTakeD
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCreepWave::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotCreepWave::OnStuck( CFFBot *me )
 {
 	m_stuckTimer.Start();
 	return TryContinue();
@@ -144,7 +144,7 @@ EventDesiredResult< CTFBot > CTFBotCreepWave::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotCreepWave::OnUnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotCreepWave::OnUnStuck( CFFBot *me )
 {
 	m_stuckTimer.Invalidate();
 	return TryContinue();
@@ -153,21 +153,21 @@ EventDesiredResult< CTFBot > CTFBotCreepWave::OnUnStuck( CTFBot *me )
 
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-CTFBotCreepAttack::CTFBotCreepAttack( CTFPlayer *victim )
+CFFBotCreepAttack::CFFBotCreepAttack( CFFPlayer *victim )
 {
 	m_victim = victim;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotCreepAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotCreepAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotCreepAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotCreepAttack::Update( CFFBot *me, float interval )
 {
 	if ( !me->IsAlive() && me->StateGet() != TF_STATE_DYING )
 	{
@@ -188,7 +188,7 @@ ActionResult< CTFBot > CTFBotCreepAttack::Update( CTFBot *me, float interval )
 		return Done( "Lost victim" );
 	}
 
-	CTFPlayer *newVictim = FindNearestEnemy( me, ff_creep_aggro_range.GetFloat() );
+	CFFPlayer *newVictim = FindNearestEnemy( me, ff_creep_aggro_range.GetFloat() );
 	if ( newVictim )
 	{
 		float newRangeSq = me->GetRangeSquaredTo( newVictim );

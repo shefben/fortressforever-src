@@ -17,7 +17,7 @@
 #include "player_vs_environment/ff_population_manager.h"
 
 //---------------------------------------------------------------------------------------------
-CTFBotMvMEngineerTeleportSpawn::CTFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEntity* pHint, bool bFirstTeleportSpawn )
+CFFBotMvMEngineerTeleportSpawn::CFFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEntity* pHint, bool bFirstTeleportSpawn )
 {
 	m_hintEntity = pHint;
 	m_bFirstTeleportSpawn = bFirstTeleportSpawn;
@@ -25,9 +25,9 @@ CTFBotMvMEngineerTeleportSpawn::CTFBotMvMEngineerTeleportSpawn( CBaseTFBotHintEn
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerTeleportSpawn::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMvMEngineerTeleportSpawn::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
-	if ( !me->HasAttribute( CTFBot::TELEPORT_TO_HINT ) )
+	if ( !me->HasAttribute( CFFBot::TELEPORT_TO_HINT ) )
 	{
 		return Done( "Cannot teleport to hint with out Attributes TeleportToHint" );
 	}
@@ -37,13 +37,13 @@ ActionResult< CTFBot >	CTFBotMvMEngineerTeleportSpawn::OnStart( CTFBot *me, Acti
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerTeleportSpawn::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMvMEngineerTeleportSpawn::Update( CFFBot *me, float interval )
 {
 	if ( !m_teleportDelay.HasStarted() )
 	{
 		m_teleportDelay.Start( 0.1f );
 		if ( m_hintEntity )
-			TFGameRules()->PushAllPlayersAway( m_hintEntity->GetAbsOrigin(), 400, 500, TF_TEAM_RED );
+			TFGameRules()->PushAllPlayersAway( m_hintEntity->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_teleportDelay.IsElapsed() )
 	{

@@ -21,7 +21,7 @@ ConVar ff_bot_cart_push_radius( "ff_bot_cart_push_radius", "60", FCVAR_CHEAT );
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadPush::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotPayloadPush::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_path.Invalidate();
@@ -33,7 +33,7 @@ ActionResult< CTFBot >	CTFBotPayloadPush::OnStart( CTFBot *me, Action< CTFBot > 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadPush::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotPayloadPush::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->IsVisibleRecently() )
@@ -67,7 +67,7 @@ ActionResult< CTFBot >	CTFBotPayloadPush::Update( CTFBot *me, float interval )
 	// move toward the point, periodically repathing to account for changing situation
 	if ( m_repathTimer.IsElapsed() )
 	{
-		VPROF_BUDGET( "CTFBotPayloadPush::Update( repath )", "NextBot" );
+		VPROF_BUDGET( "CFFBotPayloadPush::Update( repath )", "NextBot" );
 
 		Vector cartForward;
 		cart->GetVectors( &cartForward, NULL, NULL );
@@ -86,7 +86,7 @@ ActionResult< CTFBot >	CTFBotPayloadPush::Update( CTFBot *me, float interval )
 			pushPos = cart->WorldSpaceCenter() + ff_bot_cart_push_radius.GetFloat() * enemyToCart;		
 		}
 
-		CTFBotPathCost cost( me, DEFAULT_ROUTE );
+		CFFBotPathCost cost( me, DEFAULT_ROUTE );
 		m_path.Compute( me, pushPos, cost );
 
 		m_repathTimer.Start( RandomFloat( 0.2f, 0.4f ) );
@@ -100,9 +100,9 @@ ActionResult< CTFBot >	CTFBotPayloadPush::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotPayloadPush::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotPayloadPush::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
-	VPROF_BUDGET( "CTFBotPayloadPush::OnResume", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadPush::OnResume", "NextBot" );
 
 	m_repathTimer.Invalidate();
 
@@ -111,9 +111,9 @@ ActionResult< CTFBot > CTFBotPayloadPush::OnResume( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadPush::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotPayloadPush::OnStuck( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotPayloadPush::OnStuck", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadPush::OnStuck", "NextBot" );
 
 	m_repathTimer.Invalidate();
 	me->GetLocomotionInterface()->ClearStuckStatus();
@@ -123,16 +123,16 @@ EventDesiredResult< CTFBot > CTFBotPayloadPush::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadPush::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotPayloadPush::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadPush::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotPayloadPush::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
-	VPROF_BUDGET( "CTFBotPayloadPush::OnMoveToFailure", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadPush::OnMoveToFailure", "NextBot" );
 
 	m_repathTimer.Invalidate();
 
@@ -141,14 +141,14 @@ EventDesiredResult< CTFBot > CTFBotPayloadPush::OnMoveToFailure( CTFBot *me, con
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotPayloadPush::ShouldRetreat( const INextBot *bot ) const
+QueryResultType	CFFBotPayloadPush::ShouldRetreat( const INextBot *bot ) const
 {
 	return ANSWER_UNDEFINED;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotPayloadPush::ShouldHurry( const INextBot *bot ) const
+QueryResultType CFFBotPayloadPush::ShouldHurry( const INextBot *bot ) const
 {
 	return ANSWER_UNDEFINED;
 }

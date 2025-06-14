@@ -7,13 +7,13 @@
 #include "ff_bot_hint_teleporter_exit.h"
 
 
-BEGIN_DATADESC( CTFBotHintTeleporterExit )
+BEGIN_DATADESC( CFFBotHintTeleporterExit )
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( bot_hint_teleporter_exit, CTFBotHintTeleporterExit );
+LINK_ENTITY_TO_CLASS( bot_hint_teleporter_exit, CFFBotHintTeleporterExit );
 
 //------------------------------------------------------------------------------
-CTFBotHintTeleporterExit::CTFBotHintTeleporterExit( void )
+CFFBotHintTeleporterExit::CFFBotHintTeleporterExit( void )
 {
 }
 

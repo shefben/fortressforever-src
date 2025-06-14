@@ -6,21 +6,21 @@
 #ifndef FF_BOT_PREPARE_STICKYBOMB_TRAP_H
 #define FF_BOT_PREPARE_STICKYBOMB_TRAP_H
 
-class CTFBotPrepareStickybombTrap : public Action< CTFBot >
+class CFFBotPrepareStickybombTrap : public Action< CFFBot >
 {
 public:
-	CTFBotPrepareStickybombTrap( void );
-	virtual ~CTFBotPrepareStickybombTrap( );
+	CFFBotPrepareStickybombTrap( void );
+	virtual ~CFFBotPrepareStickybombTrap( );
 
-	static bool IsPossible( CTFBot *me );	// Return true if this Action has what it needs to perform right now
+	static bool IsPossible( CFFBot *me );	// Return true if this Action has what it needs to perform right now
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
-	virtual ActionResult< CTFBot >	OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnInjured( CTFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnInjured( CFFBot *me, const CTakeDamageInfo &info );
 
 	virtual QueryResultType			ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;	// should we attack "them"?
 
@@ -38,7 +38,7 @@ private:
 	CTFNavArea *m_myArea;
 
 	CUtlVector< BombTargetArea > m_bombTargetAreaVector;
-	void InitBombTargetAreas( CTFBot *me );
+	void InitBombTargetAreas( CFFBot *me );
 	CountdownTimer m_launchWaitTimer;
 };
 

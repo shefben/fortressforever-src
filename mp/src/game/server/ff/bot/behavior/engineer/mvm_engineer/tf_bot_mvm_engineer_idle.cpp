@@ -63,7 +63,7 @@ bool GetBombInfo( BombInfo_t* pBombInfo = NULL )
 	{
 		CCaptureFlag *pTempFlag = static_cast< CCaptureFlag* >( ICaptureFlagAutoList::AutoList()[i] );
 		Vector vTempBombSpot;
-		CTFPlayer *carrier = ToTFPlayer( pTempFlag->GetOwnerEntity() );
+		CFFPlayer *carrier = ToFFPlayer( pTempFlag->GetOwnerEntity() );
 		if ( carrier )
 		{
 			vTempBombSpot = carrier->GetAbsOrigin();
@@ -102,7 +102,7 @@ bool GetBombInfo( BombInfo_t* pBombInfo = NULL )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerIdle::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMvMEngineerIdle::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -119,7 +119,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::OnStart( CTFBot *me, Action< CTFBo
 }
 
 
-void CTFBotMvMEngineerIdle::TakeOverStaleNest( CBaseTFBotHintEntity* pHint, CTFBot *me )
+void CFFBotMvMEngineerIdle::TakeOverStaleNest( CBaseTFBotHintEntity* pHint, CFFBot *me )
 {
 	if ( pHint != NULL && pHint->OwnerObjectHasNoOwner() )
 	{
@@ -131,7 +131,7 @@ void CTFBotMvMEngineerIdle::TakeOverStaleNest( CBaseTFBotHintEntity* pHint, CTFB
 }
 
 
-bool CTFBotMvMEngineerIdle::ShouldAdvanceNestSpot( CTFBot *me )
+bool CFFBotMvMEngineerIdle::ShouldAdvanceNestSpot( CFFBot *me )
 {
 	if ( !m_nestHint )
 	{
@@ -181,7 +181,7 @@ bool CTFBotMvMEngineerIdle::ShouldAdvanceNestSpot( CTFBot *me )
 }
 
 
-void CTFBotMvMEngineerIdle::TryToDetonateStaleNest()
+void CFFBotMvMEngineerIdle::TryToDetonateStaleNest()
 {
 	if ( m_bTriedToDetonateStaleNest )
 		return;
@@ -192,20 +192,20 @@ void CTFBotMvMEngineerIdle::TryToDetonateStaleNest()
 		return;
 
 	// collect all existing and active teleporter hints
-	CUtlVector< CTFBotHintEngineerNest* > activeEngineerNest;
+	CUtlVector< CFFBotHintEngineerNest* > activeEngineerNest;
 	for ( int i=0; i<ITFBotHintEntityAutoList::AutoList().Count(); ++i )
 	{
 		CBaseTFBotHintEntity *pHint = static_cast<CBaseTFBotHintEntity*>( ITFBotHintEntityAutoList::AutoList()[i] );
 		if ( pHint->IsHintType( CBaseTFBotHintEntity::HINT_ENGINEER_NEST ) && pHint->IsEnabled() && pHint->GetOwnerEntity() == NULL )
 		{
-			activeEngineerNest.AddToTail( static_cast< CTFBotHintEngineerNest* >( pHint ) );
+			activeEngineerNest.AddToTail( static_cast< CFFBotHintEngineerNest* >( pHint ) );
 		}
 	}
 
 	// try to detonate stale nest that's out of range, when engineer finished building his nest
 	for ( int i=0; i<activeEngineerNest.Count(); ++i )
 	{
-		CTFBotHintEngineerNest *pNest = activeEngineerNest[i];
+		CFFBotHintEngineerNest *pNest = activeEngineerNest[i];
 		if ( pNest->IsStaleNest() )
 		{
 			pNest->DetonateStaleNest();
@@ -217,7 +217,7 @@ void CTFBotMvMEngineerIdle::TryToDetonateStaleNest()
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMvMEngineerIdle::Update( CFFBot *me, float interval )
 {
 	if ( !me->IsAlive() )
 	{
@@ -243,10 +243,10 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 		m_findHintTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
 		// figure out where to teleport into the map
-		bool bShouldTeleportToHint = me->HasAttribute( CTFBot::TELEPORT_TO_HINT );
+		bool bShouldTeleportToHint = me->HasAttribute( CFFBot::TELEPORT_TO_HINT );
 		bool bShouldCheckForBlockingObject = !m_bTeleportedToHint && bShouldTeleportToHint;
-		CHandle< CTFBotHintEngineerNest > newNest = NULL;
-		if ( !CTFBotMvMEngineerHintFinder::FindHint( bShouldCheckForBlockingObject, !bShouldTeleportToHint, &newNest ) )
+		CHandle< CFFBotHintEngineerNest > newNest = NULL;
+		if ( !CFFBotMvMEngineerHintFinder::FindHint( bShouldCheckForBlockingObject, !bShouldTeleportToHint, &newNest ) )
 		{
 			// try again next time
 			return Continue();
@@ -270,12 +270,12 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 		}
 	}
 
-	if ( !m_bTeleportedToHint && me->HasAttribute( CTFBot::TELEPORT_TO_HINT ) )
+	if ( !m_bTeleportedToHint && me->HasAttribute( CFFBot::TELEPORT_TO_HINT ) )
 	{
 		m_nTeleportedCount++;
 		bool bFirstTeleportSpawn = m_nTeleportedCount == 1;
 		m_bTeleportedToHint = true;
-		return SuspendFor( new CTFBotMvMEngineerTeleportSpawn( m_nestHint, bFirstTeleportSpawn ), "In spawn area - teleport to the teleporter hint" );
+		return SuspendFor( new CFFBotMvMEngineerTeleportSpawn( m_nestHint, bFirstTeleportSpawn ), "In spawn area - teleport to the teleporter hint" );
 	}
 
 	const float rebuildInterval = 3.0f;
@@ -305,12 +305,12 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 			{
 				if ( m_sentryRebuildTimer.IsElapsed() )
 				{
-					return SuspendFor( new CTFBotMvMEngineerBuildSentryGun( m_sentryHint ), "No sentry - building a new one" );
+					return SuspendFor( new CFFBotMvMEngineerBuildSentryGun( m_sentryHint ), "No sentry - building a new one" );
 				}
 				else
 				{
 					// run away!
-					return SuspendFor( new CTFBotRetreatToCover( 1.0f ), "Lost my sentry - retreat!" );
+					return SuspendFor( new CFFBotRetreatToCover( 1.0f ), "Lost my sentry - retreat!" );
 				}
 			}
 		}
@@ -334,7 +334,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 		}
 		else if ( m_teleporterRebuildTimer.IsElapsed() )
 		{
-			return SuspendFor( new CTFBotMvMEngineerBuildTeleportExit( m_teleporterHint ), "Sentry is safe - building a teleport exit" );
+			return SuspendFor( new CFFBotMvMEngineerBuildTeleportExit( m_teleporterHint ), "Sentry is safe - building a teleport exit" );
 		}
 	}
 
@@ -358,7 +358,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 			Vector toTeleporter = myTeleporter->GetAbsOrigin() - me->GetAbsOrigin();
 			Vector hittingTeleporterSpot = myTeleporter->GetAbsOrigin() - 50.0f * toTeleporter.Normalized();
 
-			CTFBotPathCost cost( me, SAFEST_ROUTE );
+			CFFBotPathCost cost( me, SAFEST_ROUTE );
 			m_path.Compute( me, hittingTeleporterSpot, cost );
 		}
 
@@ -392,7 +392,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 
 			Vector behindSentrySpot = mySentry->GetAbsOrigin() - 50.0f * mySentryForward;
 
-			CTFBotPathCost cost( me, SAFEST_ROUTE );
+			CFFBotPathCost cost( me, SAFEST_ROUTE );
 			m_path.Compute( me, behindSentrySpot, cost );
 		}
 
@@ -413,27 +413,27 @@ ActionResult< CTFBot >	CTFBotMvMEngineerIdle::Update( CTFBot *me, float interval
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMvMEngineerIdle::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotMvMEngineerIdle::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotMvMEngineerIdle::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotMvMEngineerIdle::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotMvMEngineerIdle::ShouldHurry( const INextBot *me ) const
+QueryResultType	CFFBotMvMEngineerIdle::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
 
 
-CTFBotHintEngineerNest* SelectOutOfRangeNest( const CUtlVector< CTFBotHintEngineerNest* >& nestVector )
+CFFBotHintEngineerNest* SelectOutOfRangeNest( const CUtlVector< CFFBotHintEngineerNest* >& nestVector )
 {
 	if ( nestVector.Count() )
 	{
@@ -454,16 +454,16 @@ CTFBotHintEngineerNest* SelectOutOfRangeNest( const CUtlVector< CTFBotHintEngine
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotMvMEngineerHintFinder::FindHint( bool bShouldCheckForBlockingObjects, bool bAllowOutOfRangeNest, CHandle< CTFBotHintEngineerNest >* pFoundNest /*= NULL*/ )
+bool CFFBotMvMEngineerHintFinder::FindHint( bool bShouldCheckForBlockingObjects, bool bAllowOutOfRangeNest, CHandle< CFFBotHintEngineerNest >* pFoundNest /*= NULL*/ )
 {
 	// collect all existing and active teleporter hints
-	CUtlVector< CTFBotHintEngineerNest* > activeEngineerNest;
+	CUtlVector< CFFBotHintEngineerNest* > activeEngineerNest;
 	for ( int i=0; i<ITFBotHintEntityAutoList::AutoList().Count(); ++i )
 	{
 		CBaseTFBotHintEntity *pHint = static_cast<CBaseTFBotHintEntity*>( ITFBotHintEntityAutoList::AutoList()[i] );
 		if ( pHint->IsHintType( CBaseTFBotHintEntity::HINT_ENGINEER_NEST ) && pHint->IsEnabled() && pHint->GetOwnerEntity() == NULL )
 		{
-			activeEngineerNest.AddToTail( static_cast< CTFBotHintEngineerNest* >( pHint ) );
+			activeEngineerNest.AddToTail( static_cast< CFFBotHintEngineerNest* >( pHint ) );
 		}
 	}
 
@@ -480,14 +480,14 @@ bool CTFBotMvMEngineerHintFinder::FindHint( bool bShouldCheckForBlockingObjects,
 	BombInfo_t bombInfo;
 	GetBombInfo( &bombInfo );
 
-	CUtlVector< CTFBotHintEngineerNest* > forwardOutOfRangeHintVector;
-	CUtlVector< CTFBotHintEngineerNest* > backwardOutOfRangeHintVector;
+	CUtlVector< CFFBotHintEngineerNest* > forwardOutOfRangeHintVector;
+	CUtlVector< CFFBotHintEngineerNest* > backwardOutOfRangeHintVector;
 
-	CUtlVector< CTFBotHintEngineerNest* > freeAtFrontHintVector;
-	CUtlVector< CTFBotHintEngineerNest* > staleAtFrontHintVector;
+	CUtlVector< CFFBotHintEngineerNest* > freeAtFrontHintVector;
+	CUtlVector< CFFBotHintEngineerNest* > staleAtFrontHintVector;
 	for( int i=0; i<activeEngineerNest.Count(); ++i )
 	{
-		CTFBotHintEngineerNest* pCurrentNest = activeEngineerNest[i];
+		CFFBotHintEngineerNest* pCurrentNest = activeEngineerNest[i];
 		const Vector& vNestPosition = pCurrentNest->GetAbsOrigin();
 		CTFNavArea *hintArea = (CTFNavArea *)TheNavMesh->GetNearestNavArea( vNestPosition, false, 1000.0f );
 		if ( !hintArea )
@@ -538,7 +538,7 @@ bool CTFBotMvMEngineerHintFinder::FindHint( bool bShouldCheckForBlockingObjects,
 		}
 	}
 
-	CTFBotHintEngineerNest *hint = NULL;
+	CFFBotHintEngineerNest *hint = NULL;
 	if ( freeAtFrontHintVector.Count() == 0 && staleAtFrontHintVector.Count() == 0 )
 	{
 		if ( bAllowOutOfRangeNest )

@@ -9,22 +9,22 @@
 #include "Path/NextBotPathFollow.h"
 #include "Path/NextBotChasePath.h"
 
-class CTFBotDefendPoint : public Action< CTFBot >
+class CFFBotDefendPoint : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual ActionResult< CTFBot >	OnResume( CTFBot *me, Action< CTFBot > *interruptingAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnResume( CFFBot *me, Action< CFFBot > *interruptingAction );
 
-	virtual EventDesiredResult< CTFBot > OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
+	virtual EventDesiredResult< CFFBot > OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnMoveToSuccess( CTFBot *me, const Path *path );
-	virtual EventDesiredResult< CTFBot > OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnMoveToSuccess( CFFBot *me, const Path *path );
+	virtual EventDesiredResult< CFFBot > OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason );
 
-	virtual EventDesiredResult< CTFBot > OnTerritoryContested( CTFBot *me, int territoryID );
-	virtual EventDesiredResult< CTFBot > OnTerritoryCaptured( CTFBot *me, int territoryID );
-	virtual EventDesiredResult< CTFBot > OnTerritoryLost( CTFBot *me, int territoryID );
+	virtual EventDesiredResult< CFFBot > OnTerritoryContested( CFFBot *me, int territoryID );
+	virtual EventDesiredResult< CFFBot > OnTerritoryCaptured( CFFBot *me, int territoryID );
+	virtual EventDesiredResult< CFFBot > OnTerritoryLost( CFFBot *me, int territoryID );
 
 	virtual const char *GetName( void ) const	{ return "DefendPoint"; };
 
@@ -37,10 +37,10 @@ private:
 	CountdownTimer m_idleTimer;
 
 	CTFNavArea *m_defenseArea;
-	CTFNavArea *SelectAreaToDefendFrom( CTFBot *me );
+	CTFNavArea *SelectAreaToDefendFrom( CFFBot *me );
 
-	bool IsPointThreatened( CTFBot *me );
-	bool WillBlockCapture( CTFBot *me ) const;
+	bool IsPointThreatened( CFFBot *me );
+	bool WillBlockCapture( CFFBot *me ) const;
 	bool m_isAllowedToRoam;
 };
 

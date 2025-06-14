@@ -16,7 +16,7 @@ ConVar ff_bot_sticky_charge_rate( "ff_bot_sticky_charge_rate", "0.01", FCVAR_CHE
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotStickybombSentrygun::CTFBotStickybombSentrygun( CObjectSentrygun *sentrygun )
+CFFBotStickybombSentrygun::CFFBotStickybombSentrygun( CObjectSentrygun *sentrygun )
 {
 	m_sentrygun = sentrygun;
 	m_hasGivenAim = false;
@@ -24,7 +24,7 @@ CTFBotStickybombSentrygun::CTFBotStickybombSentrygun( CObjectSentrygun *sentrygu
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotStickybombSentrygun::CTFBotStickybombSentrygun( CObjectSentrygun *sentrygun, float aimYaw, float aimPitch, float aimCharge )
+CFFBotStickybombSentrygun::CFFBotStickybombSentrygun( CObjectSentrygun *sentrygun, float aimYaw, float aimPitch, float aimCharge )
 {
 	m_sentrygun = sentrygun;
 	m_hasGivenAim = true;
@@ -35,7 +35,7 @@ CTFBotStickybombSentrygun::CTFBotStickybombSentrygun( CObjectSentrygun *sentrygu
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotStickybombSentrygun::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotStickybombSentrygun::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	// detonate old set of stickies
 	me->PressAltFireButton();
@@ -82,7 +82,7 @@ ActionResult< CTFBot >	CTFBotStickybombSentrygun::OnStart( CTFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotStickybombSentrygun::IsAimOnTarget( CTFBot *me, float pitch, float yaw, float charge )
+bool CFFBotStickybombSentrygun::IsAimOnTarget( CFFBot *me, float pitch, float yaw, float charge )
 {
 	// estimate impact spot
 	Vector impactSpot = me->EstimateStickybombProjectileImpactPosition( pitch, yaw, charge );
@@ -107,9 +107,9 @@ bool CTFBotStickybombSentrygun::IsAimOnTarget( CTFBot *me, float pitch, float ya
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotStickybombSentrygun::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotStickybombSentrygun::Update( CFFBot *me, float interval )
 {
-	CTFWeaponBase *myCurrentWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myCurrentWeapon = me->GetActiveFFWeapon();
 	CTFPipebombLauncher *stickyLauncher = dynamic_cast< CTFPipebombLauncher * >( me->Weapon_GetSlot( TF_WPN_TYPE_SECONDARY ) );
 
 	if ( !myCurrentWeapon || !stickyLauncher )
@@ -117,7 +117,7 @@ ActionResult< CTFBot >	CTFBotStickybombSentrygun::Update( CTFBot *me, float inte
 		return Done( "Missing weapon" );
 	}
 
-	if ( myCurrentWeapon->GetWeaponID() != TF_WEAPON_PIPEBOMBLAUNCHER )
+	if ( myCurrentWeapon->GetWeaponID() != FF_WEAPON_PIPEBOMBLAUNCHER )
 	{
 		me->Weapon_Switch( stickyLauncher );
 	}
@@ -292,7 +292,7 @@ ActionResult< CTFBot >	CTFBotStickybombSentrygun::Update( CTFBot *me, float inte
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotStickybombSentrygun::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotStickybombSentrygun::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	// detonate any stickes left out there
 	me->PressAltFireButton();
@@ -302,7 +302,7 @@ void CTFBotStickybombSentrygun::OnEnd( CTFBot *me, Action< CTFBot > *nextAction 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotStickybombSentrygun::OnSuspend( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotStickybombSentrygun::OnSuspend( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	// detonate any stickes left out there
 	me->PressAltFireButton();
@@ -313,21 +313,21 @@ ActionResult< CTFBot > CTFBotStickybombSentrygun::OnSuspend( CTFBot *me, Action<
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotStickybombSentrygun::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotStickybombSentrygun::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	return TryDone( RESULT_IMPORTANT, "Ouch!" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotStickybombSentrygun::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotStickybombSentrygun::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotStickybombSentrygun::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotStickybombSentrygun::ShouldHurry( const INextBot *me ) const
 {
 	// while killing a sentry we're "hurrying" so we don't dodge
 	return ANSWER_YES;
@@ -335,7 +335,7 @@ QueryResultType CTFBotStickybombSentrygun::ShouldHurry( const INextBot *me ) con
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotStickybombSentrygun::ShouldRetreat( const INextBot *me ) const
+QueryResultType CFFBotStickybombSentrygun::ShouldRetreat( const INextBot *me ) const
 {
 	// stay stuck in to try to kill that gun!
 	return ANSWER_NO;

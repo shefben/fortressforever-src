@@ -15,7 +15,7 @@ extern ConVar ff_deploying_bomb_time;
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMDeployBomb::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMvMDeployBomb::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	me->SetDeployingBombState( TF_BOMB_DEPLOYING_DELAY );
 	m_timer.Start( ff_deploying_bomb_delay_time.GetFloat() );
@@ -45,7 +45,7 @@ ActionResult< CTFBot >	CTFBotMvMDeployBomb::OnStart( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotMvMDeployBomb::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotMvMDeployBomb::Update( CFFBot *me, float interval )
 {
 	CCaptureZone *pAreaTrigger = NULL;
 
@@ -62,11 +62,11 @@ ActionResult< CTFBot > CTFBotMvMDeployBomb::Update( CTFBot *me, float interval )
 		if ( me->IsRangeGreaterThan( m_anchorPos, movedRange ) )
 		{
 			// Look for players that pushed me away and send an event
-			CUtlVector<CTFPlayer *> playerVector;
-			CollectPlayers( &playerVector, TF_TEAM_PVE_DEFENDERS );
+			CUtlVector<CFFPlayer *> playerVector;
+			CollectPlayers( &playerVector, FF_TEAM_PVE_DEFENDERS );
 			FOR_EACH_VEC( playerVector, i )
 			{
-				CTFPlayer *pPlayer = playerVector[i];
+				CFFPlayer *pPlayer = playerVector[i];
 				if ( !pPlayer )
 					continue;
 
@@ -149,7 +149,7 @@ extern void TE_PlayerAnimEvent( CBasePlayer *pPlayer, PlayerAnimEvent_t event, i
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMvMDeployBomb::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotMvMDeployBomb::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 	if ( me->GetDeployingBombState() == TF_BOMB_DEPLOYING_ANIMATING )
 	{
@@ -178,13 +178,13 @@ void CTFBotMvMDeployBomb::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMvMDeployBomb::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotMvMDeployBomb::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	// so event doesn't fall thru to buried action which will then redo transition to this state as we stay in contact with the zone
 	return TryToSustain( RESULT_CRITICAL );
 }
 
-QueryResultType CTFBotMvMDeployBomb::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotMvMDeployBomb::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	return ANSWER_NO;
 }

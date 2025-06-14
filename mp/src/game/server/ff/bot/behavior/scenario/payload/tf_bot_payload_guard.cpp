@@ -25,7 +25,7 @@ ConVar ff_bot_debug_payload_guard_vantage_points( "ff_bot_debug_payload_guard_va
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadGuard::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotPayloadGuard::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_path.Invalidate();
@@ -37,7 +37,7 @@ ActionResult< CTFBot >	CTFBotPayloadGuard::OnStart( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotPayloadGuard::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotPayloadGuard::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->IsVisibleRecently() )
@@ -74,7 +74,7 @@ ActionResult< CTFBot >	CTFBotPayloadGuard::Update( CTFBot *me, float interval )
 		if ( trainWatcher->GetCapturerCount() >= 0 )
 		{
 			// the cart is not yet blocked - move to block it!
-			return SuspendFor( new CTFBotPayloadBlock, "Moving to block the cart's forward motion" );
+			return SuspendFor( new CFFBotPayloadBlock, "Moving to block the cart's forward motion" );
 		}
 	}
 
@@ -105,7 +105,7 @@ ActionResult< CTFBot >	CTFBotPayloadGuard::Update( CTFBot *me, float interval )
 		// update our path periodically
 		if ( m_repathTimer.IsElapsed() )
 		{
-			CTFBotPathCost cost( me, DEFAULT_ROUTE );
+			CFFBotPathCost cost( me, DEFAULT_ROUTE );
 			m_path.Compute( me, m_vantagePoint, cost );
 			m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) );
 		}
@@ -116,9 +116,9 @@ ActionResult< CTFBot >	CTFBotPayloadGuard::Update( CTFBot *me, float interval )
 	else
 	{
 		// at vantage point
-		if ( CTFBotPrepareStickybombTrap::IsPossible( me ) )
+		if ( CFFBotPrepareStickybombTrap::IsPossible( me ) )
 		{
-			return SuspendFor( new CTFBotPrepareStickybombTrap, "Laying sticky bombs!" );
+			return SuspendFor( new CFFBotPrepareStickybombTrap, "Laying sticky bombs!" );
 		}
 	}
 
@@ -127,9 +127,9 @@ ActionResult< CTFBot >	CTFBotPayloadGuard::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotPayloadGuard::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotPayloadGuard::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
-	VPROF_BUDGET( "CTFBotPayloadGuard::OnResume", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadGuard::OnResume", "NextBot" );
 
 	m_vantagePointTimer.Invalidate();
 	m_repathTimer.Invalidate();
@@ -139,9 +139,9 @@ ActionResult< CTFBot > CTFBotPayloadGuard::OnResume( CTFBot *me, Action< CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnStuck( CFFBot *me )
 {
-	VPROF_BUDGET( "CTFBotPayloadGuard::OnStuck", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadGuard::OnStuck", "NextBot" );
 
 	m_repathTimer.Invalidate();
 	me->GetLocomotionInterface()->ClearStuckStatus();
@@ -151,16 +151,16 @@ EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
-	VPROF_BUDGET( "CTFBotPayloadGuard::OnMoveToFailure", "NextBot" );
+	VPROF_BUDGET( "CFFBotPayloadGuard::OnMoveToFailure", "NextBot" );
 
 	m_vantagePointTimer.Invalidate();
 	m_repathTimer.Invalidate();
@@ -171,14 +171,14 @@ EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnMoveToFailure( CTFBot *me, co
 
 //---------------------------------------------------------------------------------------------
 // Invoked when cart is being pushed
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnTerritoryContested( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnTerritoryContested( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
@@ -186,16 +186,16 @@ EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnTerritoryCaptured( CTFBot *me
 
 //---------------------------------------------------------------------------------------------
 // Invoked when cart hits a checkpoint
-EventDesiredResult< CTFBot > CTFBotPayloadGuard::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotPayloadGuard::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotPayloadGuard::ShouldRetreat( const INextBot *bot ) const
+QueryResultType	CFFBotPayloadGuard::ShouldRetreat( const INextBot *bot ) const
 {
-	CTFBot *me = ToTFBot( bot->GetEntity() );
+	CFFBot *me = ToTFBot( bot->GetEntity() );
 
 	CTeamTrainWatcher *trainWatcher = TFGameRules()->GetPayloadToBlock( me->GetTeamNumber() );
 	if ( trainWatcher && trainWatcher->IsTrainNearCheckpoint() )
@@ -209,7 +209,7 @@ QueryResultType	CTFBotPayloadGuard::ShouldRetreat( const INextBot *bot ) const
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotPayloadGuard::ShouldHurry( const INextBot *bot ) const
+QueryResultType CFFBotPayloadGuard::ShouldHurry( const INextBot *bot ) const
 {
 	return ANSWER_UNDEFINED;
 }
@@ -219,7 +219,7 @@ QueryResultType CTFBotPayloadGuard::ShouldHurry( const INextBot *bot ) const
 class CCollectPayloadGuardVantagePoints : public ISearchSurroundingAreasFunctor
 {
 public:
-	CCollectPayloadGuardVantagePoints( CTFBot *me, CBaseEntity *cart )
+	CCollectPayloadGuardVantagePoints( CFFBot *me, CBaseEntity *cart )
 	{
 		m_me = me;
 		m_cart = cart;
@@ -257,7 +257,7 @@ public:
 		return true;
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	CBaseEntity *m_cart;
 	CUtlVector< Vector > m_vantagePointVector;
 };
@@ -267,7 +267,7 @@ public:
 //
 // Find a tactically advantageous area where we can see the payload
 //
-Vector CTFBotPayloadGuard::FindVantagePoint( CTFBot *me, CBaseEntity *cart )
+Vector CFFBotPayloadGuard::FindVantagePoint( CFFBot *me, CBaseEntity *cart )
 {
 	CTFNavArea *cartArea = (CTFNavArea *)TheNavMesh->GetNearestNavArea( cart );
 

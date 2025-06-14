@@ -14,7 +14,7 @@
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDead::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotDead::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_deadTimer.Start();
 
@@ -23,22 +23,22 @@ ActionResult< CTFBot >	CTFBotDead::OnStart( CTFBot *me, Action< CTFBot > *priorA
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDead::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotDead::Update( CFFBot *me, float interval )
 {
 	if ( me->IsAlive() )
 	{
 		// how did this happen?
-		return ChangeTo( new CTFBotMainAction, "This should not happen!" );
+		return ChangeTo( new CFFBotMainAction, "This should not happen!" );
 	}
 
 	if ( m_deadTimer.IsGreaterThen( 5.0f ) )
 	{
-		if ( me->HasAttribute( CTFBot::REMOVE_ON_DEATH ) )
+		if ( me->HasAttribute( CFFBot::REMOVE_ON_DEATH ) )
 		{
 			// remove dead bots
 			engine->ServerCommand( UTIL_VarArgs( "kickid %d\n", me->GetUserID() ) );
 		}
-		else if ( me->HasAttribute( CTFBot::BECOME_SPECTATOR_ON_DEATH ) )
+		else if ( me->HasAttribute( CFFBot::BECOME_SPECTATOR_ON_DEATH ) )
 		{
 			me->ChangeTeam( TEAM_SPECTATOR, false, true );
 			return Done();
@@ -46,7 +46,7 @@ ActionResult< CTFBot >	CTFBotDead::Update( CTFBot *me, float interval )
 	}
 
 #ifdef TF_RAID_MODE
-	if ( TFGameRules()->IsRaidMode() && me->GetTeamNumber() == TF_TEAM_RED )
+	if ( TFGameRules()->IsRaidMode() && me->GetTeamNumber() == FF_TEAM_RED )
 	{
 		// dead defenders go to spectator for recycling
 		me->ChangeTeam( TEAM_SPECTATOR, false, true );

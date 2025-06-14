@@ -10,15 +10,15 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotFetchFlag : public Action< CTFBot >
+class CFFBotFetchFlag : public Action< CFFBot >
 {
 public:
 	#define TEMPORARY_FLAG_FETCH true
-	CTFBotFetchFlag( bool isTemporary = false );
-	virtual ~CTFBotFetchFlag() { }
+	CFFBotFetchFlag( bool isTemporary = false );
+	virtual ~CFFBotFetchFlag() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;

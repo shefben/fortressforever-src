@@ -12,38 +12,38 @@
 
 
 //-----------------------------------------------------------------------------
-class CTFBotEscortSquadLeader : public Action< CTFBot >
+class CFFBotEscortSquadLeader : public Action< CFFBot >
 {
 public:
-	CTFBotEscortSquadLeader( Action< CTFBot > *actionToDoAfterSquadDisbands = NULL );
-	virtual ~CTFBotEscortSquadLeader() { }
+	CFFBotEscortSquadLeader( Action< CFFBot > *actionToDoAfterSquadDisbands = NULL );
+	virtual ~CFFBotEscortSquadLeader() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
 	virtual const char *GetName( void ) const	{ return "EscortSquadLeader"; };
 
 private:
-	Action< CTFBot > *m_actionToDoAfterSquadDisbands;
-	CTFBotMeleeAttack m_meleeAttackAction;
+	Action< CFFBot > *m_actionToDoAfterSquadDisbands;
+	CFFBotMeleeAttack m_meleeAttackAction;
 
 	PathFollower m_formationPath;
 	CountdownTimer m_pathTimer;
 
-	const Vector &GetFormationForwardVector( CTFBot *me );
+	const Vector &GetFormationForwardVector( CFFBot *me );
 	Vector m_formationForward;
 };
 
 
 //-----------------------------------------------------------------------------
-class CTFBotWaitForOutOfPositionSquadMember : public Action< CTFBot >
+class CFFBotWaitForOutOfPositionSquadMember : public Action< CFFBot >
 {
 public:
-	virtual ~CTFBotWaitForOutOfPositionSquadMember() { }
+	virtual ~CFFBotWaitForOutOfPositionSquadMember() { }
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "WaitForOutOfPositionSquadMember"; };
 

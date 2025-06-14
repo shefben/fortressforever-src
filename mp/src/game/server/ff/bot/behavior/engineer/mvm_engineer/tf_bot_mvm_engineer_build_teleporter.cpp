@@ -20,21 +20,21 @@ extern ConVar ff_bot_path_lookahead_range;
 
 				   
 //---------------------------------------------------------------------------------------------
-CTFBotMvMEngineerBuildTeleportExit::CTFBotMvMEngineerBuildTeleportExit( CTFBotHintTeleporterExit *hint )
+CFFBotMvMEngineerBuildTeleportExit::CFFBotMvMEngineerBuildTeleportExit( CFFBotHintTeleporterExit *hint )
 {
 	m_teleporterBuildHint = hint;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerBuildTeleportExit::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMvMEngineerBuildTeleportExit::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	return Continue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMvMEngineerBuildTeleportExit::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMvMEngineerBuildTeleportExit::Update( CFFBot *me, float interval )
 {
 	if ( m_teleporterBuildHint == NULL )
 		return Done( "No hint entity" );
@@ -46,7 +46,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildTeleportExit::Update( CTFBot *me, f
 		{
 			m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Compute( me, m_teleporterBuildHint->GetAbsOrigin(), cost );
 		}
 
@@ -63,7 +63,7 @@ ActionResult< CTFBot >	CTFBotMvMEngineerBuildTeleportExit::Update( CTFBot *me, f
 	if ( !m_delayBuildTime.HasStarted() )
 	{
 		m_delayBuildTime.Start( 0.1f );
-		TFGameRules()->PushAllPlayersAway( m_teleporterBuildHint->GetAbsOrigin(), 400, 500, TF_TEAM_RED );
+		TFGameRules()->PushAllPlayersAway( m_teleporterBuildHint->GetAbsOrigin(), 400, 500, FF_TEAM_RED );
 	}
 	else if ( m_delayBuildTime.IsElapsed() )
 	{

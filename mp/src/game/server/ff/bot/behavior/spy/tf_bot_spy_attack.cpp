@@ -9,6 +9,7 @@
 #include "bot/behavior/spy/ff_bot_spy_attack.h"
 #include "bot/behavior/ff_bot_retreat_to_cover.h"
 #include "bot/behavior/spy/ff_bot_spy_sap.h"
+#include "ff_weapon_base.h"
 
 #include "nav_mesh.h"
 
@@ -19,14 +20,14 @@ ConVar ff_bot_spy_change_target_range_threshold( "ff_bot_spy_change_target_range
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotSpyAttack::CTFBotSpyAttack( CTFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
+CFFBotSpyAttack::CFFBotSpyAttack( CFFPlayer *victim ) : m_path( ChasePath::LEAD_SUBJECT )
 {
 	m_victim = victim;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotSpyAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_isCoverBlown = false;
@@ -41,7 +42,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::OnStart( CTFBot *me, Action< CTFBot > *p
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotSpyAttack::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetKnown( m_victim );
 
@@ -54,7 +55,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 		m_isCoverBlown = false;
 		if ( closestThreat )
 		{
-			m_victim = ToTFPlayer( closestThreat->GetEntity() );
+			m_victim = ToFFPlayer( closestThreat->GetEntity() );
 		}
 	}
 	else if ( closestThreat && 
@@ -69,7 +70,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 			if ( closestThreat->GetEntity()->IsPlayer() )
 			{
 				threat = closestThreat;
-				m_victim = ToTFPlayer( closestThreat->GetEntity() );
+				m_victim = ToFFPlayer( closestThreat->GetEntity() );
 				m_isCoverBlown = false;
 			}
 		}
@@ -84,7 +85,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 	CBaseObject *sapTarget = me->GetNearestKnownSappableTarget();
 	if ( sapTarget && me->IsEntityBetweenTargetAndSelf( sapTarget, threat->GetEntity() ) )
 	{
-		return ChangeTo( new CTFBotSpySap( sapTarget ), "Opportunistically sapping an enemy object between my victim and I" );
+		return ChangeTo( new CFFBotSpySap( sapTarget ), "Opportunistically sapping an enemy object between my victim and I" );
 	}
 
 	if ( me->IsAnyEnemySentryAbleToAttackMe() )
@@ -94,10 +95,10 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 		CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
 		me->Weapon_Switch( myGun );
 
-		return ChangeTo( new CTFBotRetreatToCover, "Escaping sentry fire!" );
+		return ChangeTo( new CFFBotRetreatToCover, "Escaping sentry fire!" );
 	}
 
-	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 	if ( !playerThreat )
 	{
 		return Done( "Current 'threat' is not a player or a building?" );
@@ -106,21 +107,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 	// remember who we are attacking (in case we changed our minds)
 	m_victim = playerThreat;
 
-	// uncloak so we can attack
-	if ( me->m_Shared.IsStealthed() && m_decloakTimer.IsElapsed() )
-	{
-		me->PressAltFireButton();
-		m_decloakTimer.Start( 1.0f );
-	}
-
-	bool isKnifeFight = false;
-
-	if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-		 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-		 me->m_Shared.IsStealthed() )
-	{
-		isKnifeFight = true;
-	}
+       bool isKnifeFight = false;
 
 	Vector playerThreatForward;
 	playerThreat->EyeVectors( &playerThreatForward );
@@ -132,10 +119,10 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 
 	switch( me->GetDifficulty() )
 	{
-	case CTFBot::EASY:		behindTolerance = 0.9f;		break;
-	case CTFBot::NORMAL:	behindTolerance = 0.7071f;	break;
-	case CTFBot::HARD:		behindTolerance = 0.2f;		break;
-	case CTFBot::EXPERT:	behindTolerance = 0.0f;		break;
+	case CFFBot::EASY:		behindTolerance = 0.9f;		break;
+	case CFFBot::NORMAL:	behindTolerance = 0.7071f;	break;
+	case CFFBot::HARD:		behindTolerance = 0.2f;		break;
+	case CFFBot::EXPERT:	behindTolerance = 0.0f;		break;
 	}
 
 	if ( TFGameRules()->IsMannVsMachineMode() )
@@ -146,7 +133,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 	bool isBehindVictim = DotProduct( playerThreatForward, toPlayerThreat ) > behindTolerance;
 
 	// easy Spies always think they're in position to backstab
-	if ( me->GetDifficulty() == CTFBot::EASY )
+	if ( me->GetDifficulty() == CFFBot::EASY )
 	{
 		isBehindVictim = true;
 	}
@@ -167,19 +154,15 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 		m_isCoverBlown |= ( playerThreat->GetTimeSinceWeaponFired() < 0.25f );
 	}
 	
-	if ( m_isCoverBlown ||
-		 me->m_Shared.InCond( TF_COND_BURNING ) ||
-		 me->m_Shared.InCond( TF_COND_URINE ) ||
-		 me->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-		 me->m_Shared.InCond( TF_COND_BLEEDING ) )
-	{
-		isKnifeFight = false;
-	}
+       if ( m_isCoverBlown )
+       {
+               isKnifeFight = false;
+       }
 
 	CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( isKnifeFight ? TF_WPN_TYPE_MELEE : TF_WPN_TYPE_PRIMARY );
 	me->Weapon_Switch( myGun );
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+       CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 
 	bool isMovingTowardVictim = true;
 
@@ -229,22 +212,12 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 			}
 
 			if ( threatRange < me->GetDesiredAttackRange() )
-			{
-				// if we're still disguised, go for the backstab
-				if ( me->m_Shared.InCond( TF_COND_DISGUISED ) )
-				{
-					if ( isBehindVictim || m_isCoverBlown )
-					{
-						// we're behind them (or they're onto us) - backstab!
-						me->PressFireButton();
-					}
-				}
-				else
-				{
-					// we're exposed - stab! stab! stab!
-					me->PressFireButton();
-				}
-			}
+                       {
+                               if ( isBehindVictim || m_isCoverBlown )
+                               {
+                                       me->PressFireButton();
+                               }
+                       }
 		}
 	}
 	else
@@ -270,7 +243,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 				}
 			}
 
-			CTFBotPathCost cost( me, FASTEST_ROUTE );
+			CFFBotPathCost cost( me, FASTEST_ROUTE );
 			m_path.Update( me, threat->GetEntity(), cost );
 		}
 	}
@@ -280,7 +253,7 @@ ActionResult< CTFBot >	CTFBotSpyAttack::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotSpyAttack::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotSpyAttack::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_victim = NULL;
 	m_path.Invalidate();
@@ -291,35 +264,31 @@ ActionResult< CTFBot > CTFBotSpyAttack::OnResume( CTFBot *me, Action< CTFBot > *
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnStuck( CFFBot *me )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
-	if ( me->IsEnemy( info.GetAttacker() ) )
-	{
-		if ( !me->m_Shared.InCond( TF_COND_DISGUISED ) )
-		{
-			// hurt by an enemy and exposed as a spy - flee!
-			m_isCoverBlown = true;
+       if ( me->IsEnemy( info.GetAttacker() ) )
+       {
+               m_isCoverBlown = true;
 
-			CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
-			me->Weapon_Switch( myGun );
+               CBaseCombatWeapon *myGun = me->Weapon_GetWeaponByType( TF_WPN_TYPE_PRIMARY );
+               me->Weapon_Switch( myGun );
 
-			return TryChangeTo( new CTFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
-		}
-	}
+               return TryChangeTo( new CFFBotRetreatToCover, RESULT_IMPORTANT, "Time to get out of here!" );
+       }
 
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotSpyAttack::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotSpyAttack::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	if ( me->IsEnemy( other ) && other->MyCombatCharacterPointer() )
 	{
@@ -334,33 +303,29 @@ EventDesiredResult< CTFBot > CTFBotSpyAttack::OnContact( CTFBot *me, CBaseEntity
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotSpyAttack::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotSpyAttack::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_UNDEFINED;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyAttack::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotSpyAttack::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
+QueryResultType CFFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
-	if ( m_isCoverBlown ||
-		 me->m_Shared.InCond( TF_COND_BURNING ) ||
-		 me->m_Shared.InCond( TF_COND_URINE ) ||
-		 me->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-		 me->m_Shared.InCond( TF_COND_BLEEDING ) )
-	{
-		// our cover is blown anyway
-		return ANSWER_YES;
-	}
+       if ( m_isCoverBlown )
+       {
+               // our cover is blown anyway
+               return ANSWER_YES;
+       }
 
 	return ANSWER_NO;
 }
@@ -368,7 +333,7 @@ QueryResultType CTFBotSpyAttack::ShouldAttack( const INextBot *meBot, const CKno
 
 //---------------------------------------------------------------------------------------------
 // Use this to signal the enemy we are focusing on, so we dont avoid them
-QueryResultType CTFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
+QueryResultType CFFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *blocker ) const
 {
 	if ( blocker != IS_ANY_HINDRANCE_POSSIBLE )
 	{
@@ -385,16 +350,16 @@ QueryResultType CTFBotSpyAttack::IsHindrance( const INextBot *me, CBaseEntity *b
 
 //---------------------------------------------------------------------------------------------
 // Return the more dangerous of the two threats to 'subject', or NULL if we have no opinion
-const CKnownEntity * CTFBotSpyAttack::SelectMoreDangerousThreat( const INextBot *meBot, 
+const CKnownEntity * CFFBotSpyAttack::SelectMoreDangerousThreat( const INextBot *meBot, 
 																 const CBaseCombatCharacter *subject,
 																 const CKnownEntity *threat1, 
 																 const CKnownEntity *threat2 ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
 	if ( me->IsSelf( subject ) )
 	{
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+               CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon && myWeapon->IsMeleeWeapon() )
 		{
 			// attack the closest victim with my knife

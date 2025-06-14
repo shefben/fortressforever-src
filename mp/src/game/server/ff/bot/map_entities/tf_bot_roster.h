@@ -6,14 +6,14 @@
 #ifndef FF_BOT_ROSTER_H
 #define FF_BOT_ROSTER_H
 
-class CTFBotRoster : public CPointEntity
+class CFFBotRoster : public CPointEntity
 {
-	DECLARE_CLASS( CTFBotRoster, CPointEntity );
+	DECLARE_CLASS( CFFBotRoster, CPointEntity );
 public:
 	DECLARE_DATADESC();
 
-	CTFBotRoster( void );
-	virtual ~CTFBotRoster() {}
+	CFFBotRoster( void );
+	virtual ~CFFBotRoster() {}
 
 	// input
 	void InputSetAllowScout( inputdata_t &inputdata );

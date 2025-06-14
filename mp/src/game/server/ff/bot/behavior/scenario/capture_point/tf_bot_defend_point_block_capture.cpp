@@ -21,7 +21,7 @@ ConVar ff_bot_defend_owned_point_percent( "ff_bot_defend_owned_point_percent", "
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotDefendPointBlockCapture::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -42,7 +42,7 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::OnStart( CTFBot *me, Actio
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotDefendPointBlockCapture::IsPointSafe( CTFBot *me )
+bool CFFBotDefendPointBlockCapture::IsPointSafe( CFFBot *me )
 {
 	// if a point was just captured, defend this point for awhile
 	if ( me->WasPointJustLost() )
@@ -81,7 +81,7 @@ bool CTFBotDefendPointBlockCapture::IsPointSafe( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotDefendPointBlockCapture::Update( CFFBot *me, float interval )
 {
 	// if point is safe, we can move back to our defense positions
 	if ( IsPointSafe( me ) )
@@ -89,10 +89,10 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float 
 		return Done( "Point is safe again" );
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		// medics look ridiculous rushing to the point - they need to heal
-		return SuspendFor( new CTFBotMedicHeal );
+		return SuspendFor( new CFFBotMedicHeal );
 	}
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
@@ -115,9 +115,9 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float 
 		}
 	}
 
-	if ( isStandingOnThePoint && CTFBotPrepareStickybombTrap::IsPossible( me ) )
+	if ( isStandingOnThePoint && CFFBotPrepareStickybombTrap::IsPossible( me ) )
 	{
-		return SuspendFor( new CTFBotPrepareStickybombTrap, "Placing stickies for defense" );
+		return SuspendFor( new CFFBotPrepareStickybombTrap, "Placing stickies for defense" );
 	}
 
 	if ( controlPointAreas )
@@ -150,7 +150,7 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float 
 
 			if ( goalArea )
 			{
-				CTFBotPathCost cost( me, DEFAULT_ROUTE );
+				CFFBotPathCost cost( me, DEFAULT_ROUTE );
 				m_path.Compute( me, goalArea->GetRandomPoint(), cost );
 			}
 		}
@@ -164,7 +164,7 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float 
 		{
 			m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) ); 
 
-			CTFBotPathCost cost( me, DEFAULT_ROUTE );
+			CFFBotPathCost cost( me, DEFAULT_ROUTE );
 			m_path.Compute( me, ( pointExtent.lo + pointExtent.hi )/2.0f, cost );
 		}
 
@@ -176,7 +176,7 @@ ActionResult< CTFBot >	CTFBotDefendPointBlockCapture::Update( CTFBot *me, float 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotDefendPointBlockCapture::OnResume( CTFBot *me, Action< CTFBot > *interruptingAction )
+ActionResult< CFFBot > CFFBotDefendPointBlockCapture::OnResume( CFFBot *me, Action< CFFBot > *interruptingAction )
 {
 	m_path.Invalidate();
 
@@ -185,7 +185,7 @@ ActionResult< CTFBot > CTFBotDefendPointBlockCapture::OnResume( CTFBot *me, Acti
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	me->GetLocomotionInterface()->ClearStuckStatus();
@@ -195,14 +195,14 @@ EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnStuck( CTFBot *me 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_path.Invalidate();
 	return TryContinue();
@@ -210,21 +210,21 @@ EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnMoveToFailure( CTF
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnTerritoryContested( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnTerritoryContested( CFFBot *me, int territoryID )
 {
 	return TryToSustain();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnTerritoryCaptured( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnTerritoryCaptured( CFFBot *me, int territoryID )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotDefendPointBlockCapture::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	// we lost it, fall back
 	return TryDone( RESULT_CRITICAL, "Lost the point" );
@@ -232,7 +232,7 @@ EventDesiredResult< CTFBot > CTFBotDefendPointBlockCapture::OnTerritoryLost( CTF
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotDefendPointBlockCapture::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotDefendPointBlockCapture::ShouldHurry( const INextBot *me ) const
 {
 	// hurry up and get on the point!
 	return ANSWER_YES;
@@ -240,7 +240,7 @@ QueryResultType CTFBotDefendPointBlockCapture::ShouldHurry( const INextBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotDefendPointBlockCapture::ShouldRetreat( const INextBot *me ) const
+QueryResultType CFFBotDefendPointBlockCapture::ShouldRetreat( const INextBot *me ) const
 {
 	// get on the point!
 	return ANSWER_NO;

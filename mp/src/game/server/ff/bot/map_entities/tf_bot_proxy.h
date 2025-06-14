@@ -7,18 +7,18 @@
 #define FF_BOT_PROXY_H
 
 
-class CTFBot;
-class CTFBotActionPoint;
+class CFFBot;
+class CFFBotActionPoint;
 
 
-class CTFBotProxy : public CPointEntity
+class CFFBotProxy : public CPointEntity
 {
-	DECLARE_CLASS( CTFBotProxy, CPointEntity );
+	DECLARE_CLASS( CFFBotProxy, CPointEntity );
 public:
 	DECLARE_DATADESC();
 
-	CTFBotProxy( void );
-	virtual ~CTFBotProxy() { }
+	CFFBotProxy( void );
+	virtual ~CFFBotProxy() { }
 
 	void Think( void );
 
@@ -50,8 +50,8 @@ protected:
 	string_t m_actionPointName;
 	float m_respawnInterval;
 
-	CHandle< CTFBot > m_bot;
-	CHandle< CTFBotActionPoint > m_moveGoal;
+	CHandle< CFFBot > m_bot;
+	CHandle< CFFBotActionPoint > m_moveGoal;
 };
 
 

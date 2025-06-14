@@ -12,7 +12,7 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-CTFBotNavEntMoveTo::CTFBotNavEntMoveTo( const CFuncNavPrerequisite *prereq )
+CFFBotNavEntMoveTo::CFFBotNavEntMoveTo( const CFuncNavPrerequisite *prereq )
 {
 	m_prereq = prereq;
 	m_pGoalArea = NULL;
@@ -20,7 +20,7 @@ CTFBotNavEntMoveTo::CTFBotNavEntMoveTo( const CFuncNavPrerequisite *prereq )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotNavEntMoveTo::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotNavEntMoveTo::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	if ( m_prereq == NULL )
 	{
@@ -55,7 +55,7 @@ ActionResult< CTFBot >	CTFBotNavEntMoveTo::OnStart( CTFBot *me, Action< CTFBot >
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotNavEntMoveTo::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotNavEntMoveTo::Update( CFFBot *me, float interval )
 {
 	if ( m_prereq == NULL )
 	{
@@ -95,7 +95,7 @@ ActionResult< CTFBot >	CTFBotNavEntMoveTo::Update( CTFBot *me, float interval )
 			{
 				m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-				CTFBotPathCost cost( me, FASTEST_ROUTE );
+				CFFBotPathCost cost( me, FASTEST_ROUTE );
 				m_path.Compute( me, m_goalPosition, cost );
 			}
 

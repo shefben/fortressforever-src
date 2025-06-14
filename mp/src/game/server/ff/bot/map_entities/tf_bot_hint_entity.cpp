@@ -37,7 +37,7 @@ bool CBaseTFBotHintEntity::OwnerObjectHasNoOwner() const
 		}
 		else
 		{
-			if ( !pObj->GetBuilder()->IsPlayerClass( TF_CLASS_ENGINEER ) )
+			if ( !pObj->GetBuilder()->IsPlayerClass( CLASS_ENGINEER ) )
 			{
 				AssertMsg( 0, "Object has an owner that's not engineer." );
 				Warning( "Object has an owner that's not engineer." );

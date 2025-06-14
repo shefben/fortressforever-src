@@ -14,14 +14,14 @@ extern ConVar ff_bot_path_lookahead_range;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotMoveToVantagePoint::CTFBotMoveToVantagePoint( float maxTravelDistance )
+CFFBotMoveToVantagePoint::CFFBotMoveToVantagePoint( float maxTravelDistance )
 {
 	m_maxTravelDistance = maxTravelDistance;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMoveToVantagePoint::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMoveToVantagePoint::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -39,7 +39,7 @@ ActionResult< CTFBot >	CTFBotMoveToVantagePoint::OnStart( CTFBot *me, Action< CT
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMoveToVantagePoint::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMoveToVantagePoint::Update( CFFBot *me, float interval )
 {
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat && threat->IsVisibleInFOVNow() )
@@ -51,7 +51,7 @@ ActionResult< CTFBot >	CTFBotMoveToVantagePoint::Update( CTFBot *me, float inter
 	{
 		m_repathTimer.Start( 1.0f );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 		if ( !m_path.Compute( me, m_vantageArea->GetCenter(), cost ) )
 		{
 			return Done( "No path to vantage point exists" );
@@ -66,7 +66,7 @@ ActionResult< CTFBot >	CTFBotMoveToVantagePoint::Update( CTFBot *me, float inter
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMoveToVantagePoint::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMoveToVantagePoint::OnStuck( CFFBot *me )
 {
 	m_path.Invalidate();
 	return TryContinue();
@@ -74,14 +74,14 @@ EventDesiredResult< CTFBot > CTFBotMoveToVantagePoint::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMoveToVantagePoint::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotMoveToVantagePoint::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryDone( RESULT_CRITICAL, "Vantage point reached" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMoveToVantagePoint::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotMoveToVantagePoint::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	m_path.Invalidate();
 	return TryContinue();

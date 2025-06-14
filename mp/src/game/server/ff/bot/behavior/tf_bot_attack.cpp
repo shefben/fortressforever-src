@@ -17,13 +17,13 @@ extern ConVar ff_bot_offense_must_push_time;
 
 
 //---------------------------------------------------------------------------------------------
-CTFBotAttack::CTFBotAttack( void ) : m_chasePath( ChasePath::LEAD_SUBJECT )
+CFFBotAttack::CFFBotAttack( void ) : m_chasePath( ChasePath::LEAD_SUBJECT )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotAttack::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotAttack::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -33,10 +33,10 @@ ActionResult< CTFBot >	CTFBotAttack::OnStart( CTFBot *me, Action< CTFBot > *prio
 
 //---------------------------------------------------------------------------------------------
 // head aiming and weapon firing is handled elsewhere - we just need to get into position to fight
-ActionResult< CTFBot >	CTFBotAttack::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotAttack::Update( CFFBot *me, float interval )
 {
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
-	bool isUsingCloseRangeWeapon = ( myWeapon && ( myWeapon->IsWeapon( TF_WEAPON_FLAMETHROWER ) || myWeapon->IsMeleeWeapon() ) );
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
+	bool isUsingCloseRangeWeapon = ( myWeapon && ( myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) || myWeapon->IsMeleeWeapon() ) );
 
 	const CKnownEntity *threat = me->GetVisionInterface()->GetPrimaryKnownThreat();
 	if ( threat == NULL || threat->IsObsolete() || !me->GetIntentionInterface()->ShouldAttack( me, threat ) )
@@ -69,12 +69,12 @@ ActionResult< CTFBot >	CTFBotAttack::Update( CTFBot *me, float interval )
 		{
 			if ( isUsingCloseRangeWeapon && !TFGameRules()->IsMannVsMachineMode() )	// all bots in MvM use the default route
 			{
-				CTFBotPathCost cost( me, SAFEST_ROUTE );
+				CFFBotPathCost cost( me, SAFEST_ROUTE );
 				m_chasePath.Update( me, threat->GetEntity(), cost );
 			}
 			else
 			{
-				CTFBotPathCost cost( me, DEFAULT_ROUTE );
+				CFFBotPathCost cost( me, DEFAULT_ROUTE );
 				m_chasePath.Update( me, threat->GetEntity(), cost );
 			}
 		}
@@ -104,12 +104,12 @@ ActionResult< CTFBot >	CTFBotAttack::Update( CTFBot *me, float interval )
 
 				if ( isUsingCloseRangeWeapon && !TFGameRules()->IsMannVsMachineMode() )	// all bots in MvM use the default route
 				{
-					CTFBotPathCost cost( me, SAFEST_ROUTE );
+					CFFBotPathCost cost( me, SAFEST_ROUTE );
 					m_path.Compute( me, threat->GetLastKnownPosition(), cost );
 				}
 				else
 				{
-					CTFBotPathCost cost( me, DEFAULT_ROUTE );
+					CFFBotPathCost cost( me, DEFAULT_ROUTE );
 					float maxPathLength = TFGameRules()->IsMannVsMachineMode() ? TFBOT_MVM_MAX_PATH_LENGTH : 0.0f;
 					m_path.Compute( me, threat->GetLastKnownPosition(), cost, maxPathLength );
 				}
@@ -122,35 +122,35 @@ ActionResult< CTFBot >	CTFBotAttack::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotAttack::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotAttack::OnStuck( CFFBot *me )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotAttack::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotAttack::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotAttack::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotAttack::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotAttack::ShouldRetreat( const INextBot *me ) const
+QueryResultType	CFFBotAttack::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_UNDEFINED;
 }
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotAttack::ShouldHurry( const INextBot *me ) const
+QueryResultType CFFBotAttack::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_UNDEFINED;
 }

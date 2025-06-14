@@ -4,21 +4,21 @@
 #ifndef FF_BOT_MVM_ENGINEER_BUILD_SENTRYGUN_H
 #define FF_BOT_MVM_ENGINEER_BUILD_SENTRYGUN_H
 
-class CTFBotHintSentrygun;
+class CFFBotHintSentrygun;
 
-class CTFBotMvMEngineerBuildSentryGun : public Action< CTFBot >
+class CFFBotMvMEngineerBuildSentryGun : public Action< CFFBot >
 {
 public:
-	CTFBotMvMEngineerBuildSentryGun( CTFBotHintSentrygun* pSentryHint );
+	CFFBotMvMEngineerBuildSentryGun( CFFBotHintSentrygun* pSentryHint );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
 	virtual const char *GetName( void ) const	{ return "MvMEngineerBuildSentryGun"; };
 
 private:
-	CHandle< CTFBotHintSentrygun > m_sentryBuildHint;
+	CHandle< CFFBotHintSentrygun > m_sentryBuildHint;
 	CHandle< CObjectSentrygun > m_sentry;
 
 	CountdownTimer m_delayBuildTime;

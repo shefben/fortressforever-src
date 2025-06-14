@@ -8,32 +8,32 @@
 #include "ff_obj.h"
 #include "ff_obj_teleporter.h"
 
-IMPLEMENT_SERVERCLASS_ST( CTFBotHintEngineerNest, DT_TFBotHintEngineerNest )
+IMPLEMENT_SERVERCLASS_ST( CFFBotHintEngineerNest, DT_TFBotHintEngineerNest )
 	SendPropBool( SENDINFO(m_bHasActiveTeleporter) ),
 END_SEND_TABLE()
 
-BEGIN_DATADESC( CTFBotHintEngineerNest )
+BEGIN_DATADESC( CFFBotHintEngineerNest )
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( bot_hint_engineer_nest, CTFBotHintEngineerNest );
+LINK_ENTITY_TO_CLASS( bot_hint_engineer_nest, CFFBotHintEngineerNest );
 
 //------------------------------------------------------------------------------
-CTFBotHintEngineerNest::CTFBotHintEngineerNest( void )
+CFFBotHintEngineerNest::CFFBotHintEngineerNest( void )
 {
 	m_bHasActiveTeleporter = false;
 }
 
 
-void CTFBotHintEngineerNest::Spawn()
+void CFFBotHintEngineerNest::Spawn()
 {
 	BaseClass::Spawn();
 
-	SetThink( &CTFBotHintEngineerNest::HintThink );
+	SetThink( &CFFBotHintEngineerNest::HintThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
 
-void CTFBotHintEngineerNest::HintThink()
+void CFFBotHintEngineerNest::HintThink()
 {
 	// find sentry and teleporter hint
 	for ( int i=0; i<ITFBotHintEntityAutoList::AutoList().Count(); ++i )
@@ -55,12 +55,12 @@ void CTFBotHintEngineerNest::HintThink()
 		Warning( "Must have a teleporter and/or a sentry hint with the same name.\n" );
 	}
 
-	SetThink( &CTFBotHintEngineerNest::HintTeleporterThink );
+	SetThink( &CFFBotHintEngineerNest::HintTeleporterThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
 
-void CTFBotHintEngineerNest::HintTeleporterThink()
+void CFFBotHintEngineerNest::HintTeleporterThink()
 {
 	bool bFoundActiveTeleporter = false;
 	for ( int i=0; i<m_teleporters.Count(); ++i )
@@ -83,7 +83,7 @@ void CTFBotHintEngineerNest::HintTeleporterThink()
 }
 
 
-bool CTFBotHintEngineerNest::IsStaleNest() const
+bool CFFBotHintEngineerNest::IsStaleNest() const
 {
 	for ( int i=0; i<m_sentries.Count(); ++i )
 	{
@@ -105,14 +105,14 @@ bool CTFBotHintEngineerNest::IsStaleNest() const
 }
 
 
-void CTFBotHintEngineerNest::DetonateStaleNest()
+void CFFBotHintEngineerNest::DetonateStaleNest()
 {
 	DetonateObjectsFromHints( m_sentries );
 	DetonateObjectsFromHints( m_teleporters );
 }
 
 
-void CTFBotHintEngineerNest::DetonateObjectsFromHints( const HintVector_t& hints )
+void CFFBotHintEngineerNest::DetonateObjectsFromHints( const HintVector_t& hints )
 {
 	for ( int i=0; i<hints.Count(); ++i )
 	{
@@ -128,7 +128,7 @@ void CTFBotHintEngineerNest::DetonateObjectsFromHints( const HintVector_t& hints
 }
 
 
-CBaseTFBotHintEntity* CTFBotHintEngineerNest::GetHint( const HintVector_t& hints ) const
+CBaseTFBotHintEntity* CFFBotHintEngineerNest::GetHint( const HintVector_t& hints ) const
 {
 	if ( hints.Count() == 0 )
 	{
@@ -148,13 +148,13 @@ CBaseTFBotHintEntity* CTFBotHintEngineerNest::GetHint( const HintVector_t& hints
 }
 
 
-CTFBotHintSentrygun* CTFBotHintEngineerNest::GetSentryHint() const
+CFFBotHintSentrygun* CFFBotHintEngineerNest::GetSentryHint() const
 {
-	return (CTFBotHintSentrygun*)GetHint( m_sentries );
+	return (CFFBotHintSentrygun*)GetHint( m_sentries );
 }
 
 
-CTFBotHintTeleporterExit* CTFBotHintEngineerNest::GetTeleporterHint() const
+CFFBotHintTeleporterExit* CFFBotHintEngineerNest::GetTeleporterHint() const
 {
-	return (CTFBotHintTeleporterExit*)GetHint( m_teleporters );
+	return (CFFBotHintTeleporterExit*)GetHint( m_teleporters );
 }

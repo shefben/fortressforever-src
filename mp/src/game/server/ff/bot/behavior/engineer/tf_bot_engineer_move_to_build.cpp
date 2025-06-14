@@ -49,7 +49,7 @@ int CompareRangeToPoint( CTFNavArea * const *area1, CTFNavArea * const *area2 )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotEngineerMoveToBuild::CollectBuildAreas( CTFBot *me )
+void CFFBotEngineerMoveToBuild::CollectBuildAreas( CFFBot *me )
 {
 	// if we have a predesignated build area, we're done
 	if ( me->GetHomeArea() )
@@ -63,7 +63,7 @@ void CTFBotEngineerMoveToBuild::CollectBuildAreas( CTFBot *me )
 	int i;
 
 	int myTeam = me->GetTeamNumber();
-	int enemyTeam = ( myTeam == TF_TEAM_BLUE ) ? TF_TEAM_RED : TF_TEAM_BLUE;
+	int enemyTeam = ( myTeam == FF_TEAM_BLUE ) ? FF_TEAM_RED : FF_TEAM_BLUE;
 
 	CCaptureZone *zone = me->GetFlagCaptureZone();
 	if ( zone )
@@ -81,7 +81,7 @@ void CTFBotEngineerMoveToBuild::CollectBuildAreas( CTFBot *me )
 	{
 		CTeamTrainWatcher *trainWatcher;
 
-		if ( myTeam == TF_TEAM_BLUE )
+		if ( myTeam == FF_TEAM_BLUE )
 		{
 			trainWatcher = TFGameRules()->GetPayloadToPush( me->GetTeamNumber() );
 		}
@@ -221,7 +221,7 @@ void CTFBotEngineerMoveToBuild::CollectBuildAreas( CTFBot *me )
 /**
  * Doesn't recompute the potential areas, just reselected from the list
  */
-void CTFBotEngineerMoveToBuild::SelectBuildLocation( CTFBot *me )
+void CFFBotEngineerMoveToBuild::SelectBuildLocation( CFFBot *me )
 {
 	m_path.Invalidate();
 
@@ -237,12 +237,12 @@ void CTFBotEngineerMoveToBuild::SelectBuildLocation( CTFBot *me )
 	}
 
 	// if we have a set of specific build locations, pick one of them
-	CUtlVector< CTFBotHintSentrygun * > sentryHintVector;
+	CUtlVector< CFFBotHintSentrygun * > sentryHintVector;
 
-	CTFBotHintSentrygun *sentryHint;
-	for( sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
+	CFFBotHintSentrygun *sentryHint;
+	for( sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
 		 sentryHint;
-		 sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
+		 sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
 	{
 		// clear the previous owner if it is us
 		if ( sentryHint->GetPlayerOwner() == me )
@@ -295,7 +295,7 @@ void CTFBotEngineerMoveToBuild::SelectBuildLocation( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotEngineerMoveToBuild::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 
@@ -321,7 +321,7 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::OnStart( CTFBot *me, Action< C
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotEngineerMoveToBuild::Update( CFFBot *me, float interval )
 {
 	if ( me->WasPointJustLost() )
 	{
@@ -346,22 +346,22 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float inte
 		// we already have a sentry from a previous life - continue what we were doing
 
 		// if we used a sentry hint last time, reuse it
-		CTFBotHintSentrygun *sentryHint;
-		for( sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
+		CFFBotHintSentrygun *sentryHint;
+		for( sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( NULL, "bot_hint_sentrygun" ) );
 			 sentryHint;
-			 sentryHint = static_cast< CTFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
+			 sentryHint = static_cast< CFFBotHintSentrygun * >( gEntList.FindEntityByClassname( sentryHint, "bot_hint_sentrygun" ) ) )
 		{
 			if ( sentryHint->GetPlayerOwner() == me )
 			{
-				return ChangeTo( new CTFBotEngineerBuilding( sentryHint ), "Going back to my existing sentry nest and reusing a sentry hint" );
+				return ChangeTo( new CFFBotEngineerBuilding( sentryHint ), "Going back to my existing sentry nest and reusing a sentry hint" );
 			}
 		}
 
-		return ChangeTo( new CTFBotEngineerBuilding, "Going back to my existing sentry nest" );
+		return ChangeTo( new CFFBotEngineerBuilding, "Going back to my existing sentry nest" );
 	}
 
 	// offensive engineers need to place a forward teleporter
-	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP && !TFGameRules()->IsInKothMode() && me->GetTeamNumber() == TF_TEAM_BLUE )
+	if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP && !TFGameRules()->IsInKothMode() && me->GetTeamNumber() == FF_TEAM_BLUE )
 	{
 		CObjectTeleporter *myTeleportExit = (CObjectTeleporter *)me->GetObjectOfType( OBJ_TELEPORTER, MODE_TELEPORTER_EXIT );
 		int myTeam = me->GetTeamNumber();
@@ -422,8 +422,8 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float inte
 				{
 					if ( !me->m_Shared.InCond( TF_COND_INVULNERABLE ) && ShouldRetreat( me ) != ANSWER_NO )
 					{
-						Action< CTFBot > *nextActionWhenInCover = new CTFBotEngineerBuildTeleportExit;
-						return SuspendFor( new CTFBotRetreatToCover( nextActionWhenInCover ), "Retreating to a safe place to build my teleporter exit" );
+						Action< CFFBot > *nextActionWhenInCover = new CFFBotEngineerBuildTeleportExit;
+						return SuspendFor( new CFFBotRetreatToCover( nextActionWhenInCover ), "Retreating to a safe place to build my teleporter exit" );
 					}
 				}
 			}
@@ -435,7 +435,7 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float inte
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
 
-		CTFBotPathCost cost( me, SAFEST_ROUTE );
+		CFFBotPathCost cost( me, SAFEST_ROUTE );
 		m_path.Compute( me, m_sentryBuildLocation, cost );
 	}
 
@@ -457,10 +457,10 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float inte
 		{
 			if ( m_sentryBuildHint != NULL )
 			{
-				return ChangeTo( new CTFBotEngineerBuilding( m_sentryBuildHint ), "Reached my precise build location" );
+				return ChangeTo( new CFFBotEngineerBuilding( m_sentryBuildHint ), "Reached my precise build location" );
 			}
 
-			return ChangeTo( new CTFBotEngineerBuilding, "Reached my build location" );
+			return ChangeTo( new CFFBotEngineerBuilding, "Reached my build location" );
 		}
 
 		m_path.Update( me );
@@ -471,7 +471,7 @@ ActionResult< CTFBot >	CTFBotEngineerMoveToBuild::Update( CTFBot *me, float inte
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotEngineerMoveToBuild::OnStuck( CFFBot *me )
 {
 //	SelectBuildLocation( me );
 	return TryContinue();
@@ -479,14 +479,14 @@ EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnMoveToSuccess( CTFBot *me, const Path *path )
+EventDesiredResult< CFFBot > CFFBotEngineerMoveToBuild::OnMoveToSuccess( CFFBot *me, const Path *path )
 {
 	return TryContinue();
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason )
+EventDesiredResult< CFFBot > CFFBotEngineerMoveToBuild::OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason )
 {
 	SelectBuildLocation( me );
 
@@ -495,7 +495,7 @@ EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnMoveToFailure( CTFBot 
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotEngineerMoveToBuild::OnTerritoryLost( CTFBot *me, int territoryID )
+EventDesiredResult< CFFBot > CFFBotEngineerMoveToBuild::OnTerritoryLost( CFFBot *me, int territoryID )
 {
 	// we have to wait a moment until contested point changes to select a new build spot
 	m_fallBackTimer.Start( 0.2f );

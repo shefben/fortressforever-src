@@ -8,18 +8,18 @@
 
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotMissionReprogrammed : public Action< CTFBot >
+class CFFBotMissionReprogrammed : public Action< CFFBot >
 {
 #ifdef STAGING_ONLY
 public:
-	CTFBotMissionReprogrammed( void );
+	CFFBotMissionReprogrammed( void );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnKilled( CTFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnKilled( CFFBot *me, const CTakeDamageInfo &info );
 
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;	// should we attack "them"?
 
@@ -37,9 +37,9 @@ private:
 	CountdownTimer m_detonateSeekTimer;
 	CountdownTimer m_reprogrammedTimer;
 
-	void StartDetonate( CTFBot *me, bool wasSuccessful = false );
-	void Detonate( CTFBot *me );
-	CTFPlayer *FindNearestEnemy( CTFBot *me );
+	void StartDetonate( CFFBot *me, bool wasSuccessful = false );
+	void Detonate( CFFBot *me );
+	CFFPlayer *FindNearestEnemy( CFFBot *me );
 	bool m_hasDetonated;
 	bool m_wasSuccessful;
 

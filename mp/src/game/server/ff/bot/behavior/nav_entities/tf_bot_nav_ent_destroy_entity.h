@@ -10,14 +10,14 @@
 #include "NextBot/NavMeshEntities/func_nav_prerequisite.h"
 #include "ff_weapon_pipebomblauncher.h"
 
-class CTFBotNavEntDestroyEntity : public Action< CTFBot >
+class CFFBotNavEntDestroyEntity : public Action< CFFBot >
 {
 public:
-	CTFBotNavEntDestroyEntity( const CFuncNavPrerequisite *prereq );
+	CFFBotNavEntDestroyEntity( const CFuncNavPrerequisite *prereq );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
-	virtual void					OnEnd( CTFBot *me, Action< CTFBot > *nextAction );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+	virtual void					OnEnd( CFFBot *me, Action< CFFBot > *nextAction );
 
 	virtual const char *GetName( void ) const	{ return "NavEntDestroyEntity"; };
 
@@ -27,7 +27,7 @@ private:
 	CountdownTimer m_repathTimer;
 	bool m_wasIgnoringEnemies;
 
-	void DetonateStickiesWhenSet( CTFBot *me, CTFPipebombLauncher *stickyLauncher ) const;
+	void DetonateStickiesWhenSet( CFFBot *me, CTFPipebombLauncher *stickyLauncher ) const;
 	bool m_isReadyToLaunchSticky;
 };
 

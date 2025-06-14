@@ -9,19 +9,19 @@
 #ifdef FF_RAID_MODE
 
 //-----------------------------------------------------------------------------
-class CTFBotWander : public Action< CTFBot >
+class CFFBotWander : public Action< CFFBot >
 {
 public:
-	CTFBotWander( void );
+	CFFBotWander( void );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
-	virtual EventDesiredResult< CTFBot > OnInjured( CTFBot *me, const CTakeDamageInfo &info );
-	virtual EventDesiredResult< CTFBot > OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result = NULL );
+	virtual EventDesiredResult< CFFBot > OnInjured( CFFBot *me, const CTakeDamageInfo &info );
+	virtual EventDesiredResult< CFFBot > OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info );
 
-	virtual EventDesiredResult< CTFBot > OnCommandAttack( CTFBot *me, CBaseEntity *victim );
+	virtual EventDesiredResult< CFFBot > OnCommandAttack( CFFBot *me, CBaseEntity *victim );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;					// are we in a hurry?
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;							// is it time to retreat?
@@ -34,13 +34,13 @@ private:
 };
 
 
-inline QueryResultType CTFBotWander::ShouldHurry( const INextBot *me ) const
+inline QueryResultType CFFBotWander::ShouldHurry( const INextBot *me ) const
 {
 	return ANSWER_YES;
 }
 
 
-inline QueryResultType CTFBotWander::ShouldRetreat( const INextBot *me ) const
+inline QueryResultType CFFBotWander::ShouldRetreat( const INextBot *me ) const
 {
 	return ANSWER_NO;
 }

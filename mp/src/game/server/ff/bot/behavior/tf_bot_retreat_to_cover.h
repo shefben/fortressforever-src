@@ -6,18 +6,18 @@
 #ifndef FF_BOT_RETREAT_TO_COVER_H
 #define FF_BOT_RETREAT_TO_COVER_H
 
-class CTFBotRetreatToCover : public Action< CTFBot >
+class CFFBotRetreatToCover : public Action< CFFBot >
 {
 public:
-	CTFBotRetreatToCover( float hideDuration = -1.0f );
-	CTFBotRetreatToCover( Action< CTFBot > *actionToChangeToOnceCoverReached );
+	CFFBotRetreatToCover( float hideDuration = -1.0f );
+	CFFBotRetreatToCover( Action< CFFBot > *actionToChangeToOnceCoverReached );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
-	virtual EventDesiredResult< CTFBot > OnStuck( CTFBot *me );
-	virtual EventDesiredResult< CTFBot > OnMoveToSuccess( CTFBot *me, const Path *path );
-	virtual EventDesiredResult< CTFBot > OnMoveToFailure( CTFBot *me, const Path *path, MoveToFailureType reason );
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me );
+	virtual EventDesiredResult< CFFBot > OnMoveToSuccess( CFFBot *me, const Path *path );
+	virtual EventDesiredResult< CFFBot > OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason );
 
 	virtual QueryResultType ShouldHurry( const INextBot *me ) const;					// are we in a hurry?
 
@@ -25,7 +25,7 @@ public:
 
 private:
 	float m_hideDuration;
-	Action< CTFBot > *m_actionToChangeToOnceCoverReached;
+	Action< CFFBot > *m_actionToChangeToOnceCoverReached;
 
 	PathFollower m_path;
 	CountdownTimer m_repathTimer;
@@ -33,7 +33,7 @@ private:
 	CTFNavArea *m_coverArea;
 	CountdownTimer m_waitInCoverTimer;
 
-	CTFNavArea *FindCoverArea( CTFBot *me );
+	CTFNavArea *FindCoverArea( CFFBot *me );
 };
 
 

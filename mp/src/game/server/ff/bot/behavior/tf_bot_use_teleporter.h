@@ -9,7 +9,7 @@
 #include "ff_obj_teleporter.h"
 #include "Path/NextBotPathFollow.h"
 
-class CTFBotUseTeleporter : public Action< CTFBot >
+class CFFBotUseTeleporter : public Action< CFFBot >
 {
 public:
 	enum UseHowType
@@ -17,10 +17,10 @@ public:
 		USE_IF_READY,
 		ALWAYS_USE
 	};
-	CTFBotUseTeleporter( CObjectTeleporter *teleporter, UseHowType how = USE_IF_READY );
+	CFFBotUseTeleporter( CObjectTeleporter *teleporter, UseHowType how = USE_IF_READY );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "UseTeleporter"; };
 

@@ -8,32 +8,32 @@
 #include "ff_bot_hint_sentrygun.h"
 
 
-BEGIN_DATADESC( CTFBotHintSentrygun )
+BEGIN_DATADESC( CFFBotHintSentrygun )
 	DEFINE_KEYFIELD( m_isSticky, FIELD_BOOLEAN, "sticky" ),
 	DEFINE_OUTPUT( m_outputOnSentryGunDestroyed, "OnSentryGunDestroyed" ),
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( bot_hint_sentrygun, CTFBotHintSentrygun );
+LINK_ENTITY_TO_CLASS( bot_hint_sentrygun, CFFBotHintSentrygun );
 
 //------------------------------------------------------------------------------
-CTFBotHintSentrygun::CTFBotHintSentrygun( void )
+CFFBotHintSentrygun::CFFBotHintSentrygun( void )
 	: m_isSticky( false )
 	, m_iUseCount( 0 )
 {
 }
 
 //------------------------------------------------------------------------------
-void CTFBotHintSentrygun::OnSentryGunDestroyed( CBaseEntity *pEntity )
+void CFFBotHintSentrygun::OnSentryGunDestroyed( CBaseEntity *pEntity )
 {
 	m_outputOnSentryGunDestroyed.FireOutput( pEntity, pEntity );
 }
 
 //------------------------------------------------------------------------------
-bool CTFBotHintSentrygun::IsAvailableForSelection( CTFPlayer *pRequestingPlayer ) const
+bool CFFBotHintSentrygun::IsAvailableForSelection( CFFPlayer *pRequestingPlayer ) const
 {
 	// sentry hint is eligible as long as there is no owner (or the owner is no longer an engineer)
 	// if the hint is enabled and the hint is not in use and it is on the same team as me
-	if ( ( GetPlayerOwner() == NULL || !GetPlayerOwner()->IsPlayerClass( TF_CLASS_ENGINEER ) ) && 
+	if ( ( GetPlayerOwner() == NULL || !GetPlayerOwner()->IsPlayerClass( CLASS_ENGINEER ) ) && 
 		 ( IsEnabled() && IsInUse() == false && InSameTeam( pRequestingPlayer ) ) )
 	{
 		return true;

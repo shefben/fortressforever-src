@@ -6,13 +6,13 @@
 #ifndef FF_BOT_SCENARIO_MONITOR_H
 #define FF_BOT_SCENARIO_MONITOR_H
 
-class CTFBotScenarioMonitor : public Action< CTFBot >
+class CFFBotScenarioMonitor : public Action< CFFBot >
 {
 public:
-	virtual Action< CTFBot > *InitialContainedAction( CTFBot *me );
+	virtual Action< CFFBot > *InitialContainedAction( CFFBot *me );
 
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual const char *GetName( void ) const	{ return "ScenarioMonitor"; }
 
@@ -20,7 +20,7 @@ private:
 	CountdownTimer m_ignoreLostFlagTimer;
 	CountdownTimer m_lostFlagTimer;
 
-	virtual Action< CTFBot > *DesiredScenarioAndClassAction( CTFBot *me );
+	virtual Action< CFFBot > *DesiredScenarioAndClassAction( CFFBot *me );
 };
 
 

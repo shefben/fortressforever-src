@@ -7,15 +7,15 @@
 #include "Path/NextBotPathFollow.h"
 
 class CBaseTFBotHintEntity;
-class CTFBotHintSentrygun;
-class CTFBotHintTeleporterExit;
-class CTFBotHintEngineerNest;
+class CFFBotHintSentrygun;
+class CFFBotHintTeleporterExit;
+class CFFBotHintEngineerNest;
 
-class CTFBotMvMEngineerIdle : public Action< CTFBot >
+class CFFBotMvMEngineerIdle : public Action< CFFBot >
 {
 public:
-	virtual ActionResult< CTFBot >	OnStart( CTFBot *me, Action< CTFBot > *priorAction );
-	virtual ActionResult< CTFBot >	Update( CTFBot *me, float interval );
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
 
 	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;
 	virtual QueryResultType	ShouldRetreat( const INextBot *me ) const;							// is it time to retreat?
@@ -34,21 +34,21 @@ private:
 
 	int m_nTeleportedCount;
 	bool m_bTeleportedToHint;
-	CHandle< CTFBotHintTeleporterExit > m_teleporterHint;
-	CHandle< CTFBotHintSentrygun > m_sentryHint;
-	CHandle< CTFBotHintEngineerNest > m_nestHint;
+	CHandle< CFFBotHintTeleporterExit > m_teleporterHint;
+	CHandle< CFFBotHintSentrygun > m_sentryHint;
+	CHandle< CFFBotHintEngineerNest > m_nestHint;
 
-	void TakeOverStaleNest( CBaseTFBotHintEntity* pHint, CTFBot *me );
-	bool ShouldAdvanceNestSpot( CTFBot *me );
+	void TakeOverStaleNest( CBaseTFBotHintEntity* pHint, CFFBot *me );
+	bool ShouldAdvanceNestSpot( CFFBot *me );
 
 	void TryToDetonateStaleNest();
 	bool m_bTriedToDetonateStaleNest;
 };
 
-class CTFBotMvMEngineerHintFinder
+class CFFBotMvMEngineerHintFinder
 {
 public:
-	static bool FindHint( bool bShouldCheckForBlockingObjects, bool bAllowOutOfRangeNest, CHandle< CTFBotHintEngineerNest >* pFoundNest = NULL );
+	static bool FindHint( bool bShouldCheckForBlockingObjects, bool bAllowOutOfRangeNest, CHandle< CFFBotHintEngineerNest >* pFoundNest = NULL );
 };
 
 

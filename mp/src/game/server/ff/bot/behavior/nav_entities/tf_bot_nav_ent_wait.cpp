@@ -12,14 +12,14 @@
 extern ConVar ff_bot_path_lookahead_range;
 
 //---------------------------------------------------------------------------------------------
-CTFBotNavEntWait::CTFBotNavEntWait( const CFuncNavPrerequisite *prereq )
+CFFBotNavEntWait::CFFBotNavEntWait( const CFuncNavPrerequisite *prereq )
 {
 	m_prereq = prereq;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotNavEntWait::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot > CFFBotNavEntWait::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	if ( m_prereq == NULL )
 	{
@@ -33,7 +33,7 @@ ActionResult< CTFBot > CTFBotNavEntWait::OnStart( CTFBot *me, Action< CTFBot > *
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot > CTFBotNavEntWait::Update( CTFBot *me, float interval )
+ActionResult< CFFBot > CFFBotNavEntWait::Update( CFFBot *me, float interval )
 {
 	if ( m_prereq == NULL )
 	{

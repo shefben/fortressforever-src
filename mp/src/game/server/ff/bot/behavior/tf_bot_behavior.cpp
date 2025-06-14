@@ -57,20 +57,20 @@ ConVar ff_bot_use_items( "ff_bot_use_items", "0", FCVAR_CHEAT, "0-100: Chance bo
 #endif
 
 //---------------------------------------------------------------------------------------------
-Action< CTFBot > *CTFBotMainAction::InitialContainedAction( CTFBot *me )
+Action< CFFBot > *CFFBotMainAction::InitialContainedAction( CFFBot *me )
 {
-	return new CTFBotTacticalMonitor;
+	return new CFFBotTacticalMonitor;
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMainAction::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMainAction::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_lastTouch = NULL;
 	m_lastTouchTime = 0.0f;
 	m_aimErrorRadius = 0.0f;
 	m_aimErrorAngle = 0.0f;
-	m_nextDisguise = TF_CLASS_UNDEFINED;
+	m_nextDisguise = CLASS_UNDEFINED;
 
 	m_yawRate = 0.0f;
 	m_priorYaw = 0.0f;
@@ -81,13 +81,13 @@ ActionResult< CTFBot >	CTFBotMainAction::OnStart( CTFBot *me, Action< CTFBot > *
 	// check for !IsAlive because bot could be DYING
 	if ( !me->IsAlive() )
 	{
-		return ChangeTo( new CTFBotDead, "I'm actually dead" );
+		return ChangeTo( new CFFBotDead, "I'm actually dead" );
 	}
 
 #ifdef TF_CREEP_MODE
 	if ( TFGameRules()->IsCreepWaveMode() )
 	{
-		return ChangeTo( new CTFBotCreepWave, "I'm a creep" );
+		return ChangeTo( new CFFBotCreepWave, "I'm a creep" );
 	}
 #endif // TF_CREEP_MODE
 
@@ -110,11 +110,11 @@ ActionResult< CTFBot >	CTFBotMainAction::OnStart( CTFBot *me, Action< CTFBot > *
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 {
-	VPROF_BUDGET( "CTFBotMainAction::Update", "NextBot" );
+	VPROF_BUDGET( "CFFBotMainAction::Update", "NextBot" );
 
-	if ( me->GetTeamNumber() != TF_TEAM_BLUE && me->GetTeamNumber() != TF_TEAM_RED )
+	if ( me->GetTeamNumber() != FF_TEAM_BLUE && me->GetTeamNumber() != FF_TEAM_RED )
 	{
 		// not on a team - do nothing
 		return Done( "Not on a playing team" );
@@ -123,14 +123,14 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 	// Should I accept taunt from my partner?
 	if ( me->FindPartnerTauntInitiator() )
 	{
-		return SuspendFor( new CTFBotTaunt, "Responding to teammate partner taunt" );
+		return SuspendFor( new CFFBotTaunt, "Responding to teammate partner taunt" );
 	}
 
 	// make sure our vision FOV matches the player's
 	me->GetVisionInterface()->SetFieldOfView( me->GetFOV() );
 
 	// teammates in training have infinite ammo
-	if ( TFGameRules()->IsInTraining() && me->GetTeamNumber() == TF_TEAM_BLUE )
+	if ( TFGameRules()->IsInTraining() && me->GetTeamNumber() == FF_TEAM_BLUE )
 	{
 		me->GiveAmmo( 1000, TF_AMMO_METAL, true );
 	}
@@ -160,7 +160,7 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 // 		}
 	}
 
-	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == TF_TEAM_PVE_INVADERS )
+	if ( TFGameRules()->IsMannVsMachineMode() && me->GetTeamNumber() == FF_TEAM_PVE_INVADERS )
 	{
 		// infinite ammo
 		// me->GiveAmmo( 100, TF_AMMO_PRIMARY, true );
@@ -169,12 +169,10 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES1, true );
 		// This resets the Bonk drink meter...
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES2, true );
-		me->GiveAmmo( 100, TF_AMMO_METAL, true );
-
-		me->m_Shared.AddToSpyCloakMeter( 100.0f );
+               me->GiveAmmo( 100, TF_AMMO_METAL, true );
 
 		CTFNavArea *myArea = me->GetLastKnownArea();
-		int spawnRoomFlag = me->GetTeamNumber() == TF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
+		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
 
 		if ( myArea && myArea->HasAttributeTF( spawnRoomFlag ) )
 		{
@@ -215,31 +213,7 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 		}
 	}
 
-	// spies always want to be disguised
-	if ( !me->IsFiringWeapon() && !me->m_Shared.InCond( TF_COND_DISGUISED ) && !me->m_Shared.InCond( TF_COND_DISGUISING ) )
-	{
-		if ( me->CanDisguise() )
-		{
-			if ( m_nextDisguise == TF_CLASS_UNDEFINED )
-			{
-				if ( me->IsDifficulty( CTFBot::EASY ) || me->IsDifficulty( CTFBot::NORMAL ) )
-				{
-					// disguise as a random class
-					me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( TF_FIRST_NORMAL_CLASS, TF_LAST_NORMAL_CLASS-1 ) );
-				}
-				else
-				{
-					me->DisguiseAsMemberOfEnemyTeam();
-				}
-			}
-			else
-			{
-				// disguise as the class we just killed
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), m_nextDisguise );
-				m_nextDisguise = TF_CLASS_UNDEFINED;
-			}
-		}
-	}
+
 
 	me->EquipRequiredWeapon();
 
@@ -247,7 +221,7 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 	FireWeaponAtEnemy( me );
 	Dodge( me );
 
-	if ( me->IsPlayerClass( TF_CLASS_DEMOMAN ) )
+	if ( me->IsPlayerClass( CLASS_DEMOMAN ) )
 	{
 		// dont auto reload, so we fire stickies fast
 		me->SetAutoReload( false );
@@ -263,14 +237,14 @@ ActionResult< CTFBot >	CTFBotMainAction::Update( CTFBot *me, float interval )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult<CTFBot> CTFBotMainAction::OnKilled( CTFBot *me, const CTakeDamageInfo& info )
+EventDesiredResult<CFFBot> CFFBotMainAction::OnKilled( CFFBot *me, const CTakeDamageInfo& info )
 {
-	return TryChangeTo( new CTFBotDead, RESULT_CRITICAL, "I died!" );
+	return TryChangeTo( new CFFBotDead, RESULT_CRITICAL, "I died!" );
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMainAction::OnInjured( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMainAction::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
 {
 	CBaseObject *obj = dynamic_cast< CBaseObject * >( info.GetInflictor() );
 
@@ -296,7 +270,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnInjured( CTFBot *me, const CTak
 			me->DelayedThreatNotice( info.GetInflictor(), 0.5f );
 
 			// chance of nearby friends noticing the backstab
-			CUtlVector< CTFPlayer * > playerVector;
+			CUtlVector< CFFPlayer * > playerVector;
 			CollectPlayers( &playerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 			float minRange = ff_bot_notice_backstab_min_range.GetFloat();
@@ -305,7 +279,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnInjured( CTFBot *me, const CTak
 
 			for( int i=0; i<playerVector.Count(); ++i )
 			{
-				CTFBot *bot = ToTFBot( playerVector[i] );
+				CFFBot *bot = ToTFBot( playerVector[i] );
 				if ( bot )
 				{
 					if ( !me->IsSelf( bot ) )
@@ -350,7 +324,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnInjured( CTFBot *me, const CTak
 	if ( false && !me->IsSelf( info.GetAttacker() ) )
 	{
 		// hack to stop engineers from looking away from healing their sentry
-		if ( !me->IsPlayerClass( TF_CLASS_ENGINEER ) && !me->IsPlayerClass( TF_CLASS_MEDIC ) )
+		if ( !me->IsPlayerClass( CLASS_ENGINEER ) && !me->IsPlayerClass( CLASS_MEDIC ) )
 		{
 			CBaseObject *obj = dynamic_cast< CBaseObject * >( info.GetInflictor() );
 
@@ -388,7 +362,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnInjured( CTFBot *me, const CTak
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMainAction::OnContact( CTFBot *me, CBaseEntity *other, CGameTrace *result )
+EventDesiredResult< CFFBot > CFFBotMainAction::OnContact( CFFBot *me, CBaseEntity *other, CGameTrace *result )
 {
 	if ( other && !other->IsSolidFlagSet( FSOLID_NOT_SOLID ) && !other->IsWorld() && !other->IsPlayer() )
 	{
@@ -444,7 +418,7 @@ public:
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMainAction::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMainAction::OnStuck( CFFBot *me )
 {
 /*
 	// if we are touching a func_door while stuck, assume the door is locked and block
@@ -537,7 +511,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMainAction::OnOtherKilled( CTFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseCombatCharacter *victim, const CTakeDamageInfo &info )
 {
 	// make sure we forget about this guy
 	me->GetVisionInterface()->ForgetEntity( victim );
@@ -554,17 +528,17 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnOtherKilled( CTFBot *me, CBaseC
 
 	if ( do_taunt )
 	{
-		CTFPlayer *playerVictim = ToTFPlayer( victim );
+		CFFPlayer *playerVictim = ToFFPlayer( victim );
 
 		me->ForgetSpy( playerVictim );
 
-		if ( me->IsSelf( info.GetAttacker() ) && me->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( me->IsSelf( info.GetAttacker() ) && me->IsPlayerClass( CLASS_SPY ) )
 		{
 			// disguise as our victim
 			m_nextDisguise = playerVictim->GetPlayerClass()->GetClassIndex();
 		}
 
-		if ( !ToTFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
+		if ( !ToFFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
 		{
 			bool isTaunting = !me->HasTheFlag() && RandomFloat( 0.0f, 100.0f ) <= ff_bot_taunt_victim_chance.GetFloat();
 
@@ -577,7 +551,7 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnOtherKilled( CTFBot *me, CBaseC
 			if ( isTaunting )
 			{
 				// we just killed a human - taunt!
-				return TrySuspendFor( new CTFBotTaunt, RESULT_IMPORTANT, "Taunting our victim" );
+				return TrySuspendFor( new CFFBotTaunt, RESULT_IMPORTANT, "Taunting our victim" );
 			}
 		}
 	}
@@ -601,9 +575,9 @@ EventDesiredResult< CTFBot > CTFBotMainAction::OnOtherKilled( CTFBot *me, CBaseC
 /**
  * Given a subject, return the world space position we should aim at
  */
-Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCombatCharacter *subject ) const
+Vector CFFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCombatCharacter *subject ) const
 {
-	CTFBot *me = (CTFBot *)meBot->GetEntity();
+	CFFBot *me = (CFFBot *)meBot->GetEntity();
 
 	if ( subject )
 	{
@@ -618,13 +592,13 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 			}
 		}
 
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+		CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon )
 		{
 			// lead our target and aim for the feet with the rocket launcher
-			if ( !me->IsDifficulty( CTFBot::EASY ) )
+			if ( !me->IsDifficulty( CFFBot::EASY ) )
 			{
-				if ( myWeapon->GetWeaponID() == TF_WEAPON_ROCKETLAUNCHER )
+				if ( myWeapon->GetWeaponID() == FF_WEAPON_ROCKETLAUNCHER )
 				{
 					// if they are above us, don't aim for the feet
 					const float aboveTolerance = 30.0f;
@@ -673,7 +647,7 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 
 					return subject->EyePosition();
 				}
-				else if ( myWeapon->GetWeaponID() == TF_WEAPON_COMPOUND_BOW )
+				else if ( myWeapon->GetWeaponID() == FF_WEAPON_COMPOUND_BOW )
 				{
 					// lead our target
 					const float missileSpeed = ( (CTFCompoundBow *)myWeapon )->GetProjectileSpeed();
@@ -684,7 +658,7 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 					{
 						float timeToTravel = rangeBetween / missileSpeed;
 
-						Vector targetSpot = me->IsDifficulty( CTFBot::NORMAL ) ? subject->WorldSpaceCenter() : subject->EyePosition();
+						Vector targetSpot = me->IsDifficulty( CFFBot::NORMAL ) ? subject->WorldSpaceCenter() : subject->EyePosition();
 
 						Vector leadTargetSpot = targetSpot + timeToTravel * subject->GetAbsVelocity();
 
@@ -743,19 +717,19 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 				
 				switch( me->GetDifficulty() )
 				{
-				case CTFBot::EXPERT:
-				case CTFBot::HARD:
+				case CFFBot::EXPERT:
+				case CFFBot::HARD:
 					// aim for the head - reaction times will differentiate the skill levels
 					desiredAimSpot = subject->EyePosition();
 					break;
 
 				default:
 					Assert(0);
-				case CTFBot::NORMAL:
+				case CFFBot::NORMAL:
 					desiredAimSpot = ( subject->EyePosition() + subject->EyePosition() + subject->WorldSpaceCenter() ) / 3.0f;
 					break;
 
-				case CTFBot::EASY:
+				case CFFBot::EASY:
 					desiredAimSpot = subject->WorldSpaceCenter();
 					break;
 				}
@@ -765,8 +739,8 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 				return imperfectAimSpot;
 			}
 
-			if ( myWeapon->IsWeapon( TF_WEAPON_GRENADELAUNCHER ) ||
-				 myWeapon->IsWeapon( TF_WEAPON_PIPEBOMBLAUNCHER ) )
+			if ( myWeapon->IsWeapon( FF_WEAPON_GRENADELAUNCHER ) ||
+				 myWeapon->IsWeapon( FF_WEAPON_PIPEBOMBLAUNCHER ) )
 			{
 				Vector toThreat = subject->GetAbsOrigin() - me->GetAbsOrigin();
 				float threatRange = toThreat.NormalizeInPlace();
@@ -801,7 +775,7 @@ Vector CTFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
  * This is most useful for bots derived from CBasePlayer that go through
  * the player movement system.
  */
-QueryResultType CTFBotMainAction::IsPositionAllowed( const INextBot *me, const Vector &pos ) const
+QueryResultType CFFBotMainAction::IsPositionAllowed( const INextBot *me, const Vector &pos ) const
 {
 	return ANSWER_YES;
 
@@ -857,9 +831,9 @@ QueryResultType CTFBotMainAction::IsPositionAllowed( const INextBot *me, const V
 
 
 //---------------------------------------------------------------------------------------------
-bool CTFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, const CKnownEntity *threat ) const
+bool CFFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, const CKnownEntity *threat ) const
 {
-	CTFBot *me = GetActor();
+	CFFBot *me = GetActor();
 
 	// the TFBot code assumes the subject is always "me"
 	if ( !me || !me->IsSelf( subject ) )
@@ -878,7 +852,7 @@ bool CTFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 	if ( !me->IsLineOfFireClear( threat->GetEntity() ) )
 		return false;
 
-	CTFPlayer *threatPlayer = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *threatPlayer = ToFFPlayer( threat->GetEntity() );
 
 	Vector to = me->GetAbsOrigin() - threat->GetLastKnownPosition();
 	float threatRange = to.NormalizeInPlace();
@@ -923,7 +897,7 @@ bool CTFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 	}
 
 	// does a sniper have a shot on me?
-	if ( threatPlayer->IsPlayerClass( TF_CLASS_SNIPER ) )
+	if ( threatPlayer->IsPlayerClass( CLASS_SNIPER ) )
 	{
 		Vector sniperForward;
 		threatPlayer->EyeVectors( &sniperForward );
@@ -936,13 +910,13 @@ bool CTFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 		return false;
 	}
 
-	if ( me->GetDifficulty() > CTFBot::NORMAL && threatPlayer->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->GetDifficulty() > CFFBot::NORMAL && threatPlayer->IsPlayerClass( CLASS_MEDIC ) )
 	{
 		// always try to kill these guys first
 		return true;
 	}
 
-	if ( me->GetDifficulty() > CTFBot::NORMAL && threatPlayer->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( me->GetDifficulty() > CFFBot::NORMAL && threatPlayer->IsPlayerClass( CLASS_ENGINEER ) )
 	{
 		// take out engineers to let the team kill their sentry nests
 		return true;
@@ -953,7 +927,7 @@ bool CTFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 
 
 //---------------------------------------------------------------------------------------------
-const CKnownEntity *CTFBotMainAction::SelectCloserThreat( CTFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 ) const
+const CKnownEntity *CFFBotMainAction::SelectCloserThreat( CFFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 ) const
 {
 	float rangeSq1 = me->GetRangeSquaredTo( threat1->GetEntity() );
 	float rangeSq2 = me->GetRangeSquaredTo( threat2->GetEntity() );
@@ -968,18 +942,18 @@ const CKnownEntity *CTFBotMainAction::SelectCloserThreat( CTFBot *me, const CKno
 //---------------------------------------------------------------------------------------------
 // If the given threat is being healed by a Medic, return the Medic, otherwise just
 // return the threat.
-const CKnownEntity *CTFBotMainAction::GetHealerOfThreat( const CKnownEntity *threat ) const
+const CKnownEntity *CFFBotMainAction::GetHealerOfThreat( const CKnownEntity *threat ) const
 {
 	if ( !threat || !threat->GetEntity() )
 		return NULL;
 
-	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 	if ( playerThreat )
 	{
 		for( int i=0; i<playerThreat->m_Shared.GetNumHealers(); ++i )
 		{
 			CBaseEntity *healer = playerThreat->m_Shared.GetHealerByIndex( i );
-			CTFPlayer *playerHealer = ToTFPlayer( healer );
+			CFFPlayer *playerHealer = ToFFPlayer( healer );
 
 			if ( playerHealer )
 			{
@@ -999,22 +973,22 @@ const CKnownEntity *CTFBotMainAction::GetHealerOfThreat( const CKnownEntity *thr
 
 //---------------------------------------------------------------------------------------------
 // return the more dangerous of the two threats to 'subject', or NULL if we have no opinion
-const CKnownEntity *CTFBotMainAction::SelectMoreDangerousThreat( const INextBot *meBot, 
+const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreat( const INextBot *meBot, 
 																 const CBaseCombatCharacter *subject,
 																 const CKnownEntity *threat1, 
 																 const CKnownEntity *threat2 ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 
 	// determine the actual threat
 	const CKnownEntity *threat = SelectMoreDangerousThreatInternal( me, subject, threat1, threat2 );
 
-	if ( me->IsDifficulty( CTFBot::EASY ) )
+	if ( me->IsDifficulty( CFFBot::EASY ) )
 	{
 		return threat;
 	}
 
-	if ( me->IsDifficulty( CTFBot::NORMAL ) && me->TransientlyConsistentRandomValue() < 0.5f )
+	if ( me->IsDifficulty( CFFBot::NORMAL ) && me->TransientlyConsistentRandomValue() < 0.5f )
 	{
 		return threat;
 	}
@@ -1026,14 +1000,14 @@ const CKnownEntity *CTFBotMainAction::SelectMoreDangerousThreat( const INextBot 
 
 //---------------------------------------------------------------------------------------------
 // Given a pair of enemy players, return the closest Spy of those two, or NULL if neither is a Spy
-const CKnownEntity *SelectClosestSpyToMe( CTFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 )
+const CKnownEntity *SelectClosestSpyToMe( CFFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 )
 {
-	CTFPlayer *playerThreat1 = ToTFPlayer( threat1->GetEntity() );
-	CTFPlayer *playerThreat2 = ToTFPlayer( threat2->GetEntity() );
+	CFFPlayer *playerThreat1 = ToFFPlayer( threat1->GetEntity() );
+	CFFPlayer *playerThreat2 = ToFFPlayer( threat2->GetEntity() );
 
-	if ( playerThreat1 && playerThreat1->IsPlayerClass( TF_CLASS_SPY ) )
+	if ( playerThreat1 && playerThreat1->IsPlayerClass( CLASS_SPY ) )
 	{
-		if ( playerThreat2 && playerThreat2->IsPlayerClass( TF_CLASS_SPY ) )
+		if ( playerThreat2 && playerThreat2->IsPlayerClass( CLASS_SPY ) )
 		{
 			if ( me->GetRangeSquaredTo( playerThreat1 ) < me->GetRangeSquaredTo( playerThreat2 ) )
 				return threat1;
@@ -1043,7 +1017,7 @@ const CKnownEntity *SelectClosestSpyToMe( CTFBot *me, const CKnownEntity *threat
 
 		return threat1;
 	}
-	else if ( playerThreat2 && playerThreat2->IsPlayerClass( TF_CLASS_SPY ) )
+	else if ( playerThreat2 && playerThreat2->IsPlayerClass( CLASS_SPY ) )
 	{
 		return threat2;
 	}
@@ -1054,15 +1028,15 @@ const CKnownEntity *SelectClosestSpyToMe( CTFBot *me, const CKnownEntity *threat
 
 //---------------------------------------------------------------------------------------------
 // Return the more dangerous of the two threats to 'subject', or NULL if we have no opinion
-const CKnownEntity *CTFBotMainAction::SelectMoreDangerousThreatInternal( const INextBot *meBot, 
+const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreatInternal( const INextBot *meBot, 
 																		 const CBaseCombatCharacter *subject,
 																		 const CKnownEntity *threat1, 
 																		 const CKnownEntity *threat2 ) const
 {
-	CTFBot *me = ToTFBot( meBot->GetEntity() );
+	CFFBot *me = ToTFBot( meBot->GetEntity() );
 	const CKnownEntity *closerThreat = SelectCloserThreat( me, threat1, threat2 );
 
-	if ( me->HasWeaponRestriction( CTFBot::MELEE_ONLY ) )
+	if ( me->HasWeaponRestriction( CFFBot::MELEE_ONLY ) )
 	{
 		// melee only bots just use closest threat
 		return closerThreat;
@@ -1172,14 +1146,14 @@ const CKnownEntity *CTFBotMainAction::SelectMoreDangerousThreatInternal( const I
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType CTFBotMainAction::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
+QueryResultType CFFBotMainAction::ShouldAttack( const INextBot *meBot, const CKnownEntity *them ) const
 {
 	if ( g_pPopulationManager )
 	{
 		// if I'm in my spawn room, obey the population manager's attack restrictions
-		CTFBot *me = ToTFBot( meBot->GetEntity() );
+		CFFBot *me = ToTFBot( meBot->GetEntity() );
 		CTFNavArea *myArea = me->GetLastKnownArea();
-		int spawnRoomFlag = me->GetTeamNumber() == TF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
+		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
 
 		if ( myArea && myArea->HasAttributeTF( spawnRoomFlag ) )
 		{
@@ -1192,14 +1166,14 @@ QueryResultType CTFBotMainAction::ShouldAttack( const INextBot *meBot, const CKn
 
 
 //---------------------------------------------------------------------------------------------
-QueryResultType	CTFBotMainAction::ShouldHurry( const INextBot *meBot ) const
+QueryResultType	CFFBotMainAction::ShouldHurry( const INextBot *meBot ) const
 {
 	if ( g_pPopulationManager )
 	{
 		// if I'm in my spawn room, obey the population manager's attack restrictions
-		CTFBot *me = ToTFBot( meBot->GetEntity() );
+		CFFBot *me = ToTFBot( meBot->GetEntity() );
 		CTFNavArea *myArea = me->GetLastKnownArea();
-		int spawnRoomFlag = me->GetTeamNumber() == TF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
+		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
 
 		if ( myArea && myArea->HasAttributeTF( spawnRoomFlag ) )
 		{
@@ -1216,15 +1190,15 @@ QueryResultType	CTFBotMainAction::ShouldHurry( const INextBot *meBot ) const
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
+void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 {
 	if ( !me->IsAlive() )
 		return;
 
-	if ( me->HasAttribute( CTFBot::SUPPRESS_FIRE ) )
+	if ( me->HasAttribute( CFFBot::SUPPRESS_FIRE ) )
 		return;
 
-	if ( me->HasAttribute( CTFBot::IGNORE_ENEMIES ) )
+	if ( me->HasAttribute( CFFBot::IGNORE_ENEMIES ) )
 		return;
 
 	if ( me->m_Shared.InCond( TF_COND_TAUNTING ) )
@@ -1235,13 +1209,13 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 		return;
 	}
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( !myWeapon )
 		return;
 
 	if ( me->IsBarrageAndReloadWeapon( myWeapon ) )
 	{
-		if ( me->HasAttribute( CTFBot::HOLD_FIRE_UNTIL_FULL_RELOAD ) || ff_bot_always_full_reload.GetBool() )
+		if ( me->HasAttribute( CFFBot::HOLD_FIRE_UNTIL_FULL_RELOAD ) || ff_bot_always_full_reload.GetBool() )
 		{
 			if ( myWeapon->Clip1() <= 0 )
 			{
@@ -1261,15 +1235,15 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 		}
 	}
 
-	if ( me->HasAttribute( CTFBot::ALWAYS_FIRE_WEAPON ) )
+	if ( me->HasAttribute( CFFBot::ALWAYS_FIRE_WEAPON ) )
 	{
 		me->PressFireButton();
 		return;
 	}
 
-	if ( me->IsPlayerClass( TF_CLASS_MEDIC ) )
+	if ( me->IsPlayerClass( CLASS_MEDIC ) )
 	{
-		if ( myWeapon && myWeapon->IsWeapon( TF_WEAPON_MEDIGUN ) )
+		if ( myWeapon && myWeapon->IsWeapon( FF_WEAPON_MEDIGUN ) )
 		{
 			// don't interfere with medic healing behaviors
 			return;
@@ -1277,7 +1251,7 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 	}
 
 	// if we're a heavy and just saw a bad guy, keep the barrel spinning (unless we're in a hurry)
-	if ( me->IsPlayerClass( TF_CLASS_HEAVYWEAPONS ) && !me->IsAmmoLow() && me->GetIntentionInterface()->ShouldHurry( me ) != ANSWER_YES )
+	if ( me->IsPlayerClass( CLASS_HEAVYWEAPONS ) && !me->IsAmmoLow() && me->GetIntentionInterface()->ShouldHurry( me ) != ANSWER_YES )
 	{
 		const float spinTime = 3.0f;
 		if ( me->GetVisionInterface()->GetTimeSinceVisible( GetEnemyTeam( me->GetTeamNumber() ) ) < spinTime )
@@ -1306,13 +1280,13 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 	// if our target is uber'd, most weapons are useless - unless we're in MvM, where invuln tanking is valuable
 	if ( TFGameRules() && !TFGameRules()->IsMannVsMachineMode() )
 	{
-		CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+		CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 		if ( playerThreat && playerThreat->m_Shared.IsInvulnerable() )
 		{
-			if ( !myWeapon->IsWeapon( TF_WEAPON_ROCKETLAUNCHER ) &&
-				!myWeapon->IsWeapon( TF_WEAPON_GRENADELAUNCHER ) &&
-				!myWeapon->IsWeapon( TF_WEAPON_PIPEBOMBLAUNCHER ) &
-				!myWeapon->IsWeapon( TF_WEAPON_ROCKETLAUNCHER_DIRECTHIT ) )
+			if ( !myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER ) &&
+				!myWeapon->IsWeapon( FF_WEAPON_GRENADELAUNCHER ) &&
+				!myWeapon->IsWeapon( FF_WEAPON_PIPEBOMBLAUNCHER ) &
+				!myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER_DIRECTHIT ) )
 			{
 				// firing would just waste ammo, so don't
 				return;
@@ -1339,7 +1313,7 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 	}
 
 	// limit range of hitscan weapon fire in MvM
-	if ( TFGameRules()->IsMannVsMachineMode() && !me->IsPlayerClass( TF_CLASS_SNIPER ) && me->IsHitScanWeapon( myWeapon ) )
+	if ( TFGameRules()->IsMannVsMachineMode() && !me->IsPlayerClass( CLASS_SNIPER ) && me->IsHitScanWeapon( myWeapon ) )
 	{
 		if ( me->IsRangeGreaterThan( threat->GetEntity(), ff_bot_hitscan_range_limit.GetFloat() ) )
 		{
@@ -1347,7 +1321,7 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 		}
 	}
 
-	if ( myWeapon->IsWeapon( TF_WEAPON_FLAMETHROWER ) )
+	if ( myWeapon->IsWeapon( FF_WEAPON_FLAMETHROWER ) )
 	{
 		CTFFlameThrower *pFlamethrower = assert_cast< CTFFlameThrower* >( myWeapon );
 		// watch for enemy projectiles heading our way
@@ -1370,7 +1344,7 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 	// actual head aiming is handled elsewhere, just check if we're on target
 	if ( me->GetBodyInterface()->IsHeadAimingOnTarget() && threatRange < me->GetMaxAttackRange() )
 	{
-		if ( myWeapon->IsWeapon( TF_WEAPON_COMPOUND_BOW ) )
+		if ( myWeapon->IsWeapon( FF_WEAPON_COMPOUND_BOW ) )
 		{
 			CTFCompoundBow *myBow = (CTFCompoundBow *)myWeapon;
 
@@ -1453,7 +1427,7 @@ void CTFBotMainAction::FireWeaponAtEnemy( CTFBot *me )
 class CCompareFriendFoeInfluence : public IVision::IForEachKnownEntity
 {
 public:
-	CCompareFriendFoeInfluence( CTFBot *me )
+	CCompareFriendFoeInfluence( CFFBot *me )
 	{
 		m_me = me;
 		m_friendScore = 0;
@@ -1489,7 +1463,7 @@ public:
 		return true;
 	}
 
-	CTFBot *m_me;
+	CFFBot *m_me;
 	float m_friendScore;
 	float m_foeScore;
 };
@@ -1499,9 +1473,9 @@ public:
 /**
  * If we're outnumbered, retreat and wait for backup - unless we're ubered!
  */
-QueryResultType	CTFBotMainAction::ShouldRetreat( const INextBot *bot ) const
+QueryResultType	CFFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 {
-	CTFBot *me = (CTFBot *)bot->GetEntity();
+	CFFBot *me = (CFFBot *)bot->GetEntity();
 
 	// don't retreat if we're in "melee only" mode
 	if ( TheTFBots().IsMeleeOnly() )
@@ -1512,7 +1486,7 @@ QueryResultType	CTFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 		return ANSWER_NO;
 
 	// don't retreat if we're ignoring enemies
-	if ( me->HasAttribute( CTFBot::IGNORE_ENEMIES ) )
+	if ( me->HasAttribute( CFFBot::IGNORE_ENEMIES ) )
 		return ANSWER_NO;
 
 	// retreat if stunned
@@ -1523,16 +1497,7 @@ QueryResultType	CTFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 	if ( TFGameRules()->InSetup() )
 		return ANSWER_NO;
 
-	// if we're an undercover spy, don't blow our cover
-	if ( me->IsPlayerClass( TF_CLASS_SPY ) )
-	{
-		if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-			 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-			 me->m_Shared.IsStealthed() )
-		{
-			return ANSWER_NO;
-		}
-	}
+
 
 	CCompareFriendFoeInfluence compare( me );
 	me->GetVisionInterface()->ForEachKnownEntity( compare );
@@ -1547,26 +1512,22 @@ QueryResultType	CTFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 
 
 //-----------------------------------------------------------------------------------------
-void CTFBotMainAction::Dodge( CTFBot *me )
+void CFFBotMainAction::Dodge( CFFBot *me )
 {
 	// low-skill bots don't dodge
-	if ( me->IsDifficulty( CTFBot::EASY ) )
+	if ( me->IsDifficulty( CFFBot::EASY ) )
 		return;
 
-	// no need to dodge if we're invulnerable
-	if ( me->m_Shared.IsInvulnerable() )
-		return;
-
-	// don't dodge if we're trying to snipe
-	if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
-		return;
+       // no need to dodge if we're invulnerable or trying to snipe
+       if ( me->m_Shared.IsInvulnerable() )
+               return;
 
 	// don't dodge if we are taunting
 	if ( me->m_Shared.InCond( TF_COND_TAUNTING ) )
 		return;
 
 	// don't dodge if that ability is "turned off"
-	if ( me->HasAttribute( CTFBot::DISABLE_DODGE ) )
+	if ( me->HasAttribute( CFFBot::DISABLE_DODGE ) )
 		return;
 
 	// don't dodge if we're not trying to fight back
@@ -1578,16 +1539,10 @@ void CTFBotMainAction::Dodge( CTFBot *me )
 		return;
 
 	// for now, engies don't dodge
-	if ( me->IsPlayerClass( TF_CLASS_ENGINEER ) )
+	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		return;
 
-	// disguised/cloaked spies don't dodge
-	if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-		 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-		 me->m_Shared.IsStealthed() )
-	{
-		return;
-	}
+
 
 
 #ifdef TF_RAID_MODE
@@ -1600,8 +1555,8 @@ void CTFBotMainAction::Dodge( CTFBot *me )
 	{
 		bool isShotClear = true;
 
-		CTFWeaponBase *myGun = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
-		if ( myGun && myGun->IsWeapon( TF_WEAPON_COMPOUND_BOW ) )
+		CFFWeaponBase *myGun = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+		if ( myGun && myGun->IsWeapon( FF_WEAPON_COMPOUND_BOW ) )
 		{
 			CTFCompoundBow *myBow = (CTFCompoundBow *)myGun;
 			if ( myBow->GetCurrentCharge() > 0.0f )

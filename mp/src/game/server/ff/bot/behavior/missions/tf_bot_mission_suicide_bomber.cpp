@@ -19,13 +19,13 @@ ConVar ff_bot_suicide_bomb_range( "ff_bot_suicide_bomb_range", "300", FCVAR_CHEA
 ConVar ff_bot_suicide_bomb_friendly_fire( "ff_bot_suicide_bomb_friendly_fire", "1", FCVAR_CHEAT );
 
 //---------------------------------------------------------------------------------------------
-CTFBotMissionSuicideBomber::CTFBotMissionSuicideBomber( void )
+CFFBotMissionSuicideBomber::CFFBotMissionSuicideBomber( void )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMissionSuicideBomber::OnStart( CTFBot *me, Action< CTFBot > *priorAction )
+ActionResult< CFFBot >	CFFBotMissionSuicideBomber::OnStart( CFFBot *me, Action< CFFBot > *priorAction )
 {
 	m_path.SetMinLookAheadDistance( me->GetDesiredPathLookAheadRange() );
 	m_detonateTimer.Invalidate();
@@ -46,7 +46,7 @@ ActionResult< CTFBot >	CTFBotMissionSuicideBomber::OnStart( CTFBot *me, Action< 
 
 
 //---------------------------------------------------------------------------------------------
-ActionResult< CTFBot >	CTFBotMissionSuicideBomber::Update( CTFBot *me, float interval )
+ActionResult< CFFBot >	CFFBotMissionSuicideBomber::Update( CFFBot *me, float interval )
 {
 	// one we start detonating, there's no turning back
 	if ( m_detonateTimer.HasStarted() )
@@ -62,7 +62,7 @@ ActionResult< CTFBot >	CTFBotMissionSuicideBomber::Update( CTFBot *me, float int
 				CObjectSentrygun *sentry = dynamic_cast< CObjectSentrygun * >( m_victim.Get() );
 				if ( sentry && sentry->GetOwner() )
 				{
-					CTFPlayer *pOwner = ToTFPlayer( sentry->GetOwner() );
+					CFFPlayer *pOwner = ToFFPlayer( sentry->GetOwner() );
 					if ( pOwner )
 					{
 						IGameEvent *event = gameeventmanager->CreateEvent( "mvm_sentrybuster_detonate" );
@@ -133,7 +133,7 @@ ActionResult< CTFBot >	CTFBotMissionSuicideBomber::Update( CTFBot *me, float int
 	{
 		m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) );
 
-		CTFBotPathCost cost( me, FASTEST_ROUTE );
+		CFFBotPathCost cost( me, FASTEST_ROUTE );
 
 		if ( m_path.Compute( me, m_lastKnownVictimPosition, cost ) == false )
 		{
@@ -159,13 +159,13 @@ ActionResult< CTFBot >	CTFBotMissionSuicideBomber::Update( CTFBot *me, float int
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionSuicideBomber::OnEnd( CTFBot *me, Action< CTFBot > *nextAction )
+void CFFBotMissionSuicideBomber::OnEnd( CFFBot *me, Action< CFFBot > *nextAction )
 {
 }
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMissionSuicideBomber::OnKilled( CTFBot *me, const CTakeDamageInfo &info )
+EventDesiredResult< CFFBot > CFFBotMissionSuicideBomber::OnKilled( CFFBot *me, const CTakeDamageInfo &info )
 {
 	if ( !m_bHasDetonated )
 	{
@@ -193,7 +193,7 @@ EventDesiredResult< CTFBot > CTFBotMissionSuicideBomber::OnKilled( CTFBot *me, c
 
 
 //---------------------------------------------------------------------------------------------
-EventDesiredResult< CTFBot > CTFBotMissionSuicideBomber::OnStuck( CTFBot *me )
+EventDesiredResult< CFFBot > CFFBotMissionSuicideBomber::OnStuck( CFFBot *me )
 {
 	// we're stuck, decide to detonate now!
 	if ( !m_bHasDetonated && !m_detonateTimer.HasStarted() )
@@ -206,7 +206,7 @@ EventDesiredResult< CTFBot > CTFBotMissionSuicideBomber::OnStuck( CTFBot *me )
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionSuicideBomber::StartDetonate( CTFBot *me, bool bWasSuccessful /* = false */, bool bWasKilled /*= false*/ )
+void CFFBotMissionSuicideBomber::StartDetonate( CFFBot *me, bool bWasSuccessful /* = false */, bool bWasKilled /*= false*/ )
 {
 	if ( m_detonateTimer.HasStarted() )
 		return;
@@ -232,7 +232,7 @@ void CTFBotMissionSuicideBomber::StartDetonate( CTFBot *me, bool bWasSuccessful 
 
 
 //---------------------------------------------------------------------------------------------
-void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
+void CFFBotMissionSuicideBomber::Detonate( CFFBot *me )
 {
 	// BLAST!
 	m_bHasDetonated = true;
@@ -248,7 +248,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 	{
 		if ( TFGameRules() && TFGameRules()->IsMannVsMachineMode() )
 		{
-			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, TF_TEAM_PVE_DEFENDERS );
+			TFGameRules()->HaveAllPlayersSpeakConceptIfAllowed( MP_CONCEPT_MVM_SENTRY_BUSTER_DOWN, FF_TEAM_PVE_DEFENDERS );
 
 			// ACHIEVEMENT_TF_MVM_KILL_SENTRY_BUSTER
 			for ( int iDamager = 0 ; iDamager < MAX_ACHIEVEMENT_HISTORY_SLOTS ; iDamager ++ )
@@ -258,7 +258,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 				{
 					if ( damagerHistory->hEntity && ( gpGlobals->curtime - damagerHistory->flTimeDamage <= 5.0f ) )
 					{
-						CTFPlayer *pRecentDamager = ToTFPlayer( damagerHistory->hEntity );
+						CFFPlayer *pRecentDamager = ToFFPlayer( damagerHistory->hEntity );
 						if ( pRecentDamager )
 						{
 							pRecentDamager->AwardAchievement( ACHIEVEMENT_TF_MVM_KILL_SENTRY_BUSTER );
@@ -269,9 +269,9 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 		}
 	}
 
-	CUtlVector< CTFPlayer * > playerVector;
-	CollectPlayers( &playerVector, TF_TEAM_RED, COLLECT_ONLY_LIVING_PLAYERS );
-	CollectPlayers( &playerVector, TF_TEAM_BLUE, COLLECT_ONLY_LIVING_PLAYERS, APPEND_PLAYERS );
+	CUtlVector< CFFPlayer * > playerVector;
+	CollectPlayers( &playerVector, FF_TEAM_RED, COLLECT_ONLY_LIVING_PLAYERS );
+	CollectPlayers( &playerVector, FF_TEAM_BLUE, COLLECT_ONLY_LIVING_PLAYERS, APPEND_PLAYERS );
 
 	CUtlVector< CBaseCombatCharacter * > victimVector;
 
@@ -284,7 +284,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 	}
 
 	// objects
-	CTFTeam *team = GetGlobalTFTeam( TF_TEAM_BLUE );
+	CTFTeam *team = GetGlobalTFTeam( FF_TEAM_BLUE );
 	if ( team )
 	{
 		for ( i=0; i<team->GetNumObjects(); ++i )
@@ -297,7 +297,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 		}
 	}
 
-	team = GetGlobalTFTeam( TF_TEAM_RED );
+	team = GetGlobalTFTeam( FF_TEAM_RED );
 	if ( team )
 	{
 		for ( i=0; i<team->GetNumObjects(); ++i )
@@ -335,7 +335,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 	}
 
 	// Clear my mission before we have everyone take damage so I will die with the rest
-	me->SetMission( CTFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
+	me->SetMission( CFFBot::NO_MISSION, MISSION_DOESNT_RESET_BEHAVIOR_SYSTEM );
 	me->m_takedamage = DAMAGE_YES;
 
 	// kill victims (including me)
@@ -391,7 +391,7 @@ void CTFBotMissionSuicideBomber::Detonate( CTFBot *me )
 
 
 // Should we attack "them"?
-QueryResultType CTFBotMissionSuicideBomber::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
+QueryResultType CFFBotMissionSuicideBomber::ShouldAttack( const INextBot *me, const CKnownEntity *them ) const
 {
 	// buster never "attacks", just approaches and self-detonates
 	return ANSWER_NO;
