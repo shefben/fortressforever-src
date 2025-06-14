@@ -27,7 +27,7 @@
 #include "bot/behavior/ff_bot_tactical_monitor.h"
 #include "bot/behavior/ff_bot_taunt.h"
 #include "bot/behavior/scenario/creep_wave/ff_bot_creep_wave.h"
-#include "player_vs_environment/ff_population_manager.h"
+#include "player_vs_environment/tf_population_manager.h"
 
 
 extern ConVar ff_bot_health_ok_ratio;
