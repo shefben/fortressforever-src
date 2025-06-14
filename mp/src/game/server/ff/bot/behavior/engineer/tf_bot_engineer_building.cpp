@@ -147,31 +147,53 @@ void CFFBotEngineerBuilding::UpgradeAndMaintainBuildings( CFFBot *me )
 
 	if ( rangeToSentry < tooFarRange || rangeToDispenser < tooFarRange )
 	{
-		// we are (nearly) in position - work on our buildings
-		m_searchTimer.Invalidate();
+       // we are (nearly) in position - work on our buildings
+       m_searchTimer.Invalidate();
 
-		CBaseObject *workTarget = mySentry;
+       CBaseObject *workTarget = mySentry;
 
-		if ( mySentry->HasSapper() || mySentry->IsPlasmaDisabled() )
-			workTarget = mySentry;
-		else if ( myDispenser->HasSapper() || myDispenser->IsPlasmaDisabled() )
-			workTarget = myDispenser;
-		else if ( mySentry->GetTimeSinceLastInjury() < 1.0f || mySentry->GetHealth() < mySentry->GetMaxHealth() )
-			workTarget = mySentry;
-		else if ( mySentry->IsBuilding() )
-			workTarget = mySentry;
-		else if ( myDispenser->IsBuilding() )
-			workTarget = myDispenser;
-		else if ( mySentry->GetUpgradeLevel() < 3 )
-			workTarget = mySentry;
-		else if ( myDispenser->GetHealth() < myDispenser->GetMaxHealth() )
-			workTarget = myDispenser;
-		else if ( myDispenser->GetUpgradeLevel() < mySentry->GetUpgradeLevel() )
-			workTarget = myDispenser;
+       if ( mySentry->HasSapper() || mySentry->IsPlasmaDisabled() )
+               workTarget = mySentry;
+       else if ( myDispenser->HasSapper() || myDispenser->IsPlasmaDisabled() )
+               workTarget = myDispenser;
+       else if ( mySentry->GetTimeSinceLastInjury() < 1.0f || mySentry->GetHealth() < mySentry->GetMaxHealth() )
+               workTarget = mySentry;
+       else if ( mySentry->IsBuilding() )
+               workTarget = mySentry;
+       else if ( myDispenser->IsBuilding() )
+               workTarget = myDispenser;
+       else if ( mySentry->GetUpgradeLevel() < 3 )
+               workTarget = mySentry;
+       else if ( myDispenser->GetHealth() < myDispenser->GetMaxHealth() )
+               workTarget = myDispenser;
+       else if ( myDispenser->GetUpgradeLevel() < mySentry->GetUpgradeLevel() )
+               workTarget = myDispenser;
 
-		me->StopLookingAroundForEnemies();
-		me->GetBodyInterface()->AimHeadTowards( workTarget->WorldSpaceCenter(), IBody::CRITICAL, 1.0f, NULL, "Work on my buildings" );
-		me->PressFireButton();
+       me->StopLookingAroundForEnemies();
+       me->GetBodyInterface()->AimHeadTowards( workTarget->WorldSpaceCenter(), IBody::CRITICAL, 1.0f, NULL, "Work on my buildings" );
+       me->PressFireButton();
+
+       // assist nearby friendly buildings if ours are healthy
+       for ( int i = 0; i < IBaseObjectAutoList::AutoList().Count(); ++i )
+       {
+               CBaseObject *allyObj = static_cast< CBaseObject* >( IBaseObjectAutoList::AutoList()[ i ] );
+
+               if ( allyObj->GetTeamNumber() != me->GetTeamNumber() )
+                       continue;
+
+               if ( allyObj == mySentry || allyObj == myDispenser )
+                       continue;
+
+               if ( !me->IsRangeLessThan( allyObj, tooFarRange ) )
+                       continue;
+
+               if ( allyObj->HasSapper() || allyObj->GetHealth() < allyObj->GetMaxHealth() )
+               {
+                       me->GetBodyInterface()->AimHeadTowards( allyObj->WorldSpaceCenter(), IBody::CRITICAL, 1.0f, NULL, "Helping allied building" );
+                       me->PressFireButton();
+                       break;
+               }
+       }
 	}
 }
 

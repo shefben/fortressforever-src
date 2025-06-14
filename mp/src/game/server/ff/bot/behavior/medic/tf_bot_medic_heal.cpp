@@ -353,33 +353,33 @@ public:
 				float maxHealth = m_isInCombat ? player->GetMaxHealth() : player->m_Shared.GetMaxBuffedHealth();
 				float healthRatio = (float)player->GetHealth() / maxHealth;
 
-				if ( m_isOnFire )
-				{
-					// only others on fire who have less health can trump
-					if ( player->m_Shared.InCond( TF_COND_BURNING ) && healthRatio < m_injuredHealthRatio )
-					{
-						m_mostInjured = player;
-						m_injuredHealthRatio = healthRatio;
-					}
-				}
-				else
-				{
-					if ( player->m_Shared.InCond( TF_COND_BURNING ) )
-					{
-						// fire trumps
-						m_mostInjured = player;
-						m_injuredHealthRatio = healthRatio;
-						m_isOnFire = true;
-					}
-					else
-					{
-						if ( healthRatio < m_injuredHealthRatio )
-						{
-							m_mostInjured = player;
-							m_injuredHealthRatio = healthRatio;
-						}
-					}
-				}
+                               if ( m_isOnFire )
+                               {
+                                       // only others in critical condition who have less health can trump
+                                       if ( ( player->m_Shared.InCond( TF_COND_BURNING ) || player->m_Shared.InCond( TF_COND_BLEEDING ) ) && healthRatio < m_injuredHealthRatio )
+                                       {
+                                               m_mostInjured = player;
+                                               m_injuredHealthRatio = healthRatio;
+                                       }
+                               }
+                               else
+                               {
+                                       if ( player->m_Shared.InCond( TF_COND_BURNING ) || player->m_Shared.InCond( TF_COND_BLEEDING ) )
+                                       {
+                                               // burning or bleeding trumps
+                                               m_mostInjured = player;
+                                               m_injuredHealthRatio = healthRatio;
+                                               m_isOnFire = true;
+                                       }
+                                       else
+                                       {
+                                               if ( healthRatio < m_injuredHealthRatio )
+                                               {
+                                                       m_mostInjured = player;
+                                                       m_injuredHealthRatio = healthRatio;
+                                               }
+                                       }
+                               }
 			}
 		}
 
