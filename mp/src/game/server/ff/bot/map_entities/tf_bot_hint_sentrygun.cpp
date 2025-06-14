@@ -29,7 +29,7 @@ void CFFBotHintSentrygun::OnSentryGunDestroyed( CBaseEntity *pEntity )
 }
 
 //------------------------------------------------------------------------------
-bool CFFBotHintSentrygun::IsAvailableForSelection( CTFPlayer *pRequestingPlayer ) const
+bool CFFBotHintSentrygun::IsAvailableForSelection( CFFPlayer *pRequestingPlayer ) const
 {
 	// sentry hint is eligible as long as there is no owner (or the owner is no longer an engineer)
 	// if the hint is enabled and the hint is not in use and it is on the same team as me

@@ -22,8 +22,6 @@
 #include "bot/behavior/sniper/ff_bot_sniper_lurk.h"
 #include "bot/behavior/scenario/capture_point/ff_bot_capture_point.h"
 #include "bot/behavior/scenario/capture_point/ff_bot_defend_point.h"
-#include "bot/behavior/scenario/payload/ff_bot_payload_guard.h"
-#include "bot/behavior/scenario/payload/ff_bot_payload_push.h"
 #include "bot/behavior/ff_bot_use_teleporter.h"
 #include "bot/behavior/training/ff_bot_training.h"
 #include "bot/behavior/ff_bot_destroy_enemy_sentry.h"
@@ -253,23 +251,9 @@ Action< CFFBot > *CFFBotScenarioMonitor::DesiredScenarioAndClassAction( CFFBot *
 		// capture the flag
 		return new CFFBotFetchFlag;
 	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_ESCORT )
-	{
-		// push the cart
-		if ( me->GetTeamNumber() == FF_TEAM_BLUE )
-		{
-			// blu is pushing
-			return new CFFBotPayloadPush;
-		}
-		else if ( me->GetTeamNumber() == FF_TEAM_RED )
-		{
-			// red is blocking
-			return new CFFBotPayloadGuard;
-		}
-	}
-	else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
-	{
-		// if we have a point we can capture - do it
+       else if ( TFGameRules()->GetGameType() == TF_GAMETYPE_CP )
+       {
+               // if we have a point we can capture - do it
 		CUtlVector< CTeamControlPoint * > captureVector;
 		TFGameRules()->CollectCapturePoints( me, &captureVector );
 
@@ -336,7 +320,7 @@ ActionResult< CFFBot >	CFFBotScenarioMonitor::Update( CFFBot *me, float interval
 
 		if ( flag )
 		{
-			CTFPlayer *carrier = ToTFPlayer( flag->GetOwnerEntity() );
+			CFFPlayer *carrier = ToFFPlayer( flag->GetOwnerEntity() );
 			if ( carrier )
 			{
 				m_lostFlagTimer.Invalidate();

@@ -37,7 +37,7 @@ public:
 		m_builder = NULL;
 	}
 		
-	void SetBuilder( CTFWeaponBuilder *builder )
+	void SetBuilder( CFFWeaponBase *builder )
 	{
 		m_builder = builder;
 	}
@@ -55,7 +55,7 @@ public:
 		}
 	}
 
-	CTFWeaponBuilder *m_builder;
+	CFFWeaponBase *m_builder;
 };
 
 
@@ -157,7 +157,7 @@ ActionResult< CFFBot >	CFFBotEngineerBuildDispenser::Update( CFFBot *me, float i
 	}
 
 	// we're at our build spot behind our sentry now - build a Dispenser
-	CTFWeaponBuilder *builder = dynamic_cast< CTFWeaponBuilder * >( me->GetActiveTFWeapon() );
+	CFFWeaponBase *builder = dynamic_cast< CFFWeaponBase * >( me->GetActiveFFWeapon() );
 	if ( !builder || builder->GetType() != OBJ_DISPENSER || builder->m_hObjectBeingBuilt == NULL )
 	{
 		// at home position, build the object

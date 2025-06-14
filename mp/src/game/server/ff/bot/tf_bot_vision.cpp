@@ -37,26 +37,7 @@ void CFFBotVision::Update( void )
 	if ( !me )
 		return;
 
-	// forget spies we have lost sight of
-	CUtlVector< CTFPlayer * > playerVector;
-	CollectPlayers( &playerVector, GetEnemyTeam( me->GetTeamNumber() ), COLLECT_ONLY_LIVING_PLAYERS );
-
-	for( int i=0; i<playerVector.Count(); ++i )
-	{
-		if ( !playerVector[i]->IsPlayerClass( CLASS_SPY ) )
-			continue;
-
-		const CKnownEntity *known = GetKnown( playerVector[i] );
-
-		if ( !known || !known->IsVisibleRecently() )
-		{
-			// if a hidden spy changes disguises, we no longer recognize him
-			if ( playerVector[i]->m_Shared.InCond( TF_COND_DISGUISING ) )
-			{
-				me->ForgetSpy( playerVector[i] );				
-			}
-		}
-	}
+       // forget spies we have lost sight of - fortress forever has no disguising
 }
 
 
@@ -185,7 +166,7 @@ bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 
 	if ( subject->IsPlayer() )
 	{
-		CTFPlayer *enemy = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *enemy = static_cast< CFFPlayer * >( subject );
 
 		// test for designer-defined ignorance
 		switch( enemy->GetPlayerClass()->GetClassIndex() )
@@ -254,62 +235,11 @@ bool CFFBotVision::IsIgnored( CBaseEntity *subject ) const
 			break;
 		}
 
-#ifdef STAGING_ONLY
-		if ( enemy->m_Shared.InCond( TF_COND_REPROGRAMMED ) )
-		{
-			return true;
-		}
-#endif // STAGING_ONLY
-
-		if ( me->IsKnownSpy( enemy ) )
-		{
-			// don't ignore revealed spies
-			return false;
-		}
-
-		if ( enemy->m_Shared.InCond( TF_COND_BURNING ) ||
-			 enemy->m_Shared.InCond( TF_COND_URINE ) ||
-			 enemy->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-			 enemy->m_Shared.InCond( TF_COND_BLEEDING ) )
-		{
-			// always notice players with these conditions
-			return false;
-		}
-
-		// An upgrade in MvM grants AE stealth where the player can fire
-		// while in stealth, and for a short period after it drops
-		if ( enemy->m_Shared.InCond( TF_COND_STEALTHED_USER_BUFF_FADING ) )
-		{
-			return true;
-		}
-
-		if ( enemy->m_Shared.IsStealthed() )
-		{
-			if ( enemy->m_Shared.GetPercentInvisible() < 0.75f )
-			{
-				// spy is partially cloaked, and therefore attracts our attention
-				return false;
-			}
-
-			// invisible!
-			return true;
-		}
-
-		if ( enemy->IsPlacingSapper() )
-		{
-			return false;
-		}
-
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISING ) )
-		{
-			return false;
-		}
-		
-		if ( enemy->m_Shared.InCond( TF_COND_DISGUISED ) && enemy->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
-		{
-			// spy is disguised as a member of my team
-			return true;
-		}
+               if ( me->IsKnownSpy( enemy ) )
+               {
+                       // don't ignore revealed spies
+                       return false;
+               }
 	}
 	else if ( subject->IsBaseObject() ) // not a player
 	{
@@ -354,93 +284,22 @@ bool CFFBotVision::IsVisibleEntityNoticed( CBaseEntity *subject ) const
 
 	if ( subject->IsPlayer() && me->IsEnemy( subject ) )
 	{
-		CTFPlayer *player = static_cast< CTFPlayer * >( subject );
+		CFFPlayer *player = static_cast< CFFPlayer * >( subject );
 
-		if ( player->m_Shared.InCond( TF_COND_BURNING ) ||
-			 player->m_Shared.InCond( TF_COND_URINE ) ||
-			 player->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
-			 player->m_Shared.InCond( TF_COND_BLEEDING ) )
-		{
-			// always notice players with these conditions
-			if ( player->m_Shared.InCond( TF_COND_STEALTHED ) )
-			{
-				me->RealizeSpy( player );
-			}
-			return true;
-		}
+               if ( player->m_Shared.InCond( TF_COND_BURNING ) ||
+                        player->m_Shared.InCond( TF_COND_URINE ) ||
+                        player->m_Shared.InCond( TF_COND_STEALTHED_BLINK ) ||
+                        player->m_Shared.InCond( TF_COND_BLEEDING ) )
+               {
+                       // always notice players with these conditions
+                       return true;
+               }
 
-#ifdef STAGING_ONLY
-		// Bots can be hacked/reprogrammed by spies.  Ignore.
-		if ( player->m_Shared.InCond( TF_COND_REPROGRAMMED ) )
-		{
-			return false;
-		}
-#endif // STAGING_ONLY
-
-		// An upgrade in MvM grants AE stealth where the player can fire
-		// while in stealth, and for a short period after it drops
-		if ( player->m_Shared.InCond( TF_COND_STEALTHED_USER_BUFF_FADING ) )
-		{
-			me->ForgetSpy( player );
-			return false;
-		}
-
-		if ( player->m_Shared.IsStealthed() )
-		{
-			if ( player->m_Shared.GetPercentInvisible() < 0.75f )
-			{
-				// spy is partially cloaked, and therefore attracts our attention
-				me->RealizeSpy( player );
-				return true;
-			}
-
-			// invisible!
-			me->ForgetSpy( player );
-			return false;
-		}
-
-		if ( TFGameRules()->IsMannVsMachineMode() )	// in MvM mode, forget spies as soon as they are fully disguised
-		{
-			CFFBot::SuspectedSpyInfo_t* pSuspectInfo = me->IsSuspectedSpy( player );
-			// But only if we aren't suspecting them currently.  This happens when we bump into them.
-			if( !pSuspectInfo || !pSuspectInfo->IsCurrentlySuspected() )
-			{
-				if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
-				{
-					me->ForgetSpy( player );
-					return false;
-				}
-			}
-		}
-
-		if ( me->IsKnownSpy( player ) )
-		{
-			// always notice non-invisible revealed spies
-			return true;
-		}
-
-		if ( !TFGameRules()->IsMannVsMachineMode() )	// ignore in MvM mode
-		{
-			if ( player->IsPlacingSapper() )
-			{
-				// spotted a spy!
-				me->RealizeSpy( player );
-				return true;
-			}
-		}
-
-		if ( player->m_Shared.InCond( TF_COND_DISGUISING ) )
-		{
-			// spotted a spy!
-			me->RealizeSpy( player );
-			return true;
-		}
-
-		if ( player->m_Shared.InCond( TF_COND_DISGUISED ) && player->m_Shared.GetDisguiseTeam() == me->GetTeamNumber() )
-		{
-			// spy is disguised as a member of my team, don't notice him
-			return false;
-		}
+               if ( me->IsKnownSpy( player ) )
+               {
+                       // always notice revealed spies
+                       return true;
+               }
 	}
 
 	return true;

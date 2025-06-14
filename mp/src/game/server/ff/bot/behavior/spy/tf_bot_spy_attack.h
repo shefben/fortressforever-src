@@ -13,7 +13,7 @@
 class CFFBotSpyAttack : public Action< CFFBot >
 {
 public:
-	CFFBotSpyAttack( CTFPlayer *victim );
+	CFFBotSpyAttack( CFFPlayer *victim );
 	virtual ~CFFBotSpyAttack() { }
 
 	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
@@ -38,11 +38,10 @@ public:
 	virtual const char *GetName( void ) const	{ return "SpyAttack"; };
 
 private:
-	CHandle< CTFPlayer > m_victim;
+	CHandle< CFFPlayer > m_victim;
 	ChasePath m_path;
 	bool m_isCoverBlown;
 	CountdownTimer m_chuckleTimer;
-	CountdownTimer m_decloakTimer;
 };
 
 

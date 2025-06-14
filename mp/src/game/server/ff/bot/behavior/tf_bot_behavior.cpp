@@ -169,9 +169,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES1, true );
 		// This resets the Bonk drink meter...
 		//me->GiveAmmo( 100, TF_AMMO_GRENADES2, true );
-		me->GiveAmmo( 100, TF_AMMO_METAL, true );
-
-		me->m_Shared.AddToSpyCloakMeter( 100.0f );
+               me->GiveAmmo( 100, TF_AMMO_METAL, true );
 
 		CTFNavArea *myArea = me->GetLastKnownArea();
 		int spawnRoomFlag = me->GetTeamNumber() == FF_TEAM_RED ? TF_NAV_SPAWN_ROOM_RED : TF_NAV_SPAWN_ROOM_BLUE;
@@ -215,31 +213,7 @@ ActionResult< CFFBot >	CFFBotMainAction::Update( CFFBot *me, float interval )
 		}
 	}
 
-	// spies always want to be disguised
-	if ( !me->IsFiringWeapon() && !me->m_Shared.InCond( TF_COND_DISGUISED ) && !me->m_Shared.InCond( TF_COND_DISGUISING ) )
-	{
-		if ( me->CanDisguise() )
-		{
-			if ( m_nextDisguise == CLASS_UNDEFINED )
-			{
-				if ( me->IsDifficulty( CFFBot::EASY ) || me->IsDifficulty( CFFBot::NORMAL ) )
-				{
-					// disguise as a random class
-					me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), RandomInt( CLASS_SCOUT, CLASS_CIVILIAN-1 ) );
-				}
-				else
-				{
-					me->DisguiseAsMemberOfEnemyTeam();
-				}
-			}
-			else
-			{
-				// disguise as the class we just killed
-				me->m_Shared.Disguise( GetEnemyTeam( me->GetTeamNumber() ), m_nextDisguise );
-				m_nextDisguise = CLASS_UNDEFINED;
-			}
-		}
-	}
+
 
 	me->EquipRequiredWeapon();
 
@@ -296,7 +270,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnInjured( CFFBot *me, const CTak
 			me->DelayedThreatNotice( info.GetInflictor(), 0.5f );
 
 			// chance of nearby friends noticing the backstab
-			CUtlVector< CTFPlayer * > playerVector;
+			CUtlVector< CFFPlayer * > playerVector;
 			CollectPlayers( &playerVector, me->GetTeamNumber(), COLLECT_ONLY_LIVING_PLAYERS );
 
 			float minRange = ff_bot_notice_backstab_min_range.GetFloat();
@@ -554,7 +528,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseC
 
 	if ( do_taunt )
 	{
-		CTFPlayer *playerVictim = ToTFPlayer( victim );
+		CFFPlayer *playerVictim = ToFFPlayer( victim );
 
 		me->ForgetSpy( playerVictim );
 
@@ -564,7 +538,7 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnOtherKilled( CFFBot *me, CBaseC
 			m_nextDisguise = playerVictim->GetPlayerClass()->GetClassIndex();
 		}
 
-		if ( !ToTFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
+		if ( !ToFFPlayer( victim )->IsBot() && me->IsEnemy( victim ) && me->IsSelf( info.GetAttacker() ) )
 		{
 			bool isTaunting = !me->HasTheFlag() && RandomFloat( 0.0f, 100.0f ) <= ff_bot_taunt_victim_chance.GetFloat();
 
@@ -618,7 +592,7 @@ Vector CFFBotMainAction::SelectTargetPoint( const INextBot *meBot, const CBaseCo
 			}
 		}
 
-		CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+		CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 		if ( myWeapon )
 		{
 			// lead our target and aim for the feet with the rocket launcher
@@ -878,7 +852,7 @@ bool CFFBotMainAction::IsImmediateThreat( const CBaseCombatCharacter *subject, c
 	if ( !me->IsLineOfFireClear( threat->GetEntity() ) )
 		return false;
 
-	CTFPlayer *threatPlayer = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *threatPlayer = ToFFPlayer( threat->GetEntity() );
 
 	Vector to = me->GetAbsOrigin() - threat->GetLastKnownPosition();
 	float threatRange = to.NormalizeInPlace();
@@ -973,13 +947,13 @@ const CKnownEntity *CFFBotMainAction::GetHealerOfThreat( const CKnownEntity *thr
 	if ( !threat || !threat->GetEntity() )
 		return NULL;
 
-	CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+	CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 	if ( playerThreat )
 	{
 		for( int i=0; i<playerThreat->m_Shared.GetNumHealers(); ++i )
 		{
 			CBaseEntity *healer = playerThreat->m_Shared.GetHealerByIndex( i );
-			CTFPlayer *playerHealer = ToTFPlayer( healer );
+			CFFPlayer *playerHealer = ToFFPlayer( healer );
 
 			if ( playerHealer )
 			{
@@ -1028,8 +1002,8 @@ const CKnownEntity *CFFBotMainAction::SelectMoreDangerousThreat( const INextBot 
 // Given a pair of enemy players, return the closest Spy of those two, or NULL if neither is a Spy
 const CKnownEntity *SelectClosestSpyToMe( CFFBot *me, const CKnownEntity *threat1, const CKnownEntity *threat2 )
 {
-	CTFPlayer *playerThreat1 = ToTFPlayer( threat1->GetEntity() );
-	CTFPlayer *playerThreat2 = ToTFPlayer( threat2->GetEntity() );
+	CFFPlayer *playerThreat1 = ToFFPlayer( threat1->GetEntity() );
+	CFFPlayer *playerThreat2 = ToFFPlayer( threat2->GetEntity() );
 
 	if ( playerThreat1 && playerThreat1->IsPlayerClass( CLASS_SPY ) )
 	{
@@ -1235,7 +1209,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 		return;
 	}
 
-	CTFWeaponBase *myWeapon = me->m_Shared.GetActiveTFWeapon();
+	CFFWeaponBase *myWeapon = me->GetActiveFFWeapon();
 	if ( !myWeapon )
 		return;
 
@@ -1306,7 +1280,7 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	// if our target is uber'd, most weapons are useless - unless we're in MvM, where invuln tanking is valuable
 	if ( TFGameRules() && !TFGameRules()->IsMannVsMachineMode() )
 	{
-		CTFPlayer *playerThreat = ToTFPlayer( threat->GetEntity() );
+		CFFPlayer *playerThreat = ToFFPlayer( threat->GetEntity() );
 		if ( playerThreat && playerThreat->m_Shared.IsInvulnerable() )
 		{
 			if ( !myWeapon->IsWeapon( FF_WEAPON_ROCKETLAUNCHER ) &&
@@ -1523,16 +1497,7 @@ QueryResultType	CFFBotMainAction::ShouldRetreat( const INextBot *bot ) const
 	if ( TFGameRules()->InSetup() )
 		return ANSWER_NO;
 
-	// if we're an undercover spy, don't blow our cover
-	if ( me->IsPlayerClass( CLASS_SPY ) )
-	{
-		if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-			 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-			 me->m_Shared.IsStealthed() )
-		{
-			return ANSWER_NO;
-		}
-	}
+
 
 	CCompareFriendFoeInfluence compare( me );
 	me->GetVisionInterface()->ForEachKnownEntity( compare );
@@ -1553,13 +1518,9 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	if ( me->IsDifficulty( CFFBot::EASY ) )
 		return;
 
-	// no need to dodge if we're invulnerable
-	if ( me->m_Shared.IsInvulnerable() )
-		return;
-
-	// don't dodge if we're trying to snipe
-	if ( me->m_Shared.InCond( TF_COND_ZOOMED ) )
-		return;
+       // no need to dodge if we're invulnerable or trying to snipe
+       if ( me->m_Shared.IsInvulnerable() )
+               return;
 
 	// don't dodge if we are taunting
 	if ( me->m_Shared.InCond( TF_COND_TAUNTING ) )
@@ -1581,13 +1542,7 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	if ( me->IsPlayerClass( CLASS_ENGINEER ) )
 		return;
 
-	// disguised/cloaked spies don't dodge
-	if ( me->m_Shared.InCond( TF_COND_DISGUISED ) ||
-		 me->m_Shared.InCond( TF_COND_DISGUISING ) ||
-		 me->m_Shared.IsStealthed() )
-	{
-		return;
-	}
+
 
 
 #ifdef TF_RAID_MODE
@@ -1600,7 +1555,7 @@ void CFFBotMainAction::Dodge( CFFBot *me )
 	{
 		bool isShotClear = true;
 
-		CTFWeaponBase *myGun = (CTFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
+		CFFWeaponBase *myGun = (CFFWeaponBase *)me->Weapon_GetSlot( TF_WPN_TYPE_PRIMARY );
 		if ( myGun && myGun->IsWeapon( FF_WEAPON_COMPOUND_BOW ) )
 		{
 			CTFCompoundBow *myBow = (CTFCompoundBow *)myGun;

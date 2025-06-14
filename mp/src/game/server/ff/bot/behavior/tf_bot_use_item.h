@@ -9,7 +9,7 @@
 class CFFBotUseItem : public Action< CFFBot >
 {
 public:
-	CFFBotUseItem( CTFWeaponBase *item );
+	CFFBotUseItem( CFFWeaponBase *item );
 	virtual ~CFFBotUseItem() { }
 
 	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
@@ -19,7 +19,7 @@ public:
 	virtual const char *GetName( void ) const	{ return "UseItem"; };
 
 private:
-	CHandle< CTFWeaponBase > m_item;
+	CHandle< CFFWeaponBase > m_item;
 	CountdownTimer m_cooldownTimer;
 };
 
