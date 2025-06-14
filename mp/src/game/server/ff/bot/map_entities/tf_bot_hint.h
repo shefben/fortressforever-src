@@ -1,0 +1,54 @@
+//========= Copyright Valve Corporation, All rights reserved. ============//
+// ff_bot_hint.h
+// Designer-placed hint for TFBots
+
+#ifndef FF_BOT_HINT_H
+#define FF_BOT_HINT_H
+
+class CFFBot;
+
+//-----------------------------------------------------------------------------------------------------
+/**
+ * An entity that specifies TFBot behavior hints.
+ */
+class CFFBotHint : public CBaseEntity
+{
+public:
+	DECLARE_DATADESC();
+	DECLARE_CLASS( CFFBotHint, CBaseEntity );
+
+	CFFBotHint( void );
+	virtual ~CFFBotHint() { }
+
+	enum HintType
+	{
+		HINT_SNIPER_SPOT = 0,
+		HINT_SENTRY_SPOT = 1,
+	};
+
+	bool IsA( HintType type ) const;
+
+	bool IsFor( CFFBot *who ) const;				// return true if this hint applies to the given entity
+
+	virtual void Spawn( void );
+	virtual void UpdateOnRemove( void );
+
+	void InputEnable( inputdata_t &inputdata );
+	void InputDisable( inputdata_t &inputdata );
+	bool IsEnabled( void ) const { return !m_isDisabled; }
+
+protected:
+	int m_team;
+	int m_hint;
+	bool m_isDisabled;
+
+	void UpdateNavDecoration( void );
+};
+
+inline bool CFFBotHint::IsA( HintType type ) const
+{
+	return ( m_hint == type );
+}
+
+
+#endif // FF_BOT_HINT_H

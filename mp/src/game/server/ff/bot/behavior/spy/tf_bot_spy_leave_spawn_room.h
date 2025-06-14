@@ -1,0 +1,26 @@
+//========= Copyright Valve Corporation, All rights reserved. ============//
+// ff_bot_spy_leave_spawn_room.h
+// Assume the enemy is watching our spawn - escape it
+// Michael Booth, September 2011
+
+#ifndef FF_BOT_LEAVE_SPAWN_ROOM_H
+#define FF_BOT_LEAVE_SPAWN_ROOM_H
+
+#include "Path/NextBotPathFollow.h"
+
+class CFFBotSpyLeaveSpawnRoom : public Action< CFFBot >
+{
+public:
+	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction );
+	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval );
+
+	virtual QueryResultType ShouldAttack( const INextBot *me, const CKnownEntity *them ) const;	// should we attack "them"?
+
+	virtual const char *GetName( void ) const	{ return "SpyLeaveSpawnRoom"; };
+
+private:
+	CountdownTimer m_waitTimer;
+	int m_attempt;
+};
+
+#endif // FF_BOT_LEAVE_SPAWN_ROOM_H
