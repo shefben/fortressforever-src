@@ -3647,36 +3647,20 @@ void CFFBot::DeleteSquad( void )
 //---------------------------------------------------------------------------------------------
 bool CFFBot::IsWeaponRestricted( CFFWeaponBase *weapon ) const
 {
-	if ( !weapon )
-	{
-		return false;
-	}
+       if ( !weapon )
+       {
+               return false;
+       }
 
-	// Get the weapon's loadout slot
-	CEconItemView *pEconItemView = weapon->GetAttributeContainer()->GetItem();
-	if ( !pEconItemView )
-		return false;
-	CTFItemDefinition *pItemDef = pEconItemView->GetStaticData();
-	if ( !pItemDef )
-		return false;
-	int iLoadoutSlot = pItemDef->GetLoadoutSlot( GetPlayerClass()->GetClassIndex() );
+       if ( HasWeaponRestriction( MELEE_ONLY ) )
+       {
+               return !weapon->IsMeleeWeapon();
+       }
 
-	if ( HasWeaponRestriction( MELEE_ONLY ) )
-	{
-		return (iLoadoutSlot != LOADOUT_POSITION_MELEE);
-	}
+       // Fortress Forever does not maintain TF2-style loadout slots
+       // Ignore PRIMARY_ONLY and SECONDARY_ONLY restrictions
 
-	if ( HasWeaponRestriction( PRIMARY_ONLY ) )
-	{
-		return (iLoadoutSlot != LOADOUT_POSITION_PRIMARY);
-	}
-
-	if ( HasWeaponRestriction( SECONDARY_ONLY ) )
-	{
-		return (iLoadoutSlot != LOADOUT_POSITION_SECONDARY);
-	}
-
-	return false;
+       return false;
 }
 
 
@@ -3981,31 +3965,8 @@ void CFFBot::UpdateDelayedThreatNotices( void )
 //---------------------------------------------------------------------------------------------
 void CFFBot::GiveRandomItem( loadout_positions_t loadoutPosition )
 {
-	CUtlVector< const CEconItemDefinition * > itemVector;
-
-	const CEconItemSchema::ItemDefinitionMap_t& mapItemDefs = ItemSystem()->GetItemSchema()->GetItemDefinitionMap();
-	FOR_EACH_MAP_FAST( mapItemDefs, i )
-	{
-		const CTFItemDefinition *pItemDef = dynamic_cast< const CTFItemDefinition * >( mapItemDefs[i] );
-
-		if ( pItemDef && pItemDef->GetLoadoutSlot( GetPlayerClass()->GetClassIndex() ) == loadoutPosition )
-		{
-			itemVector.AddToTail( pItemDef );
-		}
-	}
-
-	if ( itemVector.Count() > 0 )
-	{
-		int which = RandomInt( 0, itemVector.Count()-1 );
-
-/*
-		CBaseCombatWeapon *myMelee = me->Weapon_GetSlot( TF_WPN_TYPE_MELEE );
-		me->Weapon_Detach( myMelee );
-		UTIL_Remove( myMelee );
-*/
-
-// Fortress Forever does not support wearable item generation
-	}
+       // Fortress Forever has no item schema support
+       // function intentionally left blank
 }
 
 
@@ -4179,27 +4140,21 @@ Action< CFFBot > *CFFBot::OpportunisticallyUseWeaponAbilities( void )
 			continue;
 
 		// if I have some kind of buff banner - use it!
-		if ( weapon->GetWeaponID() == FF_WEAPON_BUFF_ITEM )
-		{
-			CTFBuffItem *buff = (CTFBuffItem *)weapon;
-			if ( buff->IsFull() )
-			{
-				return new CFFBotUseItem( buff );
-			}
-		}
-		else if ( weapon->GetWeaponID() == FF_WEAPON_LUNCHBOX )
-		{
-			// if we have an eatable (drink, sandvich, etc) - eat it!
-			CTFLunchBox *lunchbox = (CTFLunchBox *)weapon;
-			if ( lunchbox->HasAmmo() )
-			{
-				// scout lunchboxes are also gated by their energy drink meter
-				if ( !IsPlayerClass( CLASS_SCOUT ) || m_Shared.GetScoutEnergyDrinkMeter() >= 100 )
-				{
-					return new CFFBotUseItem( lunchbox );
-				}
-			}
-		}
+               if ( weapon->GetWeaponID() == FF_WEAPON_BUFF_ITEM )
+               {
+                       if ( weapon->HasAmmo() )
+                       {
+                               return new CFFBotUseItem( weapon );
+                       }
+               }
+               else if ( weapon->GetWeaponID() == FF_WEAPON_LUNCHBOX )
+               {
+                       // if we have an eatable item - use it
+                       if ( weapon->HasAmmo() )
+                       {
+                               return new CFFBotUseItem( weapon );
+                       }
+               }
 		else if ( weapon->GetWeaponID() == FF_WEAPON_BAT_WOOD )
 		{
 			// sandman
@@ -4458,27 +4413,15 @@ void CFFBot::OnEventChangeAttributes( const CFFBot::EventChangeAttributes_t* pEv
 
 int CFFBot::GetUberHealthThreshold()
 {
-	int iUberHealthThreshold = 0;
-	CALL_ATTRIB_HOOK_INT( iUberHealthThreshold, bot_medic_uber_health_threshold );
-	if ( iUberHealthThreshold > 0 )
-	{
-		return iUberHealthThreshold;
-	}
-
-	return 50;
+       // Attribute hooks not supported
+       return 50;
 }
 
 
 float CFFBot::GetUberDeployDelayDuration()
 {
-	float flDelayUberDuration = 0;
-	CALL_ATTRIB_HOOK_INT( flDelayUberDuration, bot_medic_uber_deploy_delay_duration );
-	if ( flDelayUberDuration > 0 )
-	{
-		return flDelayUberDuration;
-	}
-	
-        return -1.f;
+       // Attribute hooks not supported
+       return -1.f;
 }
 
 //------------------------------------------------------------------------------------
