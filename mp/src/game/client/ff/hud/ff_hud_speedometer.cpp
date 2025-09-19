@@ -13,7 +13,7 @@
 #include "iclientvehicle.h"
 #include "ammodef.h"
 #include "ff_utils.h"
-#include "ff_shareddefs.h" //added to use colors stored within!
+#include "ff_shareddefs.h"
 
 #include <KeyValues.h>
 #include <vgui/ISurface.h>
@@ -24,12 +24,6 @@
 
 #include <vgui/ILocalize.h>
 
-// ELMO *** 
-#define BHOP_CAP_SOFT 1.4f // as defined in ff_gamemovement.cpp
-#define BHOP_CAP_MID 1.55f // as defined in ff_gamemovement.cpp
-#define BHOP_CAP_HARD 1.71f // as defined in ff_gamemovement.cpp
-// *** ELMO
-
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -37,7 +31,6 @@ using namespace vgui;
 
 static ConVar hud_speedometer("hud_speedometer", "1", FCVAR_ARCHIVE, "Toggle speedometer. Disclaimer: We are not responsible if you get a ticket.");
 static ConVar hud_speedometer_avg("hud_speedometer_avg", "0", FCVAR_ARCHIVE, "Toggle average speedometer.");
-// ELMO *** 
 static ConVar hud_speedometer_color("hud_speedometer_color", "2", FCVAR_ARCHIVE, "0=No color, 1=Stepped Color, 2=Fading Color (RED > hardcap :: ORANGE > softcap :: GREEN > run speed :: WHITE < run speed)", true, 0.0f, true, 2.0f);
 static ConVar hud_speedometer_avg_color("hud_speedometer_avg_color", "0", FCVAR_ARCHIVE, "0=No color, 1=Stepped Color, 2=Fading Color (RED > hardcap :: ORANGE > softcap :: GREEN > run speed :: WHITE < run speed)", true, 0.0f, true, 2.0f);
 
