@@ -226,39 +226,13 @@ Color CHudSpeedometer::GetSpeedometerColor(
 {
 	int colorMode = hud_speedometer_color.GetInt();
 
-	int softCap = BHOP_CAP_SOFT * maxSpeed;
-	int midCap = BHOP_CAP_MID * maxSpeed;
-	int hardCap = BHOP_CAP_HARD * maxSpeed;
-
-	if (colorMode == 1) // Stepped
-	{
-		if (speed > hardCap)
-			return INTENSITYSCALE_COLOR_RED;
-		else if (speed > midCap)
-			return INTENSITYSCALE_COLOR_ORANGE;
-		else if (speed > softCap)
-			return INTENSITYSCALE_COLOR_YELLOW;
-		else if (speed > maxSpeed)
-			return INTENSITYSCALE_COLOR_GREEN;
-		else
-			return INTENSITYSCALE_COLOR_DEFAULT;
-	}
-	else if (colorMode == 2) // Fading
-	{
-		// only use yellow threshold for fading color mode
-		if (speed > hardCap)
-			return INTENSITYSCALE_COLOR_RED;
-		else if (speed > midCap)
-			return ColorFade(speed, midCap, hardCap, INTENSITYSCALE_COLOR_ORANGE, INTENSITYSCALE_COLOR_RED);
-		else if (speed > softCap)
-			return ColorFade(speed, softCap, midCap, INTENSITYSCALE_COLOR_YELLOW, INTENSITYSCALE_COLOR_ORANGE);
-		else if (speed > maxSpeed)
-			return ColorFade(speed, maxSpeed, softCap, INTENSITYSCALE_COLOR_GREEN, INTENSITYSCALE_COLOR_YELLOW);
-		else
-			return INTENSITYSCALE_COLOR_DEFAULT;
-	}
-	else // No color
-	{
-		return INTENSITYSCALE_COLOR_DEFAULT;
-	}
+	return GetIntensityColor(
+		speed,
+		colorMode,
+		255,
+		BHOP_CAP_HARD * maxSpeed,
+		BHOP_CAP_MID * maxSpeed,
+		BHOP_CAP_SOFT * maxSpeed,
+		maxSpeed,
+		true);
 }
