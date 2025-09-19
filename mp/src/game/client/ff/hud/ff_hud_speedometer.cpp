@@ -69,11 +69,9 @@ public:
 	virtual void Paint();
 
 private:
-	// ELMO ***
-	float m_flAvgVelocity;
+	float m_flAvgSpeed;
+	float m_flSpeed;
 	unsigned int m_iNumUpdates;
-	int m_iVelocity;
-	// *** ELMO
 	float m_flNextUpdate;
 
 private:
@@ -104,7 +102,7 @@ void CHudSpeedometer::Init(void)
 void CHudSpeedometer::VidInit(void)
 {
 	Reset();
-	m_flAvgVelocity = 0.0;
+	m_flAvgSpeed = 0.0;
 	m_iNumUpdates = 0;
 }
 
@@ -135,14 +133,14 @@ void CHudSpeedometer::OnThink()
 	if (m_flNextUpdate < gpGlobals->curtime)
 	{
 		Vector vecVelocity = pPlayer->GetAbsVelocity();
-		m_iVelocity = (int)FastSqrt(
+		m_flSpeed = FastSqrt(
 			vecVelocity.x * vecVelocity.x
 			+ vecVelocity.y * vecVelocity.y);
 
 		if (!isSpectating)
 		{
 			// average[i+1] = (average[i]*i + value[i+1])/(i+1)
-			m_flAvgVelocity = (m_flAvgVelocity * m_iNumUpdates + (float)m_iVelocity) / (m_iNumUpdates + 1);
+			m_flAvgSpeed = (m_flAvgSpeed * m_iNumUpdates + m_flSpeed) / (m_iNumUpdates + 1);
 			m_iNumUpdates++;
 		}
 
@@ -165,25 +163,25 @@ void CHudSpeedometer::Paint()
 		return;
 
 	bool isSpectating = FF_IsPlayerSpec(C_FFPlayer::GetLocalFFPlayer());
-	float maxVelocity = pPlayer->MaxSpeed();
+	float maxSpeed = pPlayer->MaxSpeed();
 	Color speedColor;
 
 	// regular speedometer
 	if (hud_speedometer.GetBool())
 	{
-		if (m_iVelocity > BHOP_CAP_HARD * maxVelocity && hud_speedometer_color.GetInt() > 0) // above hard cap
+		if (m_flSpeed > BHOP_CAP_HARD * maxSpeed && hud_speedometer_color.GetInt() > 0) // above hard cap
 			speedColor = INTENSITYSCALE_COLOR_RED;
-		else if (m_iVelocity - 1 > BHOP_CAP_SOFT * maxVelocity && hud_speedometer_color.GetInt() > 0) // above soft cap
+		else if (m_flSpeed - 1 > BHOP_CAP_SOFT * maxSpeed && hud_speedometer_color.GetInt() > 0) // above soft cap
 			if (hud_speedometer_color.GetInt() == 2)
-				speedColor = ColorFade(m_iVelocity, BHOP_CAP_SOFT * maxVelocity, BHOP_CAP_HARD * maxVelocity, INTENSITYSCALE_COLOR_ORANGE, INTENSITYSCALE_COLOR_RED);
+				speedColor = ColorFade(m_flSpeed, BHOP_CAP_SOFT * maxSpeed, BHOP_CAP_HARD * maxSpeed, INTENSITYSCALE_COLOR_ORANGE, INTENSITYSCALE_COLOR_RED);
 			else
 				speedColor = INTENSITYSCALE_COLOR_ORANGE;
-		else if (m_iVelocity > maxVelocity && hud_speedometer_color.GetInt() > 0) // above max run speed
+		else if (m_flSpeed > maxSpeed && hud_speedometer_color.GetInt() > 0) // above max run speed
 			if (hud_speedometer_color.GetInt() == 2)
-				if (m_iVelocity > (maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4) && hud_speedometer_color.GetInt() > 0) // above max run speed
-					speedColor = ColorFade(m_iVelocity, maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4, BHOP_CAP_SOFT * maxVelocity, INTENSITYSCALE_COLOR_YELLOW, INTENSITYSCALE_COLOR_ORANGE);
+				if (m_flSpeed > (maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4) && hud_speedometer_color.GetInt() > 0) // above max run speed
+					speedColor = ColorFade(m_flSpeed, maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4, BHOP_CAP_SOFT * maxSpeed, INTENSITYSCALE_COLOR_YELLOW, INTENSITYSCALE_COLOR_ORANGE);
 				else
-					speedColor = ColorFade(m_iVelocity, maxVelocity, maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4, INTENSITYSCALE_COLOR_GREEN, INTENSITYSCALE_COLOR_YELLOW);
+					speedColor = ColorFade(m_flSpeed, maxSpeed, maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4, INTENSITYSCALE_COLOR_GREEN, INTENSITYSCALE_COLOR_YELLOW);
 			else
 				speedColor = INTENSITYSCALE_COLOR_GREEN;
 		else // below max run speed
@@ -194,7 +192,7 @@ void CHudSpeedometer::Paint()
 		surface()->DrawSetTextPos(SpeedFont_xpos, SpeedFont_ypos);
 
 		wchar_t unicode[6];
-		V_snwprintf(unicode, ARRAYSIZE(unicode), L"%d", (int)m_iVelocity);
+		V_snwprintf(unicode, ARRAYSIZE(unicode), L"%d", (int)m_flSpeed);
 
 		for (wchar_t* wch = unicode; *wch != 0; wch++)
 			surface()->DrawUnicodeChar(*wch);
@@ -203,19 +201,19 @@ void CHudSpeedometer::Paint()
 	// average speedometer
 	if (hud_speedometer_avg.GetBool() && !isSpectating)
 	{
-		if (m_flAvgVelocity > BHOP_CAP_HARD * maxVelocity && hud_speedometer_avg_color.GetInt() > 0) // above hard cap
+		if (m_flAvgSpeed > BHOP_CAP_HARD * maxSpeed && hud_speedometer_avg_color.GetInt() > 0) // above hard cap
 			speedColor = INTENSITYSCALE_COLOR_RED;
-		else if (m_flAvgVelocity - 1 > BHOP_CAP_SOFT * maxVelocity && hud_speedometer_avg_color.GetInt() > 0) // above soft cap
+		else if (m_flAvgSpeed - 1 > BHOP_CAP_SOFT * maxSpeed && hud_speedometer_avg_color.GetInt() > 0) // above soft cap
 			if (hud_speedometer_avg_color.GetInt() == 2)
-				speedColor = ColorFade(m_flAvgVelocity, BHOP_CAP_SOFT * maxVelocity, BHOP_CAP_HARD * maxVelocity, INTENSITYSCALE_COLOR_ORANGE, INTENSITYSCALE_COLOR_RED);
+				speedColor = ColorFade(m_flAvgSpeed, BHOP_CAP_SOFT * maxSpeed, BHOP_CAP_HARD * maxSpeed, INTENSITYSCALE_COLOR_ORANGE, INTENSITYSCALE_COLOR_RED);
 			else
 				speedColor = INTENSITYSCALE_COLOR_ORANGE;
-		else if (m_flAvgVelocity > maxVelocity && hud_speedometer_avg_color.GetInt() > 0) // above max run speed
+		else if (m_flAvgSpeed > maxSpeed && hud_speedometer_avg_color.GetInt() > 0) // above max run speed
 			if (hud_speedometer_avg_color.GetInt() == 2)
-				if (m_flAvgVelocity > (maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4) && hud_speedometer_color.GetInt() > 0) // above max run speed
-					speedColor = ColorFade(m_flAvgVelocity, maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4, BHOP_CAP_SOFT * maxVelocity, INTENSITYSCALE_COLOR_YELLOW, INTENSITYSCALE_COLOR_ORANGE);
+				if (m_flAvgSpeed > (maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4) && hud_speedometer_color.GetInt() > 0) // above max run speed
+					speedColor = ColorFade(m_flAvgSpeed, maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4, BHOP_CAP_SOFT * maxSpeed, INTENSITYSCALE_COLOR_YELLOW, INTENSITYSCALE_COLOR_ORANGE);
 				else
-					speedColor = ColorFade(m_flAvgVelocity, maxVelocity, maxVelocity + 3 * (BHOP_CAP_SOFT * maxVelocity - maxVelocity) / 4, INTENSITYSCALE_COLOR_GREEN, INTENSITYSCALE_COLOR_YELLOW);
+					speedColor = ColorFade(m_flAvgSpeed, maxSpeed, maxSpeed + 3 * (BHOP_CAP_SOFT * maxSpeed - maxSpeed) / 4, INTENSITYSCALE_COLOR_GREEN, INTENSITYSCALE_COLOR_YELLOW);
 			else
 				speedColor = INTENSITYSCALE_COLOR_GREEN;
 		else // below max run speed
@@ -237,7 +235,7 @@ void CHudSpeedometer::Paint()
 		surface()->DrawSetTextColor(speedColor);
 
 		wchar_t unicode[6];
-		V_snwprintf(unicode, ARRAYSIZE(unicode), L"%d", (int)m_flAvgVelocity);
+		V_snwprintf(unicode, ARRAYSIZE(unicode), L"%d", (int)m_flAvgSpeed);
 
 		for (wchar_t* wch = unicode; *wch != 0; wch++)
 			surface()->DrawUnicodeChar(*wch);
