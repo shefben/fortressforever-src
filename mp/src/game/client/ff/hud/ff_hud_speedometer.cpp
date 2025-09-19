@@ -64,10 +64,10 @@ public:
 private:
 	float m_flAvgSpeed;
 	float m_flSpeed;
-	unsigned int m_iNumUpdates;
 	float m_flNextUpdate;
 
 	Color GetSpeedometerColor(int speed, int maxSpeed);
+	float AlphaForTarget(float p, float T, float dt);
 
 private:
 	// Stuff we need to know
@@ -97,8 +97,7 @@ void CHudSpeedometer::Init(void)
 void CHudSpeedometer::VidInit(void)
 {
 	Reset();
-	m_flAvgSpeed = 0.0;
-	m_iNumUpdates = 0;
+	m_flAvgSpeed = 0.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -117,31 +116,44 @@ void CHudSpeedometer::OnThink()
 	if (!hud_speedometer.GetBool() && !hud_speedometer_avg.GetBool())
 		return;
 
-	C_FFPlayer* pPlayer = C_FFPlayer::GetLocalFFPlayerOrAnyObserverTarget();
+	C_FFPlayer* pPlayer
+		= C_FFPlayer::GetLocalFFPlayerOrAnyObserverTarget();
 
 	if (!pPlayer)
 		return;
 
-	bool isSpectating = FF_IsPlayerSpec(C_FFPlayer::GetLocalFFPlayer());
+	if (gpGlobals->curtime < m_flNextUpdate) {
+		return;
+	}
 
-	//don't update so fast.
-	if (m_flNextUpdate < gpGlobals->curtime)
-	{
-		Vector vecVelocity = pPlayer->GetAbsVelocity();
-		m_flSpeed = FastSqrt(
+	Vector vecVelocity
+		= pPlayer->GetAbsVelocity();
+
+	m_flSpeed
+		= FastSqrt(
 			vecVelocity.x * vecVelocity.x
 			+ vecVelocity.y * vecVelocity.y);
 
-		if (!isSpectating)
-		{
-			// average[i+1] = (average[i]*i + value[i+1])/(i+1)
-			m_flAvgSpeed = (m_flAvgSpeed * m_iNumUpdates + m_flSpeed) / (m_iNumUpdates + 1);
-			m_iNumUpdates++;
-		}
+	const float dt = 0.1f;     // your m_flNextUpdate step
+	const float p = 0.8f;      // 80% responsiveness
+	const float T = 1.0f;      // within 1 second
+	const float alpha          // 0.14866
+		= AlphaForTarget(p, T, dt);
 
-		m_flNextUpdate = gpGlobals->curtime + 0.1;
-	}
+	m_flAvgSpeed
+		= alpha * m_flSpeed
+		+ (1.0f - alpha) * m_flAvgSpeed;
 
+	m_flNextUpdate = gpGlobals->curtime + dt;
+}
+
+// Pick alpha to hit fraction p (e.g. 0.8) by time T, given update step dt.
+float CHudSpeedometer::AlphaForTarget(float p, float T, float dt) {
+	// Clamp to safe ranges
+	if (p <= 0.0f) return 0.0f;
+	if (p >= 1.0f) return 1.0f;
+	if (dt <= 0.0f) return 1.0f;
+	return 1.0f - powf(1.0f - p, dt / T);
 }
 
 //-----------------------------------------------------------------------------
