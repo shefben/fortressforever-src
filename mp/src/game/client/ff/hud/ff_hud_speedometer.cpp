@@ -169,7 +169,6 @@ void CHudSpeedometer::Paint()
 	if (!pPlayer)
 		return;
 
-	bool isSpectating = FF_IsPlayerSpec(C_FFPlayer::GetLocalFFPlayer());
 	float maxSpeed = pPlayer->MaxSpeed();
 
 	// regular speedometer
@@ -192,7 +191,7 @@ void CHudSpeedometer::Paint()
 	}
 
 	// average speedometer
-	if (hud_speedometer_avg.GetBool() && !isSpectating)
+	if (hud_speedometer_avg.GetBool())
 	{
 		Color avgSpeedColor
 			= GetSpeedometerColor(
