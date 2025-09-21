@@ -28,14 +28,14 @@ BaseInputDialog::BaseInputDialog( vgui::Panel *parent, const char *title ) :
 
 	SetDeleteSelfOnClose( true );
 	SetTitle(title, true);
-	SetSize(320, 180);
+	SetSize(360, 180);
 	SetSizeable( false );
 
 	m_pCancelButton = new Button(this, "CancelButton", "#VGui_Cancel");
 	m_pOKButton = new Button(this, "OKButton", "#VGui_OK");
 	m_pCancelButton->SetCommand("Cancel");
 	m_pOKButton->SetCommand("OK");
-	m_pOKButton->SetAsDefaultButton( true );
+	m_pOKButton->SetAsDefaultButton(true);
 
 	if ( parent )
 	{
@@ -46,6 +46,34 @@ BaseInputDialog::BaseInputDialog( vgui::Panel *parent, const char *title ) :
 BaseInputDialog::~BaseInputDialog()
 {
 	CleanUpContextKeyValues();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Prevents double execution of "OK" command handlers
+//-----------------------------------------------------------------------------
+void BaseInputDialog::OnKeyCodeTyped(KeyCode code)
+{
+	if (code == KEY_ENTER)
+	{
+		// Temporarily remove the action signal target before processing
+		if (GetParent())
+		{
+			RemoveActionSignalTarget(GetParent());
+		}
+
+		// Trigger the OK button command manually
+		OnCommand("OK");
+
+		// Re-add the action signal target after handling
+		if (GetParent())
+		{
+			AddActionSignalTarget(GetParent());
+		}
+
+		return;
+	}
+
+	return BaseClass::OnKeyCodeTyped(code);
 }
 
 //-----------------------------------------------------------------------------
