@@ -13,6 +13,7 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include <tier0/memdbgon.h>
+#include <string>
 
 using namespace vgui;
 
@@ -199,34 +200,36 @@ void InputDialog::PerformLayout( int x, int y, int w, int h )
 //-----------------------------------------------------------------------------
 // Purpose: handles button commands
 //-----------------------------------------------------------------------------
-void InputDialog::OnCommand(const char *command)
+void InputDialog::OnCommand(const char* command)
 {
-	// overriding OnCommand for backwards compatability
+	// overriding OnCommand for backwards compatibility
 	// it'd be nice at some point to find all uses of InputDialog and just use BaseInputDialog's OnCommand
 
 	if (!stricmp(command, "OK"))
 	{
-		int nTextLength = m_pInput->GetTextLength() + 1;
-		char* txt = (char*)_alloca( nTextLength * sizeof(char) );
-		m_pInput->GetText( txt, nTextLength );
-		KeyValues *kv = new KeyValues( "InputCompleted", "text", txt );
-		if ( m_pContextKeyValues )
+		std::string txt;
+		int textLength = m_pInput->GetTextLength() + 1;
+		txt.resize(textLength);
+		m_pInput->GetText(&txt[0], textLength);
+
+		KeyValues* kv = new KeyValues("InputCompleted", "text", txt.c_str());
+		if (m_pContextKeyValues)
 		{
-			kv->AddSubKey( m_pContextKeyValues );
+			kv->AddSubKey(m_pContextKeyValues);
 			m_pContextKeyValues = NULL;
 		}
-		PostActionSignal( kv );
+		PostActionSignal(kv);
 		CloseModal();
 	}
 	else if (!stricmp(command, "Cancel"))
 	{
-		KeyValues *kv = new KeyValues( "InputCanceled" );
-		if ( m_pContextKeyValues )
+		KeyValues* kv = new KeyValues("InputCanceled");
+		if (m_pContextKeyValues)
 		{
-			kv->AddSubKey( m_pContextKeyValues );
+			kv->AddSubKey(m_pContextKeyValues);
 			m_pContextKeyValues = NULL;
 		}
-		PostActionSignal( kv );
+		PostActionSignal(kv);
 		CloseModal();
 	}
 	else
