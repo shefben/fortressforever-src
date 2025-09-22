@@ -29,6 +29,52 @@ namespace vgui
 	{
 		DECLARE_CLASS_SIMPLE(CFFInputSlider, Slider)
 
+		// Small helper that forwards arrow keys to the owning slider when the box has focus
+		class CLinkedTextEntry : public TextEntry
+		{
+			DECLARE_CLASS_SIMPLE(CLinkedTextEntry, TextEntry)
+		public:
+			CLinkedTextEntry(Panel* parent, const char* name, CFFInputSlider* pOwner)
+				: TextEntry(parent, name), m_pOwner(pOwner) {
+			}
+
+			void OnKeyCodeTyped(KeyCode code) override
+			{
+				if (!m_pOwner)
+				{
+					TextEntry::OnKeyCodeTyped(code);
+					return;
+				}
+
+				int delta = 0;
+				switch (code)
+				{
+				case KEY_UP:
+				case KEY_RIGHT:
+					delta = +1;
+					break;
+
+				case KEY_DOWN:
+				case KEY_LEFT:
+					delta = -1;
+					break;
+
+				default:
+					// Let normal editing keys behave as usual
+					TextEntry::OnKeyCodeTyped(code);
+					return;
+				}
+
+				int currentValue = m_pOwner->GetValue();
+				int iMin, iMax;
+				m_pOwner->GetRange(iMin, iMax);
+				m_pOwner->SetValue(clamp(currentValue + delta, iMin, iMax));
+			}
+
+		private:
+			CFFInputSlider* m_pOwner;
+		};
+
 	public:
 
 		//-----------------------------------------------------------------------------
@@ -37,7 +83,7 @@ namespace vgui
 		CFFInputSlider(Panel* parent, char const* panelName, char const* inputName)
 			: BaseClass(parent, panelName)
 		{
-			m_pInputBox = new TextEntry(parent, inputName);
+			m_pInputBox = new CLinkedTextEntry(parent, inputName, this);
 			m_pInputBox->SetAllowNumericInputOnly(true);
 			m_pInputBox->AddActionSignalTarget(this);
 
