@@ -73,6 +73,13 @@ namespace vgui
 		void SetEnabled(bool state) override
 		{
 			m_pInputBox->SetEnabled(state);
+
+			if (state)
+			{
+				// Make the TextEntry control editable again (disable removes it)
+				m_pInputBox->SetEditable(true);
+			}
+
 			BaseClass::SetEnabled(state);
 		}
 
