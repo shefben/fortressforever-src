@@ -47,7 +47,7 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		// Purpose: Transfer the value onto the input box
 		//-----------------------------------------------------------------------------
-		virtual void SetValue(int value, bool bTriggerChangeMessage = true)
+		void SetValue(int value, bool bTriggerChangeMessage = true) override
 		{
 			if (value < _range[0] || value > _range[1])
 				return;
@@ -59,7 +59,7 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		// Purpose: When the slider moves, reposition the input box
 		//-----------------------------------------------------------------------------
-		virtual void SetPos(int x, int y)
+		void SetPos(int x, int y)
 		{
 			int iWide, iTall;
 			GetSize(iWide, iTall);
@@ -70,7 +70,7 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		// Purpose: Keep the input box up to date
 		//-----------------------------------------------------------------------------
-		virtual void SetEnabled(bool state)
+		void SetEnabled(bool state) override
 		{
 			m_pInputBox->SetEnabled(state);
 			BaseClass::SetEnabled(state);
@@ -79,7 +79,7 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		// Purpose: Keep the input box up to date
 		//-----------------------------------------------------------------------------
-		virtual void SetVisible(bool state)
+		void SetVisible(bool state) override
 		{
 			m_pInputBox->SetVisible(state);
 			BaseClass::SetVisible(state);
@@ -91,7 +91,7 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		// Purpose: Allow the input box to change this value
 		//-----------------------------------------------------------------------------
-		virtual void UpdateFromInput(int iValue, bool bTriggerChangeMessage = true)
+		void UpdateFromInput(int iValue, bool bTriggerChangeMessage = true)
 		{
 			BaseClass::SetValue(iValue, bTriggerChangeMessage);
 		}
