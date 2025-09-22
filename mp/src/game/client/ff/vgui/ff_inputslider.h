@@ -39,9 +39,7 @@ namespace vgui
 		{
 			m_pInputBox = new TextEntry(parent, inputName);
 			m_pInputBox->SetAllowNumericInputOnly(true);
-			//m_pInputBox->SetEditable(false);
 			m_pInputBox->AddActionSignalTarget(this);
-			//m_pInputBox->SendNewLine(true);
 
 			AddActionSignalTarget(parent);
 		}
@@ -113,18 +111,6 @@ namespace vgui
 				return -1;
 
 			int iValue = atoi(szValue);
-
-			// Since text is disabled on this box (and hopefully Valve haven't messed that
-			// up, the next checks aren't need
-
-			// atoi returned zero so make sure that the box is 1 character long and that
-			// character is 0, otherwise it could just be some text.
-			//if (iValue == 0 && (szValue[0] != '0' || m_pInputBox->GetTextLength() != 1))
-			//	return -1;
-
-			// Make sure that this number is as long as the string
-			//
-
 			return iValue;
 		}
 
@@ -133,10 +119,6 @@ namespace vgui
 		//-----------------------------------------------------------------------------
 		MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data)
 		{
-			// Apparently this is a good check
-			if (!m_pInputBox->HasFocus())
-				return;
-
 			int iValue = GetInputValue();
 
 			int iMin, iMax;
