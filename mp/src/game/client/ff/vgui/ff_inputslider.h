@@ -6,17 +6,16 @@
 	file base:	ff_inputslider
 	file ext:	h
 	author:		Adam "Elmo" Willden
-	
+
 	purpose:	This just keeps a slider hooked up with a text element.
 
-	notes: 
-	
+	notes:
+
 	Used to reside in ff_options but I'm separting the classes into their own files
 	Used to be named CInputSlider - why have FFButton and not CFFInputSlider...
 	or CButton and CInputSlider. Unless I'm missing the point here.
 
 *********************************************************************/
-
 
 #ifndef FF_INPUTSLIDER_H
 #define FF_INPUTSLIDER_H
@@ -33,9 +32,10 @@ namespace vgui
 	public:
 
 		//-----------------------------------------------------------------------------
-		// Purpose: Link this slider in with its input box
+		// Purpose: Link this slider in with an input box
 		//-----------------------------------------------------------------------------
-		CFFInputSlider(Panel *parent, char const *panelName, char const *inputName) : BaseClass(parent, panelName)
+		CFFInputSlider(Panel* parent, char const* panelName, char const* inputName)
+			: BaseClass(parent, panelName)
 		{
 			m_pInputBox = new TextEntry(parent, inputName);
 			m_pInputBox->SetAllowNumericInputOnly(true);
@@ -57,12 +57,16 @@ namespace vgui
 			m_pInputBox->SetText(VarArgs("%d", value));
 			BaseClass::SetValue(value, bTriggerChangeMessage);
 		}
+
+		//-----------------------------------------------------------------------------
+		// Purpose: When the slider moves, reposition the input box
+		//-----------------------------------------------------------------------------
 		virtual void SetPos(int x, int y)
 		{
 			int iWide, iTall;
 			GetSize(iWide, iTall);
 			m_pInputBox->SetPos(x + iWide, y);
-			BaseClass::SetPos(x,y);
+			BaseClass::SetPos(x, y);
 		}
 
 		//-----------------------------------------------------------------------------
@@ -84,6 +88,7 @@ namespace vgui
 		}
 
 	private:
+		TextEntry* m_pInputBox;
 
 		//-----------------------------------------------------------------------------
 		// Purpose: Allow the input box to change this value
@@ -94,7 +99,7 @@ namespace vgui
 		}
 
 		//-----------------------------------------------------------------------------
-		// Purpose: 
+		// Purpose:
 		//-----------------------------------------------------------------------------
 		int GetInputValue()
 		{
@@ -156,8 +161,6 @@ namespace vgui
 
 			m_pInputBox->SetText(VarArgs("%d", iValue));
 		}
-
-		TextEntry *m_pInputBox;
 	};
 }
 #endif
