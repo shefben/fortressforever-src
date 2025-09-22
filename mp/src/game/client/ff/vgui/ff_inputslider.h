@@ -22,6 +22,7 @@
 
 #include "vgui_controls/Slider.h"
 #include "vgui_controls/TextEntry.h"
+#include "KeyValues.h"	// for PostActionSignal("SliderMoved")
 
 namespace vgui
 {
@@ -65,10 +66,9 @@ namespace vgui
 					return;
 				}
 
-				int currentValue = m_pOwner->GetValue();
-				int iMin, iMax;
-				m_pOwner->GetRange(iMin, iMax);
-				m_pOwner->SetValue(clamp(currentValue + delta, iMin, iMax));
+				// Use the TEXT range (optionally wider than slider), not the slider range.
+				int currentValue = m_pOwner->GetInputValue();
+				m_pOwner->SetTextAndSync(currentValue + delta, true);
 			}
 
 		private:
@@ -101,6 +101,15 @@ namespace vgui
 			m_pInputBox->SetText(VarArgs("%d", value));
 			BaseClass::SetValue(value, bTriggerChangeMessage);
 		}
+
+		//-----------------------------------------------------------------------------
+		// Purpose: Prefer the value from the input box
+		//-----------------------------------------------------------------------------
+		int GetValue() override
+		{
+			return GetInputValue();
+		}
+
 
 		//-----------------------------------------------------------------------------
 		// Purpose: When the slider moves, reposition the input box
@@ -138,15 +147,93 @@ namespace vgui
 			BaseClass::SetVisible(state);
 		}
 
+		//-----------------------------------------------------------------------------
+		// Purpose: Overloads to optionally set a wider/narrower text range alongside slider range
+		//-----------------------------------------------------------------------------
+		void SetRange(int min, int max) override
+		{
+			BaseClass::SetRange(min, max);
+			// Unset custom text bounds; text will follow slider range (but still ±9999 capped)
+			m_bUseInputBounds = false;
+			// Ensure text shows something valid if current text is out-of-range
+			int tv = ClampToBounds(GetInputValue());
+			SetTextAndSync(tv, true);
+		}
+
+		void SetRange(int min, int max, int textMin, int textMax)
+		{
+			BaseClass::SetRange(min, max);
+
+			// Ensure text input bounds are not smaller than the given slider range
+			m_iInputMin = min(min, textMin);
+			m_iInputMax = max(max, textMax);
+			m_bUseInputBounds = true;
+
+			// Normalise current text to new bounds and sync
+			int tv = ClampToBounds(GetInputValue());
+			SetTextAndSync(tv, true);
+		}
+
+		//-----------------------------------------------------------------------------
+		// Purpose: Helper to clamp to text-bounds (±9999 and optional custom bounds)
+		//			When m_bUseInputBounds == false, also clamp to the slider's range.
+		//-----------------------------------------------------------------------------
+		int ClampToBounds(int v)
+		{
+			// hard cap absolute values beyond 9999 first
+			v = clamp(v, -9999, 9999);
+
+			if (m_bUseInputBounds)
+			{
+				// then optional user-defined bounds
+				v = clamp(v, m_iInputMin, m_iInputMax);
+			}
+			else
+			{
+				// no custom text bounds => respect slider's own range
+				int sMin, sMax; GetRange(sMin, sMax);
+				v = clamp(v, sMin, sMax);
+			}
+
+			return v;
+		}
+
+		//-----------------------------------------------------------------------------
+		// Purpose: Set text (respecting text bounds) and sync slider (slider clamps itself)
+		//-----------------------------------------------------------------------------
+		void SetTextAndSync(int v, bool bTriggerChangeMessage)
+		{
+			int tv = ClampToBounds(v);
+			m_pInputBox->SetText(VarArgs("%d", tv));
+			UpdateFromInput(tv, bTriggerChangeMessage);
+
+			// If text value sits outside slider range, base slider may not emit "SliderMoved".
+			// Manually emit it so listeners are notified.
+			int sMin, sMax; GetRange(sMin, sMax);
+			if (tv < sMin || tv > sMax)
+			{
+				PostActionSignal(new KeyValues("SliderMoved"));
+			}
+		}
+
 	private:
 		TextEntry* m_pInputBox;
+
+		// Optional input bounds (off by default)
+		bool m_bUseInputBounds = false;
+		int  m_iInputMin = 0;
+		int  m_iInputMax = 0;
 
 		//-----------------------------------------------------------------------------
 		// Purpose: Allow the input box to change this value
 		//-----------------------------------------------------------------------------
 		void UpdateFromInput(int iValue, bool bTriggerChangeMessage = true)
 		{
-			BaseClass::SetValue(iValue, bTriggerChangeMessage);
+			// Move slider thumb within the slider's own range only
+			int iMin, iMax;
+			GetRange(iMin, iMax);
+			int clampedForSlider = clamp(iValue, iMin, iMax);
+			BaseClass::SetValue(clampedForSlider, bTriggerChangeMessage);
 		}
 
 		//-----------------------------------------------------------------------------
@@ -157,13 +244,18 @@ namespace vgui
 			if (m_pInputBox->GetTextLength() == 0)
 				return -1;
 
-			char szValue[5];
-			m_pInputBox->GetText(szValue, 4);
+			// Read the whole number first, then clamp
+			char szValue[16] = { 0 };
+			m_pInputBox->GetText(szValue, sizeof(szValue));
 
 			if (!szValue[0])
 				return -1;
 
 			int iValue = atoi(szValue);
+
+			// Hard cap absolute values and then bounds
+			iValue = ClampToBounds(iValue);
+
 			return iValue;
 		}
 
@@ -173,13 +265,14 @@ namespace vgui
 		MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data)
 		{
 			int iValue = GetInputValue();
-
-			int iMin, iMax;
-			GetRange(iMin, iMax);
-
-			iValue = clamp(iValue, iMin, iMax);
-
 			UpdateFromInput(iValue, true);
+
+			// If input exceeds slider range, also notify listeners.
+			int iMin, iMax; GetRange(iMin, iMax);
+			if (iValue < iMin || iValue > iMax)
+			{
+				PostActionSignal(new KeyValues("SliderMoved"));
+			}
 		}
 
 		//-----------------------------------------------------------------------------
@@ -189,12 +282,18 @@ namespace vgui
 		{
 			int iValue = GetInputValue();
 
-			int iMin, iMax;
-			GetRange(iMin, iMax);
+			// Keep what the user typed within TEXT bounds
+			int iFinalText = ClampToBounds(iValue);
 
-			iValue = clamp(iValue, iMin, iMax);
+			m_pInputBox->SetText(VarArgs("%d", iFinalText));
+			UpdateFromInput(iFinalText, true);
 
-			m_pInputBox->SetText(VarArgs("%d", iValue));
+			// If input exceeds slider range, ensure "SliderMoved" still fires.
+			int iMin, iMax; GetRange(iMin, iMax);
+			if (iFinalText < iMin || iFinalText > iMax)
+			{
+				PostActionSignal(new KeyValues("SliderMoved"));
+			}
 		}
 	};
 }
