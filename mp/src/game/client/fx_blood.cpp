@@ -25,6 +25,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar r_classic_blood("r_classic_blood", "0", FCVAR_ARCHIVE, "Toggle classic blood effects");
+
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectBloodSpray )
 CLIENTEFFECT_MATERIAL( "effects/blood_core" )
 CLIENTEFFECT_MATERIAL( "effects/blood_gore" )
@@ -503,16 +505,19 @@ void BloodImpactCallback( const CEffectData & data )
 {
 	bool bFoundBlood = false;
 
-	// Find which sort of blood we are
-	for ( int i = 0; i < ARRAYSIZE( bloodCallbacks ); i++ )
+	if (!r_classic_blood.GetBool())
 	{
-		if ( bloodCallbacks[i].nColor == data.m_nColor )
+		// Find which sort of blood we are
+		for (int i = 0; i < ARRAYSIZE(bloodCallbacks); i++)
 		{
-			QAngle	vecAngles;
-			VectorAngles( -data.m_vNormal, vecAngles );
-			DispatchParticleEffect( bloodCallbacks[i].lpszParticleSystemName, data.m_vOrigin, vecAngles );
-			bFoundBlood = true;
-			break;
+			if (bloodCallbacks[i].nColor == data.m_nColor)
+			{
+				QAngle	vecAngles;
+				VectorAngles(-data.m_vNormal, vecAngles);
+				DispatchParticleEffect(bloodCallbacks[i].lpszParticleSystemName, data.m_vOrigin, vecAngles);
+				bFoundBlood = true;
+				break;
+			}
 		}
 	}
 
