@@ -25,7 +25,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar r_classic_blood("r_classic_blood", "0", FCVAR_ARCHIVE, "Toggle classic blood effects");
+ConVar r_classic_blood("r_classic_blood", "2", FCVAR_ARCHIVE, "Toggle classic blood effects\n 1: HL1/GoldSrc/HL2 Beta-style\n 2: Pre-Source 2007 (HL2 Retail)");
 
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectBloodSpray )
 CLIENTEFFECT_MATERIAL( "effects/blood_core" )
@@ -206,7 +206,9 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 		//
 		if (flags & FX_BLOODSPRAY_GORE)
 		{
-			hMaterial = ParticleMgr()->GetPMaterial( "effects/blood_gore" );
+			r_classic_blood.GetInt() == 2
+				? hMaterial = ParticleMgr()->GetPMaterial( "effects/blood_gore" )
+				: hMaterial = ParticleMgr()->GetPMaterial( "sprites/bloodspray" );
 
 			SimpleParticle *pParticle;
 
@@ -376,9 +378,11 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	}
 
 	// Cache the material if we haven't already
-	if ( g_Blood_Gore == NULL )
+	if ( g_Blood_Gore == NULL || r_classic_blood.GetBool() )
 	{
-		g_Blood_Gore = ParticleMgr()->GetPMaterial( "effects/blood_gore" );
+		r_classic_blood.GetInt() == 2
+			? g_Blood_Gore = ParticleMgr()->GetPMaterial( "effects/blood_gore" )
+			: g_Blood_Gore = ParticleMgr()->GetPMaterial( "sprites/bloodspray" );
 	}
 
 	for ( int i = 0; i < 4; i++ )
