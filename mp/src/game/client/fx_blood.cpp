@@ -206,9 +206,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 		//
 		if (flags & FX_BLOODSPRAY_GORE)
 		{
-			r_classic_blood.GetInt() == 2
-				? hMaterial = ParticleMgr()->GetPMaterial( "effects/blood_gore" )
-				: hMaterial = ParticleMgr()->GetPMaterial( "sprites/bloodspray" );
+			hMaterial = ParticleMgr()->GetPMaterial( r_classic_blood.GetInt()==1 ? "sprites/bloodspray" : "effects/blood_gore" );
 
 			SimpleParticle *pParticle;
 
@@ -379,11 +377,7 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 	// Cache the material if we haven't already
 	if ( g_Blood_Gore == NULL || r_classic_blood.GetBool() )
-	{
-		r_classic_blood.GetInt() == 2
-			? g_Blood_Gore = ParticleMgr()->GetPMaterial( "effects/blood_gore" )
-			: g_Blood_Gore = ParticleMgr()->GetPMaterial( "sprites/bloodspray" );
-	}
+		g_Blood_Gore = ParticleMgr()->GetPMaterial( r_classic_blood.GetInt()==1 ? "sprites/bloodspray" : "effects/blood_gore" );
 
 	for ( int i = 0; i < 4; i++ )
 	{

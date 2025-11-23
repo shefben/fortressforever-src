@@ -194,7 +194,7 @@ void CFFMiscOptions::Load()
 			}
 
 			cb->SetPos(30, iYCoords);
-			cb->SetSize(200, ROW_HEIGHT - 4);
+			cb->SetSize(210, ROW_HEIGHT - 4);
 			cb->ActivateItemByRow(0);
 
 			// Create a handy label too so we know what this is
@@ -202,7 +202,7 @@ void CFFMiscOptions::Load()
 
 			if (l)
 			{
-				l->SetPos(234, iYCoords);
+				l->SetPos(244, iYCoords);
 				l->SetSize(450, ROW_HEIGHT);
 			}
 
