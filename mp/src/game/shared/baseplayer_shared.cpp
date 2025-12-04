@@ -665,13 +665,9 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 
 	// If we are walking or ducking, silence
 	if (GetFlags() & (FL_DUCKING) || m_nButtons & IN_SPEED)
-	{
-		fvol = 0;
-	}
+		return;
 	else
-	{
 		fvol = 1.0f;
-	}
 
 	PlayStepSound( feet, psurface, fvol, false );
 }
