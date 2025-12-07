@@ -44,7 +44,7 @@ $Project
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_laser.cpp"
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_mirv.cpp"
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_mirvlet.cpp"
-			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_nail.cpp"
+			//$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_nail.cpp"
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_napalm.cpp"
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_normal.cpp"
 			$File "$SRCDIR\game\shared\ff\grenades\ff_grenade_parse.cpp"
