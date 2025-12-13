@@ -34,7 +34,7 @@ public:
 	virtual FFWeaponID GetWeaponID() const		{ return FF_WEAPON_CROWBAR; }
 
 private:
-
+	void Hit(trace_t& traceHit, Activity nHitActivity);
 	CFFWeaponCrowbar(const CFFWeaponCrowbar &);
 };
 
@@ -62,4 +62,12 @@ PRECACHE_WEAPON_REGISTER(ff_weapon_crowbar);
 //----------------------------------------------------------------------------
 CFFWeaponCrowbar::CFFWeaponCrowbar() 
 {
+}
+
+void CFFWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity)
+{
+#ifdef CLIENT_DLL
+	WeaponSound( SPECIAL2 );
+#endif
+	BaseClass::Hit(traceHit, nHitActivity);
 }

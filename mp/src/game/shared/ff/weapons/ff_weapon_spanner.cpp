@@ -114,6 +114,9 @@ void CFFWeaponSpanner::Hit(trace_t &traceHit, Activity nHitActivity)
 	if (!pHitEntity) 
 		return;
 
+#ifdef CLIENT_DLL
+	WeaponSound( SPECIAL1 );
+#endif
 	// Hit a player
 	if (pHitEntity->IsPlayer()) 
 	{
@@ -228,7 +231,7 @@ void CFFWeaponSpanner::Hit(trace_t &traceHit, Activity nHitActivity)
 		else if (pHitEntity->Classify() == CLASS_SENTRYGUN) 
 		{
 			CFFSentryGun *pSentryGun = (CFFSentryGun *) pHitEntity;
-			WeaponSound( SPECIAL1 );
+			WeaponSound( SPECIAL2 );
 
 			// Is the sentrygun mine(is pPlayer the owner?) 
 			bool bMine = ( pPlayer == ToFFPlayer( pSentryGun->m_hOwner.Get() ) );
