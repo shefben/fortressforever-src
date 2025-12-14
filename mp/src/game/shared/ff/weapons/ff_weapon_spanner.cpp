@@ -114,9 +114,6 @@ void CFFWeaponSpanner::Hit(trace_t &traceHit, Activity nHitActivity)
 	if (!pHitEntity) 
 		return;
 
-#ifdef CLIENT_DLL
-	WeaponSound( SPECIAL1 );
-#endif
 	// Hit a player
 	if (pHitEntity->IsPlayer()) 
 	{
@@ -127,6 +124,10 @@ void CFFWeaponSpanner::Hit(trace_t &traceHit, Activity nHitActivity)
 		CFFPlayer *pHitPlayer = ToFFPlayer(pHitEntity);
 		if (!pHitPlayer) 
 			return;
+
+#ifdef CLIENT_DLL
+		WeaponSound( SPECIAL1 );
+#endif
 
 		// Can the guy we hit take damage from us? If he can't, he's
 		// on our team or our ally so give him some armor!
