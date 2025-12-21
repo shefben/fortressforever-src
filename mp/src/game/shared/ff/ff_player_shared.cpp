@@ -2128,6 +2128,156 @@ void CFFPlayer::Command_EngyMe(const CCommand& args)
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: More voice commands
+//-----------------------------------------------------------------------------
+void CFFPlayer::Command_Acknowledge(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_ACKNOWLEDGED");
+#endif
+	}
+}
+void CFFPlayer::Command_Negative(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_NEGATIVE");
+#endif
+	}
+}
+
+void CFFPlayer::Command_PassFlag(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_PASSFLAG");
+#endif
+	}
+}
+void CFFPlayer::Command_TakeFlag(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_TAKEFLAG");
+#endif
+	}
+}
+
+void CFFPlayer::Command_NeedSentry(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_NEEDSENTRY");
+#endif
+	}
+}
+
+void CFFPlayer::Command_Attacking(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_ATTACKING");
+#endif
+	}
+}
+void CFFPlayer::Command_Defending(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_DEFENDING");
+#endif
+	}
+}
+
+void CFFPlayer::Command_SpottedSentry(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_SPOTSENTRY");
+#endif
+	}
+}
+void CFFPlayer::Command_SpottedPipes(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_SPOTPIPES");
+#endif
+	}
+}
+void CFFPlayer::Command_SpottedSpy(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_SPOTSPY");
+#endif
+	}
+}
+
+void CFFPlayer::Command_OnMyWay(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_ONMYWAY");
+#endif
+	}
+}
+void CFFPlayer::Command_Incoming(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_INCOMING");
+#endif
+	}
+}
+
+void CFFPlayer::Command_NeedDetpack(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_NEEDDETPACK");
+#endif
+	}
+}
+void CFFPlayer::Command_SpottedDetpack(const CCommand& args)
+{
+	if (m_flSaveMeTime < gpGlobals->curtime)
+	{
+		m_flSaveMeTime = gpGlobals->curtime + 2;
+#ifdef CLIENT_DLL
+		engine->ClientCmd("say_team #FF_CM_SPOTDETPACK");
+#endif
+	}
+}
+
 bool CFFPlayer::IsGrenade1Primed( void )
 {
 	return ( ( m_iGrenadeState == FF_GREN_PRIMEONE ) );
