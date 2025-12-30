@@ -347,8 +347,8 @@ int ACT_MINITURRET_FIRE;
 // Mini Turret sounds to cache
 const char *g_ppszMiniTurretSounds[ ] =
 {
-	"RespawnTurret.Deploy",
-	"RespawnTurret.Retire",
+	//"RespawnTurret.Deploy",
+	//"RespawnTurret.Retire",
 	"RespawnTurret.Fire",
 	"RespawnTurret.Ping",
 	"RespawnTurret.Alert",
@@ -513,7 +513,7 @@ void CFFMiniTurret::Spawn( void )
 	AddEFlags( EFL_NO_DISSOLVE );
 
 	SetPoseParameter( FF_MINITURRET_BC_YAW, 0 );
-	SetPoseParameter( FF_MINITURRET_BC_PITCH, 0 );
+	SetPoseParameter( FF_MINITURRET_BC_PITCH, -36 );
 
 	m_iAmmoType = GetAmmoDef()->Index( AMMO_SHELLS );
 
@@ -738,10 +738,9 @@ void CFFMiniTurret::OnDeploy( void )
 		SetActivity( ( Activity )ACT_MINITURRET_OPEN );
 
 		m_OnDeploy.FireOutput( NULL, this );
-
-		Vector vecSoundOrigin = EyePosition();
-		CPASAttenuationFilter filter( vecSoundOrigin );
-		EmitSound( filter, entindex(), "RespawnTurret.Deploy", &vecSoundOrigin );
+		//Vector vecSoundOrigin = EyePosition();
+		//CPASAttenuationFilter filter( vecSoundOrigin );
+		//EmitSound( filter, entindex(), "RespawnTurret.Deploy", &vecSoundOrigin );
 
 		EnableLaserDot();
 		EnableLaserBeam();
@@ -933,12 +932,13 @@ void CFFMiniTurret::OnRetire( void )
 		if( !UpdateFacing() )
 		{
 			SetActivity( ( Activity )ACT_MINITURRET_CLOSE );
+			SetPoseParameter( m_iPitchPoseParameter, -36 );
 
 			m_OnRetire.FireOutput( NULL, this );
 
-			Vector vecSoundOrigin = EyePosition();
-			CPASAttenuationFilter filter( vecSoundOrigin );
-			EmitSound( filter, entindex(), "RespawnTurret.Retire", &vecSoundOrigin );
+			//Vector vecSoundOrigin = EyePosition();
+			//CPASAttenuationFilter filter( vecSoundOrigin );
+			//EmitSound( filter, entindex(), "RespawnTurret.Retire", &vecSoundOrigin );
 		}
 	}
 	else if( IsActivityFinished() )

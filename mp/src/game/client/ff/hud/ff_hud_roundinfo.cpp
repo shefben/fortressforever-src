@@ -127,7 +127,7 @@ bool CHudRoundInfo::ShouldDraw( void )
 	if( timer <= 0 )
 		Q_snprintf( szTimer, sizeof( szTimer ), "00:00" );
 	else
-		Q_snprintf( szTimer, sizeof( szTimer ), "%d:%02d", ( timer / 60 ), ( timer % 60 ) );
+		Q_snprintf( szTimer, sizeof( szTimer ), "%02d:%02d", ( timer / 60 ), ( timer % 60 ) );
 
 	g_pVGuiLocalize->ConvertANSIToUnicode( szTimer, m_szRoundTimer, sizeof( m_szRoundTimer ) );
 
