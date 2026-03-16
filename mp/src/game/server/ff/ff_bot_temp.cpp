@@ -330,16 +330,14 @@ CON_COMMAND( bot_showhealth, "Makes a bot show his health" )
 	}
 }
 
-CON_COMMAND(bot_flashlight, "turn on flashlights")
+CON_COMMAND(bot_flashlight, "Toggle bots' flashlights")
 {
 	for (int i = 1; i <= gpGlobals->maxClients; i++)
 	{
 		CFFPlayer *pPlayer = ToFFPlayer(UTIL_PlayerByIndex(i));
 
 		if (pPlayer && (pPlayer->GetFlags() & FL_FAKECLIENT))
-		{
-			pPlayer->FlashlightTurnOn();
-		}
+			pPlayer->FlashlightIsOn() ? pPlayer->FlashlightTurnOn() : pPlayer->FlashlightTurnOff();
 	}
 }
 
