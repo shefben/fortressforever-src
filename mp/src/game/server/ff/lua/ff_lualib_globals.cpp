@@ -192,6 +192,7 @@ namespace FFLib
 				IsOfClass(pEntity, CLASS_GREN_NAPALM) ||
 				IsOfClass(pEntity, CLASS_GREN_GAS) ||
 				IsOfClass(pEntity, CLASS_GREN_CONC)
+				//IsOfClass(pEntity, CLASS_GREN_CALTROP)
 				*/
 	}
 
