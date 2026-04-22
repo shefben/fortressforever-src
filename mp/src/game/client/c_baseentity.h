@@ -69,7 +69,7 @@ typedef unsigned int			AimEntsListHandle_t;
 extern void RecvProxy_IntToColor32( const CRecvProxyData *pData, void *pStruct, void *pOut );
 extern void RecvProxy_LocalVelocity( const CRecvProxyData *pData, void *pStruct, void *pOut );
 
-// BEG: Added by Mulchman
+#ifdef FF // BEG: Added by Mulchman
 enum Class_T
 {
 	CLASS_NONE = 0,
@@ -112,16 +112,20 @@ enum Class_T
 
 	NUM_AI_CLASSES
 };
-// END: Added by Mulchman
+#endif // END: Added by Mulchman
 
 enum CollideType_t
 {
 	ENTITY_SHOULD_NOT_COLLIDE = 0,
 	ENTITY_SHOULD_COLLIDE,
+#ifdef FF
 	ENTITY_SHOULD_RESPOND,
 
 	// HACKHACK: Fix to allow laser beam to shine off ragdolls
 	ENTITY_SHOULD_COLLIDE_RESPOND
+#else
+	ENTITY_SHOULD_RESPOND
+#endif
 };
 
 class VarMapEntry_t
@@ -232,14 +236,14 @@ public:
 	DECLARE_DATADESC();
 	DECLARE_CLIENTCLASS();
 	DECLARE_PREDICTABLE();
-
+#ifdef FF
 	void PrintDeleteInfo();
-
+#endif
 									C_BaseEntity();
 	virtual							~C_BaseEntity();
-
+#ifdef FF
 	virtual Class_T					Classify(void) { return CLASS_NONE; }
-
+#endif
 	static C_BaseEntity				*CreatePredictedEntityByName( const char *classname, const char *module, int line, bool persist = false );
 	
 	// FireBullets uses shared code for prediction.
@@ -376,11 +380,11 @@ public:
 
 	C_BaseEntity					*GetEffectEntity( void ) const;
 	void							SetEffectEntity( C_BaseEntity *pEffectEnt );
-
+#ifdef FF
 	// specifies if this entity can collide with its owner entity
 	virtual bool					CanClipOwnerEntity() const { return false; }
 	virtual bool					CanClipPlayer() const { return true; }
-
+#endif
 	// This function returns a value that scales all damage done by this entity.
 	// Use CDamageModifier to hook in damage modifiers on a guy.
 	virtual float					GetAttackDamageScale( void );
@@ -628,11 +632,11 @@ public:
 	virtual bool					GetAttachmentVelocity( int number, Vector &originVel, Quaternion &angleVel );
 
 	// Team handling
-	virtual C_Team					*GetTeam( void );
+	virtual C_Team					*GetTeam( void ) const;
 	virtual int						GetTeamNumber( void ) const;
 	virtual void					ChangeTeam( int iTeamNum );			// Assign this entity to a team.
 	virtual int						GetRenderTeamNumber( void );
-	virtual bool					InSameTeam( C_BaseEntity *pEntity );	// Returns true if the specified entity is on the same team as this one
+	virtual bool					InSameTeam( const C_BaseEntity *pEntity ) const;	// Returns true if the specified entity is on the same team as this one
 	virtual bool					InLocalTeam( void );
 
 	// ID Target handling
@@ -643,11 +647,14 @@ public:
 	virtual void ModifyEmitSoundParams( EmitSound_t &params );
 
 	void	EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
+#ifdef FF
 	void	EmitSoundShared(const char* soundname, float soundtime = 0.0f, float* duration = NULL);  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
+#endif
 	void	EmitSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 	void	StopSound( const char *soundname );
-	void	StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
+	void	StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle ); #ifdef FF
 	void	StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
+#endif
 	void	GenderExpandString( char const *in, char *out, int maxlen );
 
 	static float GetSoundDuration( const char *soundname, char const *actormodel );
@@ -657,8 +664,9 @@ public:
 
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, HSOUNDSCRIPTHANDLE& handle, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
-	static void StopSound( int iEntIndex, const char *soundname );
+	static void StopSound( int iEntIndex, const char *soundname ); #ifdef FF
 	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); // Jon: for AC stuff
+#endif
 	static soundlevel_t LookupSoundLevel( const char *soundname );
 	static soundlevel_t LookupSoundLevel( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
 
@@ -875,6 +883,7 @@ public:
 	void							PreEntityPacketReceived( int commands_acknowledged );
 	void							PostEntityPacketReceived( void );
 	bool							PostNetworkDataReceived( int commands_acknowledged );
+	virtual bool					PredictionErrorShouldResetLatchedForAllPredictables( void ) { return true; } //legacy behavior is that any prediction error causes all predictables to reset latched
 	bool							GetPredictionEligible( void ) const;
 	void							SetPredictionEligible( bool canpredict );
 
@@ -1093,9 +1102,9 @@ public:
 	virtual bool		ShouldCollide( int collisionGroup, int contentsMask ) const;
 
 	// Sets physics parameters
-	void				SetFriction( float flFriction );
+	void				SetFriction( float flFriction ); #ifdef FF
 	float				GetFriction(void) const;
-
+#endif
 	void				SetGravity( float flGravity );
 	float				GetGravity( void ) const;
 
@@ -1212,10 +1221,13 @@ public:
 
 	int		GetCreationTick() const;
 
+	virtual void ClientAdjustStartSoundParams( EmitSound_t &params ) {}
+	virtual void ClientAdjustStartSoundParams( StartSoundParams_t& params ) {}
+
 #ifdef _DEBUG
 	void FunctionCheck( void *pFunction, const char *name );
 
-	ENTITYFUNCPTR TouchSet( ENTITYFUNCPTR func, const char *name )
+	ENTITYFUNCPTR TouchSet( ENTITYFUNCPTR func, char *name ) 
 	{ 
 		//COMPILE_TIME_ASSERT( sizeof(func) == 4 );
 		m_pfnTouch = func; 
@@ -1398,17 +1410,16 @@ public:
 	int								m_nModelIndexOverrides[MAX_VISION_MODES];
 #endif
 
-	//char							m_takedamage;
-	unsigned char					m_takedamage;
+	char							m_takedamage;
 	char							m_lifeState;
 
 	int								m_iHealth;
 
-	// BEG: Added by Mulchman
+#ifdef FF	// BEG: Added by Mulchman
 	int								m_iMaxHealth;
 	int								m_iArmor;
 	int								m_iMaxArmor;
-	// END: Added by Mulchman
+#endif	// END: Added by Mulchman
 
 	// was pev->speed
 	float							m_flSpeed;
@@ -1771,6 +1782,9 @@ protected:
 	RenderMode_t m_PreviousRenderMode;
 	color32 m_PreviousRenderColor;
 #endif
+
+private:
+	bool	m_bOldShouldDraw;
 };
 
 EXTERN_RECV_TABLE(DT_BaseEntity);
@@ -2052,11 +2066,11 @@ inline void C_BaseEntity::SetFriction( float flFriction )
 { 
 	m_flFriction = flFriction; 
 }
-
+#ifdef FF
 inline float C_BaseEntity::GetFriction() const
 {
 	return m_flFriction;
-}
+} #endif
 
 inline void C_BaseEntity::SetGravity( float flGravity ) 
 { 

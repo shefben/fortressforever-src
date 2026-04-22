@@ -18,15 +18,13 @@
 #include "igamesystem.h"
 #include "utlmultilist.h"
 #include "tier1/callqueue.h"
-
+#ifdef FF_CLIENT_DLL
 // BEG: Added by Mulch 11/07/2005
-#ifdef CLIENT_DLL
 	//#define CFFBuildableObject C_FFBuildableObject
-#endif
 
 #include "ff_buildableobject.h"
 // END: Added by Mulch 11/07/2005
-
+#endif
 #ifdef PORTAL
 	#include "portal_util_shared.h"
 #endif
@@ -545,11 +543,6 @@ inline void FreeTouchLink( touchlink_t *link )
 	g_EdictTouchLinks.Free( link );
 }
 
-#ifdef STAGING_ONLY
-#ifndef CLIENT_DLL
-ConVar sv_groundlink_debug( "sv_groundlink_debug", "0", FCVAR_NONE, "Enable logging of alloc/free operations for debugging." );
-#endif
-#endif // STAGING_ONLY
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -567,14 +560,6 @@ inline groundlink_t *AllocGroundLink( void )
 		DevMsg( "AllocGroundLink: failed to allocate groundlink_t.!!!  groundlinksallocated=%d g_EntityGroundLinks.Count()=%d\n", groundlinksallocated, g_EntityGroundLinks.Count() );
 	}
 
-#ifdef STAGING_ONLY
-#ifndef CLIENT_DLL
-	if ( sv_groundlink_debug.GetBool() )
-	{
-		UTIL_LogPrintf( "Groundlink Alloc: %p at %d\n", link, groundlinksallocated );
-	}
-#endif
-#endif // STAGING_ONLY
 
 	return link;
 }
@@ -586,14 +571,6 @@ inline groundlink_t *AllocGroundLink( void )
 //-----------------------------------------------------------------------------
 inline void FreeGroundLink( groundlink_t *link )
 {
-#ifdef STAGING_ONLY
-#ifndef CLIENT_DLL
-	if ( sv_groundlink_debug.GetBool() )
-	{
-		UTIL_LogPrintf( "Groundlink Free: %p at %d\n", link, groundlinksallocated );
-	}
-#endif
-#endif // STAGING_ONLY
 
 	if ( link )
 	{
@@ -626,9 +603,9 @@ static bool g_bCleanupDatObject = true;
 //-----------------------------------------------------------------------------
 void CBaseEntity::PhysicsCheckForEntityUntouch( void )
 {
-	//Assert( g_pNextLink == NULL );
+	Assert( g_pNextLink == NULL );
 
-	touchlink_t* link, * nextLink;
+	touchlink_t *link;
 
 	touchlink_t *root = ( touchlink_t * )GetDataObject( TOUCHLINK );
 	if ( root )
@@ -642,7 +619,7 @@ void CBaseEntity::PhysicsCheckForEntityUntouch( void )
 		link = root->nextLink;
 		while ( link != root )
 		{
-			nextLink = link->nextLink;
+			g_pNextLink = link->nextLink;
 
 			// these touchlinks are not polled.  The ents are touching due to an outside
 			// system that will add/delete them as necessary (vphysics in this case)
@@ -665,7 +642,7 @@ void CBaseEntity::PhysicsCheckForEntityUntouch( void )
 				}
 			}
 
-			link = nextLink;
+			link = g_pNextLink;
 		}
 
 		g_bCleanupDatObject = saveCleanup;
@@ -677,6 +654,8 @@ void CBaseEntity::PhysicsCheckForEntityUntouch( void )
 			DestroyDataObject( TOUCHLINK );
 		}
 	}
+
+	g_pNextLink = NULL;
 
 	SetCheckUntouch( false );
 }
@@ -1117,7 +1096,7 @@ void CBaseEntity::PhysicsImpact( CBaseEntity *other, trace_t &trace )
 		return;
 	}
 
-	// BEG: Added by Mulch 11/07/2005
+#ifdef FF_CLIENT_DLL	// BEG: Added by Mulch 11/07/2005
 	if (trace.m_pEnt)
 	{
 		if ((trace.m_pEnt->Classify() == CLASS_DISPENSER) ||
@@ -1130,7 +1109,7 @@ void CBaseEntity::PhysicsImpact( CBaseEntity *other, trace_t &trace )
 		}
 	}
 	// END: Added by Mulch 11/07/2005
-
+#endif
 	// If either of the entities is flagged to be deleted, 
 	//  don't call the touch functions
 	if ( ( GetFlags() | other->GetFlags() ) & FL_KILLME )

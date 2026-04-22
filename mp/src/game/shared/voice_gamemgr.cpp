@@ -13,9 +13,9 @@
 #include "player.h"
 #include "ivoiceserver.h"
 #include "usermessages.h"
-
+#ifdef FF_DLL 
 #include "ff_player.h"		// |-- Mirv: Need channels
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -210,12 +210,12 @@ void CVoiceGameMgr::UpdateMasks()
 		CBaseEntity *pEnt = UTIL_PlayerByIndex(iClient+1);
 		if(!pEnt || !pEnt->IsPlayer())
 			continue;
-
+#ifdef( FF )
 		// --> Mirv: Need different cast
 		//CBasePlayer *pPlayer = (CBasePlayer*)pEnt;
 		CFFPlayer* pPlayer = (CFFPlayer*)pEnt;
 		// <-- Mirv: Need different cast
-
+#endif
 		CSingleUserRecipientFilter user( pPlayer );
 
 		// Request the state of their "VModEnable" cvar.
@@ -236,14 +236,14 @@ void CVoiceGameMgr::UpdateMasks()
 			// Build a mask of who they can hear based on the game rules.
 			for(int iOtherClient=0; iOtherClient < m_nMaxPlayers; iOtherClient++)
 			{
-				// --> Mirv: Need different cast
+#ifdef( FF )	// --> Mirv: Need different cast
 				//CBaseEntity *pEnt = UTIL_PlayerByIndex(iOtherClient+1);
 				CFFPlayer* pEnt = (CFFPlayer*)UTIL_PlayerByIndex(iOtherClient + 1);
 				// <-- Mirv: Need different cast
 				if(pEnt && pEnt->IsPlayer() && 
 					(bAllTalk || m_pHelper->CanPlayerHearPlayer(pPlayer, (CBasePlayer*)pEnt, bProximity)) &&
 					(pPlayer->m_iChannel == pEnt->m_iChannel)) // |-- Mirv: They are in the same v. group
-				{
+#endif			{
 					gameRulesMask[iOtherClient] = true;
 					ProximityMask[iOtherClient] = bProximity;
 				}

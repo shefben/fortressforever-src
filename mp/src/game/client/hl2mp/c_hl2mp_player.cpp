@@ -28,6 +28,7 @@
 #ifdef SDK2013CE
 #define CYCLELATCH_TOLERANCE		0.15f
 #endif // SDK2013CE
+ConVar sv_infinite_aux_power( "sv_infinite_aux_power", "0", FCVAR_CHEAT | FCVAR_REPLICATED );
 
 LINK_ENTITY_TO_CLASS( player, C_HL2MP_Player );
 

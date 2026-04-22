@@ -30,17 +30,17 @@ public:
 
 	CEntityFlame( void );
 
-	static CEntityFlame	*Create( CBaseEntity *pTarget, bool useHitboxes = true, float flameSize = 1.0f);
+	static CEntityFlame	*Create( CBaseEntity *pTarget, bool useHitboxes = true );
 
 	void	AttachToEntity( CBaseEntity *pTarget );
 	void	SetLifetime( float lifetime );
 	void	SetUseHitboxes( bool use );
 	void	SetNumHitboxFires( int iNumHitBoxFires );
 	void	SetHitboxFireScale( float flHitboxFireScale );
-
+#ifdef FF_DLL
 	// Mulchman
 	void	Extinguish(void);
-
+#endif
 	float	GetRemainingLife( void );
 	int		GetNumHitboxFires( void );
 	float	GetHitboxFireScale( void );
@@ -49,9 +49,9 @@ public:
 	virtual void UpdateOnRemove();
 
 	void	SetSize( float size ) { m_flSize = size; }
-
+#ifdef FF_DLL
 	friend class CFFPlayer;		// |-- Mirv: Bug #0000162: Switching class while on fire, keeps playing burn sound
-
+#endif
 	DECLARE_DATADESC();
 
 protected:

@@ -13,9 +13,9 @@
 #include "viewrender.h"
 #include "sourcevr/isourcevirtualreality.h"
 #include "client_virtualreality.h"
-
+#ifdef FF
 #include "ff_vieweffects.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -25,6 +25,7 @@
 ConVar r_updaterefracttexture( "r_updaterefracttexture", "1", FCVAR_CHEAT ); // Jiggles: Made this a cheat so players can't disable the Spy cloak
 																			 // Already a cheat in SDK2013, convenient.
 ConVar r_depthoverlay( "r_depthoverlay", "0", FCVAR_CHEAT, "Replaces opaque objects with their grayscaled depth values. r_showz_power scales the output." );
+
 
 int g_viewscene_refractUpdateFrame = 0;
 bool g_bAllowMultipleRefractUpdatesPerScenePerFrame = false;

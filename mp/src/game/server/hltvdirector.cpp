@@ -250,7 +250,7 @@ const char** CHLTVDirector::GetModEvents()
 		"player_chat",
 		"round_start",
 		"round_end",
-
+#ifdef FF_DLL
 		// FF specific events that are listened for on the client, so 
 		// they need to be saved in SourceTV demos, sent to SourceTV clients, etc
 		"sentrygun_killed",
@@ -258,7 +258,7 @@ const char** CHLTVDirector::GetModEvents()
 		"mancannon_killed",
 		"ff_restartround",
 		"objective_event",
-		NULL
+#endif	NULL
 	};
 
 	return s_modevents;
@@ -362,7 +362,7 @@ void CHLTVDirector::StartDelayMessage()
 
 void CHLTVDirector::StartBestPlayerCameraShot()
 {
-	float flPlayerRanking[MAX_PLAYERS];
+	float flPlayerRanking[MAX_PLAYERS_ARRAY_SAFE];
 
 	memset( flPlayerRanking, 0, sizeof(flPlayerRanking) );
 

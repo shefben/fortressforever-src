@@ -889,8 +889,8 @@ void CTeamRoundTimer::RoundTimerSetupThink( void )
 		m_OnSetupFinished.FireOutput( this, this );
 		m_bFireFinished = false;
 
-		SetTimeRemaining( m_nTimeToUseAfterSetupFinished );
 		SetState( RT_STATE_NORMAL );
+		SetTimeRemaining( m_nTimeToUseAfterSetupFinished );
 
 		if ( ShowInHud() && !TeamplayRoundBasedRules()->IsInWaitingForPlayers() )
 		{
@@ -1109,8 +1109,8 @@ void CTeamRoundTimer::InputRoundSpawn( inputdata_t &input )
 
 	if ( m_nSetupTimeLength > 0 )
 	{
-		SetTimeRemaining( m_nSetupTimeLength );
 		SetState( RT_STATE_SETUP );
+		SetTimeRemaining( m_nSetupTimeLength );
 
 		if ( ShowInHud() && !TeamplayRoundBasedRules()->IsInWaitingForPlayers() )
 		{
@@ -1119,8 +1119,8 @@ void CTeamRoundTimer::InputRoundSpawn( inputdata_t &input )
 	}
 	else
 	{
-		SetTimeRemaining( m_nTimeToUseAfterSetupFinished );
 		SetState( RT_STATE_NORMAL );
+		SetTimeRemaining( m_nTimeToUseAfterSetupFinished );
 	}
 
 	if ( !m_bStartPaused && !TeamplayRoundBasedRules()->IsInWaitingForPlayers() )
@@ -1146,7 +1146,7 @@ void CTeamRoundTimer::SetTimeRemaining( int iTimerSeconds )
 		}
 	}
 
-	m_flTimeRemaining = (float)iTimerSeconds;
+	m_flTimeRemaining = flTimerSeconds;
 	m_flTimerEndTime = gpGlobals->curtime + m_flTimeRemaining;
 	m_nTimerLength = iTimerSeconds;
 	
@@ -1240,11 +1240,11 @@ void CTeamRoundTimer::AddTimerSeconds( int iSecondsToAdd, int iTeamResponsible /
 
 	if ( m_bTimerPaused )
 	{
-		m_flTimeRemaining += (float)iSecondsToAdd;
+		m_flTimeRemaining += flSecondsToAdd;
 	}
 	else
 	{
-		m_flTimerEndTime += (float)iSecondsToAdd;
+		m_flTimerEndTime += flSecondsToAdd;
 	}
 
 	m_nTimerLength += iSecondsToAdd;

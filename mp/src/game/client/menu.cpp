@@ -73,8 +73,8 @@ void CHudMenu::Init( void )
 	HOOK_HUD_MESSAGE( CHudMenu, ShowMenu );
 
 	m_bMenuTakesInput = false;
-	m_bMenuDisplayed = false;
-	m_bIsFromMenuMan = false;
+	m_bMenuDisplayed = false; #ifdef FF
+	m_bIsFromMenuMan = false; #endif
 	m_bitsValidSlots = 0;
 	m_Processed.RemoveAll();
 	m_nMaxPixels = 0;
@@ -111,10 +111,10 @@ void CHudMenu::VidInit( void )
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CHudMenu::OnThink()
-{
+{#ifdef FF
 	if ( m_bIsFromMenuMan )
 		return;
-
+#endif
 	float flSelectionTimeout = MENU_SELECTION_TIMEOUT;
 
 	// If we've been open for a while without input, hide
@@ -132,14 +132,14 @@ bool CHudMenu::ShouldDraw( void )
 	bool draw = CHudElement::ShouldDraw() && m_bMenuDisplayed;
 	if ( !draw )
 		return false;
-
+#ifdef FF
 	if (m_flExpireTime > 0 && m_flExpireTime <= gpGlobals->realtime)
 	{
 		engine->ClientCmd("menuselect 0\n");
 		m_bMenuDisplayed = false;
 		return false;
 	}
-
+#endif
 	// check for if menu is set to disappear
 	if ( m_flShutoffTime > 0 && m_flShutoffTime <= gpGlobals->realtime )
 	{  
@@ -389,8 +389,8 @@ void CHudMenu::HideMenu( void )
 //-----------------------------------------------------------------------------
 void CHudMenu::ShowMenu( const char * menuName, int validSlots )
 {
-	m_flShutoffTime = -1;
-	m_flExpireTime = -1;
+	m_flShutoffTime = -1; #ifdef FF
+	m_flExpireTime = -1; #endif
 	m_bitsValidSlots = validSlots;
 	m_fWaitingForMore = 0;
 
@@ -438,7 +438,7 @@ void CHudMenu::ShowMenu_KeyValueItems( KeyValues *pKV )
 		const char *pszItem = item->GetName();
 		const wchar_t *wLocalizedItem = g_pVGuiLocalize->Find( pszItem );
 
-		nCount = V_snwprintf( pWritePosition, nRemaining, L"%d. %ls\n", i+1, wLocalizedItem );
+		nCount = _snwprintf( pWritePosition, nRemaining, L"%d. %ls\n", i+1, wLocalizedItem );
 		nRemaining -= nCount;
 		pWritePosition += nCount;
 
@@ -448,7 +448,7 @@ void CHudMenu::ShowMenu_KeyValueItems( KeyValues *pKV )
 	// put a cancel on the end
 	m_bitsValidSlots |= (1<<9);
 
-	nCount = V_snwprintf( pWritePosition, nRemaining, L"0. %ls\n", g_pVGuiLocalize->Find( "#Cancel" ) );
+	nCount = _snwprintf( pWritePosition, nRemaining, L"0. %ls\n", g_pVGuiLocalize->Find( "#Cancel" ) );
 	nRemaining -= nCount;
 	pWritePosition += nCount;
 
@@ -473,28 +473,27 @@ void CHudMenu::MsgFunc_ShowMenu( bf_read &msg)
 {
 	m_bitsValidSlots = (short)msg.ReadWord();
 	int DisplayTime = msg.ReadChar();
-	int NeedMore = msg.ReadByte();
-	bool bIsFromMenuMan = false;
+	int NeedMore = msg.ReadByte(); #ifdef FF
+	bool bIsFromMenuMan = false; #endif
 
 	if ( DisplayTime > 0 )
 	{
-		//m_flShutoffTime = m_flOpenCloseTime + DisplayTime + gpGlobals->realtime;
-		m_flShutoffTime = m_flExpireTime = m_flOpenCloseTime + DisplayTime + gpGlobals->realtime;
+		m_flShutoffTime = m_flOpenCloseTime + DisplayTime + gpGlobals->realtime;
 
 	}
 	else
-	{
-		//m_flShutoffTime = -1;
-		m_flShutoffTime = m_flExpireTime = -1;
+	{ #ifndef FF
+		m_flShutoffTime = -1; #else
+		m_flShutoffTime = m_flExpireTime = -1; #endif
 	}
 
 	if ( m_bitsValidSlots )
 	{
 		char szString[2048];
 		msg.ReadString( szString, sizeof(szString) );
-
+#ifdef FF
 		bIsFromMenuMan = msg.ReadByte();
-
+#endif
 		if ( !m_fWaitingForMore ) // this is the start of a new menu
 		{
 			Q_strncpy( g_szPrelocalisedMenuString, szString, sizeof( g_szPrelocalisedMenuString ) );
@@ -523,16 +522,16 @@ void CHudMenu::MsgFunc_ShowMenu( bf_read &msg)
 		m_flSelectionTime = gpGlobals->curtime;
 	}
 	else
-	{
+	{ #ifdef FF
 		char szString[2048];
 		msg.ReadString( szString, sizeof(szString) );
 
-		bIsFromMenuMan = msg.ReadByte();
+		bIsFromMenuMan = msg.ReadByte(); #endif
 		HideMenu();
 	}
 
-	m_fWaitingForMore = NeedMore;
-	m_bIsFromMenuMan = bIsFromMenuMan;
+	m_fWaitingForMore = NeedMore;	#ifdef FF
+	m_bIsFromMenuMan = bIsFromMenuMan; #endif
 }
 
 //-----------------------------------------------------------------------------

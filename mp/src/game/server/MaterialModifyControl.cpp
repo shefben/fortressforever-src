@@ -147,13 +147,11 @@ bool CMaterialModifyControl::KeyValue( const char *szKeyName, const char *szValu
 //------------------------------------------------------------------------------
 int CMaterialModifyControl::UpdateTransmitState()
 {
-	// --> FF
-#ifdef GAME_DLL
+#ifdef FF_DLL
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-#endif // GAME_DLL
-	// <-- FF
+#endif // FF_DLL
 
 	// ALWAYS transmit to all clients.
 	return SetTransmitState( FL_EDICT_FULLCHECK );

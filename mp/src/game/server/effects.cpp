@@ -1142,6 +1142,26 @@ Vector CBlood::BloodPosition( CBaseEntity *pActivator )
 	return GetLocalOrigin();
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void UTIL_BloodSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags )
+{
+	if( color == DONT_BLEED )
+		return;
+
+	CEffectData	data;
+
+	data.m_vOrigin = pos;
+	data.m_vNormal = dir;
+	data.m_flScale = (float)amount;
+	data.m_fFlags = flags;
+	data.m_nColor = color;
+
+	DispatchEffect( "bloodspray", data );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Input handler for triggering the blood effect.
 //-----------------------------------------------------------------------------
@@ -1471,7 +1491,7 @@ BEGIN_DATADESC( CPrecipitation )
 	DEFINE_KEYFIELD( m_nPrecipType, FIELD_INTEGER, "preciptype" ),
 END_DATADESC()
 
-// Just send the normal entity crap
+// Just send the normal entity stuff
 IMPLEMENT_SERVERCLASS_ST( CPrecipitation, DT_Precipitation)
 	SendPropInt( SENDINFO( m_nPrecipType ), Q_log2( NUM_PRECIPITATION_TYPES ) + 1, SPROP_UNSIGNED )
 END_SEND_TABLE()
@@ -2285,9 +2305,16 @@ void EffectsPrecache( void *pUser )
 
 	if ( gpGlobals->maxClients > 1 )
 	{
-		CBaseEntity::PrecacheScriptSound( "HudChat.Message" );
-		CBaseEntity::PrecacheScriptSound( "HudChat.TeamMessage" );
+		CBaseEntity::PrecacheScriptSound( "HudChat.Message" ); #ifndef FF_DLL
+		CBaseEntity::PrecacheScriptSound( "HudChat.TeamMessage" ); #endif
 	}
+
+#ifdef TF_DLL
+	// For tempfx.
+	CBaseEntity::PrecacheModel( "models/weapons/shells/shell_cigarrette.mdl" );
+	CBaseEntity::PrecacheModel( "models/player/gibs/soldiergib007.mdl" );
+	CBaseEntity::PrecacheModel( "models/player/gibs/soldiergib008.mdl" );
+#endif
 }
 
 PRECACHE_REGISTER_FN( EffectsPrecache );

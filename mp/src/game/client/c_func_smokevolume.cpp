@@ -94,14 +94,14 @@ private:
 		return &m_pSmokeParticleInfos[GetSmokeParticleIndex(x,y,z)];
 	}
 
-	inline void	GetParticleInfoXYZ(int index, int &x, int &y, int &z)
+	inline void	GetParticleInfoXYZ(int index_, int &x, int &y, int &z)
 	{
-		Assert( index >= 0 && index < m_xCount * m_yCount * m_zCount );
-		z = index / (m_xCount*m_yCount);
+		Assert( index_ >= 0 && index_ < m_xCount * m_yCount * m_zCount );
+		z = index_ / (m_xCount*m_yCount);
 		int zIndex = z*m_xCount*m_yCount;
-		y = (index - zIndex) / m_xCount;
+		y = (index_ - zIndex) / m_xCount;
 		int yIndex = y*m_xCount;
-		x = index - zIndex - yIndex;
+		x = index_ - zIndex - yIndex;
 		Assert( IsValidXYZCoords( x, y, z ) );
 	}
 
@@ -118,10 +118,10 @@ private:
 				    z * m_SpacingRadius * 2 + m_SpacingRadius );
 	}
 
-	inline Vector GetSmokeParticlePosIndex(int index)
+	inline Vector GetSmokeParticlePosIndex(int index_ )
 	{
 		int x, y, z;
-		GetParticleInfoXYZ(index, x, y, z);
+		GetParticleInfoXYZ( index_, x, y, z);
 		return GetSmokeParticlePos(x, y, z);
 	}
 
@@ -398,9 +398,9 @@ void C_FuncSmokeVolume::Update( float fTimeDelta )
 			int x, y, z;
 			GetParticleInfoXYZ(i, x, y, z);
 
-			int xCountOffset = RandomInt(0, 2);
-			int yCountOffset = RandomInt(0, 2);
-			int zCountOffset = RandomInt(0, 2);
+			int xCountOffset = rand();
+			int yCountOffset = rand();
+			int zCountOffset = rand();
 
 			bool bFound = false;
 			for(int xCount=0; xCount < 3 && !bFound; xCount++)
@@ -588,15 +588,15 @@ void C_FuncSmokeVolume::FillVolume()
 						if(pParticle)
 						{
 							pParticle->m_Pos = vPos;
-							pParticle->m_ColorInterp = RandomInt(0, 255);
+							pParticle->m_ColorInterp = (unsigned char)((rand() * 255) / VALVE_RAND_MAX);
 							pParticle->m_RotationFactor = FRand( -1.0f, 1.0f ); // Rotation factor.
 							pParticle->m_CurRotation = FRand( -m_RotationSpeed, m_RotationSpeed );
 						}
 
 #ifdef _DEBUG
 						int testX, testY, testZ;
-						int index = GetSmokeParticleIndex(x,y,z);
-						GetParticleInfoXYZ(index, testX, testY, testZ);
+						int index_ = GetSmokeParticleIndex(x,y,z);
+						GetParticleInfoXYZ( index_, testX, testY, testZ);
 						assert(testX == x && testY == y && testZ == z);
 #endif
 

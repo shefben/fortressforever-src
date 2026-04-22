@@ -40,10 +40,10 @@ public:
 	// Data Handling
 	//-----------------------------------------------------------------------------
 	virtual int			GetTeamNumber( void ) const;
-	virtual const char *GetName( void );
-	virtual void		SetName(const char* pszName);
+	virtual const char *GetName( void ) const;	#ifdef FF
+	virtual void		SetName( const char* pszName ); #endif
 	virtual void		UpdateClientData( CBasePlayer *pPlayer );
-	virtual bool		ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity );
+	virtual bool		ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const;
 
 	//-----------------------------------------------------------------------------
 	// Spawnpoints
@@ -59,16 +59,16 @@ public:
 	virtual void InitializePlayers( void );
 	virtual void AddPlayer( CBasePlayer *pPlayer );
 	virtual void RemovePlayer( CBasePlayer *pPlayer );
-	virtual int  GetNumPlayers( void );
-	virtual CBasePlayer *GetPlayer( int iIndex );
+	virtual int  GetNumPlayers( void ) const;
+	virtual CBasePlayer *GetPlayer( int iIndex ) const ;
 
 	//-----------------------------------------------------------------------------
 	// Scoring
 	//-----------------------------------------------------------------------------
 	virtual void AddScore( int iScore );
 	virtual void SetScore( int iScore );
-	virtual int  GetScore( void );
-	virtual void ResetScores( void );
+	virtual int  GetScore( void ) const;
+	virtual void ResetScores( void ); #ifdef FF
 	virtual float GetScoreTime(void);
 	virtual void AddFortPoints(int iFortPoints);
 	virtual void SetFortPoints(int iFortPoints);
@@ -77,15 +77,15 @@ public:
 	virtual void AddDeaths(int iScore);	// Mulch
 	virtual int  GetDeaths(void);	// Mulch
 	virtual void SetDeaths(int iDeaths);
-
+#endif
 	// Round scoring
-	virtual int GetRoundsWon( void ) { return m_iRoundsWon; }
+	virtual int GetRoundsWon( void ) const { return m_iRoundsWon; }
 	virtual void SetRoundsWon( int iRounds ) { m_iRoundsWon = iRounds; }
 	virtual void IncrementRoundsWon( void ) { m_iRoundsWon++; }
 
 	void AwardAchievement( int iAchievement );
 
-	virtual int GetAliveMembers( void );
+	virtual int GetAliveMembers( void ) const;
 
 public:
 	CUtlVector< CTeamSpawnPoint * > m_aSpawnPoints;
@@ -94,13 +94,13 @@ public:
 	// Data
 	CNetworkString( m_szTeamname, MAX_TEAM_NAME_LENGTH );
 	CNetworkVar( int, m_iScore );
-	CNetworkVar(int, m_iFortPoints);
+	CNetworkVar( int, m_iRoundsWon ); #ifndef FF
+	int		m_iDeaths; #else
+	CNetworkVar( int, m_iFortPoints );
 	// Bug #0000529: Total death column doesn't work
-	CNetworkVar(int, m_iDeaths);	// Mulch: send deaths to client
-	CNetworkVar(float, m_flScoreTime); // Mulch: time when this team last scored
-	CNetworkVar( int, m_iRoundsWon );
-	//int		m_iDeaths;
-
+	CNetworkVar( int, m_iDeaths );	// Mulch: send deaths to client
+	CNetworkVar( float, m_flScoreTime ); // Mulch: time when this team last scored
+#endif
 	// Spawnpoints
 	int		m_iLastSpawn;		// Index of the last spawnpoint used
 

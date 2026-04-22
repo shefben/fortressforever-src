@@ -228,9 +228,6 @@ float		UTIL_GetSimulationInterval();
 CBasePlayer	*UTIL_PlayerByIndex( int playerIndex );
 CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID );
 
-
-CBasePlayer* UTIL_PlayerBySteamID(const char* steamid); // not case sensitive
-
 // NOTENOTE: Use this instead of UTIL_PlayerByIndex IF you're in single player
 // and you want the player.
 // not useable in multiplayer - see UTIL_GetListenServerHost()
@@ -239,8 +236,21 @@ CBasePlayer* UTIL_GetLocalPlayer( void );
 // get the local player on a listen server
 CBasePlayer *UTIL_GetListenServerHost( void );
 
-CBasePlayer* UTIL_PlayerByUserId( int userID );
-CBasePlayer* UTIL_PlayerByName( const char *name ); // not case sensitive
+// Convenience function so we don't have to make this check all over
+inline CBasePlayer *UTIL_GetLocalPlayerOrListenServerHost( void )
+{
+	if ( gpGlobals->maxClients > 1 )
+	{
+		if ( engine->IsDedicatedServer() )
+		{
+			return NULL;
+		}
+
+		return UTIL_GetListenServerHost();
+	}
+
+	return UTIL_GetLocalPlayer();
+}
 
 // Returns true if the command was issued by the listenserver host, or by the dedicated server, via rcon or the server console.
 // This is valid during ConCommand execution.
@@ -344,7 +354,7 @@ bool		UTIL_CheckBottom( CBaseEntity *pEntity, ITraceFilter *pTraceFilter, float 
 
 void		UTIL_SetOrigin			( CBaseEntity *entity, const Vector &vecOrigin, bool bFireTriggers = false );
 void		UTIL_EmitAmbientSound	( int entindex, const Vector &vecOrigin, const char *samp, float vol, soundlevel_t soundlevel, int fFlags, int pitch, float soundtime = 0.0f, float *duration = NULL );
-void		UTIL_ParticleEffect		( const Vector &vecOrigin, const Vector &vecDirection, ULONG ulColor, ULONG ulCount );
+void		UTIL_ParticleEffect		( const Vector &vecOrigin, const Vector &vecDirection, uint32 ulColor, uint32 ulCount );
 void		UTIL_ScreenShake		( const Vector &center, float amplitude, float frequency, float duration, float radius, ShakeCommand_t eCommand, bool bAirShake=false );
 void		UTIL_ScreenShakeObject	( CBaseEntity *pEnt, const Vector &center, float amplitude, float frequency, float duration, float radius, ShakeCommand_t eCommand, bool bAirShake=false );
 void		UTIL_ViewPunch			( const Vector &center, QAngle angPunch, float radius, bool bInAir );
@@ -359,7 +369,7 @@ int			UTIL_EntityInSolid( CBaseEntity *ent );
 
 bool		UTIL_IsMasterTriggered	(string_t sMaster, CBaseEntity *pActivator);
 void		UTIL_BloodStream( const Vector &origin, const Vector &direction, int color, int amount );
-//void		UTIL_BloodSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags );
+void		UTIL_BloodSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags );
 Vector		UTIL_RandomBloodVector( void );
 void		UTIL_ImpactTrace( trace_t *pTrace, int iDamageType, const char *pCustomImpactName = NULL );
 void		UTIL_PlayerDecalTrace( trace_t *pTrace, int playernum );
@@ -488,7 +498,7 @@ void			UTIL_LogPrintf( PRINTF_FORMAT_STRING const char *fmt, ... ) FMTFUNCTION( 
 // Sorta like FInViewCone, but for nonNPCs. 
 float UTIL_DotPoints ( const Vector &vecSrc, const Vector &vecCheck, const Vector &vecDir );
 
-void UTIL_StripToken( const char *pKey, char *pDest );// for redundant keynames
+void UTIL_StripToken( const char *pKey, char *pDest, int nDestLength );// for redundant keynames
 
 // Misc functions
 int BuildChangeList( levellist_t *pLevelList, int maxList );
@@ -639,6 +649,7 @@ bool UTIL_LoadAndSpawnEntitiesFromScript( CUtlVector <CBaseEntity*> &entities, c
 
 // Given a vector, clamps the scalar axes to MAX_COORD_FLOAT ranges from worldsize.h
 void UTIL_BoundToWorldSize( Vector *pVecPos );
-
-bool Util_AddDownload(const char* pszFile);
+	#ifdef FF
+	bool Util_AddDownload(const char* pszFile);
+	#endif
 #endif // UTIL_H

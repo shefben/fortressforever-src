@@ -84,8 +84,6 @@ public:
 	// used to selectivly override defaults
 	void DoorTouch( CBaseEntity *pOther );
 
-	virtual void GetGroundVelocityToApply(Vector& vecGroundVel) { vecGroundVel = GetAbsVelocity(); }		// |-- Mirv: For player prediction
-
 	// local functions
 	int DoorActivate( );
 	void DoorGoUp( void );

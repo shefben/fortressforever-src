@@ -90,17 +90,9 @@ public:
 			if ( m_bSelfCollisions )
 			{
 				char szToken[256];
-			#ifdef SDK2013CE
-				const char *pStr = nexttoken(szToken, pValue, ',', sizeof(szToken));
-			#else
 				const char *pStr = nexttoken(szToken, pValue, ',');
-			#endif
 				int index0 = atoi(szToken);
-			#ifdef SDK2013CE
-				nexttoken( szToken, pStr, ',', sizeof(szToken) );
-			#else
 				nexttoken( szToken, pStr, ',' );
-			#endif
 				int index1 = atoi(szToken);
 
 				m_pSet->EnableCollisions( index0, index1 );
@@ -214,7 +206,7 @@ static void RagdollAddSolid( IPhysicsEnvironment *pPhysEnv, ragdoll_t &ragdoll, 
 		}
 		else
 		{
-			//Msg( "CRagdollProp::CreateObjects:  Couldn't Lookup Bone %s\n", solid.name );
+			Msg( "CRagdollProp::CreateObjects:  Couldn't Lookup Bone %s\n", solid.name );
 		}
 	}
 }
@@ -322,14 +314,9 @@ static void RagdollCreateObjects( IPhysicsEnvironment *pPhysEnv, ragdoll_t &ragd
 
 void RagdollSetupCollisions( ragdoll_t &ragdoll, vcollide_t *pCollide, int modelIndex )
 {
-	//Assert(pCollide);
+	Assert(pCollide);
 	if (!pCollide)
-	{
-		// 7/3/2006 - Mulchman:
-		// Commented out because people are tired of getting this assert!
-		Warning("[RagdollSetupCollisions] Assert( pCollide )\n");
 		return;
-	}
 
 	IPhysicsCollisionSet *pSet = physics->FindCollisionSet( modelIndex );
 	if ( !pSet )
@@ -346,8 +333,8 @@ void RagdollSetupCollisions( ragdoll_t &ragdoll, vcollide_t *pCollide, int model
 			const char *pBlock = pParse->GetCurrentBlockName();
 			if ( !strcmpi( pBlock, "collisionrules" ) )
 			{
-				IPhysicsCollisionSet *pSet = physics->FindOrCreateCollisionSet( modelIndex, ragdoll.listCount );
-				CRagdollCollisionRules rules(pSet);
+				IPhysicsCollisionSet *pSetRules = physics->FindOrCreateCollisionSet( modelIndex, ragdoll.listCount );
+				CRagdollCollisionRules rules( pSetRules );
 				pParse->ParseCustom( (void *)&rules, &rules );
 				bFoundRules = true;
 			}
@@ -768,8 +755,11 @@ bool ShouldRemoveThisRagdoll( CBaseAnimating *pRagdoll )
 	{
 		if ( g_debug_ragdoll_removal.GetBool() )
 		{
-			debugoverlay->AddBoxOverlay( origin, vMins, vMaxs, QAngle( 0, 0, 0 ), 0, 255, 0, 16, 5 );
-			debugoverlay->AddLineOverlay( origin, origin + Vector( 0, 0, 64 ), 0, 255, 0, true, 5 );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddBoxOverlay( origin, vMins, vMaxs, QAngle( 0, 0, 0 ), 0, 255, 0, 16, 5 );
+				debugoverlay->AddLineOverlay( origin, origin + Vector( 0, 0, 64 ), 0, 255, 0, true, 5 );
+			}
 		}
 
 		return true;
@@ -778,8 +768,11 @@ bool ShouldRemoveThisRagdoll( CBaseAnimating *pRagdoll )
 	{
 		if ( g_debug_ragdoll_removal.GetBool() )
 		{
-			debugoverlay->AddBoxOverlay( origin, vMins, vMaxs, QAngle( 0, 0, 0 ), 0, 0, 255, 16, 5 );
-			debugoverlay->AddLineOverlay( origin, origin + Vector( 0, 0, 64 ), 0, 0, 255, true, 5 );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddBoxOverlay( origin, vMins, vMaxs, QAngle( 0, 0, 0 ), 0, 0, 255, 16, 5 );
+				debugoverlay->AddLineOverlay( origin, origin + Vector( 0, 0, 64 ), 0, 0, 255, true, 5 );
+			}
 		}
 
 		return true;
@@ -1060,14 +1053,14 @@ void CRagdollLRURetirement::MoveToTopOfLRU( CBaseAnimating *pRagdoll, bool bImpo
 		{
 			int iIndex = m_LRUImportantRagdolls.Head();
 
-			CBaseAnimating *pRagdoll = m_LRUImportantRagdolls[iIndex].Get();
+			CBaseAnimating *pRagdollLRU = m_LRUImportantRagdolls[iIndex].Get();
 
-			if ( pRagdoll )
+			if ( pRagdollLRU )
 			{
 #ifdef CLIENT_DLL
-				pRagdoll->SUB_Remove();
+				pRagdollLRU->SUB_Remove();
 #else
-				pRagdoll->SUB_StartFadeOut( 0 );
+				pRagdollLRU->SUB_StartFadeOut( 0 );
 #endif
 				m_LRUImportantRagdolls.Remove(iIndex);
 			}
@@ -1189,11 +1182,11 @@ void C_BaseAnimating::IgniteRagdoll( C_BaseAnimating *pSource )
 	if ( pChild )
 	{
 		C_EntityFlame *pFireChild = dynamic_cast<C_EntityFlame *>( pChild );
-
-		// --> Mirv: Use anim overlay instead
-		//C_ClientRagdoll *pRagdoll = dynamic_cast< C_ClientRagdoll * > ( this );
-		C_BaseAnimatingOverlay* pRagdoll = dynamic_cast<C_BaseAnimatingOverlay*> (this);
-		// <-- Mirv
+#if !defined( FF )
+		C_ClientRagdoll *pRagdoll = dynamic_cast< C_ClientRagdoll * > ( this );
+#else
+		C_BaseAnimatingOverlay* pRagdoll = dynamic_cast<C_BaseAnimatingOverlay*> (this); // Mirv: Use anim overlay instead
+#endif
 
 		if ( pFireChild )
 		{

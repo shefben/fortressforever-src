@@ -1341,9 +1341,9 @@ protected:
 	PMaterialHandle		m_hMaterial;
 	TimedEvent			m_tParticleSpawn;
 	CSmartPtr<CEmberEmitter> m_pEmitter;
-
+#ifdef FF
 	bool	m_bNeedToSetOrigin;	// |-- Mirv
-};
+#endif};
 
 //Receive datatable
 IMPLEMENT_CLIENTCLASS_DT( C_Embers, DT_Embers, CEmbers )
@@ -1406,10 +1406,10 @@ void C_Embers::AddEntity( void )
 	if ( m_bEmit == false )
 		return;
 
-	// --> Mirv: Moved here from the constructor
+#ifdef FF	// --> Mirv: Moved here from the constructor
 	if (m_bNeedToSetOrigin)
 		m_pEmitter->SetSortOrigin(GetAbsOrigin());
-	// <-- Mirv
+#endif	// <-- Mirv
 
 	float tempDelta = gpGlobals->frametime;
 
@@ -1881,11 +1881,14 @@ void CSnowFallManager::FindSnowVolumes( Vector &vecCenter, float flRadius, Vecto
 	{
 		for ( iSnow = 0; iSnow < m_nActiveSnowCount; ++iSnow )
 		{
-			Vector vecCenter, vecMin, vecMax;
+			Vector vecMin, vecMax;
 			vecCenter = ( m_aSnow[iSnow].m_vecMin, m_aSnow[iSnow].m_vecMax ) * 0.5;
 			vecMin = m_aSnow[iSnow].m_vecMin - vecCenter;
 			vecMax = m_aSnow[iSnow].m_vecMax - vecCenter;
-			debugoverlay->AddBoxOverlay( vecCenter, vecMin, vecMax, QAngle( 0, 0, 0 ), 200, 0, 0, 25, r_SnowDebugBox.GetFloat() );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddBoxOverlay( vecCenter, vecMin, vecMax, QAngle( 0, 0, 0 ), 200, 0, 0, 25, r_SnowDebugBox.GetFloat() );
+			}
 		}
 	}
 #endif

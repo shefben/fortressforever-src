@@ -35,8 +35,9 @@
 #include "c_te_effect_dispatch.h"
 #include "c_props.h"
 #include "c_basedoor.h"
+#ifdef FF
 #include "c_te_effect_dispatch.h"	// |-- Mirv: Needed for client nail
-
+#endif
 // NOTE: Always include this last!
 #include "tier0/memdbgon.h"
 
@@ -75,10 +76,10 @@ ConVar func_break_max_pieces( "func_break_max_pieces", "15", FCVAR_ARCHIVE | FCV
 
 ConVar cl_fasttempentcollision( "cl_fasttempentcollision", "5" );
 
-// --> Mirv: Useful effect cvars
+#ifdef FF // --> Mirv: Useful effect cvars
 ConVar cl_brasstime("cl_brasstime", "1.0");
 ConVar cl_projectilesdetail("cl_projectilesdetail", "1", FCVAR_ARCHIVE, "Projectile lodge detail: 0 - none, 1 - cutdown, 2 - full");
-// <-- Mirv
+#endif // <-- Mirv
 
 #if !defined( HL1_CLIENT_DLL )		// HL1 implements a derivative of CTempEnts
 // Temp entity interface
@@ -86,6 +87,9 @@ static CTempEnts g_TempEnts;
 // Expose to rest of the client .dll
 ITempEnts *tempents = ( ITempEnts * )&g_TempEnts;
 #endif
+
+
+
 
 C_LocalTempEntity::C_LocalTempEntity()
 {
@@ -152,17 +156,17 @@ void C_LocalTempEntity::SetAcceleration( const Vector &vecVelocity )
 {
 	m_vecTempEntAcceleration = vecVelocity;
 }
-
+#ifdef FF_CLIENT_DLL
 void DrawSprite(const Vector& vecOrigin, float flWidth, float flHeight, color32 color);
 void BeamDraw(IMaterial* pMaterial, const Vector& vecstart, const Vector& vecend, float widthstart, float widthend, float alphastart, float alphaend, const Vector& colorstart, const Vector& colorend);
 
 static ConVar cl_nail_trail("cl_nail_trail", "1", FCVAR_ARCHIVE);
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Output : int
 //-----------------------------------------------------------------------------
-int C_LocalTempEntity::DrawStudioModel( int flags )
+int C_LocalTempEntity::DrawStudioModel( int modelFlags )
 {
 	VPROF_BUDGET( "C_LocalTempEntity::DrawStudioModel", VPROF_BUDGETGROUP_MODEL_RENDERING );
 	int drawn = 0;
@@ -174,9 +178,9 @@ int C_LocalTempEntity::DrawStudioModel( int flags )
 	MDLCACHE_CRITICAL_SECTION();
 	if ( !GetModelPtr() )
 		return drawn;
-
+#ifdef FF
 	/// TODO: Aftershock needs to do whatever he wants with this...
-	if (this->flags & FTENT_FFPROJECTILE && m_vecTempEntVelocity != vec3_origin && cl_nail_trail.GetBool())
+	if (this->modelFlags & FTENT_FFPROJECTILE && m_vecTempEntVelocity != vec3_origin && cl_nail_trail.GetBool())
 	{
 		Vector vecDir = CurrentViewOrigin() - GetAbsOrigin();
 		float flLength = vecDir.LengthSqr();
@@ -197,15 +201,15 @@ int C_LocalTempEntity::DrawStudioModel( int flags )
 				Vector(1.0f, 1.0f, 1.0f), Vector(0.6f, 0.6f, 0.6f));
 		}
 	}
-
+#endif
 	if ( m_pfnDrawHelper )
 	{
-		drawn = ( *m_pfnDrawHelper )( this, flags );
+		drawn = ( *m_pfnDrawHelper )( this, modelFlags);
 	}
 	else
 	{
 		drawn = modelrender->DrawModel( 
-			flags, 
+			modelFlags,
 			this,
 			MODEL_INSTANCE_INVALID,
 			index, 
@@ -223,7 +227,7 @@ int C_LocalTempEntity::DrawStudioModel( int flags )
 // Purpose: 
 // Input  : flags - 
 //-----------------------------------------------------------------------------
-int	C_LocalTempEntity::DrawModel( int flags )
+int	C_LocalTempEntity::DrawModel( int modelFlags )
 {
 	int drawn = 0;
 
@@ -270,7 +274,7 @@ int	C_LocalTempEntity::DrawModel( int flags )
 			);
 		break;
 	case mod_studio:
-		drawn = DrawStudioModel( flags );
+		drawn = DrawStudioModel( modelFlags );
 		break;
 	default:
 		break;
@@ -337,7 +341,7 @@ bool C_LocalTempEntity::Frame( float frametime, int framenumber )
 
 	m_vecTempEntVelocity = m_vecTempEntVelocity + ( m_vecTempEntAcceleration * frametime );
 
-	// --> Mirv: FF Projectiles like nails and darts
+#ifdef FF // --> Mirv: FF Projectiles like nails and darts
 	if (flags & FTENT_FFPROJECTILE)
 	{
 		// Start off by advancing the projectile
@@ -428,7 +432,7 @@ bool C_LocalTempEntity::Frame( float frametime, int framenumber )
 
 		return true;
 	}
-	// <-- Mirv
+#endif // <-- Mirv
 
 	if ( flags & FTENT_PLYRATTACHMENT )
 	{
@@ -1222,32 +1226,61 @@ void CTempEnts::BreakModel( const Vector &pos, const QAngle &angles, const Vecto
 	}
 }
 
-void CTempEnts::PhysicsProp( int modelindex, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int flags, int effects )
+void CTempEnts::PhysicsProp( int modelindex, int skin, const Vector& pos, const QAngle& angles, const Vector& vel, int physFlags, int physEffects )
 {
-	C_PhysPropClientside *pEntity = C_PhysPropClientside::CreateNew();
-	
-	if ( !pEntity )
-		return;
-
-	const model_t *model = modelinfo->GetModel( modelindex );
-
+	const model_t* model = modelinfo->GetModel( modelindex );
 	if ( !model )
 	{
 		DevMsg("CTempEnts::PhysicsProp: model index %i not found\n", modelindex );
 		return;
 	}
 
+	PhysicsProp( model, skin, pos, angles, vel, physFlags, physEffects, modelindex );
+}
+
+C_PhysPropClientside *CTempEnts::PhysicsProp( const model_t *model, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int physFlags, int physEffects, int modelindex )
+{
+	C_PhysPropClientside *pEntity = C_PhysPropClientside::CreateNew();
+	
+	if ( !pEntity )
+		return NULL;
+
+	if ( !model )
+		return NULL;
+
 	pEntity->SetModelName( modelinfo->GetModelName(model) );
 	pEntity->m_nSkin = skin;
 	pEntity->SetAbsOrigin( pos );
 	pEntity->SetAbsAngles( angles );
 	pEntity->SetPhysicsMode( PHYSICS_MULTIPLAYER_CLIENTSIDE );
-	pEntity->SetEffects( effects );
+	pEntity->SetEffects( physEffects );
+
+	if ( physFlags & 1 )
+	{
+		if ( modelindex >= 0 )
+			pEntity->SetModelIndex( modelindex );
+
+		// We are not calling initialize on this entity here, so we need to manually set some of the required values otherwise set in initialize.
+		pEntity->SetCollisionGroup( COLLISION_GROUP_PUSHAWAY );
+		pEntity->SetAbsVelocity( vel );
+		const model_t *mod = pEntity->GetModel();
+		if ( mod )
+		{
+			Vector mins, maxs;
+			modelinfo->GetModelBounds( mod, mins, maxs );
+			pEntity->SetCollisionBounds( mins, maxs );
+		}
+
+		pEntity->Spawn();
+		pEntity->SetHealth( 0 );
+		pEntity->Break();
+		return pEntity;
+	}
 
 	if ( !pEntity->Initialize() )
 	{
 		pEntity->Release();
-		return;
+		return NULL;
 	}
 
 	IPhysicsObject *pPhysicsObject = pEntity->VPhysicsGetObject();
@@ -1260,14 +1293,16 @@ void CTempEnts::PhysicsProp( int modelindex, int skin, const Vector& pos, const 
 	{
 		// failed to create a physics object
 		pEntity->Release();
-		return;
+		return NULL;
 	}
 
-	if ( flags & 1 )
+	if ( physFlags & 1 )
 	{
 		pEntity->SetHealth( 0 );
 		pEntity->Break();
 	}
+
+	return pEntity;
 }
 
 //-----------------------------------------------------------------------------
@@ -1851,10 +1886,10 @@ C_LocalTempEntity * CTempEnts::SpawnTempModel( const model_t *pModel, const Vect
 //-----------------------------------------------------------------------------
 void CTempEnts::MuzzleFlash( int type, ClientEntityHandle_t hEntity, int attachmentIndex, bool firstPerson )
 {
-	// Mirv: Optionally disable'd muzzle flashes
+#ifdef FF // Mirv: Optionally disable'd muzzle flashes
 	if (cl_disablemuzzleflashes.GetBool())
 		return;
-
+#endif
 	switch( type )
 	{
 	case MUZZLEFLASH_COMBINE:
@@ -1919,7 +1954,7 @@ void CTempEnts::MuzzleFlash( int type, ClientEntityHandle_t hEntity, int attachm
 	default:
 		{
 			//NOTENOTE: This means you specified an invalid muzzleflash type, check your spelling?
-			//Assert( 0 );
+			Assert( 0 ); // BreakinBenny: was commented out in mod code, but not in TF2 SDK
 		}
 		break;
 	}
@@ -1934,12 +1969,13 @@ void CTempEnts::MuzzleFlash( const Vector& pos1, const QAngle& angles, int type,
 {
 #ifdef CSTRIKE_DLL
 
-#else
+	return;
 
-	// Mirv: Optionally disable'd muzzle flashes
+#else // Mirv: Optionally disable'd muzzle flashes
+#ifdef FF
 	if (cl_disablemuzzleflashes.GetBool())
 		return;
-
+#endif
 	//NOTENOTE: This function is becoming obsolete as the muzzles are moved over to being local to attachments
 
 	switch ( type )
@@ -1999,7 +2035,7 @@ void CTempEnts::MuzzleFlash( const Vector& pos1, const QAngle& angles, int type,
 	
 	default:
 		// There's no supported muzzle flash for the type specified!
-		//Assert(0);
+		Assert(0); // BreakinBenny: was commented out in mod code, but not in TF2 SDK
 		break;
 	}
 
@@ -2543,16 +2579,15 @@ void CTempEnts::LevelInit()
 	m_pHL1ShotgunShell	= (model_t *)engine->LoadModel( "models/shotgunshell.mdl" );
 #endif
 
-#if defined( CSTRIKE_DLL )
-	m_pCS_9MMShell		= (model_t *)engine->LoadModel( "models/shells/shell_9mm.mdl" );
-	m_pCS_57Shell		= (model_t *)engine->LoadModel( "models/shells/shell_57.mdl" );
-	m_pCS_12GaugeShell	= (model_t *)engine->LoadModel( "models/shells/shell_12gauge.mdl" );
-	m_pCS_556Shell		= (model_t *)engine->LoadModel( "models/shells/shell_556.mdl" );
-	m_pCS_762NATOShell	= (model_t *)engine->LoadModel( "models/shells/shell_762nato.mdl" );
-	m_pCS_338MAGShell	= (model_t *)engine->LoadModel( "models/shells/shell_338mag.mdl" );
+#if defined( CSTRIKE_DLL ) || defined ( SDK_DLL )
+	m_pCS_9MMShell		= (model_t *)engine->LoadModel( "models/Shells/shell_9mm.mdl" );
+	m_pCS_57Shell		= (model_t *)engine->LoadModel( "models/Shells/shell_57.mdl" );
+	m_pCS_12GaugeShell	= (model_t *)engine->LoadModel( "models/Shells/shell_12gauge.mdl" );
+	m_pCS_556Shell		= (model_t *)engine->LoadModel( "models/Shells/shell_556.mdl" );
+	m_pCS_762NATOShell	= (model_t *)engine->LoadModel( "models/Shells/shell_762nato.mdl" );
+	m_pCS_338MAGShell	= (model_t *)engine->LoadModel( "models/Shells/shell_338mag.mdl" );
 #endif
-	// --> Mirv: Load FF models
-#if defined (FF_CLIENT_DLL)
+#if defined( FF_CLIENT_DLL ) // --> Mirv: Load FF models
 	m_pCS_9MMShell = (model_t*)engine->LoadModel("models/shells/shell_9mm.mdl");
 	m_pCS_12GaugeShell = (model_t*)engine->LoadModel("models/shells/shell_12gauge.mdl");
 
@@ -2560,9 +2595,9 @@ void CTempEnts::LevelInit()
 
 	m_pFF_Nail = (model_t*)engine->LoadModel("models/projectiles/nail/w_nail.mdl");
 	m_pFF_Dart = (model_t*)engine->LoadModel("models/projectiles/dart/w_dart.mdl");
-#endif
-	// <-- Mirv
+#endif // <-- Mirv
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose: Initialize TE system
@@ -2590,7 +2625,7 @@ void CTempEnts::Init (void)
 	m_pHL1ShotgunShell	= NULL;
 #endif
 
-#if defined( CSTRIKE_DLL )
+#if defined( CSTRIKE_DLL ) || defined ( SDK_DLL )
 	m_pCS_9MMShell		= NULL;
 	m_pCS_57Shell		= NULL;
 	m_pCS_12GaugeShell	= NULL;
@@ -2599,7 +2634,7 @@ void CTempEnts::Init (void)
 	m_pCS_338MAGShell	= NULL;
 #endif
 
-#if defined (FF_CLIENT_DLL)
+#if defined( FF_CLIENT_DLL )
 	m_pCS_9MMShell = NULL;
 	m_pCS_12GaugeShell = NULL;
 
@@ -3021,25 +3056,34 @@ void CTempEnts::MuzzleFlash_SMG1_Player( ClientEntityHandle_t hEntity, int attac
 
 void CTempEnts::MuzzleFlash_Shotgun_Player( ClientEntityHandle_t hEntity, int attachmentIndex )
 {
-	VPROF_BUDGET( "MuzzleFlash_Shotgun_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
-	/*CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "MuzzleFlash_Shotgun_Player" );
+	VPROF_BUDGET( "MuzzleFlash_Shotgun_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING ); #ifndef FF
+	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "MuzzleFlash_Shotgun_Player" );
 
-	pSimple->SetDrawBeforeViewModel( true );*/
+	pSimple->SetDrawBeforeViewModel( true ); #else
 	CSmartPtr<CLocalSpaceEmitter> pSimple = CLocalSpaceEmitter::Create("MuzzleFlash_SMG1_Player", hEntity, attachmentIndex, FLE_VIEWMODEL);
-
+#endif
 	CacheMuzzleFlashes();
 
+	Vector origin;
+	QAngle angles;
+
+	// Get our attachment's transformation matrix
+	FX_GetAttachmentTransform( hEntity, attachmentIndex, &origin, &angles );
+
+	pSimple->GetBinding().SetBBox( origin - Vector( 4, 4, 4 ), origin + Vector( 4, 4, 4 ) );
+
+	Vector forward;
+	AngleVectors( angles, &forward, NULL, NULL );
+
 	SimpleParticle *pParticle;
-	Vector forward(1, 0, 0), offset; //NOTENOTE: All coords are in local space
+	Vector offset;
 
-	float flScale = random->RandomFloat(1.45f, 1.7f);
-
-	pSimple->SetDrawBeforeViewModel(true);
+	float flScale = random->RandomFloat( 1.25f, 1.5f );
 
 	// Flash
 	for ( int i = 1; i < 6; i++ )
 	{
-		offset = (forward * (i * 8.0f * flScale));
+		offset = origin + (forward * (i*8.0f*flScale));
 
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), m_Material_MuzzleFlash_Player[random->RandomInt(0,3)], offset );
 			
@@ -3047,7 +3091,7 @@ void CTempEnts::MuzzleFlash_Shotgun_Player( ClientEntityHandle_t hEntity, int at
 			return;
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= 0.045f;
+		pParticle->m_flDieTime		= 0.0001f;
 
 		pParticle->m_vecVelocity.Init();
 
@@ -3084,7 +3128,6 @@ void CTempEnts::MuzzleFlash_Shotgun_NPC( ClientEntityHandle_t hEntity, int attac
 	QAngle	angles;
 
 	Vector	forward;
-	int		i;
 
 	// Setup the origin.
 	Vector	origin;
@@ -3151,7 +3194,7 @@ void CTempEnts::MuzzleFlash_Shotgun_NPC( ClientEntityHandle_t hEntity, int attac
 
 	int	numEmbers = random->RandomInt( 4, 8 );
 
-	for ( i = 0; i < numEmbers; i++ )
+	for ( int i = 0; i < numEmbers; i++ )
 	{
 		pTrailParticle = (TrailParticle *) pTrails->AddParticle( sizeof( TrailParticle ), g_Mat_SMG_Muzzleflash[0], origin );
 			
@@ -3475,7 +3518,7 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 	const model_t *pModel = NULL;
 	int hitsound = TE_BOUNCE_SHELL;
 
-#if defined ( CSTRIKE_DLL )
+#if defined ( CSTRIKE_DLL ) || defined ( SDK_DLL )
 
 	switch( shellType )
 	{
@@ -3504,15 +3547,11 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 		hitsound = TE_RIFLE_SHELL;
 		pModel = m_pCS_338MAGShell;
 		break;
-	case FF_SHELL_40MM:
-		hitsound = TE_RIFLE_SHELL;
-		pModel = m_pFF_40MMShell;
 }
 #endif
 
-#if defined (FF_CLIENT_DLL)
-
-	switch (shellType)
+#if defined ( FF_CLIENT_DLL )
+	switch ( shellType )
 	{
 	default:
 	case CS_SHELL_9MM:
@@ -3528,7 +3567,6 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 		pModel = m_pFF_40MMShell;
 		break;
 	}
-
 #endif
 
 	if ( pModel == NULL )
@@ -3571,16 +3609,17 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 	pTemp->m_vecTempEntAngVelocity[0] = random->RandomFloat(-256,256);
 	pTemp->m_vecTempEntAngVelocity[1] = random->RandomFloat(-256,256);
 	pTemp->m_vecTempEntAngVelocity[2] = 0;
-#if defined ( CSTRIKE_DLL ) || defined ( FF_CLIENT_DLL )
+#if defined( FF_CLIENT_DLL )
 	if (shellType == FF_SHELL_40MM)
 		pTemp->m_vecTempEntAngVelocity = QAngle(0, 0, 0);
 #endif
 	pTemp->SetRenderMode( kRenderNormal );
 	pTemp->tempent_renderamt = 255;
-	
-	//pTemp->die = gpGlobals->curtime + 10;
+#ifndef FF	
+	pTemp->die = gpGlobals->curtime + 10;
+#else
 	pTemp->die = gpGlobals->curtime + cl_brasstime.GetFloat();
-
+#endif
 	bool bViewModelBrass = false;
 
 	if ( pShooter && pShooter->GetObserverMode() == OBS_MODE_IN_EYE )
@@ -3609,8 +3648,7 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 	
 }
 
-// --> Mirv: A FF projectile
-
+#ifdef FF // --> Mirv: A FF projectile
 extern bool AllowEffects(int iEntityIndex, float flNewDelay);
 
 void CTempEnts::FFProjectile(const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex)
@@ -3672,4 +3710,4 @@ void CTempEnts::FFProjectile(const Vector& vecPosition, const QAngle& angVelocit
 	if (projectileType == FF_PROJECTILE_NAIL_NG && random->RandomInt(0, 30))
 		pTemp->flags |= FTENT_FFOPTEFFECT;
 }
-// <-- Mirv
+#endif // <-- Mirv

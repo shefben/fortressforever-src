@@ -114,7 +114,7 @@ void CEntityFlame::InputIgnite( inputdata_t &inputdata )
 // Purpose: Creates a flame and attaches it to a target entity.
 // Input  : pTarget - 
 //-----------------------------------------------------------------------------
-CEntityFlame *CEntityFlame::Create( CBaseEntity *pTarget, bool useHitboxes, float flameSize)
+CEntityFlame *CEntityFlame::Create( CBaseEntity *pTarget, bool useHitboxes )
 {
 	CEntityFlame *pFlame = (CEntityFlame *) CreateEntityByName( "entityflame" );
 
@@ -126,13 +126,9 @@ CEntityFlame *CEntityFlame::Create( CBaseEntity *pTarget, bool useHitboxes, floa
 
 	float size = ( xSize + ySize ) * 0.5f;
 	
-	if (size != 0)
+	if ( size < 16.0f )
 	{
-		size = size * flameSize;
-	}
-	else
-	{
-		size = flameSize;
+		size = 16.0f;
 	}
 
 	UTIL_SetOrigin( pFlame, pTarget->GetAbsOrigin() );
@@ -327,7 +323,7 @@ void CEntityFlame::FlameThink( void )
 	FireSystem_AddHeatInRadius( GetAbsOrigin(), m_flSize/2, 2.0f );
 
 }  
-
+#ifdef FF_DLL
 //-----------------------------------------------------------------------------
 // Purpose: Kill the flame NOW
 //-----------------------------------------------------------------------------
@@ -350,7 +346,7 @@ void CEntityFlame::Extinguish(void)
 
 	UTIL_Remove(this);
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : pEnt -	

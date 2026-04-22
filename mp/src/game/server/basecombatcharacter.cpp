@@ -39,6 +39,10 @@
 #include "saverestoretypes.h"
 #include "nav_mesh.h"
 
+#ifdef TF_DLL
+#include "nav_mesh/tf_nav_area.h"
+#endif
+
 #ifdef NEXT_BOT
 #include "NextBot/NextBotManager.h"
 #endif
@@ -53,11 +57,11 @@
 	#include "prop_portal_shared.h"
 	#include "portal_shareddefs.h"
 #endif
-
+#ifdef FF_DLL
 #include "ff_player.h"
 #include "ff_scriptman.h"
 #include "ff_luacontext.h"
-
+#endif
 #undef MINMAX_H
 #include "minmax.h"
 
@@ -1605,9 +1609,9 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 
 	CBaseCombatWeapon *pDroppedWeapon = m_hActiveWeapon.Get();
 
-	// Modified by L0ki: we dont need to drop weapons in FF
+#ifndef FF_DLL	// Modified by L0ki: we dont need to drop weapons in FF
 	// Drop any weapon that I own
-	/*if (VPhysicsGetObject())
+	if ( VPhysicsGetObject() )
 	{
 		Vector weaponForce = forceVector * VPhysicsGetObject()->GetInvMass();
 		Weapon_Drop( m_hActiveWeapon, NULL, &weaponForce );
@@ -1615,8 +1619,8 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 	else
 	{
 		Weapon_Drop( m_hActiveWeapon );
-	}*/
-	
+	}
+#endif
 	// if flagged to drop a health kit
 	if (HasSpawnFlags(SF_NPC_DROP_HEALTHKIT))
 	{
@@ -2172,7 +2176,20 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 
 	// Pass the lighting origin over to the weapon if we have one
 	pWeapon->SetLightingOriginRelative( GetLightingOriginRelative() );
+
+	if ( IsPlayer() )
+	{
+		IGameEvent *event = gameeventmanager->CreateEvent( "weapon_equipped" );
+		if ( event )
+		{
+			event->SetString( "class", pWeapon->GetClassname() );
+			event->SetInt( "entindex", pWeapon->entindex() );
+			event->SetInt( "owner_entindex", entindex() );
+			gameeventmanager->FireEvent( event );
+		}
+	}
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose:	Leaves weapon, giving only ammo to the character
@@ -2437,7 +2454,7 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 			bool bGibbed = false;
 
 			Event_Killed( info );
-
+#ifdef FF_DLL
 			if (ToFFPlayer(this))
 			{
 				// -------------------------------------------------------------------
@@ -2451,7 +2468,7 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 				hPlayerKilled.Push(&info);
 				_scriptman.RunPredicates_LUA(NULL, &hPlayerKilled, "player_killed");
 			}
-
+#endif
 			// Only classes that specifically request it are gibbed
 			if ( ShouldGib( info ) )
 			{
@@ -3013,6 +3030,18 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSo
 	}
 
 	m_iAmmo.Set( iAmmoIndex, m_iAmmo[iAmmoIndex] + iAdd );
+
+	if ( IsPlayer() )
+	{
+		IGameEvent *event = gameeventmanager->CreateEvent( "ammo_pickup" );
+		if ( event )
+		{
+			event->SetInt( "ammo_index", iAmmoIndex );
+			event->SetInt( "amount", iAdd );
+			event->SetInt( "total", m_iAmmo[ iAmmoIndex ] );
+			gameeventmanager->FireEvent( event );
+		}
+	}
 
 	return iAdd;
 }
@@ -3612,3 +3641,16 @@ float CBaseCombatCharacter::GetTimeSinceLastInjury( int team /*= TEAM_ANY */ ) c
 	return never;
 }
 
+//-----------------------------------------------------------------------------
+HSCRIPT CBaseCombatCharacter::ScriptGetLastKnownArea( void ) const 
+{ 
+#ifdef TF_DLL
+	return ToHScript( GetLastKnownArea() ); 
+#else
+	return NULL;
+#endif
+}	
+
+BEGIN_ENT_SCRIPTDESC( CBaseCombatCharacter, CBaseFlex, "Base combat characters." )
+	DEFINE_SCRIPTFUNC_NAMED( ScriptGetLastKnownArea, "GetLastKnownArea", "Return the last nav area occupied - NULL if unknown" )
+END_SCRIPTDESC();

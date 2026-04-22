@@ -42,7 +42,7 @@ CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectVGuiScreen )
 CLIENTEFFECT_MATERIAL( "engine/writez" )
 CLIENTEFFECT_REGISTER_END()
 
-
+#ifdef FF
 // ----------------------------------------------------------------------------- //
 // This is a cache of preloaded keyvalues.
 // ----------------------------------------------------------------------------- // 
@@ -75,8 +75,7 @@ void ClearKeyValuesCache()
 	}
 	g_KeyValuesCache.Purge();
 }
-
-
+#endif
 IMPLEMENT_CLIENTCLASS_DT(C_VGuiScreen, DT_VGuiScreen, CVGuiScreen)
 	RecvPropFloat( RECVINFO(m_flWidth) ),
 	RecvPropFloat( RECVINFO(m_flHeight) ),

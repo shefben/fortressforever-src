@@ -37,11 +37,11 @@ CLIENTEFFECT_MATERIAL( "effects/yellowflare_noz" )
 CLIENTEFFECT_REGISTER_END()
 
 PMaterialHandle g_Material_Spark = NULL;
-
+#ifdef FF
 // dlight scale
 extern ConVar cl_ffdlight_explosion;
 extern ConVar cl_ffdlight_generic;
-
+#endif
 static ConVar fx_drawmetalspark( "fx_drawmetalspark", "1", FCVAR_DEVELOPMENTONLY, "Draw metal spark effects." );
 
 //-----------------------------------------------------------------------------

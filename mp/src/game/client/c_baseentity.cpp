@@ -41,6 +41,10 @@
 #include "inetchannelinfo.h"
 #include "proto_version.h"
 
+#ifdef TF_CLIENT_DLL
+#include "c_tf_player.h"
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -88,7 +92,7 @@ static ConVar cl_interpolate("cl_interpolate", "1.0f", FCVAR_USERINFO | FCVAR_DE
 
 static ConVar  cl_interp_npcs( "cl_interp_npcs", "0.0", FCVAR_USERINFO, "Interpolate NPC positions starting this many seconds in past (or cl_interp, if greater)" );  
 static ConVar  cl_interp_all( "cl_interp_all", "0", 0, "Disable interpolation list optimizations.", 0, 0, 0, 0, cc_cl_interp_all_changed );
-ConVar  r_drawmodeldecals( "r_drawmodeldecals", "1" );
+ConVar  r_drawmodeldecals( "r_drawmodeldecals", "1", FCVAR_ALLOWED_IN_COMPETITIVE );
 extern ConVar	cl_showerror;
 int C_BaseEntity::m_nPredictionRandomSeed = -1;
 C_BasePlayer *C_BaseEntity::m_pPredictionPlayer = NULL;
@@ -465,13 +469,14 @@ BEGIN_RECV_TABLE_NOBASE(C_BaseEntity, DT_BaseEntity)
 	RecvPropInt(RECVINFO(m_clrRender)),
 	RecvPropInt(RECVINFO(m_iTeamNum)),
 	RecvPropInt(RECVINFO(m_CollisionGroup)),
+	RecvPropFloat(RECVINFO(m_flGravity)),
 	RecvPropFloat(RECVINFO(m_flElasticity)),
 	RecvPropFloat(RECVINFO(m_flShadowCastDistance)),
 	RecvPropEHandle( RECVINFO(m_hOwnerEntity) ),
 	RecvPropEHandle( RECVINFO(m_hEffectEntity) ),
 	RecvPropInt( RECVINFO_NAME(m_hNetworkMoveParent, moveparent), 0, RecvProxy_IntToMoveParent ),
-	RecvPropInt( RECVINFO( m_iParentAttachment ) ),
-	RecvPropInt( RECVINFO(m_takedamage), 0 ),
+	RecvPropInt( RECVINFO( m_iParentAttachment ) ), #ifdef FF
+	RecvPropInt( RECVINFO( m_takedamage ), 0 ),	#endif
 
 	RecvPropInt( "movetype", 0, SIZEOF_IGNORE, 0, RecvProxy_MoveType ),
 	RecvPropInt( "movecollide", 0, SIZEOF_IGNORE, 0, RecvProxy_MoveCollide ),
@@ -548,7 +553,7 @@ BEGIN_PREDICTION_DATA_NO_BASE( C_BaseEntity )
 //	DEFINE_FIELD( m_flLastMessageTime, FIELD_FLOAT ),
 	DEFINE_FIELD( m_vecBaseVelocity, FIELD_VECTOR ),
 	DEFINE_FIELD( m_iEFlags, FIELD_INTEGER ),
-	DEFINE_FIELD( m_flGravity, FIELD_FLOAT ),
+	DEFINE_PRED_FIELD( m_flGravity, FIELD_FLOAT, FTYPEDESC_INSENDTABLE | FTYPEDESC_NOERRORCHECK ),
 //	DEFINE_FIELD( m_ModelInstance, FIELD_SHORT ),
 	DEFINE_FIELD( m_flProxyRandomValue, FIELD_FLOAT ),
 
@@ -1099,6 +1104,28 @@ bool C_BaseEntity::Init( int entnum, int iSerialNum )
 
 	index = entnum;
 
+	if ( this->IsPlayer() )
+	{
+		// Josh: If we ever have a player that could ever cause us
+		// an out of bounds access to any player sized arrays.
+		// Just get out now!
+		//
+		// All these issues should be bounds checked now anyway,
+		// but I'd much rather be safe than sorry here.
+		//
+		// Additionally, make sure we aren't 0 or negative,
+		// the player CANNOT be worldspawn.
+		// Someone is going to try that to get an extra player and frog something up!
+		// 
+		// Player index is entindex - 1.
+		// MAX_PLAYERS_ARRAY_SAFE is MAX_PLAYERS + 1.
+		if ( index <= 0 || index >= MAX_PLAYERS_ARRAY_SAFE )
+		{
+			Warning("Player with out of bounds entindex! Got: %d Expected to be in inclusive range: %d - %d\n", index, 1, MAX_PLAYERS );
+			return false;
+		}
+	}
+
 	cl_entitylist->AddNetworkableEntity( GetIClientUnknown(), entnum, iSerialNum );
 
 	CollisionProp()->CreatePartitionHandle();
@@ -1252,8 +1279,8 @@ void C_BaseEntity::Release()
 	}
 
 	UpdateOnRemove();
-
-	PrintDeleteInfo();
+#ifdef FF
+	PrintDeleteInfo(); #endif
 	delete this;
 }
 
@@ -1712,19 +1739,20 @@ void C_BaseEntity::GetShadowRenderBounds( Vector &mins, Vector &maxs, ShadowType
 	GetRenderBounds( mins, maxs );
 	m_EntClientFlags &= ~ENTCLIENTFLAG_GETTINGSHADOWRENDERBOUNDS;
 }
-
+#ifdef FF
 ConVar sDebugAbsQueriesValid("ffdev_debugabsqueriesvalid", "0", FCVAR_CHEAT);
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: Last received origin
 // Output : const float
 //-----------------------------------------------------------------------------
 const Vector& C_BaseEntity::GetAbsOrigin( void ) const
 {
+	//Assert( s_bAbsQueriesValid );
+#ifdef FF
 	if (!s_bAbsQueriesValid && sDebugAbsQueriesValid.GetBool())
 		Warning("!s_bAbsQueriesValid: %s\n", const_cast<C_BaseEntity*>(this)->GetClassname());
-	//Assert(s_bAbsQueriesValid);
-
+#endif
 	const_cast<C_BaseEntity*>(this)->CalcAbsolutePosition();
 	return m_vecAbsOrigin;
 }
@@ -1735,11 +1763,10 @@ const Vector& C_BaseEntity::GetAbsOrigin( void ) const
 // Output : const
 //-----------------------------------------------------------------------------
 const QAngle& C_BaseEntity::GetAbsAngles( void ) const
-{
+{#ifdef FF
 	if (!s_bAbsQueriesValid && sDebugAbsQueriesValid.GetBool())
-		Warning("!s_bAbsQueriesValid: %s\n", const_cast<C_BaseEntity*>(this)->GetClassname());
+		Warning("!s_bAbsQueriesValid: %s\n", const_cast<C_BaseEntity*>(this)->GetClassname()); #endif
 	//Assert( s_bAbsQueriesValid );
-
 	const_cast<C_BaseEntity*>(this)->CalcAbsolutePosition();
 	return m_angAbsRotation;
 }
@@ -1766,9 +1793,9 @@ void C_BaseEntity::SetNetworkAngles( const QAngle& ang )
 // Purpose: 
 // Input  : index - 
 //-----------------------------------------------------------------------------
-void C_BaseEntity::SetModelIndex( int index )
+void C_BaseEntity::SetModelIndex( int index_ )
 {
-	m_nModelIndex = index;
+	m_nModelIndex = index_;
 	const model_t *pModel = modelinfo->GetModel( m_nModelIndex );
 	SetModelPointer( pModel );
 }
@@ -2057,13 +2084,13 @@ void C_BaseEntity::UpdatePartitionListEntry()
 	if (shouldCollide == ENTITY_SHOULD_COLLIDE)
 		list |= PARTITION_CLIENT_SOLID_EDICTS;
 	else if (shouldCollide == ENTITY_SHOULD_RESPOND)
-		list |= PARTITION_CLIENT_RESPONSIVE_EDICTS;
+		list |= PARTITION_CLIENT_RESPONSIVE_EDICTS; #ifdef FF
 	// HACKHACK: Fix to allow laser beam to shine off ragdolls
 	else if (shouldCollide == ENTITY_SHOULD_COLLIDE_RESPOND)
 		list |= PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS;
-
+#endif
 	// add the entity to the KD tree so we will collide against it
-	partition->RemoveAndInsert( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, list, CollisionProp()->GetPartitionHandle() );
+	::partition->RemoveAndInsert( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, list, CollisionProp()->GetPartitionHandle() );
 }
 
 
@@ -2119,7 +2146,7 @@ void C_BaseEntity::NotifyShouldTransmit( ShouldTransmitState_t state )
 			SetDormant( true );
 			
 			// remove the entity from the KD tree so we won't collide against it
-			partition->Remove( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, CollisionProp()->GetPartitionHandle() );
+			::partition->Remove( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, CollisionProp()->GetPartitionHandle() );
 		
 		}
 		break;
@@ -2193,6 +2220,7 @@ void C_BaseEntity::PreDataUpdate( DataUpdateType_t updateType )
 	}
 
 	m_ubOldInterpolationFrame = m_ubInterpolationFrame;
+	m_bOldShouldDraw = ShouldDraw();
 }
 
 const Vector& C_BaseEntity::GetOldOrigin()
@@ -2641,6 +2669,12 @@ void C_BaseEntity::PostDataUpdate( DataUpdateType_t updateType )
 
 	// if we changed parents, recalculate visibility
 	if ( m_hOldMoveParent != m_hNetworkMoveParent )
+	{
+		UpdateVisibility();
+	}
+
+	// if ShouldDraw state changes, recalculate visibility
+	if ( m_bOldShouldDraw != ShouldDraw() )
 	{
 		UpdateVisibility();
 	}

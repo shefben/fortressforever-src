@@ -22,8 +22,8 @@ $Configuration	"Debug"
 {
 	$General
 	{
-		$OutputDirectory			".\Debug_$GAMENAME"			[$WIN32]
-		$IntermediateDirectory		".\Debug_$GAMENAME"			[$WIN32]
+		$OutputDirectory			".\Debug_$GAMENAME" [$WINDOWS]
+		$IntermediateDirectory		".\Debug_$GAMENAME" [$WINDOWS]
 
 		$OutputDirectory			".\Debug_$GAMENAME_360"		[$X360]
 		$IntermediateDirectory		".\Debug_$GAMENAME_360"		[$X360]
@@ -34,8 +34,9 @@ $Configuration	"Release"
 {
 	$General
 	{
-		$OutputDirectory			".\Release_$GAMENAME"		[$WIN32]
-		$IntermediateDirectory		".\Release_$GAMENAME"		[$WIN32]
+		// Windows generator doesn't sandbox these directories per configuration but others do :-/
+		$OutputDirectory			".\Release_$GAMENAME" [$WINDOWS]
+		$IntermediateDirectory		".\Release_$GAMENAME" [$WINDOWS]
 
 		$OutputDirectory			".\Release_$GAMENAME_360"	[$X360]
 		$IntermediateDirectory		".\Release_$GAMENAME_360"	[$X360]
@@ -46,29 +47,34 @@ $Configuration
 {
 	$General
 	{
-			$OutputDirectory			".\$GAMENAME"		[$OSXALL]
+		$OutputDirectory			".\$GAMENAME" [$OSXALL]
+		$IntermediateDirectory		".\$GAMENAME" [$OSXALL]
 	}
 
 	$Compiler
 	{
 		$AdditionalIncludeDirectories	".\;$BASE;$SRCDIR\vgui2\include;$SRCDIR\vgui2\controls;$SRCDIR\game\shared;.\game_controls;$SRCDIR\thirdparty\sixensesdk\include"
 		$PreprocessorDefinitions		"$BASE;NO_STRING_T;CLIENT_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead" 
+		$PreprocessorDefinitions		"$BASE;INCLUDED_STEAM2_USERID_STRUCTS" 
 		$PreprocessorDefinitions		"$BASE;fopen=dont_use_fopen" [$WIN32]
 		$PreprocessorDefinitions		"$BASE;USE_WEBM_FOR_REPLAY;" [$LINUXALL]
-		$PreprocessorDefinitions		"$BASE;CURL_STATICLIB" [$WIN32 && $BUILD_REPLAY]
 		$Create/UsePrecompiledHeader	"Use Precompiled Header (/Yu)"
 		$Create/UsePCHThroughFile		"cbase.h"
 		$PrecompiledHeaderFile			"$(IntDir)/client.pch"
+
+		// misyl: We should eliminate these someday.
+		$DisableSpecificWarnings		"$BASE;4267" [$WIN64] // warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+		$DisableSpecificWarnings		"$BASE;4101" [$WINDOWS] // warning C4101: 'topColor': unreferenced local variable
 	}
 
 	$Linker
 	{
 		$SystemLibraries				"iconv" [$OSXALL]
 		$SystemFrameworks				"Carbon" [$OSXALL]
-		$SystemLibraries				"rt" [$LINUXALL]
+		$SystemLibraries				"rt;z" [$LINUXALL]
 		$IgnoreImportLibrary			"TRUE"
-		$AdditionalDependencies			"$BASE winmm.lib"	[$WIN32]
-		$AdditionalDependencies			"$BASE wsock32.lib Ws2_32.lib" [$BUILD_REPLAY]
+		$AdditionalDependencies			"$BASE winmm.lib"	[$WINDOWS]
+		$AdditionalDependencies			"$BASE wsock32.lib Ws2_32.lib" [$BUILD_REPLAY&&$WINDOWS]
 	}
 }
 
@@ -305,8 +311,8 @@ $Project
 		$File	"clientshadowmgr.cpp"
 		$File	"clientsideeffects.cpp"
 		$File	"clientsideeffects_test.cpp"
-		//$File	"clientsteamcontext.cpp"		// removed in latest steam API (v1.60)
-		//$File	"clientsteamcontext.h"			// removed in latest steam API (v1.60)
+		$File	"clientsteamcontext.cpp"
+		$File	"clientsteamcontext.h"
 		$File	"colorcorrectionmgr.cpp"
 		$File	"commentary_modelviewer.cpp"
 		$File	"commentary_modelviewer.h"
@@ -340,8 +346,6 @@ $Project
 		$File	"fx_tracer.cpp"
 		$File	"fx_trail.cpp"
 		$File	"fx_water.cpp"
-		$File	"hl2\fx_hl2_impacts.cpp"
-		$File	"hl2\fx_hl2_tracers.cpp"
 		$File	"$SRCDIR\game\shared\gamemovement.cpp"
 		$File	"$SRCDIR\game\shared\gamerules.cpp"
 		$File	"$SRCDIR\game\shared\gamerules_register.cpp"
@@ -428,7 +432,7 @@ $Project
 		$File	"ragdoll.cpp"
 		$File	"$SRCDIR\game\shared\ragdoll_shared.cpp"
 		$File	"recvproxy.cpp"
-		$File	"basepresence.cpp"			[$WIN32||$POSIX]
+		$File	"basepresence.cpp"			[$WINDOWS||$POSIX]
 		$File	"basepresence_xbox.cpp"		[$X360]
 		$File	"$SRCDIR\game\shared\rope_helpers.cpp"
 		$File	"$SRCDIR\game\shared\saverestore.cpp"
@@ -504,7 +508,9 @@ $Project
 		$File	"$SRCDIR\game\client\c_vote_controller.cpp"
 		//Haptics
 		$File	"$SRCDIR\public\haptics\haptic_msgs.cpp"	[!$X360]
-		$File	"$SRCDIR\public\haptics\haptic_utils.cpp"	[$WIN32&&!$X360]
+		$File	"$SRCDIR\public\haptics\haptic_utils.cpp"	[$WINDOWS&&!$X360]
+
+
 
 		$Folder	"Sixense"
 		{
@@ -660,7 +666,7 @@ $Project
 
 	}
 
-	$Folder	"MP3" [$WIN32||$POSIX]
+	$Folder	"MP3" [$WINDOWS||$POSIX]
 	{
 		$File	"mp3player.cpp"
 		$File	"mp3player.h"
@@ -876,6 +882,7 @@ $Project
 		$File	"weapons_resource.h"
 		$File	"vgui_video.h"
 		$File   "vgui_video_player.h"
+
 	}
 
 	$Folder	"Public Header Files"

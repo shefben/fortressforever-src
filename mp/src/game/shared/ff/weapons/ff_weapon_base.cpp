@@ -145,6 +145,33 @@ CFFWeaponBase::CFFWeaponBase()
 	SetCollisionGroup(COLLISION_GROUP_WEAPON);
 }
 
+#ifdef GAME_DLL
+//-----------------------------------------------------------------------------
+// Purpose: We want to remove this weapon
+//-----------------------------------------------------------------------------
+void CFFWeaponBase::ForceRemove()
+{
+	SetRemoveable(true);
+	AddSpawnFlags(SF_NORESPAWN);
+	StopAnimation();
+	StopFollowingEntity();
+	SetMoveType(MOVETYPE_NONE);
+	SetGravity(1.0);
+	m_iState = WEAPON_NOT_CARRIED;
+	RemoveEffects(EF_NODRAW);
+	VPhysicsDestroyObject();
+	SetGroundEntity(NULL);
+	AddEFlags(EFL_NO_WEAPON_PICKUP);
+	SetThink(NULL);
+	SetTouch(NULL);
+	SetOwnerEntity(NULL);
+	SetOwner(NULL);
+
+	// Die!
+	UTIL_Remove(this);
+}
+#endif
+
 void CFFWeaponBase::Spawn()
 {
 	CBaseCombatWeapon::Spawn();

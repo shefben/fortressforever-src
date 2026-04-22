@@ -25,19 +25,19 @@
 #include <game/client/iviewport.h>
 
 #include "mouseoverpanelbutton.h"
-
+#ifdef FF
 class MouseOverButton;
 class LoadoutLabel;
 class ClassPropertiesLabel;
-
+#endif
 namespace vgui
 {
-	class TextEntry;
+	class TextEntry; #ifdef FF
 	class PlayerModelPanel;
 	class FFButton;
 	class ProgressBar;
 	class Section;
-	class RichText;
+	class RichText; #endif
 }
 
 //-----------------------------------------------------------------------------
@@ -50,13 +50,14 @@ private:
 
 public:
 	CClassMenu(IViewPort *pViewPort);
+	CClassMenu(IViewPort *pViewPort, const char *panelName );
 	virtual ~CClassMenu();
 
 	virtual const char *GetName( void ) { return PANEL_CLASS; }
 	virtual void SetData(KeyValues *data);
 	virtual void Reset();
-	virtual void Update();
-	virtual bool NeedsUpdate( void ) { return gpGlobals->curtime > m_flNextUpdate; }
+	virtual void Update() {};
+	virtual bool NeedsUpdate( void ) { return false; }
 	virtual bool HasInputElements( void ) { return true; }
 	virtual void ShowPanel( bool bShow );
 
@@ -65,6 +66,7 @@ public:
 	virtual bool IsVisible() { return BaseClass::IsVisible(); }
 	virtual void SetParent( vgui::VPANEL parent ) { BaseClass::SetParent( parent ); }
 
+	virtual GameActionSet_t GetPreferredActionSet() { return GAME_ACTION_SET_NONE; }
 	virtual void OnKeyCodePressed(vgui::KeyCode code);
 	virtual void OnKeyCodeReleased(vgui::KeyCode code);
 
@@ -86,7 +88,7 @@ protected:
 	ButtonCode_t m_iScoreBoardKey;
 	int			m_iTeam;
 	vgui::EditablePanel *m_pPanel;
-
+#ifdef FF
 	vgui::RichText* m_pClassInfo;
 
 	float			m_flNextUpdate;
@@ -115,6 +117,7 @@ protected:
 
 	//virtual vgui::Panel* CreateControlByName(const char* controlName);
 	//virtual MouseOverPanelButton* CreateNewMouseOverPanelButton(vgui::EditablePanel* panel);
+#endif
 };
 
 

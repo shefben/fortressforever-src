@@ -320,11 +320,11 @@ void CHudHintDisplay::LocalizeAndDisplay( const char *pszHudTxtMsg, const char *
 		C_BasePlayer *pLocalPlayer = C_BasePlayer::GetLocalPlayer();
 		if ( pLocalPlayer )
 		{
-#ifndef HL2MP
-			/*if ( sv_hudhint_sound.GetBool() && cl_hudhint_sound.GetBool() )
+#ifndef HL2MP && #ifndef FF
+			if ( sv_hudhint_sound.GetBool() && cl_hudhint_sound.GetBool() )
 			{
 				pLocalPlayer->EmitSound( "Hud.Hint" );
-			}*/
+			}
 #endif // HL2MP
 
 			if ( pLocalPlayer->Hints() )
@@ -340,7 +340,7 @@ void CHudHintDisplay::LocalizeAndDisplay( const char *pszHudTxtMsg, const char *
 }
 
 
-#ifdef HL2MP
+
 
 //-----------------------------------------------------------------------------
 // Purpose: Displays small key-centric hints on the right hand side of the screen
@@ -573,7 +573,7 @@ bool CHudHintKeyDisplay::SetHintText( const char *text )
 
 					// Turn localized string into icon character
 					Q_snprintf( szBuff, sizeof( szBuff ), "#GameUI_Icons_%s", g_pInputSystem->ButtonCodeToString( static_cast<ButtonCode_t>( iCode ) ) );
-					g_pVGuiLocalize->ConstructString( szWideBuff, sizeof( szWideBuff ), g_pVGuiLocalize->Find( szBuff ), 0 );
+					g_pVGuiLocalize->ConstructString_safe( szWideBuff, g_pVGuiLocalize->Find( szBuff ), 0 );
 					g_pVGuiLocalize->ConvertUnicodeToANSI( szWideBuff, szBuff, sizeof( szBuff ) );
 
 					// Add this icon to our list of keys to display
@@ -788,5 +788,3 @@ void CHudHintKeyDisplay::MsgFunc_KeyHintText( bf_read &msg )
 		g_pClientMode->GetViewportAnimationController()->StartAnimationSequence( "KeyHintMessageHide" ); 
 	}
 }
-
-#endif

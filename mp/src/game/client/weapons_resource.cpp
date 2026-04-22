@@ -28,9 +28,9 @@ static CHudTexture *FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, 
 
 	return list[ idx ];
 }
-
+#ifdef FF
 CHudTexture* FindHudTextureInDict(CUtlDict< CHudTexture*, int >& list, const char* psz);	// |-- Mirv: Now defined in hud.cpp
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Output : 
@@ -166,13 +166,13 @@ void WeaponsResource::LoadWeaponSprites( WEAPON_FILE_INFO_HANDLE hWeaponFileInfo
 				pWeaponInfo->iconInactive->Precache();
 				pHudHR->SetHistoryGap( pWeaponInfo->iconInactive->Height() );
 			}
-
+#ifdef FF
 			if (strlen(pWeaponInfo->szClassName) > 3)
 			{
 				Q_snprintf(p->szShortName, 63, "weapon_%s", pWeaponInfo->szClassName + 3);
 				gHUD.AddSearchableHudIconToList(*p);
 			}
-		}
+#endif	}
 
 		p = FindHudTextureInDict( tempList, "weapon_s" );
 		if ( p )
@@ -215,7 +215,7 @@ void WeaponsResource::LoadWeaponSprites( WEAPON_FILE_INFO_HANDLE hWeaponFileInfo
 				pHudHR->SetHistoryGap( pWeaponInfo->iconAmmo2->Height() );
 			}
 		}
-
+#ifdef FF
 		// --> Mirv:
 		p = FindHudTextureInDict(tempList, "deathnotice");
 		if (p)
@@ -250,7 +250,7 @@ void WeaponsResource::LoadWeaponSprites( WEAPON_FILE_INFO_HANDLE hWeaponFileInfo
 				gHUD.AddSearchableHudIconToList(*p);
 			}
 		}
-		// <-- squeek
+#endif	// <-- squeek
 	}
 
 	FreeHudTextureList( tempList );

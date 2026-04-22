@@ -6,11 +6,14 @@
 //=============================================================================//
 #include "cbase.h"
 #include "c_playerresource.h"
+#ifndef FF
+#include "c_team.h"
+#else
 #include "c_ff_team.h"
 #include "gamestringpool.h"
-
+#ifdef FF
 #include "ff_shareddefs.h"
-
+#endif
 #ifdef HL2MP
 #include "hl2mp_gamerules.h"
 #endif
@@ -23,65 +26,73 @@ const float PLAYER_RESOURCE_THINK_INTERVAL = 0.2f;
 IMPLEMENT_CLIENTCLASS_DT_NOBASE(C_PlayerResource, DT_PlayerResource, CPlayerResource)
 	RecvPropArray3( RECVINFO_ARRAY(m_iPing), RecvPropInt( RECVINFO(m_iPing[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_iScore), RecvPropInt( RECVINFO(m_iScore[0]))),
-	RecvPropArray3( RECVINFO_ARRAY(m_iFortPoints), RecvPropInt( RECVINFO(m_iFortPoints[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_iDeaths), RecvPropInt( RECVINFO(m_iDeaths[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_bConnected), RecvPropInt( RECVINFO(m_bConnected[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_iTeam), RecvPropInt( RECVINFO(m_iTeam[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_bAlive), RecvPropInt( RECVINFO(m_bAlive[0]))),
-	RecvPropArray3( RECVINFO_ARRAY(m_iHealth), RecvPropInt( RECVINFO(m_iHealth[0]))),
+	RecvPropArray3( RECVINFO_ARRAY(m_iHealth), RecvPropInt( RECVINFO(m_iHealth[0]))), #ifdef FF
+	RecvPropArray3( RECVINFO_ARRAY(m_iFortPoints), RecvPropInt( RECVINFO(m_iFortPoints[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_iArmor), RecvPropInt(RECVINFO(m_iArmor[0]))),
 	RecvPropArray3( RECVINFO_ARRAY(m_iClass), RecvPropInt(RECVINFO(m_iClass[0]))), // |-- Mirv: Current class
 	RecvPropArray3( RECVINFO_ARRAY(m_iChannel), RecvPropInt(RECVINFO(m_iChannel[0]))), // |-- Mirv: Channel information
 	RecvPropArray3( RECVINFO_ARRAY(m_iAssists), RecvPropInt(RECVINFO(m_iAssists[0]))),
-	RecvPropBool( RECVINFO(m_bIsIntermission)),
+	RecvPropBool( RECVINFO(m_bIsIntermission)), #endif
+	RecvPropArray3( RECVINFO_ARRAY(m_iAccountID), RecvPropInt( RECVINFO(m_iAccountID[0]))),
+	RecvPropArray3( RECVINFO_ARRAY(m_bValid), RecvPropInt( RECVINFO(m_bValid[0]))),
+	RecvPropArray3( RECVINFO_ARRAY( m_iUserID ), RecvPropInt( RECVINFO( m_iUserID[0] ) ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_PlayerResource )
 
-	DEFINE_PRED_ARRAY( m_szName, FIELD_STRING, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iPing, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iScore, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iFortPoints, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iDeaths, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_bConnected, FIELD_BOOLEAN, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iTeam, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_bAlive, FIELD_BOOLEAN, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iHealth, FIELD_INTEGER, MAX_PLAYERS+1, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_ARRAY( m_iArmor, FIELD_INTEGER, MAX_PLAYERS + 1, FTYPEDESC_PRIVATE),
-	DEFINE_PRED_ARRAY( m_iClass, FIELD_INTEGER, MAX_PLAYERS + 1, FTYPEDESC_PRIVATE),
-	DEFINE_PRED_ARRAY( m_iChannel, FIELD_INTEGER, MAX_PLAYERS + 1, FTYPEDESC_PRIVATE),
-	DEFINE_PRED_ARRAY( m_iAssists, FIELD_INTEGER, MAX_PLAYERS + 1, FTYPEDESC_PRIVATE),
+	DEFINE_PRED_ARRAY( m_szName, FIELD_STRING, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iPing, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iScore, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iDeaths, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_bConnected, FIELD_BOOLEAN, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iTeam, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_bAlive, FIELD_BOOLEAN, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iHealth, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iAccountID, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_bValid, FIELD_BOOLEAN, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iUserID, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ), #ifdef FF
+	DEFINE_PRED_ARRAY( m_iFortPoints, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iArmor, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iClass, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iChannel, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ),
+	DEFINE_PRED_ARRAY( m_iAssists, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE, FTYPEDESC_PRIVATE ), #endif
 
 END_PREDICTION_DATA()	
 
 C_PlayerResource *g_PR;
 
 IGameResources * GameResources( void ) { return g_PR; }
-
+#ifdef FF
 extern ConVar hud_newteamcolors;
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 C_PlayerResource::C_PlayerResource()
-{
-	memset( m_szName, 0, sizeof(m_szName) );
+{#ifdef FF
+	memset( m_szName, 0, sizeof(m_szName) ); #endif
 	memset( m_iPing, 0, sizeof( m_iPing ) );
 //	memset( m_iPacketloss, 0, sizeof( m_iPacketloss ) );
 	memset( m_iScore, 0, sizeof( m_iScore ) );
-	memset( m_iFortPoints, 0, sizeof(m_iFortPoints) );
 	memset( m_iDeaths, 0, sizeof( m_iDeaths ) );
 	memset( m_bConnected, 0, sizeof( m_bConnected ) );
 	memset( m_iTeam, 0, sizeof( m_iTeam ) );
 	memset( m_bAlive, 0, sizeof( m_bAlive ) );
 	memset( m_iHealth, 0, sizeof( m_iHealth ) );
-	memset( m_iArmor, 0, sizeof(m_iArmor) );
-	memset( m_iClass, 0, sizeof(m_iClass) );	// |-- Mirv: Current class
+	memset( m_iAccountID, 0, sizeof( m_iAccountID ) );
+	memset( m_bValid, 0, sizeof( m_bValid ) );
+	memset( m_iUserID, 0, sizeof( m_iUserID ) ); #ifdef FF
+	memset( m_iFortPoints, 0, sizeof( m_iFortPoints ) );
+	memset( m_iArmor, 0, sizeof( m_iArmor ) );
+	memset( m_iClass, 0, sizeof( m_iClass ) );	// |-- Mirv: Current class
 
 	memset( m_iChannel, 0, sizeof(m_iChannel) ); // |-- Mirv: Channel information
 
-	memset( m_iAssists, 0, sizeof(m_iAssists) );
-
+	memset( m_iAssists, 0, sizeof(m_iAssists) ); #endif
 	m_szUnconnectedName = 0;
 	
 	for ( int i=0; i<MAX_TEAMS; i++ )
@@ -89,11 +100,17 @@ C_PlayerResource::C_PlayerResource()
 		m_Colors[i] = COLOR_GREY;
 	}
 
+#ifdef HL2MP
+	m_Colors[TEAM_COMBINE] = COLOR_BLUE;
+	m_Colors[TEAM_REBELS] = COLOR_RED;
+	m_Colors[TEAM_UNASSIGNED] = COLOR_YELLOW;
+#elifdef FF
 	m_Colors[TEAM_SPECTATOR] = TEAM_COLOR_SPECTATOR;
 	m_Colors[TEAM_BLUE]		 = TEAM_COLOR_BLUE;
 	m_Colors[TEAM_RED]		 = TEAM_COLOR_RED;
 	m_Colors[TEAM_YELLOW]	 = TEAM_COLOR_YELLOW;
 	m_Colors[TEAM_GREEN]	 = TEAM_COLOR_GREEN;
+#endif
 
 	g_PR = this;
 }
@@ -122,17 +139,23 @@ void C_PlayerResource::UpdatePlayerName( int slot )
 		Error( "UpdatePlayerName with bogus slot %d\n", slot );
 		return;
 	}
-	if (!m_szUnconnectedName )
+
+	if ( !m_szUnconnectedName )
+	{
 		m_szUnconnectedName = AllocPooledString( PLAYER_UNCONNECTED_NAME );
+	}
 	
 	player_info_t sPlayerInfo;
 	if ( IsConnected( slot ) && engine->GetPlayerInfo( slot, &sPlayerInfo ) )
 	{
-		m_szName[slot] = AllocPooledString( sPlayerInfo.name );
+		m_szName[slot] = AllocPooledString( UTIL_GetFilteredPlayerName( slot, sPlayerInfo.name ) );
 	}
 	else 
 	{
-		m_szName[slot] = m_szUnconnectedName;
+		if ( !IsValid( slot ) )
+		{
+			m_szName[slot] = m_szUnconnectedName;
+		}
 	}
 }
 
@@ -140,7 +163,7 @@ void C_PlayerResource::ClientThink()
 {
 	BaseClass::ClientThink();
 
-	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	for ( int i = 1; i <= MAX_PLAYERS; ++i )
 	{
 		UpdatePlayerName( i );
 	}
@@ -159,7 +182,7 @@ const char *C_PlayerResource::GetPlayerName( int iIndex )
 		return PLAYER_ERROR_NAME;
 	}
 	
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return PLAYER_UNCONNECTED_NAME;
 
 	// X360TBD: Network - figure out why the name isn't set
@@ -191,9 +214,9 @@ int C_PlayerResource::GetTeam(int iIndex )
 	}
 }
 
-const char * C_PlayerResource::GetTeamName(int index)
+const char * C_PlayerResource::GetTeamName(int index_)
 {
-	C_Team *team = GetGlobalTeam( index );
+	C_Team *team = GetGlobalTeam( index_ );
 
 	if ( !team )
 		return "Unknown";
@@ -201,9 +224,9 @@ const char * C_PlayerResource::GetTeamName(int index)
 	return team->Get_Name();
 }
 
-int C_PlayerResource::GetTeamScore(int index)
+int C_PlayerResource::GetTeamScore(int index_ )
 {
-	C_Team *team = GetGlobalTeam( index );
+	C_Team *team = GetGlobalTeam( index_ );
 
 	if ( !team )
 		return 0;
@@ -285,14 +308,14 @@ bool C_PlayerResource::IsLocalPlayer(int index)
 }
 
 
-bool C_PlayerResource::IsHLTV(int index)
+bool C_PlayerResource::IsHLTV(int index_ )
 {
-	if ( !IsConnected( index ) )
+	if ( !IsConnected( index_ ) && !IsValid( index_ ) )
 		return false;
 
 	player_info_t sPlayerInfo;
 	
-	if ( engine->GetPlayerInfo( index, &sPlayerInfo ) )
+	if ( engine->GetPlayerInfo( index_, &sPlayerInfo ) )
 	{
 		return sPlayerInfo.ishltv;
 	}
@@ -300,15 +323,15 @@ bool C_PlayerResource::IsHLTV(int index)
 	return false;
 }
 
-bool C_PlayerResource::IsReplay(int index)
+bool C_PlayerResource::IsReplay(int index_ )
 {
 #if defined( REPLAY_ENABLED )
-	if ( !IsConnected( index ) )
+	if ( !IsConnected( index_ ) && !IsValid( index_ ) )
 		return false;
 
 	player_info_t sPlayerInfo;
 
-	if ( engine->GetPlayerInfo( index, &sPlayerInfo ) )
+	if ( engine->GetPlayerInfo( index_, &sPlayerInfo ) )
 	{
 		return sPlayerInfo.isreplay;
 	}
@@ -322,7 +345,7 @@ bool C_PlayerResource::IsReplay(int index)
 //-----------------------------------------------------------------------------
 bool C_PlayerResource::IsFakePlayer( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return false;
 
 	// Yuck, make sure it's up to date
@@ -340,7 +363,7 @@ bool C_PlayerResource::IsFakePlayer( int iIndex )
 //-----------------------------------------------------------------------------
 int	C_PlayerResource::GetPing( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return 0;
 
 	return m_iPing[iIndex];
@@ -351,7 +374,7 @@ int	C_PlayerResource::GetPing( int iIndex )
 /*-----------------------------------------------------------------------------
 int	C_PlayerResource::GetPacketloss( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsPreservedData( iIndex ) )
 		return 0;
 
 	return m_iPacketloss[iIndex];
@@ -362,7 +385,7 @@ int	C_PlayerResource::GetPacketloss( int iIndex )
 //-----------------------------------------------------------------------------
 int	C_PlayerResource::GetPlayerScore( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return 0;
 
 	return m_iScore[iIndex];
@@ -384,7 +407,7 @@ int	C_PlayerResource::GetFortPoints(int iIndex)
 //-----------------------------------------------------------------------------
 int	C_PlayerResource::GetDeaths( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return 0;
 
 	return m_iDeaths[iIndex];
@@ -395,7 +418,7 @@ int	C_PlayerResource::GetDeaths( int iIndex )
 //-----------------------------------------------------------------------------
 int	C_PlayerResource::GetHealth( int iIndex )
 {
-	if ( !IsConnected( iIndex ) )
+	if ( !IsConnected( iIndex ) && !IsValid( iIndex ) )
 		return 0;
 
 	return m_iHealth[iIndex];
@@ -432,7 +455,7 @@ const Color &C_PlayerResource::GetTeamColor(int index )
 	}
 	else
 	{
-		return m_Colors[index];
+		return m_Colors[index_];
 	}
 }
 

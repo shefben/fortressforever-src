@@ -14,6 +14,7 @@
 #include "physics_npc_solver.h"
 #include "vphysics/friction.h"
 #include "hierarchy.h"
+#include "vscript_shared.h"
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -1161,7 +1162,7 @@ void CFuncTrain::Stop( void )
 		}
 
 		//Do not teleport to our final move destination
-		SetMoveDone( NULL );
+		SetMoveDone( nullptr );
 		SetMoveDoneTime( -1 );
 	}
 }
@@ -1229,6 +1230,10 @@ BEGIN_DATADESC( CFuncTrackTrain )
 	DEFINE_FUNCTION( DeadEnd ),
 
 END_DATADESC()
+
+BEGIN_ENT_SCRIPTDESC( CFuncTrackTrain, CBaseEntity, "func_train" )
+DEFINE_SCRIPTFUNC_NAMED( ScriptGetFuturePosition, "GetFuturePosition", "Get a position on the track x seconds in the future" )
+END_SCRIPTDESC()
 
 LINK_ENTITY_TO_CLASS( func_tracktrain, CFuncTrackTrain );
 
@@ -1448,12 +1453,12 @@ void CFuncTrackTrain::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 
 		delta = ((int)(m_flSpeed * 4) / (int)m_maxSpeed)*0.25 + 0.25 * delta;
 		if ( delta > 1 )
-			delta = 1;
-		/*else if ( delta < -0.25 )
-			delta = -0.25;*/
+			delta = 1;	#ifndef FF
+		else if ( delta < -0.25 )
+			delta = -0.25; #else
 		// jon: allow backwards at full speed
-		else if (delta < -1)
-			delta = -1;
+		else if ( delta < -1 )
+			delta = -1;	#endif
 		if ( m_spawnflags & SF_TRACKTRAIN_FORWARDONLY )
 		{
 			if ( delta < 0 )
@@ -1697,11 +1702,12 @@ void CFuncTrackTrain::Blocked( CBaseEntity *pOther )
 		VectorNormalize(vecNewVelocity);
 		vecNewVelocity *= m_flBlockDamage;
 		pOther->SetAbsVelocity( vecNewVelocity );
-	}
+	} #ifndef FF
 	// We want this physics interaction to always be checked regardless of spawnflag.
 	// Mappers and Valve don't set this because it makes players get stuck or pushed outside the map...
 	// But I can't think of a good reason not to let trains handle being blocked by physics entities
-	if ( !pOther->IsPlayer() )
+	if ( !pOther->IsPlayer() ) #else
+	if ( Has SpawnFlags(SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER) )
 	{
 		CBaseEntity *pPhysicsBlocker = FindPhysicsBlockerForHierarchy(this);
 		if ( pPhysicsBlocker )
@@ -2095,7 +2101,7 @@ void CFuncTrackTrain::UpdateOrientationAtPathTracks( CPathTrack *pPrev, CPathTra
 	}
 	QAngle angles;
 	VectorAngles( vecFaceDir, angles );
-	// !!!  All of this crap has to be done to make the angles not wrap around, revisit this.
+	// !!!  All of this stuff has to be done to make the angles not wrap around, revisit this.
 	FixupAngles( angles );
 
 	// Wrapped with this bool so we don't affect old trains
@@ -2376,7 +2382,7 @@ void CFuncTrackTrain::Next( void )
 		SetThink( &CFuncTrackTrain::Next );
 		SetMoveDoneTime( 0.5 );
 		SetNextThink( gpGlobals->curtime );
-		SetMoveDone( NULL );
+		SetMoveDone( nullptr );
 	}
 	else
 	{
@@ -2408,6 +2414,33 @@ void CFuncTrackTrain::Next( void )
 			DeadEnd();
 		}
 	}
+}
+
+
+Vector CFuncTrackTrain::ScriptGetFuturePosition( float flSeconds, float flMinSpeed )
+{
+	//
+	// Based on our current position and speed, look ahead along our path and see
+	// where we should be in flSeconds seconds.
+	//
+	Vector nextPos = GetLocalOrigin();
+	float flSpeed = flMinSpeed;
+
+	nextPos.z -= m_height;
+	CPathTrack *pNextNext = NULL; 
+	CPathTrack *pNext = m_ppath->LookAhead( nextPos, flSpeed * flSeconds, 1, &pNextNext );
+
+	// If we're moving towards a dead end, but our desired speed goes in the opposite direction
+	// this fixes us from stalling
+	if ( m_bManualSpeedChanges && ( ( flSpeed < 0 ) != ( m_flDesiredSpeed < 0 ) ) )
+	{
+		if ( !pNext )
+			pNext = m_ppath;
+	}
+
+//	NDebugOverlay::Box( nextPos, Vector( -8, -8, -8 ), Vector( 8, 8, 8 ), 0, 255, 0, 0, 0.1 );
+
+	return nextPos;
 }
 
 
@@ -3214,7 +3247,7 @@ void CFuncTrackChange::HitBottom( void )
 //		UpdateTrain();
 		m_train->SetTrack( m_trackBottom );
 	}
-	SetMoveDone( NULL );
+	SetMoveDone( nullptr );
 	SetMoveDoneTime( -1 );
 
 	UpdateAutoTargets( m_toggle_state );
@@ -3236,7 +3269,7 @@ void CFuncTrackChange::HitTop( void )
 	}
 	
 	// Don't let the plat go back down
-	SetMoveDone( NULL );
+	SetMoveDone( nullptr );
 	SetMoveDoneTime( -1 );
 	UpdateAutoTargets( m_toggle_state );
 	EnableUse();

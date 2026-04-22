@@ -8,9 +8,9 @@
 #include "player.h"
 #include "player_resource.h"
 #include <coordsize.h>
-
+#ifdef FF
 #include "ff_player.h"		// |-- Mirv: Needed for channels
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -19,34 +19,34 @@ IMPLEMENT_SERVERCLASS_ST_NOBASE(CPlayerResource, DT_PlayerResource)
 //	SendPropArray( SendPropString( SENDINFO(m_szName[0]) ), SENDARRAYINFO(m_szName) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iPing), SendPropInt( SENDINFO_ARRAY(m_iPing), 10, SPROP_UNSIGNED ) ),
 //	SendPropArray( SendPropInt( SENDINFO_ARRAY(m_iPacketloss), 7, SPROP_UNSIGNED ), m_iPacketloss ),
-	SendPropArray3(SENDINFO_ARRAY3(m_iScore), SendPropInt(SENDINFO_ARRAY(m_iScore), 15)),	// |- Mirv: Upped transmission bits from 12->15
-	SendPropArray3(SENDINFO_ARRAY3(m_iFortPoints), SendPropInt(SENDINFO_ARRAY(m_iFortPoints), 20)),	// |- Shock: Upped transmission bits from 15->20 (needs to be big!)
+	SendPropArray3(SENDINFO_ARRAY3(m_iScore), SendPropInt( SENDINFO_ARRAY(m_iScore), 15 ) ),	// |- Mirv: Upped transmission bits from 12->15
+	SendPropArray3(SENDINFO_ARRAY3(m_iFortPoints), SendPropInt( SENDINFO_ARRAY(m_iFortPoints), 20 ) ),	// |- Shock: Upped transmission bits from 15->20 (needs to be big!)
 	SendPropArray3( SENDINFO_ARRAY3(m_iDeaths), SendPropInt( SENDINFO_ARRAY(m_iDeaths), 12 ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_bConnected), SendPropInt( SENDINFO_ARRAY(m_bConnected), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iTeam), SendPropInt( SENDINFO_ARRAY(m_iTeam), 4 ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_bAlive), SendPropInt( SENDINFO_ARRAY(m_bAlive), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iHealth), SendPropInt( SENDINFO_ARRAY(m_iHealth), -1, SPROP_VARINT | SPROP_UNSIGNED ) ),
-	SendPropArray3(SENDINFO_ARRAY3(m_iArmor), SendPropInt(SENDINFO_ARRAY(m_iArmor), 9, SPROP_UNSIGNED)),
-	SendPropArray3(SENDINFO_ARRAY3(m_iClass), SendPropInt(SENDINFO_ARRAY(m_iClass), 5)),	// |-- Mirv: Current class
+	SendPropArray3(SENDINFO_ARRAY3(m_iArmor), SendPropInt( SENDINFO_ARRAY(m_iArmor), 9, SPROP_UNSIGNED)),
+	SendPropArray3(SENDINFO_ARRAY3(m_iClass), SendPropInt( SENDINFO_ARRAY(m_iClass), 5 ) ),	// |-- Mirv: Current class
 
-	SendPropArray3(SENDINFO_ARRAY3(m_iChannel), SendPropInt(SENDINFO_ARRAY(m_iChannel), 4)), // |-- Mirv: Channel info
+	SendPropArray3(SENDINFO_ARRAY3(m_iChannel), SendPropInt( SENDINFO_ARRAY(m_iChannel), 4 ) ), // |-- Mirv: Channel info
 
-	SendPropArray3(SENDINFO_ARRAY3(m_iAssists), SendPropInt(SENDINFO_ARRAY(m_iAssists), 12)),
+	SendPropArray3(SENDINFO_ARRAY3(m_iAssists), SendPropInt( SENDINFO_ARRAY(m_iAssists), 12 ) ),
 
 	SendPropBool(SENDINFO(m_bIsIntermission)),
 END_SEND_TABLE()
 
 BEGIN_DATADESC( CPlayerResource )
 
-	// DEFINE_ARRAY( m_iPing, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_iPacketloss, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_iScore, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_iDeaths, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_bConnected, FIELD_INTEGER, MAX_PLAYERS+1 ),
+	// DEFINE_ARRAY( m_iPing, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_iPacketloss, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_iScore, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_iDeaths, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_bConnected, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
 	// DEFINE_FIELD( m_flNextPingUpdate, FIELD_FLOAT ),
-	// DEFINE_ARRAY( m_iTeam, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_bAlive, FIELD_INTEGER, MAX_PLAYERS+1 ),
-	// DEFINE_ARRAY( m_iHealth, FIELD_INTEGER, MAX_PLAYERS+1 ),
+	// DEFINE_ARRAY( m_iTeam, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_bAlive, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
+	// DEFINE_ARRAY( m_iHealth, FIELD_INTEGER, MAX_PLAYERS_ARRAY_SAFE ),
 	// DEFINE_FIELD( m_nUpdateCounter, FIELD_INTEGER ),
 
 	// Function Pointers
@@ -63,7 +63,7 @@ CPlayerResource *g_pPlayerResource;
 //-----------------------------------------------------------------------------
 void CPlayerResource::Spawn( void )
 {
-	for ( int i=0; i < MAX_PLAYERS+1; i++ )
+	for ( int i=0; i < MAX_PLAYERS_ARRAY_SAFE; i++ )
 	{
 		m_iPing.Set( i, 0 );
 		m_iScore.Set( i, 0 );

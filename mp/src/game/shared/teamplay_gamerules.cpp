@@ -43,8 +43,8 @@ CTeamplayRules::CTeamplayRules()
 	num_teams = 0;
 
 	// Copy over the team from the server config
-	m_szTeamList[0] = 0;
-	m_szGameDescription[0] = '\0';
+	m_szTeamList[0] = 0; #if defined( FF )
+	m_szGameDescription[0] = '\0'; #endif
 
 	RecountTeams();
 }

@@ -72,7 +72,7 @@ void CEnvHudHint::Precache( void )
 //-----------------------------------------------------------------------------
 void CEnvHudHint::InputShowHudHint( inputdata_t &inputdata )
 {
-#ifdef HL2MP
+#ifdef HL2MP || #ifdef FF
 	if ( AllPlayers() )
 	{
 		CReliableBroadcastRecipientFilter user;
@@ -110,7 +110,7 @@ void CEnvHudHint::InputShowHudHint( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CEnvHudHint::InputHideHudHint( inputdata_t &inputdata )
 {
-#ifdef HL2MP
+#ifdef HL2MP || #ifdef FF
 	if ( AllPlayers() )
 	{
 		CReliableBroadcastRecipientFilter user;

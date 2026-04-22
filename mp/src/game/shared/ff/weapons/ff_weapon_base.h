@@ -201,6 +201,7 @@ public:
 
 	#ifdef GAME_DLL
 		DECLARE_DATADESC();
+		void			ForceRemove( void );	// Say goodbye to your little friend.
 	#endif
 
 	virtual void		Spawn( void );
@@ -267,6 +268,8 @@ public:
 	// Let grenade launchers and pipe launchers report variable changes accurately
 	void				SetClip1(int iAmount) { m_iClip1 = iAmount; }
 	int					GetClip1() { return m_iClip1; }
+
+	void				GetHeatLevel(int _firemode, float& _current, float& _max) { _current = 0.f; _max = 0.f; }
 
 private:
 

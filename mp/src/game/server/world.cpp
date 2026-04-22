@@ -35,7 +35,6 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-extern CBaseEntity* g_pLastSpawnRandomizer; // this will be obsolete soon
 extern CBaseEntity				*g_pLastSpawn;
 void InitBodyQue(void);
 extern void W_Precache(void);
@@ -580,7 +579,6 @@ void CWorld::Precache( void )
 	g_WorldEntity = this;
 	g_fGameOver = false;
 	g_pLastSpawn = NULL;
-	g_pLastSpawnRandomizer = NULL;
 
 	ConVarRef stepsize( "sv_stepsize" );
 	stepsize.SetValue( 18 );
@@ -666,16 +664,16 @@ void CWorld::Precache( void )
 	// =================================================
 	//	Load and Init AI Networks
 	// =================================================
-	//CAI_NetworkManager::InitializeAINetworks();
+	CAI_NetworkManager::InitializeAINetworks();
 	// =================================================
 	//	Load and Init AI Schedules
 	// =================================================
-	//g_AI_SchedulesManager.LoadAllSchedules();
+	g_AI_SchedulesManager.LoadAllSchedules();
 	// =================================================
 	//	Initialize NPC Relationships
 	// =================================================
-	//g_pGameRules->InitDefaultAIRelationships();
-	//CBaseCombatCharacter::InitInteractionSystem();
+	g_pGameRules->InitDefaultAIRelationships();
+	CBaseCombatCharacter::InitInteractionSystem();
 
 	// Call all registered precachers.
 	CPrecacheRegister::Precache();	

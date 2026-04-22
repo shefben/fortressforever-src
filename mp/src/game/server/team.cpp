@@ -23,7 +23,7 @@ void SendProxy_PlayerList( const SendProp *pProp, const void *pStruct, const voi
 
 	// If this assertion fails, then SendProxyArrayLength_PlayerArray must have failed.
 	Assert( iElement < pTeam->m_aPlayers.Size() );
-	
+
 	CBasePlayer *pPlayer = pTeam->m_aPlayers[iElement];
 	pOut->m_Int = pPlayer->entindex();
 }
@@ -40,14 +40,13 @@ int SendProxyArrayLength_PlayerArray( const void *pStruct, int objectID )
 IMPLEMENT_SERVERCLASS_ST_NOBASE(CTeam, DT_Team)
 	SendPropInt( SENDINFO(m_iTeamNum), 5 ),
 	SendPropInt( SENDINFO(m_iScore), 0 ),
-	SendPropInt(SENDINFO(m_iFortPoints), 0),
-	// Bug #0000529: Total death column doesn't work
-	SendPropInt(SENDINFO(m_iDeaths), 0), // Mulch: send deaths to client
-	SendPropFloat(SENDINFO(m_flScoreTime)), // Mulch: time team last scored
-
 	SendPropInt( SENDINFO(m_iRoundsWon), 8 ),
-	SendPropString( SENDINFO( m_szTeamname ) ),
-
+	SendPropString( SENDINFO( m_szTeamname ) ), #ifdef FF
+	SendPropInt( SENDINFO(m_iFortPoints), 0 ),
+	// Bug #0000529: Total death column doesn't work
+	SendPropInt(SENDINFO(m_iDeaths), 0 ), // Mulch: send deaths to client
+	SendPropFloat( SENDINFO( m_flScoreTime ) ), // Mulch: time team last scored
+#endif
 	SendPropArray2( 
 		SendProxyArrayLength_PlayerArray,
 		SendPropInt("player_array_element", 0, 4, 10, SPROP_UNSIGNED, SendProxy_PlayerList), 
@@ -114,7 +113,7 @@ int CTeam::UpdateTransmitState()
 //-----------------------------------------------------------------------------
 // Visibility/scanners
 //-----------------------------------------------------------------------------
-bool CTeam::ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity )
+bool CTeam::ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const
 {
 	// Always transmit the observer target to players
 	if ( pRecipient && pRecipient->IsObserver() && pRecipient->GetObserverTarget() == pEntity )
@@ -131,11 +130,11 @@ void CTeam::Init( const char *pName, int iNumber )
 	InitializeSpawnpoints();
 	InitializePlayers();
 
-	m_iScore = 0;
+	m_iScore = 0; #ifdef FF
 	m_iFortPoints = 0;
 	m_iDeaths = 0;
 	m_flScoreTime = 0.0f;
-
+#endif
 	Q_strncpy( m_szTeamname.GetForModify(), pName, MAX_TEAM_NAME_LENGTH );
 	m_iTeamNum = iNumber;
 }
@@ -151,11 +150,11 @@ int CTeam::GetTeamNumber( void ) const
 //-----------------------------------------------------------------------------
 // Purpose: Get the team's name
 //-----------------------------------------------------------------------------
-const char *CTeam::GetName( void )
+const char *CTeam::GetName( void ) const
 {
 	return m_szTeamname;
 }
-
+#ifdef FF_DLL
 //-----------------------------------------------------------------------------
 // Purpose: Set the team's name
 //-----------------------------------------------------------------------------
@@ -163,7 +162,7 @@ void CTeam::SetName(const char* pszName)
 {
 	Q_strncpy(m_szTeamname.GetForModify(), pszName, MAX_TEAM_NAME_LENGTH);
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: Update the player's client data
 //-----------------------------------------------------------------------------
@@ -274,7 +273,7 @@ void CTeam::RemovePlayer( CBasePlayer *pPlayer )
 //-----------------------------------------------------------------------------
 // Purpose: Return the number of players in this team.
 //-----------------------------------------------------------------------------
-int CTeam::GetNumPlayers( void )
+int CTeam::GetNumPlayers( void ) const
 {
 	return m_aPlayers.Size();
 }
@@ -282,7 +281,7 @@ int CTeam::GetNumPlayers( void )
 //-----------------------------------------------------------------------------
 // Purpose: Get a specific player
 //-----------------------------------------------------------------------------
-CBasePlayer *CTeam::GetPlayer( int iIndex )
+CBasePlayer *CTeam::GetPlayer( int iIndex ) const
 {
 	Assert( iIndex >= 0 && iIndex < m_aPlayers.Size() );
 	return m_aPlayers[ iIndex ];
@@ -295,24 +294,24 @@ CBasePlayer *CTeam::GetPlayer( int iIndex )
 //-----------------------------------------------------------------------------
 void CTeam::AddScore( int iScore )
 {
-	m_iScore += iScore;
-	m_flScoreTime = gpGlobals->curtime;
+	m_iScore += iScore; #ifdef FF
+	m_flScoreTime = gpGlobals->curtime; #endif
 }
 
 void CTeam::SetScore( int iScore )
 {
-	m_iScore = iScore;
-	m_flScoreTime = gpGlobals->curtime;
+	m_iScore = iScore; #ifdef FF
+	m_flScoreTime = gpGlobals->curtime; #endif
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Get this team's score
 //-----------------------------------------------------------------------------
-int CTeam::GetScore( void )
+int CTeam::GetScore( void ) const
 {
 	return m_iScore;
 }
-
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Purpose: Add / Remove score for this team
 //-----------------------------------------------------------------------------
@@ -369,7 +368,7 @@ void CTeam::SetDeaths(int iDeaths)
 {
 	m_iDeaths = iDeaths;
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -402,7 +401,7 @@ void CTeam::AwardAchievement( int iAchievement )
 	MessageEnd();
 }
 
-int CTeam::GetAliveMembers( void )
+int CTeam::GetAliveMembers( void ) const
 {
 	int iAlive = 0;
 

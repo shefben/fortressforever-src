@@ -17,6 +17,7 @@
 #include "engine/IEngineTrace.h"
 #include "engine/IStaticPropMgr.h"
 #include "shared_classnames.h"
+#include "steam/steamuniverse.h"
 
 #ifdef CLIENT_DLL
 #include "cdll_client_int.h"
@@ -605,7 +606,7 @@ class RealTimeCountdownTimer : public CountdownTimer
 	}
 };
 
-const char* ReadAndAllocStringValue( KeyValues *pSub, const char *pName, const char *pFilename = NULL );
+char* ReadAndAllocStringValue( KeyValues *pSub, const char *pName, const char *pFilename = NULL );
 
 int UTIL_StringFieldToInt( const char *szValue, const char **pValueStrings, int iNumStrings );
 

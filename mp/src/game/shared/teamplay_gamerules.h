@@ -38,9 +38,9 @@
 #define MAX_TEAMS			32
 
 #define TEAMPLAY_TEAMLISTLENGTH		MAX_TEAMS*MAX_TEAMNAME_LENGTH
-#define TEAMPLAY_GAMEDESCLENGTH		32
-
-
+#if defined( FF )
+	#define TEAMPLAY_GAMEDESCLENGTH		32
+#endif
 class CTeamplayRules : public CMultiplayRules
 {
 public:
@@ -113,8 +113,8 @@ private:
 
 	bool m_DisableDeathPenalty;
 	bool m_teamLimit;				// This means the server set only some teams as valid
-	char m_szTeamList[TEAMPLAY_TEAMLISTLENGTH];
-	char m_szGameDescription[TEAMPLAY_GAMEDESCLENGTH];
+	char m_szTeamList[TEAMPLAY_TEAMLISTLENGTH]; #ifdef FF_DLL
+	char m_szGameDescription[TEAMPLAY_GAMEDESCLENGTH]; #endif
 	bool m_bSwitchTeams;
 	bool m_bScrambleTeams;
 

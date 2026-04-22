@@ -73,8 +73,7 @@ CShadowControl::CShadowControl()
 	m_shadowDirection.Init( 0.2, 0.2, -2 );
 	m_flShadowMaxDist = 50.0f;
 	m_shadowColor.Init( 64, 64, 64, 0 );
-	// FF TODO: make/use a better shadow system and then enable shadows by default
-	//m_bDisableShadows = true;
+	m_bDisableShadows = false;
 }
 
 

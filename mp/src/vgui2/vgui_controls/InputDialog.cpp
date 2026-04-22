@@ -13,7 +13,6 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include <tier0/memdbgon.h>
-#include <string>
 
 using namespace vgui;
 
@@ -28,14 +27,14 @@ BaseInputDialog::BaseInputDialog( vgui::Panel *parent, const char *title ) :
 
 	SetDeleteSelfOnClose( true );
 	SetTitle(title, true);
-	SetSize(360, 180);
+	SetSize(320, 180);
 	SetSizeable( false );
 
 	m_pCancelButton = new Button(this, "CancelButton", "#VGui_Cancel");
 	m_pOKButton = new Button(this, "OKButton", "#VGui_OK");
 	m_pCancelButton->SetCommand("Cancel");
 	m_pOKButton->SetCommand("OK");
-	m_pOKButton->SetAsDefaultButton(true);
+	m_pOKButton->SetAsDefaultButton( true );
 
 	if ( parent )
 	{
@@ -46,34 +45,6 @@ BaseInputDialog::BaseInputDialog( vgui::Panel *parent, const char *title ) :
 BaseInputDialog::~BaseInputDialog()
 {
 	CleanUpContextKeyValues();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Prevents double execution of "OK" command handlers
-//-----------------------------------------------------------------------------
-void BaseInputDialog::OnKeyCodeTyped(KeyCode code)
-{
-	if (code == KEY_ENTER)
-	{
-		// Temporarily remove the action signal target before processing
-		if (GetParent())
-		{
-			RemoveActionSignalTarget(GetParent());
-		}
-
-		// Trigger the OK button command manually
-		OnCommand("OK");
-
-		// Re-add the action signal target after handling
-		if (GetParent())
-		{
-			AddActionSignalTarget(GetParent());
-		}
-
-		return;
-	}
-
-	return BaseClass::OnKeyCodeTyped(code);
 }
 
 //-----------------------------------------------------------------------------
@@ -228,36 +199,34 @@ void InputDialog::PerformLayout( int x, int y, int w, int h )
 //-----------------------------------------------------------------------------
 // Purpose: handles button commands
 //-----------------------------------------------------------------------------
-void InputDialog::OnCommand(const char* command)
+void InputDialog::OnCommand(const char *command)
 {
-	// overriding OnCommand for backwards compatibility
+	// overriding OnCommand for backwards compatability
 	// it'd be nice at some point to find all uses of InputDialog and just use BaseInputDialog's OnCommand
 
 	if (!stricmp(command, "OK"))
 	{
-		std::string txt;
-		int textLength = m_pInput->GetTextLength() + 1;
-		txt.resize(textLength);
-		m_pInput->GetText(&txt[0], textLength);
-
-		KeyValues* kv = new KeyValues("InputCompleted", "text", txt.c_str());
-		if (m_pContextKeyValues)
+		int nTextLength = m_pInput->GetTextLength() + 1;
+		char* txt = (char*)_alloca( nTextLength * sizeof(char) );
+		m_pInput->GetText( txt, nTextLength );
+		KeyValues *kv = new KeyValues( "InputCompleted", "text", txt );
+		if ( m_pContextKeyValues )
 		{
-			kv->AddSubKey(m_pContextKeyValues);
+			kv->AddSubKey( m_pContextKeyValues );
 			m_pContextKeyValues = NULL;
 		}
-		PostActionSignal(kv);
+		PostActionSignal( kv );
 		CloseModal();
 	}
 	else if (!stricmp(command, "Cancel"))
 	{
-		KeyValues* kv = new KeyValues("InputCanceled");
-		if (m_pContextKeyValues)
+		KeyValues *kv = new KeyValues( "InputCanceled" );
+		if ( m_pContextKeyValues )
 		{
-			kv->AddSubKey(m_pContextKeyValues);
+			kv->AddSubKey( m_pContextKeyValues );
 			m_pContextKeyValues = NULL;
 		}
-		PostActionSignal(kv);
+		PostActionSignal( kv );
 		CloseModal();
 	}
 	else

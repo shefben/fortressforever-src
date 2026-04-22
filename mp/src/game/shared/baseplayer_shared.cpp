@@ -660,7 +660,7 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 	{
 		fvol *= 0.65;
 	}
-
+#if defined( FF )
 	// --> Mirv: Redone sound stuff
 
 	// If we are walking or ducking, silence
@@ -668,7 +668,7 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 		return;
 	else
 		fvol = 1.0f;
-
+#endif
 	PlayStepSound( feet, psurface, fvol, false );
 }
 
@@ -709,8 +709,7 @@ void CBasePlayer::PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, flo
 	}
 	else
 	{
-		IPhysicsSurfaceProps *physprops = MoveHelper()->GetSurfaceProps();
-		const char *pSoundName = physprops->GetString( stepSoundName );
+		const char *pSoundName = MoveHelper()->GetSurfaceProps()->GetString( stepSoundName );
 
 		// Give child classes an opportunity to override.
 		pSoundName = GetOverrideStepSound( pSoundName );
@@ -791,8 +790,8 @@ void CBasePlayer::GetStepSoundVelocities( float *velwalk, float *velrun )
 	}
 	else
 	{
-		*velwalk = 120;
-		*velrun = 210;
+		*velwalk = 90;
+		*velrun = 220;
 	}
 }
 
@@ -1382,8 +1381,6 @@ void CBasePlayer::PlayerUse ( void )
 
 		//!!!UNDONE: traceline here to prevent +USEing buttons through walls			
 
-		bool bUsed = false;
-
 		int caps = pUseEntity->ObjectCaps();
 		variant_t emptyVariant;
 		if ( ( (m_nButtons & IN_USE) && (caps & FCAP_CONTINUOUS_USE) ) || ( (m_afButtonPressed & IN_USE) && (caps & (FCAP_IMPULSE_USE|FCAP_ONOFF_USE)) ) )
@@ -1396,38 +1393,20 @@ void CBasePlayer::PlayerUse ( void )
 			if ( pUseEntity->ObjectCaps() & FCAP_ONOFF_USE )
 			{
 				pUseEntity->AcceptInput( "Use", this, this, emptyVariant, USE_ON );
-				bUsed = true;
 			}
 			else
 			{
 				pUseEntity->AcceptInput( "Use", this, this, emptyVariant, USE_TOGGLE );
-				bUsed = true;
 			}
 		}
 		// UNDONE: Send different USE codes for ON/OFF.  Cache last ONOFF_USE object to send 'off' if you turn away
 		else if ( (m_afButtonReleased & IN_USE) && (pUseEntity->ObjectCaps() & FCAP_ONOFF_USE) )	// BUGBUG This is an "off" use
 		{
 			pUseEntity->AcceptInput( "Use", this, this, emptyVariant, USE_OFF );
-			bUsed = true;
-		}
-
-		if (bUsed)
-		{
-			IGameEvent* pEvent = gameeventmanager->CreateEvent("player_use");
-			if (pEvent)
-			{
-				pEvent->SetInt("userid", GetUserID());
-				pEvent->SetInt("entity", pUseEntity->entindex());
-				gameeventmanager->FireEvent(pEvent, true);
-			}
 		}
 	}
 	else if ( m_afButtonPressed & IN_USE )
 	{
-		// haha, very funny
-		if ( !IsAlive() && m_iHealth <= 0 )
-			return;
-
 		PlayUseDenySound();
 	}
 #endif
@@ -1484,7 +1463,7 @@ void CBasePlayer::SmoothViewOnStairs( Vector& eyeOrigin )
 	CBaseEntity *pGroundEntity = GetGroundEntity();
 	float flCurrentPlayerZ = GetLocalOrigin().z;
 	float flCurrentPlayerViewOffsetZ = GetViewOffset().z;
-
+#if defined( FF )
 	// --> Mirv:
 	// We're now only smoothing stairs if we've recently stepped up or down
 	// far enough (currently >= 8.0 units). This way the stair smoothing isn't
@@ -1505,7 +1484,7 @@ void CBasePlayer::SmoothViewOnStairs( Vector& eyeOrigin )
 		}
 	}
 	// <-- Mirv
-
+#endif
 	// Smooth out stair step ups
 	// NOTE: Don't want to do this when the ground entity is moving the player
 	if ( ( pGroundEntity != NULL && pGroundEntity->GetMoveType() == MOVETYPE_NONE ) && ( flCurrentPlayerZ != m_flOldPlayerZ ) && smoothstairs.GetBool() &&
@@ -1853,7 +1832,6 @@ float CBasePlayer::GetFOVDistanceAdjustFactor()
 	// If FOV is lower, then we're "zoomed" in and this will give a factor < 1 so apparent LOD distances can be
 	//  shorted accordingly
 	return localFOV / defaultFOV;
-
 }
 
 //-----------------------------------------------------------------------------
@@ -1911,6 +1889,20 @@ void CBasePlayer::SharedSpawn()
 	if(IsLocalPlayer() &&haptics)
 		haptics->LocalPlayerReset();
 #endif
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+bool CBasePlayer::IsLerpingFOV( void ) const
+{
+	// If it's immediate, just do it
+	if (m_Local.m_flFOVRate == 0.0f)
+		return false;
+
+	float deltaTime = (float)(gpGlobals->curtime - m_flFOVTime) / m_Local.m_flFOVRate;
+	return deltaTime < 1.f;
 }
 
 
@@ -2039,45 +2031,44 @@ bool CBasePlayer::SetFOV( CBaseEntity *pRequester, int FOV, float zoomRate, int 
 //-----------------------------------------------------------------------------
 void CBasePlayer::UpdateUnderwaterState( void )
 {
-	if (GetWaterLevel() < WL_Eyes)
+	if ( GetWaterLevel() == WL_Eyes )
 	{
-		if (IsPlayerUnderwater())
+		if ( IsPlayerUnderwater() == false )
 		{
-			SetPlayerUnderwater(false);
-
-			if(m_iHealth > 0 && IsAlive())
-				RemoveFlag(FL_INWATER);	// Jiggles: Added for swim animations
+			SetPlayerUnderwater( true );
 		}
-	}
-	else if (GetWaterLevel() < WL_Waist)
-	{
-		if (GetWaterLevel() == 0)
-		{
-			if (GetFlags() & FL_INWATER)
-			{
-				if (m_iHealth > 0 && IsAlive())
-					EmitSound("Player.Wade");
-
-				RemoveFlag(FL_INWATER);
-			}
-			return;
-		}
-	}
-	else if (GetWaterLevel() > WL_Waist)
-	{
-		if (IsPlayerUnderwater() == false)
-		{
-			SetPlayerUnderwater(true);
-		}
-		if (m_iHealth > 0 && IsAlive()) {
-			// Jiggles: Added for swim animations
-			if (!(GetFlags() & FL_INWATER))
-			{
-				AddFlag(FL_INWATER);
-			}
-		}
-		// END ADD
 		return;
+	}
+
+	if ( IsPlayerUnderwater() )
+	{
+		SetPlayerUnderwater( false );
+	}
+
+	if ( GetWaterLevel() == 0 )
+	{
+		if ( GetFlags() & FL_INWATER )
+		{
+#ifndef CLIENT_DLL
+			if ( m_iHealth > 0 && IsAlive() )
+			{
+				EmitSound( "Player.Wade" );
+			}
+#endif
+			RemoveFlag( FL_INWATER );
+		}
+	}
+	else if ( !(GetFlags() & FL_INWATER) )
+	{
+#ifndef CLIENT_DLL
+		// player enter water sound
+		if (GetWaterType() == CONTENTS_WATER)
+		{
+			EmitSound( "Player.Wade" );
+		}
+#endif
+
+		AddFlag( FL_INWATER );
 	}
 }
 
@@ -2122,6 +2113,7 @@ bool fogparams_t::operator !=( const fogparams_t& other ) const
 {
 	if ( this->enable != other.enable ||
 		this->blend != other.blend ||
+		this->radial != other.radial ||
 		!VectorsAreEqual(this->dirPrimary, other.dirPrimary, 0.01f ) || 
 		this->colorPrimary.Get() != other.colorPrimary.Get() ||
 		this->colorSecondary.Get() != other.colorSecondary.Get() ||

@@ -11,6 +11,7 @@
 #include "KeyValues.h"
 #include "filesystem.h"
 #include "game.h"
+#include "util_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -62,7 +63,7 @@ void CSoundscapeSystem::AddSoundscapeFile( const char *filename )
 	MEM_ALLOC_CREDIT();
 	// Open the soundscape data file, and abort if we can't
 	KeyValues *pKeyValuesData = new KeyValues( filename );
-	if ( pKeyValuesData->LoadFromFile( filesystem, filename, "GAME" ) )
+	if ( filesystem->LoadKeyValues( *pKeyValuesData, IFileSystem::TYPE_SOUNDSCAPE, filename, "GAME" ) )
 	{
 		// parse out all of the top level sections and save their names
 		KeyValues *pKeys = pKeyValuesData;
@@ -165,7 +166,7 @@ bool CSoundscapeSystem::Init()
 	}
 
 	KeyValues *manifest = new KeyValues( SOUNDSCAPE_MANIFEST_FILE );
-	if ( manifest->LoadFromFile( filesystem, SOUNDSCAPE_MANIFEST_FILE, "GAME" ) )
+	if ( filesystem->LoadKeyValues( *manifest, IFileSystem::TYPE_SOUNDSCAPE, SOUNDSCAPE_MANIFEST_FILE, "GAME" ) )
 	{
 		for ( KeyValues *sub = manifest->GetFirstSubKey(); sub != NULL; sub = sub->GetNextKey() )
 		{
@@ -179,22 +180,22 @@ bool CSoundscapeSystem::Init()
 
 				// Add
 				AddSoundscapeFile( sub->GetString() );
-				//if ( mapSoundscapeFilename && FStrEq( sub->GetString(), mapSoundscapeFilename ) )
-				//{
-				//	mapSoundscapeFilename = NULL; // we've already loaded the map's soundscape
-				//}
+				if ( mapSoundscapeFilename && FStrEq( sub->GetString(), mapSoundscapeFilename ) )
+				{
+					mapSoundscapeFilename = NULL; // we've already loaded the map's soundscape
+				}
 				continue;
 			}
 
 			Warning( "CSoundscapeSystem::Init:  Manifest '%s' with bogus file type '%s', expecting 'file'\n", 
 				SOUNDSCAPE_MANIFEST_FILE, sub->GetName() );
 		}
-
+		#ifdef FF
 		// Jon - 2/14/2007: altered and moved up above
-		/*if ( mapSoundscapeFilename && filesystem->FileExists( mapSoundscapeFilename ) )
+		if ( mapSoundscapeFilename && filesystem->FileExists( mapSoundscapeFilename ) )
 		{
 			AddSoundscapeFile( mapSoundscapeFilename );
-		}*/
+		} #endif
 	}
 	else
 	{

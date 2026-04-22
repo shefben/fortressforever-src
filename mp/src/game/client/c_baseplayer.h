@@ -62,9 +62,9 @@ public:
 #define CHASE_CAM_DISTANCE_MAX	96.0f
 #define WALL_OFFSET				6.0f
 
-// Moved here from .cpp -> Defrag
+#ifdef FF// Moved here from .cpp -> Defrag
 #define FLASHLIGHT_DISTANCE		1000
-
+#endif
 bool IsInFreezeCam( void );
 
 //-----------------------------------------------------------------------------
@@ -105,9 +105,9 @@ public:
 	virtual float GetPlayerMaxSpeed();
 
 	void	SetAnimationExtension( const char *pExtension );
-
+#ifdef FF
 	Class_T			Classify(void) { return CLASS_PLAYER; }
-
+#endif
 	C_BaseViewModel		*GetViewModel( int viewmodelindex = 0, bool bObserverOK=true );
 	C_BaseCombatWeapon	*GetActiveWeapon( void ) const;
 	const char			*GetTracerType( void );
@@ -145,11 +145,11 @@ public:
 	virtual bool	IsPlayer( void ) const { return true; }
 	virtual int		GetHealth() const { return m_iHealth; }
 
-	// Added by Mulch for testing
+#ifdef FF	// Added by Mulch for testing
 	virtual int		GetMaxHealth() const { return m_iMaxHealth; }
 	virtual int		GetArmor() const { return m_iArmor; }
 	virtual int		GetMaxArmor() const { return m_iMaxArmor; }
-	// Added by Mulch for testing
+#endif	// Added by Mulch for testing
 
 	int		GetBonusProgress() const { return m_iBonusProgress; }
 	int		GetBonusChallenge() const { return m_iBonusChallenge; }
@@ -192,9 +192,9 @@ public:
 	virtual void	TeamChange( int iNewTeam );
 
 	// Flashlight
-	void	Flashlight( void );
-	//void	UpdateFlashlight( void );
-	virtual void	UpdateFlashlight(void);
+	void	Flashlight( void );	#ifndef FF
+	void	UpdateFlashlight( void ); #else
+	virtual void	UpdateFlashlight(void); #endif
 
 	// Weapon selection code
 	virtual bool				IsAllowedToSwitchWeapons( void ) { return !IsObserver(); }
@@ -275,6 +275,7 @@ public:
 
 	virtual void				UpdateClientData( void );
 
+	bool						IsLerpingFOV( void ) const;
 	virtual float				GetFOV( void );	
 	int							GetDefaultFOV( void ) const;
 	virtual bool				IsZoomed( void )	{ return false; }
@@ -400,8 +401,9 @@ public:
 #if defined USES_ECON_ITEMS
 	// Wearables
 	virtual void			UpdateWearables();
+	const C_EconWearable	*GetWearable( int i ) const { return m_hMyWearables[i]; }
 	C_EconWearable			*GetWearable( int i ) { return m_hMyWearables[i]; }
-	int						GetNumWearables( void ) { return m_hMyWearables.Count(); }
+	int						GetNumWearables( void ) const { return m_hMyWearables.Count(); }
 #endif
 
 	bool					HasFiredWeapon( void ) { return m_bFiredWeapon; }
@@ -415,6 +417,8 @@ protected:
 
 public:
 	int m_StuckLast;
+
+	const char* GetScriptOverlayMaterial() const { return m_Local.m_szScriptOverlayMaterial; }
 	
 	// Data for only the local player
 	CNetworkVarEmbedded( CPlayerLocalData, m_Local );
@@ -489,7 +493,7 @@ protected:
 // DATA
 	int				m_iObserverMode;	// if in spectator mode != 0
 	EHANDLE			m_hObserverTarget;	// current observer target
-	float			m_flObserverChaseDistance; // last distance to observer traget
+	float			m_flObserverChaseDistance; // last distance to observer target
 	Vector			m_vecFreezeFrameStart;
 	float			m_flFreezeFrameStartTime;	// Time at which we entered freeze frame observer mode
 	float			m_flFreezeFrameDistance;
@@ -538,9 +542,8 @@ private:
 
 
 	// Player flashlight dynamic light pointers
-protected:
 	CFlashlightEffect *m_pFlashlight;
-private:
+
 	typedef CHandle<C_BaseCombatWeapon> CBaseCombatWeaponHandle;
 	CNetworkVar( CBaseCombatWeaponHandle, m_hLastWeapon );
 
@@ -552,8 +555,8 @@ private:
 	CHandle< C_BaseViewModel >	m_hViewModel[ MAX_VIEWMODELS ];		
 	
 	float					m_flOldPlayerZ;
-	float					m_flOldPlayerViewOffsetZ;
-	bool					m_bSmoothStair;					// |-- Mirv
+	float					m_flOldPlayerViewOffsetZ; #ifdef FF
+	bool					m_bSmoothStair;	#endif					// |-- Mirv
 	
 	Vector	m_vecVehicleViewOrigin;		// Used to store the calculated view of the player while riding in a vehicle
 	QAngle	m_vecVehicleViewAngles;		// Vehicle angles
@@ -584,10 +587,10 @@ private:
 	friend class CHL2GameMovement;
 	friend class CDODGameMovement;
 	friend class CPortalGameMovement;
-	// --> billdoor: allow access to private member variables from our player movement code
+#ifdef FF	// --> billdoor: allow access to private member variables from our player movement code
 	friend class CFFGameMovement;
 	// <-- billdoor: allow access to private member variables from our player movement code
-	
+#endif
 	// Accessors for gamemovement
 	float GetStepSize( void ) const { return m_Local.m_flStepSize; }
 

@@ -12,6 +12,7 @@
 #include "view.h"
 #ifdef TF_CLIENT_DLL
 #include "cdll_util.h"
+#include "tf_gamerules.h"
 #endif
 #include "engine/IStaticPropMgr.h"
 #include "c_impact_effects.h"
@@ -20,7 +21,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-static ConVar  r_drawflecks("r_drawflecks", "1", FCVAR_ARCHIVE);
+static ConVar  r_drawflecks( "r_drawflecks", "1", FCVAR_ALLOWED_IN_COMPETITIVE );
 extern ConVar r_drawmodeldecals;
 
 ImpactSoundRouteFn g_pImpactSoundRouteFn = NULL;
@@ -79,7 +80,7 @@ bool FX_AffectRagdolls( Vector vecOrigin, Vector vecStart, int iDamageType )
 	shotRay.Init( vecStart, vecOrigin );
 
 	CRagdollEnumerator ragdollEnum( shotRay, iDamageType );
-	partition->EnumerateElementsAlongRay( PARTITION_CLIENT_RESPONSIVE_EDICTS, shotRay, false, &ragdollEnum );
+	::partition->EnumerateElementsAlongRay( PARTITION_CLIENT_RESPONSIVE_EDICTS, shotRay, false, &ragdollEnum );
 
 	return ragdollEnum.Hit();
 }
@@ -98,9 +99,9 @@ DECLARE_CLIENT_EFFECT( "RagdollImpact", RagdollImpactCallback );
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-
+#ifdef FF
 extern ConVar	ffdev_disableentitydecals;
-
+#endif
 bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType, int iHitbox, C_BaseEntity *pEntity, trace_t &tr, int nFlags, int maxLODToDecal )
 {
 	VPROF( "Impact" );
@@ -137,7 +138,7 @@ bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType
 
 #ifdef TF_CLIENT_DLL
 		// Don't show blood decals if we're filtering them out (Pyro Goggles)
-		if ( IsLocalPlayerUsingVisionFilterFlags( TF_VISION_FILTER_PYRO ) || UTIL_IsLowViolence() )
+		if ( IsLocalPlayerUsingVisionFilterFlags( TF_VISION_FILTER_PYRO ) || UTIL_IsLowViolence() || ( TFGameRules() && TFGameRules()->IsTruceActive() ) )
 		{
 			if ( V_strstr( pchDecalName, "Flesh" ) )
 			{
@@ -154,8 +155,8 @@ bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType
 			}
 			else if ( pEntity )
 			{
-				// Here we deal with decals on entities.
-				//pEntity->AddDecal( vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal );
+#ifndef FF		// Here we deal with decals on entities.
+				pEntity->AddDecal( vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal ); #else
 				bool bDraw = true;
 				if (ffdev_disableentitydecals.GetBool())
 				{
@@ -164,7 +165,7 @@ bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType
 				}
 				if (bDraw)
 					pEntity->AddDecal(vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal);
-			}
+#endif		}
 		}
 	}
 	else

@@ -119,16 +119,11 @@ entities. Each one is useful under different conditions.
 #include "tier0/fasttimer.h"
 #include "utllinkedlist.h"
 #include "utldict.h"
-#ifdef SDK2013CE
-#include <typeinfo>
-#else
-#ifdef WIN32
+#if defined( WIN32 ) && _MSC_VER <= 1920
 #include <typeinfo.h>
 #else
 #include <typeinfo>
 #endif
-#endif // SDK2013CE
-
 #include "tier1/utlintrusivelist.h"
 #include "tier1/utlstring.h"
 
@@ -368,9 +363,7 @@ public:
 	// deallocate them when the IParticleEffect SimulateAndRender() method 
 	// returns false. The first argument is the size of the particle
 	// structure in bytes
-	// Use the third argument to override the alloc size by specifying the size
-	// in bytes that you want to use instead of MAX_PARTICLE_SIZE (which is 96)
-	Particle* AddParticle(int sizeInBytes, PMaterialHandle pMaterial, int iMaxParticleSizeOverride = 0);
+	Particle*		AddParticle( int sizeInBytes, PMaterialHandle pMaterial );
 
 	// This is an optional call you can make if you want to manually manage the effect's
 	// bounding box. Normally, the bounding box is managed automatically, but in certain

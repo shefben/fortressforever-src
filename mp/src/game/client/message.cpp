@@ -433,7 +433,7 @@ void CHudMessage::MessageScanStart( void )
 			m_parms.fadeBlend = 0;	// Pure source (on)
 		m_parms.charTime = 0;
 
-		if (m_parms.pMessage->effect == 1 && RandomInt(1, 100) <= 10)
+		if ( m_parms.pMessage->effect == 1 && (rand()%100) < 10 )
 			m_parms.charTime = 1;
 		break;
 
@@ -987,7 +987,7 @@ void CHudMessage::AddChar( int r, int g, int b, int a, wchar_t ch )
 //-----------------------------------------------------------------------------
 void CHudMessage::GetTextExtents( int *wide, int *tall, const char *string )
 {
-	*wide = g_pMatSystemSurface->DrawTextLen( m_hFont, (char *)string );
+	*wide = g_pMatSystemSurface->DrawTextLen( m_hFont, "%s", (char *)string );
 	*tall = vgui::surface()->GetFontTall( m_hFont );
 }
 

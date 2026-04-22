@@ -18,7 +18,6 @@
 #include "baseviewmodel_shared.h"
 #include "weapon_proficiency.h"
 #include "utlmap.h"
-#include "mathlib/mathlib.h"
 
 #if defined( CLIENT_DLL )
 #define CBaseCombatWeapon C_BaseCombatWeapon
@@ -81,29 +80,6 @@ typedef struct
 	int			weaponAct;
 	bool		required;
 } acttable_t;
-
-
-struct poseparamtable_t
-{
-	const char *pszName;
-	float		flValue;
-};
-
-// Put this in your derived class definition to declare it's poseparam table
-#define DECLARE_POSEPARAMTABLE()	static poseparamtable_t m_poseparamtable[];\
-	virtual poseparamtable_t* PoseParamList( int &iPoseParamCount ) { return NULL; }
-
-// You also need to include the activity table itself in your class' implementation:
-// e.g.
-//	acttable_t	CTFGrapplingHook::m_poseparamtable[] = 
-//	{
-//		{ "r_arm", 2 },
-//	};
-//
-// The grapplinghook overrides the r_arm pose param, value to 2.
-
-#define IMPLEMENT_POSEPARAMTABLE(className)\
-	poseparamtable_t* className::PoseParamList( int &iPoseParamCount ) { iPoseParamCount = ARRAYSIZE(m_poseparamtable); return m_poseparamtable; }
 
 class CHudTexture;
 class Color;
@@ -181,6 +157,9 @@ public:
 	DECLARE_CLASS( CBaseCombatWeapon, BASECOMBATWEAPON_DERIVED_FROM );
 	DECLARE_NETWORKCLASS();
 	DECLARE_PREDICTABLE();
+#ifdef GAME_DLL
+	DECLARE_ENT_SCRIPTDESC();
+#endif
 
 							CBaseCombatWeapon();
 	virtual 				~CBaseCombatWeapon();
@@ -269,9 +248,6 @@ public:
 	virtual void			HandleFireOnEmpty();					// Called when they have the attack button down
 																	// but they are out of ammo. The default implementation
 																	// either reloads, switches weapons, or plays an empty sound.
-	// FF
-	virtual void			GetHeatLevel(int _firemode, float& _current, float& _max) { _current = 0.f; _max = 0.f; }
-
 	virtual bool			CanPerformSecondaryAttack() const;
 
 	virtual bool			ShouldBlockPrimaryFire() { return false; }
@@ -279,6 +255,9 @@ public:
 #ifdef CLIENT_DLL
 	virtual void			CreateMove( float flInputSampleTime, CUserCmd *pCmd, const QAngle &vecOldViewAngles ) {}
 	virtual int				CalcOverrideModelIndex() OVERRIDE;
+
+	// misyl: If weapon mispred's don't reset all the player's variables.
+	virtual bool PredictionErrorShouldResetLatchedForAllPredictables( void ) OVERRIDE;
 #endif
 
 	virtual bool			IsWeaponZoomed() { return false; }		// Is this weapon in its 'zoomed in' mode?
@@ -336,7 +315,7 @@ public:
 
 	virtual void			AddViewKick( void );	// Add in the view kick for the weapon
 
-	virtual const char			*GetDeathNoticeName( void );	// Get the string to print death notices with
+	virtual char			*GetDeathNoticeName( void );	// Get the string to print death notices with
 
 	CBaseCombatCharacter	*GetOwner() const;
 	void					SetOwner( CBaseCombatCharacter *owner );
@@ -416,9 +395,6 @@ public:
 	virtual Activity		ActivityOverride( Activity baseAct, bool *pRequired );
 	virtual	acttable_t*		ActivityList( int &iActivityCount ) { return NULL; }
 
-	virtual void			PoseParameterOverride( bool bReset );
-	virtual poseparamtable_t* PoseParamList( int &iPoseParamCount ) { return NULL; }
-
 	virtual void			Activate( void );
 
 	virtual bool ShouldUseLargeViewModelVROverride() { return false; }
@@ -446,10 +422,6 @@ public:
 	void					DestroyItem( void );
 	virtual void			Kill( void );
 
-	// FF
-	// Just die & get deleted already you stupid weapon
-	virtual void			ForceRemove(void);
-
 	virtual int				CapabilitiesGet( void ) { return 0; }
 	virtual	int				ObjectCaps( void );
 
@@ -476,6 +448,11 @@ public:
 	void					Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	virtual CDmgAccumulator	*GetDmgAccumulator( void ) { return NULL; }
+
+	void					SetSoundsEnabled( bool bSoundsEnabled ) { m_bSoundsEnabled = bSoundsEnabled; }
+
+	void					SetCustomViewModel( const char *pszCustomViewModel );
+	void					SetCustomViewModelModelIndex( int nCustomViewModelModelIndex );
 
 // Client only methods
 #else
@@ -546,11 +523,6 @@ public:
 	bool					WantsToOverrideViewmodelAttachments( void ) { return false; }
 #endif
 
-#ifdef SDK2013CE
-	//Tony; notifications of any third person switches.
-	virtual void			ThirdPersonSwitch( bool bThirdPerson ) {};
-#endif // SDK2013CE
-
 #endif // End client-only methods
 
 	virtual bool			CanLower( void ) { return false; }
@@ -559,6 +531,33 @@ public:
 
 	virtual void			HideThink( void );
 	virtual bool			CanReload( void );
+
+	virtual float			GetNextSecondaryAttackDelay( void ) { return 0.5f; } // This is for setting the next attack timer from inside SecondaryAttack()
+
+	void SetClip1( int nClip )
+	{
+		if ( UsesClipsForAmmo1() )
+		{
+			m_iClip1 = nClip;
+		}
+		else
+		{
+			SetPrimaryAmmoCount( m_iClip1 );
+			m_iClip1 = WEAPON_NOCLIP;
+		}
+	}
+	void SetClip2( int nClip )
+	{
+		if ( UsesClipsForAmmo1() )
+		{
+			m_iClip2 = nClip;
+		}
+		else
+		{
+			SetPrimaryAmmoCount( m_iClip2 );
+			m_iClip2 = WEAPON_NOCLIP;
+		}
+	}
 
 private:
 	typedef CHandle< CBaseCombatCharacter > CBaseCombatCharacterHandle;
@@ -586,7 +585,7 @@ public:
 	CNetworkVar( float, m_flNextSecondaryAttack );					// soonest time ItemPostFrame will call SecondaryAttack
 	CNetworkVar( float, m_flTimeWeaponIdle );							// soonest time ItemPostFrame will call WeaponIdle
 	// Weapon state
-	CNetworkVar( bool,		m_bInReload);			// Are we in the middle of a reload;
+	bool					m_bInReload;			// Are we in the middle of a reload;
 	bool					m_bFireOnEmpty;			// True when the gun is empty and the player is still holding down the attack key(s)
 	bool					m_bFiringWholeClip;		// Are we in the middle of firing the whole clip;
 	// Weapon art
@@ -600,6 +599,12 @@ public:
 
 	bool					SetIdealActivity( Activity ideal );
 	void					MaintainIdealActivity( void );
+
+#ifdef CLIENT_DLL
+	virtual const Vector&	GetViewmodelOffset() { return vec3_origin; }
+#endif // CLIENT_DLL
+
+	virtual bool			UsesCenterFireProjectile( void ) const { return false; }
 
 private:
 	Activity				m_Activity;
@@ -655,8 +660,12 @@ private:
 	float					m_flHudHintPollTime;	// When to poll the weapon again for whether it should display a hud hint.
 	float					m_flHudHintMinDisplayTime; // if the hint is squelched before this, reset my counter so we'll display it again.
 	
+	CNetworkVar( short, m_nCustomViewmodelModelIndex );
+
 	// Server only
 #if !defined( CLIENT_DLL )
+
+	bool					m_bSoundsEnabled;
 
 	// Outputs
 protected:

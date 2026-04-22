@@ -123,7 +123,7 @@ void CCenterStringLabel::ApplySchemeSettings(vgui::IScheme *pScheme)
 	BaseClass::ApplySchemeSettings(pScheme);
 
 	// Use a large font
-	m_hFont = pScheme->GetFont( "Trebuchet24" );
+	m_hFont = pScheme->GetFont( "Trebuchet24", true );
 	assert( m_hFont );
 	SetFont( m_hFont );
 
@@ -147,21 +147,19 @@ void CCenterStringLabel::SetTextColor( int r, int g, int b, int a )
 	SetFgColor( Color( r, g, b, a ) );
 }
 
-// --> FF
+#ifdef FF
 extern ConVar cl_drawhud;
 extern ConVar hud_messages;
-// <-- FF
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CCenterStringLabel::Print( char *text )
 {
-	// --> FF
+#ifdef FF
 	if (!cl_drawhud.GetBool() || !hud_messages.GetBool())
 		return;
-	// <-- FF
-
+#endif // FF
 	SetText( text );
 	
 	m_flCentertimeOff = scr_centertime.GetFloat() + gpGlobals->curtime;
@@ -172,10 +170,10 @@ void CCenterStringLabel::Print( char *text )
 //-----------------------------------------------------------------------------
 void CCenterStringLabel::Print( wchar_t *text )
 {
-	// --> FF
+#ifdef FF
 	if (!cl_drawhud.GetBool() || !hud_messages.GetBool())
 		return;
-	// <-- FF
+#endif //FF
 	SetText( text );
 	
 	m_flCentertimeOff = scr_centertime.GetFloat() + gpGlobals->curtime;

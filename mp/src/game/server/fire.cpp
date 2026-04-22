@@ -267,7 +267,7 @@ IterationRetval_t CFireSphere::EnumElement( IHandleEntity *pHandleEntity )
 int FireSystem_GetFiresInSphere( CFire **pList, int listMax, bool onlyActiveFires, const Vector &origin, float radius )
 {
 	CFireSphere sphereEnum( pList, listMax, onlyActiveFires, origin, radius );
-	partition->EnumerateElementsInSphere( PARTITION_ENGINE_NON_STATIC_EDICTS, origin, radius, false, &sphereEnum );
+	::partition->EnumerateElementsInSphere( PARTITION_ENGINE_NON_STATIC_EDICTS, origin, radius, false, &sphereEnum );
 
 	return sphereEnum.GetCount();
 }
@@ -747,13 +747,11 @@ void CFire::Spawn( void )
 
 int CFire::UpdateTransmitState()
 {
-	// --> FF
-#ifdef GAME_DLL
+#ifdef FF_DLL
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-#endif // GAME_DLL
-	// <-- FF
+#endif // FF_DLL
 
 	// Don't want to be FL_EDICT_DONTSEND because our fire entity may make us transmit.
 	return SetTransmitState( FL_EDICT_ALWAYS );

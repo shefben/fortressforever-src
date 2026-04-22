@@ -452,6 +452,32 @@ char * CheckChatText( CBasePlayer *pPlayer, char *text )
 		p[length] = 0;
 	}
 
+	// Josh:
+	// Cheaters can send us whatever data they want through this channel
+	// Let's validate they aren't trying to clear the chat.
+	// If we detect any of these blacklisted characters (which players cannot type anyway.)
+	// Let's just end the string here.
+	static const char s_blacklist[] = {
+	//	CLRF   LF    ESC
+		'\r',  '\n', '\x1b'
+	};
+
+	int oldLength = length;
+	for (int i = 0; i < length && oldLength == length; i++) {
+		for (int j = 0; j < ARRAYSIZE(s_blacklist); j++) {
+			if (p[i] == s_blacklist[j]) {
+				p[i] = '\0';
+				length = i;
+			}
+		}
+	}
+
+	// Josh:
+	// If the whole string was garbage characters
+	// Let's just not print anything.
+	if ( !*p )
+		return NULL;
+
 	// cut off after 127 chars
 	if ( length > 127 )
 		text[127] = 0;
@@ -521,7 +547,7 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 
 	if ( !p )
 		return;
-
+#ifdef FF_DLL
 	// Parse out % commands. Doing it here so it will
 	// get sent out to clients correctly especially
 	// if the location is a resource a resource string
@@ -616,7 +642,7 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 
 	if (!p)
 		return;
-
+#endif
 	if ( pEdict )
 	{
 		if ( !pPlayer->CanSpeak() )
@@ -625,6 +651,12 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 		// See if the player wants to modify of check the text
 		pPlayer->CheckChatText( p, 127 );	// though the buffer szTemp that p points to is 256, 
 											// chat text is capped to 127 in CheckChatText above
+
+		// make sure the text has valid content
+		p = CheckChatText( pPlayer, p );
+
+		if ( !p )
+			return;
 
 		Assert( strlen( pPlayer->GetPlayerName() ) > 0 );
 
@@ -667,7 +699,7 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 	j = sizeof(text) - 2 - strlen(text);  // -2 for /n and null terminator
 	if ( (int)strlen(p) > j )
 		p[j] = 0;
-
+#ifdef FF_DLL
 	// normalize quotes
 	char* temp = p;
 	while (*temp != '\0')
@@ -677,10 +709,25 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 
 		temp++;
 	}
-
+#endif
 	Q_strncat( text, p, sizeof( text ), COPY_ALL_CHARACTERS );
 	Q_strncat( text, "\n", sizeof( text ), COPY_ALL_CHARACTERS );
+ 
+	// loop through all players
+	// Start with the first player.
+	// This may return the world in single player if the client types something between levels or during spawn
+	// so check it, or it will infinite loop
 
+	client = NULL;
+	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+	{
+		client = ToBaseMultiplayerPlayer( UTIL_PlayerByIndex( i ) );
+		if ( !client || !client->edict() )
+			continue;
+		
+		if ( client->edict() == pEdict )
+			continue;
+#ifdef FF_DLL
 	// if lua doesn't have a player_onchat function, always allow the message
 	bool bMessageAllowed = true;
 
@@ -711,85 +758,84 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 
 			if (client->edict() == pEdict)
 				continue;
-
-			if (!(client->IsNetClient()))	// Not a client ? (should never be true)
+#endif
+			if ( !(client->IsNetClient()) )	// Not a client ? (should never be true)
 				continue;
 
-			if (teamonly && g_pGameRules->PlayerCanHearChat(client, pPlayer) != GR_TEAMMATE)
-				continue;
+		if ( teamonly && g_pGameRules->PlayerCanHearChat( client, pPlayer ) != GR_TEAMMATE )
+			continue;
 
-			if (pPlayer && !client->CanHearAndReadChatFrom(pPlayer))
-				continue;
+		if ( pPlayer && !client->CanHearAndReadChatFrom( pPlayer ) )
+			continue;
 
-			if (pPlayer && GetVoiceGameMgr() && GetVoiceGameMgr()->IsPlayerIgnoringPlayer(pPlayer->entindex(), i))
-				continue;
+		if ( pPlayer && GetVoiceGameMgr() && GetVoiceGameMgr()->IsPlayerIgnoringPlayer( pPlayer->entindex(), i ) )
+			continue;
 
-			CSingleUserRecipientFilter user(client);
-			user.MakeReliable();
+		CSingleUserRecipientFilter user( client );
+		user.MakeReliable();
 
-			if (pszFormat)
-			{
-				UTIL_SayText2Filter(user, pPlayer, true, pszFormat, pszPlayerName, p, pszLocation);
-			}
-			else
-			{
-				UTIL_SayTextFilter(user, text, pPlayer, true);
-			}
-		}
-
-		if (pPlayer)
+		if ( pszFormat )
 		{
-			// print to the sending client
-			CSingleUserRecipientFilter user(pPlayer);
-			user.MakeReliable();
-
-			if (pszFormat)
-			{
-				UTIL_SayText2Filter(user, pPlayer, true, pszFormat, pszPlayerName, p, pszLocation);
-			}
-			else
-			{
-				UTIL_SayTextFilter(user, text, pPlayer, true);
-			}
+			UTIL_SayText2Filter( user, pPlayer, true, pszFormat, pszPlayerName, p, pszLocation );
 		}
-
-		// echo to server console
-		// Adrian: Only do this if we're running a dedicated server since we already print to console on the client.
-		if (engine->IsDedicatedServer())
-			Msg("%s", text);
-
-		Assert(p);
-
-		int userid = 0;
-		const char* networkID = "Console";
-		const char* playerName = "Console";
-		const char* playerTeam = "Console";
-		if (pPlayer)
-		{
-			userid = pPlayer->GetUserID();
-			networkID = pPlayer->GetNetworkIDString();
-			playerName = pPlayer->GetPlayerName();
-			CTeam* team = pPlayer->GetTeam();
-			if (team)
-			{
-				playerTeam = team->GetName();
-			}
-		}
-
-		if (teamonly)
-			UTIL_LogPrintf("\"%s<%i><%s><%s>\" say_team \"%s\"\n", playerName, userid, networkID, playerTeam, p);
 		else
-			UTIL_LogPrintf("\"%s<%i><%s><%s>\" say \"%s\"\n", playerName, userid, networkID, playerTeam, p);
-
-		IGameEvent* event = gameeventmanager->CreateEvent( ( teamonly ? "player_sayteam" : "player_say" ), true);
-
-		if (event) // will be null if there are no listeners!
 		{
-			event->SetInt("userid", userid);
-			event->SetString("text", p);
-			event->SetInt("priority", 1);	// HLTV event priority, not transmitted
-			gameeventmanager->FireEvent(event/*, true*/);
+			UTIL_SayTextFilter( user, text, pPlayer, true );
 		}
+	}
+
+	if ( pPlayer )
+	{
+		// print to the sending client
+		CSingleUserRecipientFilter user( pPlayer );
+		user.MakeReliable();
+
+		if ( pszFormat )
+		{
+			UTIL_SayText2Filter( user, pPlayer, true, pszFormat, pszPlayerName, p, pszLocation );
+		}
+		else
+		{
+			UTIL_SayTextFilter( user, text, pPlayer, true );
+		}
+	}
+
+	// echo to server console
+	// Adrian: Only do this if we're running a dedicated server since we already print to console on the client.
+	if ( engine->IsDedicatedServer() )
+		 Msg( "%s", text );
+
+	Assert( p );
+
+	int userid = 0;
+	const char *networkID = "Console";
+	const char *playerName = "Console";
+	const char *playerTeam = "Console";
+	if ( pPlayer )
+	{
+		userid = pPlayer->GetUserID();
+		networkID = pPlayer->GetNetworkIDString();
+		playerName = pPlayer->GetPlayerName();
+		CTeam *team = pPlayer->GetTeam();
+		if ( team )
+		{
+			playerTeam = team->GetName();
+		}
+	}
+		
+	if ( teamonly )
+		UTIL_LogPrintf( "\"%s<%i><%s><%s>\" say_team \"%s\"\n", playerName, userid, networkID, playerTeam, p );
+	else
+		UTIL_LogPrintf( "\"%s<%i><%s><%s>\" say \"%s\"\n", playerName, userid, networkID, playerTeam, p );
+
+	IGameEvent * event = gameeventmanager->CreateEvent( "player_say", true );
+
+	if ( event )
+	{
+		event->SetInt("userid", userid );
+		event->SetString("text", p );
+		event->SetInt("priority", 1 );	// HLTV event priority, not transmitted
+		gameeventmanager->FireEvent( event, true );
 	}
 }
 
@@ -805,8 +851,8 @@ void ClientPrecache( void )
 	CBaseEntity::PrecacheModel( "sprites/purpleglow1.vmt" );	
 	CBaseEntity::PrecacheModel( "sprites/purplelaser1.vmt" );	
 	
-#ifndef HL2MP
-	//CBaseEntity::PrecacheScriptSound( "Hud.Hint" );
+#ifndef HL2MP || ifndef FF
+	CBaseEntity::PrecacheScriptSound( "Hud.Hint" );
 #endif // HL2MP
 	CBaseEntity::PrecacheScriptSound( "Player.FallDamage" );
 	CBaseEntity::PrecacheScriptSound( "Player.Swim" );
@@ -1062,12 +1108,12 @@ void CPointServerCommand::InputCommand( inputdata_t& inputdata )
 {
 	if ( !inputdata.value.String()[0] )
 		return;
-
+#ifdef FF_DLL
 	// deny any string that includes rcon_password
 		// can't just check for the start because ' rcon_password blah' and 'dummy; rcon_password blah' are also valid
 	if (Q_stristr(inputdata.value.String(), "rcon_password"))
 		return;
-
+#endif
 	bool bAllowed = ( sAllowPointServerCommand == eAllowAlways );
 #ifdef TF_DLL
 	if ( sAllowPointServerCommand == eAllowOfficial )
@@ -1102,12 +1148,12 @@ void CC_DrawLine( const CCommand &args )
 	Vector startPos;
 	Vector endPos;
 
-	startPos.x = atof(args[1]);
-	startPos.y = atof(args[2]);
-	startPos.z = atof(args[3]);
-	endPos.x = atof(args[4]);
-	endPos.y = atof(args[5]);
-	endPos.z = atof(args[6]);
+	startPos.x = clamp( atof(args[1]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	startPos.y = clamp( atof(args[2]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	startPos.z = clamp( atof(args[3]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	endPos.x = clamp( atof(args[4]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	endPos.y = clamp( atof(args[5]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	endPos.z = clamp( atof(args[6]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
 
 	UTIL_AddDebugLine(startPos,endPos,true,true);
 }
@@ -1122,9 +1168,9 @@ void CC_DrawCross( const CCommand &args )
 {
 	Vector vPosition;
 
-	vPosition.x = atof(args[1]);
-	vPosition.y = atof(args[2]);
-	vPosition.z = atof(args[3]);
+	vPosition.x = clamp( atof(args[1]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	vPosition.y = clamp( atof(args[2]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	vPosition.z = clamp( atof(args[3]), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
 
 	// Offset since min and max z in not about center
 	Vector mins = Vector(-5,-5,-5);
@@ -1164,10 +1210,10 @@ void kill_helper( const CCommand &args, bool bExplode )
 			{
 				if ( Q_strstr( pPlayer->GetPlayerName(), args[1] ) )
 				{
-					// Bug #0000578: Suiciding using /kill doesn't cause a respawn delay
+#ifdef FF_DLL		// Bug #0000578: Suiciding using /kill doesn't cause a respawn delay
 					if (pPlayer->IsAlive())
 						pPlayer->m_flNextSpawnDelay = 5.0f;
-
+#endif
 					pPlayer->CommitSuicide( bExplode );
 				}
 			}
@@ -1178,10 +1224,10 @@ void kill_helper( const CCommand &args, bool bExplode )
 		CBasePlayer *pPlayer = UTIL_GetCommandClient();
 		if ( pPlayer )
 		{
-			// Bug #0000578: Suiciding using /kill doesn't cause a respawn delay
-			if (pPlayer->IsAlive())
-				pPlayer->m_flNextSpawnDelay = 5.0f;
-
+#ifdef FF_DLL	// Bug #0000578: Suiciding using /kill doesn't cause a respawn delay
+				if (pPlayer->IsAlive())
+					pPlayer->m_flNextSpawnDelay = 5.0f;
+#endif
 			pPlayer->CommitSuicide( bExplode );
 		}
 	}
@@ -1189,10 +1235,10 @@ void kill_helper( const CCommand &args, bool bExplode )
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-// CON_COMMAND( kill, "Kills the player with generic damage" )
-// {
-//	kill_helper( args, false );
-// }
+CON_COMMAND( kill, "Kills the player with generic damage" )
+{
+	kill_helper( args, false );
+}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -1265,16 +1311,16 @@ CON_COMMAND_F( buddha, "Toggle.  Player takes damage but won't die. (Shows red c
 	}
 }
 
-
+#ifdef FF_DLL
 #define TALK_INTERVAL 0.66 // min time between say commands from a client
-//------------------------------------------------------------------------------
+#endif//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 CON_COMMAND( say, "Display player message" )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( UTIL_GetCommandClient() ); 
 	if ( pPlayer )
 	{
-		if (( pPlayer->LastTimePlayerTalked() + TALK_INTERVAL ) < gpGlobals->curtime) 
+		if ( pPlayer->CanPlayerTalk() )
 		{
 			Host_Say( pPlayer->edict(), args, 0 );
 			pPlayer->NotePlayerTalked();
@@ -1298,7 +1344,7 @@ CON_COMMAND( say_team, "Display player message to team" )
 	CBasePlayer *pPlayer = ToBasePlayer( UTIL_GetCommandClient() ); 
 	if (pPlayer)
 	{
-		if (( pPlayer->LastTimePlayerTalked() + TALK_INTERVAL ) < gpGlobals->curtime) 
+		if ( pPlayer->CanPlayerTalk() )
 		{
 			Host_Say( pPlayer->edict(), args, 1 );
 			pPlayer->NotePlayerTalked();
@@ -1708,9 +1754,9 @@ CON_COMMAND_F( setpos, "Move player to specified origin (must have sv_cheats).",
 	Vector oldorigin = pPlayer->GetAbsOrigin();
 
 	Vector newpos;
-	newpos.x = atof( args[1] );
-	newpos.y = atof( args[2] );
-	newpos.z = args.ArgC() == 4 ? atof( args[3] ) : oldorigin.z;
+	newpos.x = clamp( atof( args[1] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	newpos.y = clamp( atof( args[2] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+	newpos.z = args.ArgC() == 4 ?  clamp( atof( args[3] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT ) : oldorigin.z;
 
 	pPlayer->SetAbsOrigin( newpos );
 

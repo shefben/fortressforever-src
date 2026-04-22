@@ -9,8 +9,8 @@
 #include "EventLog.h"
 #include "team.h"
 #include "KeyValues.h"
-#include "ff_shareddefs.h"
-
+#ifdef FF_DLL
+#include "ff_shareddefs.h" #endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -121,7 +121,7 @@ bool CEventLog::PrintPlayerEvent( IGameEvent *event )
 	}
 	else if ( !Q_strncmp( eventName, "player_death", Q_strlen("player_death") ) )
 	{
-		const int attackerid = event->GetInt("attacker");
+		const int attackerid = event->GetInt("attacker" );
 
 		const int assisterid = event->GetInt("killassister");
 

@@ -120,14 +120,13 @@ public:
 	bool				m_bHasWarnedAI;				// whether or not this grenade has issued its DANGER sound to the world sound list yet.
 	CNetworkVar( bool, m_bIsLive );					// Is this grenade live, or can it be picked up?
 	CNetworkVar( float, m_DmgRadius );				// How far do I do damage?
+	CNetworkVar( float, m_flNextAttack );
 	float				m_flDetonateTime;			// Time at which to detonate.
 	float				m_flWarnAITime;				// Time at which to warn the AI
-
-	CNetworkVar(float, m_flNextAttack);
-
+#if defined( FF )
 	int					m_iKillType; // custom kill type sent with explosion damage info
 	int					m_iDamageType; // damage type used for default explosion calls
-
+#endif
 protected:
 
 	CNetworkVar( float, m_flDamage );		// Damage to inflict.

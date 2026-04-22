@@ -32,11 +32,11 @@
 #include <igameresources.h>
 
 #include "vgui_avatarimage.h"
-
+#ifdef FF
 #include "in_buttons.h"
 #include "ff_gamerules.h"
 #include "c_ff_player.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 

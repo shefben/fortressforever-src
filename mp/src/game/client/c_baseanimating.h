@@ -26,8 +26,9 @@
 #include "ragdoll_shared.h"
 #include "tier0/threadtools.h"
 #include "datacache/idatacache.h"
+#ifdef FF_CLIENT_DLL
 #include "materialsystem/imaterial.h"
-
+#endif
 #define LIPSYNC_POSEPARAM_NAME "mouth"
 #define NUM_HITBOX_FIRES	10
 
@@ -153,11 +154,14 @@ public:
 	virtual void UpdateIKLocks( float currentTime );
 	virtual void CalculateIKLocks( float currentTime );
 	virtual bool ShouldDraw();
+	virtual void UpdateVisibility() OVERRIDE;
 	virtual int DrawModel( int flags );
 	virtual int	InternalDrawModel( int flags );
 	virtual bool OnInternalDrawModel( ClientModelRenderInfo_t *pInfo );
 	virtual bool OnPostInternalDrawModel( ClientModelRenderInfo_t *pInfo );
 	void		DoInternalDrawModel( ClientModelRenderInfo_t *pInfo, DrawModelState_t *pState, matrix3x4_t *pBoneToWorldArray = NULL );
+
+	virtual IMaterial* GetEconWeaponMaterialOverride( int iTeam ) { return NULL; }
 
 	//
 	virtual CMouthInfo *GetMouth();
@@ -471,6 +475,8 @@ protected:
 
 	virtual bool					CalcAttachments();
 
+	virtual bool					ShouldFlipViewModel();
+
 private:
 	// This method should return true if the bones have changed + SetupBones needs to be called
 	virtual float					LastBoneChangedTime() { return FLT_MAX; }
@@ -491,14 +497,13 @@ public:
 
 	// Texture group to use
 	int								m_nSkin;
-
-	// Override Material (FF)
+#ifdef FF	// Override Material (FF)
 	IMaterial*						m_pOverrideMaterial;
 	virtual void					FindOverrideMaterial(char const* pMaterialName, const char* pTextureGroupName, bool complain = true, const char* pComplainPrefix = NULL);
 	virtual void					ReleaseOverrideMaterial(char const* pMaterialName = 0);
 	void							StartMaterialOverride();
 	void							StopMaterialOverride();
-
+#endif
 	// Object bodygroup
 	int								m_nBody;
 
@@ -507,10 +512,9 @@ public:
 
 	CSequenceTransitioner			m_SequenceTransitioner;
 
-	// --> FF
+#ifdef FF
 	ColorRGBExp32					m_colorMuzzleDLight;
-	// <-- FF
-
+#endif
 protected:
 	CIKContext						*m_pIk;
 
@@ -634,6 +638,7 @@ private:
 	unsigned char m_nOldMuzzleFlashParity;
 
 	bool							m_bInitModelEffects;
+	bool							m_bDelayInitModelEffects;
 
 	// Dynamic models
 	bool							m_bDynamicModelAllowed;
@@ -652,6 +657,7 @@ private:
 	mutable CStudioHdr				*m_pStudioHdr;
 	mutable MDLHandle_t				m_hStudioHdr;
 	CThreadFastMutex				m_StudioHdrInitLock;
+	bool							m_bHasAttachedParticles;
 };
 
 enum 

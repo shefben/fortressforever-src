@@ -31,9 +31,9 @@ public:
 	void ToggleChaseAsFirstPerson();
 	bool IsPVSLocked();
 	void SetAutoDirector( bool bActive );
-
+#ifdef FF
 	bool IsValidObserverTarget(int nEntity);
-	
+#endif
 	int  GetMode();	// returns current camera mode
 	C_BaseEntity *GetPrimaryTarget();  // return primary target
 	void SetPrimaryTarget( int nEntity); // set the primary obs target

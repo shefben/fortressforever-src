@@ -5,9 +5,13 @@
 //=============================================================================//
 
 #include "cbase.h"
-//#include "sdk_fx_shared.h"
+#ifndef FF
+#include "sdk_fx_shared.h"
+#include "c_sdk_player.h"
+#else
 #include "ff_fx_shared.h"
 #include "c_ff_player.h"
+#endif
 #include "c_basetempentity.h"
 #include <cliententitylist.h>
 

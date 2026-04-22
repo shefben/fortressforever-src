@@ -89,7 +89,7 @@ public:
 
 	void OnStopAllSounds()
 	{
-		m_params.ent.Set( NULL );
+		m_params.entIndex = 0;
 		m_params.soundscapeIndex = -1;
 		m_loopingSounds.Purge();
 		m_randomSounds.Purge();
@@ -304,14 +304,13 @@ bool C_SoundscapeSystem::Init()
 	m_loopingSoundId = 0;
 
 	const char *mapname = MapName();
-	char mapSoundscapeFilename[256] = { 0 };
-	char mapSoundscapeFilenameFF[256] = { 0 }; // for the FF method of using maps/mapname_soundscapes.txt
-
-	if (mapname && *mapname)
-	{
-		// Jon - 2/14/2007: Let's support both methods.
-		//mapSoundscapeFilename = VarArgs( "scripts/soundscapes_%s.txt", mapname )
-
+	const char *mapSoundscapeFilename = NULL; #ifdef FF
+	const char *mapSoundscapeFilenameFF = NULL; // for the FF method of using maps/mapname_soundscapes.txt
+#endif
+	if ( mapname && *mapname )
+	{ #ifndef FF // Jon - 2/14/2007: Let's support both methods.
+		mapSoundscapeFilename = VarArgs( "scripts/soundscapes_%s.txt", mapname );
+#else
 		// Let's load map soundscape files without worrying about the manifest.
 		if (filesystem->FileExists(VarArgs("scripts/soundscapes_%s.txt", mapname)))
 		{
@@ -333,7 +332,7 @@ bool C_SoundscapeSystem::Init()
 
 		// NULL their ends just in case
 		mapSoundscapeFilename[255] = 0;
-		mapSoundscapeFilenameFF[255] = 0;
+		mapSoundscapeFilenameFF[255] = 0; #endif
 	}
 
 	KeyValues *manifest = new KeyValues( SOUNDSCAPE_MANIFEST_FILE );
@@ -343,19 +342,28 @@ bool C_SoundscapeSystem::Init()
 		{
 			if ( !Q_stricmp( sub->GetName(), "file" ) )
 			{
-				// Jon - 2/14/2007: don't load the map soundscapes file twice
+#ifdef FF		// Jon - 2/14/2007: don't load the map soundscapes file twice
 				if (mapSoundscapeFilename[0] && FStrEq(sub->GetString(), mapSoundscapeFilename))
 					continue;
 				if (mapSoundscapeFilenameFF[0] && FStrEq(sub->GetString(), mapSoundscapeFilenameFF))
 					continue;
-
+#endif
 				// Add
 				AddSoundScapeFile( sub->GetString() );
+				if ( mapSoundscapeFilename && FStrEq( sub->GetString(), mapSoundscapeFilename ) )
+				{
+					mapSoundscapeFilename = NULL; // we've already loaded the map's soundscape
+				}
 				continue;
 			}
 
 			Warning( "C_SoundscapeSystem::Init:  Manifest '%s' with bogus file type '%s', expecting 'file'\n", 
 				SOUNDSCAPE_MANIFEST_FILE, sub->GetName() );
+		}
+
+		if ( mapSoundscapeFilename && filesystem->FileExists( mapSoundscapeFilename ) )
+		{
+			AddSoundScapeFile( mapSoundscapeFilename );
 		}
 	}
 	else
@@ -413,7 +421,7 @@ void C_SoundscapeSystem::Shutdown()
 	m_loopingSounds.RemoveAll();
 	m_randomSounds.RemoveAll();
 	m_soundscapes.RemoveAll();
-	m_params.ent.Set( NULL );
+	m_params.entIndex = 0;
 	m_params.soundscapeIndex = -1;
 
 	while ( m_SoundscapeScripts.Count() > 0 )
@@ -577,12 +585,12 @@ void C_SoundscapeSystem::Update( float frametime )
 
 void C_SoundscapeSystem::UpdateAudioParams( audioparams_t &audio )
 {
-	if ( m_params.soundscapeIndex == audio.soundscapeIndex && m_params.ent.Get() == audio.ent.Get() )
+	if ( m_params.soundscapeIndex == audio.soundscapeIndex && m_params.entIndex == audio.entIndex )
 		return;
 
 	m_params = audio;
 	m_forcedSoundscapeIndex = -1;
-	if ( audio.ent.Get() && audio.soundscapeIndex >= 0 && audio.soundscapeIndex < m_soundscapes.Count() )
+	if ( audio.entIndex > 0 && audio.soundscapeIndex >= 0 && audio.soundscapeIndex < m_soundscapes.Count() )
 	{
 		DevReportSoundscapeName( audio.soundscapeIndex );
 		StartNewSoundscape( m_soundscapes[audio.soundscapeIndex] );
@@ -590,7 +598,7 @@ void C_SoundscapeSystem::UpdateAudioParams( audioparams_t &audio )
 	else
 	{
 		// bad index (and the soundscape file actually existed...)
-		if ( audio.ent.Get() != 0 &&
+		if ( audio.entIndex > 0 &&
 			 audio.soundscapeIndex != -1 )
 		{
 			DevMsg(1, "Error: Bad soundscape!\n");

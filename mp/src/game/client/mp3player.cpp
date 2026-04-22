@@ -822,7 +822,7 @@ void CMP3Player::RemoveTempSounds()
 	FileFindHandle_t fh;
 
 	char path[ 512 ];
-	Q_strncpy( path, "sound/_mp3/*.mp3", sizeof( path ) ); // */
+	Q_strncpy( path, "sound/_mp3/*.mp3", sizeof( path ) );
 
 	char const *fn = g_pFullFileSystem->FindFirstEx( path, "MOD", &fh );
 	if ( fn )
@@ -1317,6 +1317,12 @@ void CMP3Player::PopulateTree()
 	PopulateLists();
 }
 
+// Instead of including windows.h
+extern "C"
+{
+	extern int __stdcall CopyFileA( char *pszSource, char *pszDest, int bFailIfExists );
+};
+
 void CMP3Player::GetLocalCopyOfSong( const MP3File_t &mp3, char *outsong, size_t outlen )
 {
 	outsong[ 0 ] = 0;
@@ -1371,9 +1377,7 @@ void CMP3Player::GetLocalCopyOfSong( const MP3File_t &mp3, char *outsong, size_t
 
 		// !!!HACK HACK:
 		// Total hack right now, using windows OS calls to copy file to full destination
-		// not anymore because
-		// we now have std::filesystem::copy_file which we can use (since C++17)
-		int success = std::filesystem::copy_file( sourcepath, destpath/*, TRUE*/ );
+		int success = ::CopyFileA( sourcepath, destpath, TRUE );
 		if ( success > 0 )
 		{
 			Q_snprintf( outsong, outlen, "_mp3/%s.mp3", hexname );

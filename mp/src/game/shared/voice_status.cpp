@@ -30,10 +30,10 @@
 #include "cdll_int.h"
 #include <vgui/IPanel.h>
 
-
+#ifdef( FF )
 #include "c_ff_player.h"
 #include "ff_gamerules.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -230,14 +230,14 @@ void CVoiceStatus::DrawHeadLabels()
 		if ( !pClient || pClient->IsDormant() )
 			continue;
 
-		C_FFPlayer* pPlayer = dynamic_cast<C_FFPlayer*>(pClient);
+		C_BasePlayer *pPlayer = dynamic_cast<C_BasePlayer*>(pClient);
 		if( !pPlayer )
 			continue;
 
 		// Don't show an icon for dead or spectating players (ie: invisible entities).
 		if( pPlayer->IsPlayerDead() )
 			continue;
-
+#ifdef( FF )
 		C_FFPlayer* pLocalPlayer = dynamic_cast<C_FFPlayer*>(C_BasePlayer::GetLocalPlayer());
 		if (!pLocalPlayer)
 			continue;
@@ -245,7 +245,7 @@ void CVoiceStatus::DrawHeadLabels()
 		// Don't show an icon for cloaked enemies
 		if (pPlayer->IsCloaked() && (FFGameRules()->PlayerRelationship(pPlayer, pLocalPlayer) == GR_NOTTEAMMATE))
 			continue;
-
+#endif
 		// Place it 20 units above his head.
 		Vector vOrigin = pPlayer->WorldSpaceCenter();
 		vOrigin.z += g_flHeadOffset;
@@ -345,25 +345,6 @@ void CVoiceStatus::UpdateSpeakerStatus(int entindex, bool bTalking)
 	}
 }
 
-int CVoiceStatus::GetSpeakerStatus(int entindex)
-{
-	player_info_t pi;
-	if (!engine->GetPlayerInfo(entindex, &pi))
-		return 0;
-
-	bool bTalking = !!m_VoicePlayers[entindex - 1];
-	bool bBanned = m_BanMgr.GetPlayerBan(pi.guid);
-	bool bNeverSpoken = !m_VoiceEnabledPlayers[entindex - 1];
-
-	if (bBanned)
-		return VOICE_BANNED;
-	else if (bTalking)
-		return VOICE_TALKING;
-	else if (bNeverSpoken)
-		return VOICE_NEVERSPOKEN;
-	else
-		return VOICE_NOTTALKING;
-}
 
 void CVoiceStatus::UpdateServerState(bool bForce)
 {
@@ -409,7 +390,7 @@ void CVoiceStatus::UpdateServerState(bool bForce)
 
 			player_info_t pi;
 
-			if ( !engine->GetPlayerInfo( i+1, &pi ) )
+			if ( !engine->GetPlayerInfo( playerIndex + 1, &pi ) )
 				continue;
 
 			if ( m_BanMgr.GetPlayerBan( pi.guid ) )
@@ -601,11 +582,10 @@ void CVoiceStatus::SetPlayerBlockedState(int iPlayer, bool blocked)
 	{
 		Msg("CVoiceStatus::SetPlayerBlockedState: setting player %d ban to %d\n", iPlayer, !m_BanMgr.GetPlayerBan(pi.guid));
 	}
-
-	// --> Mirv: What the hell, a toggle??
-	// m_BanMgr.SetPlayerBan(pi.guid, !m_BanMgr.GetPlayerBan(pi.guid));
+#ifndef( FF ) // Mirv: What the hell, a toggle??
+	m_BanMgr.SetPlayerBan(pi.guid, !m_BanMgr.GetPlayerBan(pi.guid));
+#else
 	m_BanMgr.SetPlayerBan(pi.guid, blocked);
-	// <-- Mirv: What the hell, a toggle??
 	UpdateServerState(false);
 }
 

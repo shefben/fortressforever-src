@@ -49,13 +49,50 @@ short		g_sModelIndexBubbles;		// holds the index for the bubbles model
 short		g_sModelIndexBloodDrop;		// holds the sprite index for the initial blood
 short		g_sModelIndexBloodSpray;	// holds the sprite index for splattered blood
 
+BEGIN_ENT_SCRIPTDESC( CBaseCombatWeapon, BASECOMBATWEAPON_DERIVED_FROM, "Base Combat Weapon" )
+	DEFINE_SCRIPTFUNC( SetCustomViewModel, "Sets a custom view model for this weapon by model name" )
+	DEFINE_SCRIPTFUNC( SetCustomViewModelModelIndex, "Sets a custom view model for this weapon by modelindex" )
+	DEFINE_SCRIPTFUNC( GetSubType, "Get the weapon subtype" )
+	DEFINE_SCRIPTFUNC( SetSubType, "Set the weapon subtype" )
+	DEFINE_SCRIPTFUNC( IsAllowedToSwitch, "Are we allowed to switch to this weapon?" )
+	DEFINE_SCRIPTFUNC( CanBeSelected, "Can this weapon be selected" )
+	DEFINE_SCRIPTFUNC( VisibleInWeaponSelection, "Is this weapon visible in weapon selection" )
+	DEFINE_SCRIPTFUNC( HasAnyAmmo, "Do we have any ammo?" )
+	DEFINE_SCRIPTFUNC( HasPrimaryAmmo, "Do we have any primary ammo?" )
+	DEFINE_SCRIPTFUNC( HasSecondaryAmmo, "Do we have any secondary ammo?" )
+	DEFINE_SCRIPTFUNC( UsesPrimaryAmmo, "Do we use primary ammo?" )
+	DEFINE_SCRIPTFUNC( UsesSecondaryAmmo, "Do we use secondary ammo?" )
+	DEFINE_SCRIPTFUNC( UsesClipsForAmmo1, "Do we use clips for ammo 1?" )
+	DEFINE_SCRIPTFUNC( UsesClipsForAmmo2, "Do we use clips for ammo 2?" )
+	DEFINE_SCRIPTFUNC( PrimaryAttack, "Force a primary attack" )
+	DEFINE_SCRIPTFUNC( SecondaryAttack, "Force a secondary attack" )
+	DEFINE_SCRIPTFUNC( GetMaxClip1, "Max size of clip1" )
+	DEFINE_SCRIPTFUNC( GetMaxClip2, "Max size of clip2" )
+	DEFINE_SCRIPTFUNC( GetDefaultClip1, "Default size of clip1" )
+	DEFINE_SCRIPTFUNC( GetDefaultClip2, "Default size of clip2" )
+	DEFINE_SCRIPTFUNC( GetWeight, "Get the weapon weighting/importance" )
+	DEFINE_SCRIPTFUNC( GetWeaponFlags, "Get the weapon flags" )
+	DEFINE_SCRIPTFUNC( GetSlot, "Gets the weapon's current slot" )
+	DEFINE_SCRIPTFUNC( GetPosition, "Gets the weapon's current position" )
+	DEFINE_SCRIPTFUNC( GetName, "Gets the weapon's name" )
+	DEFINE_SCRIPTFUNC( GetPrintName, "Gets the weapon's print name" )
+	DEFINE_SCRIPTFUNC( IsMeleeWeapon, "Returns whether this is a melee weapon" )
+	DEFINE_SCRIPTFUNC( GetPrimaryAmmoType, "Returns the primary ammo type" )
+	DEFINE_SCRIPTFUNC( GetSecondaryAmmoType, "Returns the secondary ammo type" )
+	DEFINE_SCRIPTFUNC( Clip1, "Current ammo in clip1" )
+	DEFINE_SCRIPTFUNC( Clip2, "Current ammo in clip2" )
+	DEFINE_SCRIPTFUNC( SetClip1, "Set current ammo in clip1" )
+	DEFINE_SCRIPTFUNC( SetClip2, "Set current ammo in clip2" )
+	DEFINE_SCRIPTFUNC( GetPrimaryAmmoCount, "Current primary ammo count if no clip is used or to give a player if they pick up this weapon legacy style (not TF)" )
+	DEFINE_SCRIPTFUNC( GetSecondaryAmmoCount, "Current secondary ammo count if no clip is used or to give a player if they pick up this weapon legacy style (not TF)" )
+END_SCRIPTDESC();
 
 ConVar weapon_showproficiency( "weapon_showproficiency", "0" );
 extern ConVar ai_debug_shoot_positions;
-
+#ifdef FF_DLL
 extern void PrecacheFileGrenadeInfoDatabase(IFileSystem* filesystem, const unsigned char* pICEKey);
 extern void PrecacheFilePlayerClassInfoDatabase(IFileSystem* filesystem, const unsigned char* pICEKey);
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: Precache global weapon sounds
 //-----------------------------------------------------------------------------
@@ -73,12 +110,12 @@ void W_Precache(void)
 #endif // HL1_DLL
 
 #ifndef TF_DLL
-
+	#ifdef FF_DLL
 	// --> Mirv: Add some more here
 	PrecacheFileGrenadeInfoDatabase(filesystem, g_pGameRules->GetEncryptionKey());
 	PrecacheFilePlayerClassInfoDatabase(filesystem, g_pGameRules->GetEncryptionKey());
 	// <--
-
+	#endif
 	g_sModelIndexFireball = CBaseEntity::PrecacheModel ("sprites/zerogxplode.vmt");// fireball
 
 	g_sModelIndexSmoke = CBaseEntity::PrecacheModel ("sprites/steam1.vmt");// smoke
@@ -103,14 +140,14 @@ void W_Precache(void)
 //-----------------------------------------------------------------------------
 int CBaseCombatWeapon::UpdateTransmitState( void)
 {
-	// --> FF
-#ifdef GAME_DLL
+	#ifdef FF_DLL
+
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-#endif // GAME_DLL
-	// <-- FF
-	// 
+		
+
+	#endif // FF_DLL
 	// If the weapon is being carried by a CBaseCombatCharacter, let the combat character do the logic
 	// about whether or not to transmit it.
 	if ( GetOwner() )
@@ -132,20 +169,20 @@ void CBaseCombatWeapon::Operator_FrameUpdate( CBaseCombatCharacter *pOperator )
 	if ( IsSequenceFinished() )
 	{
 		// --> Mirv: Removed for world model fix
-
+		#ifndef FF_DLL
 		// Don't allow this to happen. It won't affect the viewmodel loops because
 		// they are done separately. If something comes up later with w_ model loops,
 		// reset to the current sequence and not the new SelectWeightedSequence
-		//if ( SequenceLoops() )
-		//{
-		//	// animation does loop, which means we're playing subtle idle. Might need to fidget.
-		//	int iSequence = SelectWeightedSequence( GetActivity() );
-		//	if ( iSequence != ACTIVITY_NOT_AVAILABLE )
-		//	{
-		//		ResetSequence( iSequence );	// Set to new anim (if it's there)
-		//	}
-		//}
-		// <-- Mirv
+		if ( SequenceLoops() )
+		{
+			// animation does loop, which means we're playing subtle idle. Might need to fidget.
+			int iSequence = SelectWeightedSequence( GetActivity() );
+			if ( iSequence != ACTIVITY_NOT_AVAILABLE )
+			{
+				ResetSequence( iSequence );	// Set to new anim (if it's there)
+			}
+		}
+		#endif
 #if 0
 		else
 		{
@@ -755,3 +792,26 @@ void CBaseCombatWeapon::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 	}
 }
 
+void CBaseCombatWeapon::SetCustomViewModel( const char *pszCustomViewModel )
+{
+	if ( !pszCustomViewModel || !*pszCustomViewModel )
+	{
+		m_nCustomViewmodelModelIndex = 0;
+		return;
+	}
+
+	const bool bPrecacheAllowed = CBaseEntity::IsPrecacheAllowed();
+	CBaseEntity::SetAllowPrecache( true );
+
+	SetCustomViewModelModelIndex( PrecacheModel( pszCustomViewModel, false ) );
+
+	CBaseEntity::SetAllowPrecache( bPrecacheAllowed );
+}
+
+void CBaseCombatWeapon::SetCustomViewModelModelIndex( int nCustomViewModelModelIndex )
+{
+	if ( nCustomViewModelModelIndex < 0 )
+		nCustomViewModelModelIndex = 0;
+
+	m_nCustomViewmodelModelIndex = nCustomViewModelModelIndex;
+}

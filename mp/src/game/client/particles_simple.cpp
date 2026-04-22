@@ -200,12 +200,12 @@ PMaterialHandle CParticleEffect::GetPMaterial(const char *name)
 //			material - 
 // Output : SimpleParticle
 //-----------------------------------------------------------------------------
-Particle *CParticleEffect::AddParticle( unsigned int particleSize, PMaterialHandle material, const Vector &origin, int iMaxParticleSizeOverride)
+Particle *CParticleEffect::AddParticle( unsigned int particleSize, PMaterialHandle material, const Vector &origin )
 {
 	// If you get here, then you must call SetSortOrigin before adding particles.
 	Assert( m_vSortOrigin.IsValid() );
 
-	Particle *pParticle = (Particle *) m_ParticleEffect.AddParticle( particleSize, material, iMaxParticleSizeOverride);
+	Particle *pParticle = (Particle *) m_ParticleEffect.AddParticle( particleSize, material );
 
 	if( pParticle == NULL )
 		return NULL;
@@ -223,13 +223,8 @@ REGISTER_EFFECT_USING_CREATE( CSimpleEmitter );
 
 CSimpleEmitter::CSimpleEmitter( const char *pDebugName ) : CParticleEffect( pDebugName )
 {
-	/*m_flNearClipMin	= 16.0f;
-	m_flNearClipMax	= 64.0f;*/
-	m_flNearClipMin = 8.0f;
-	m_flNearClipMax = 32.0f;
-
-	m_flFarClipMin = 65536;
-	m_flFarClipMax = 65536;
+	m_flNearClipMin	= 16.0f;
+	m_flNearClipMax	= 64.0f;
 }
 
 
@@ -255,16 +250,6 @@ void CSimpleEmitter::SetNearClip( float nearClipMin, float nearClipMax )
 	m_flNearClipMax = nearClipMax;
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Set the internal far clip range for this particle system
-// Input  : farClipMin - beginning of clip range
-//			farClipMax - end of clip range
-//-----------------------------------------------------------------------------
-void CSimpleEmitter::SetFarClip(float farClipMin, float farClipMax)
-{
-	m_flFarClipMin = farClipMin;
-	m_flFarClipMax = farClipMax;
-}
 
 SimpleParticle*	CSimpleEmitter::AddSimpleParticle( 
 	PMaterialHandle hMaterial, 
@@ -415,7 +400,7 @@ void CSimpleEmitter::RenderParticles( CParticleRenderIterator *pIterator )
 			pIterator->GetParticleDraw(),
 			tPos,
 			UpdateColor( pParticle ),
-			UpdateAlpha(pParticle) * GetAlphaDistanceFade(tPos, m_flNearClipMin, m_flNearClipMax, m_flFarClipMin, m_flFarClipMax),
+			UpdateAlpha( pParticle ) * GetAlphaDistanceFade( tPos, m_flNearClipMin, m_flNearClipMax ),
 			UpdateScale( pParticle ),
 			pParticle->m_flRoll
 			);

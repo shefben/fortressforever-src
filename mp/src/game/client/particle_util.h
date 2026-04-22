@@ -14,7 +14,6 @@
 #include "particlemgr.h"
 #include "cdll_client_int.h"
 #include "timedevent.h"
-#include "vstdlib/random.h"
 
 // Lerp between two floating point numbers.
 inline float FLerp(float minVal, float maxVal, float t)
@@ -30,7 +29,7 @@ inline Vector VecLerp(const Vector &minVal, const Vector &maxVal, float t)
 // Get a random floating point number between the two specified numbers.
 inline float FRand(float minVal, float maxVal)
 {
-	return RandomFloat(minVal, maxVal);
+	return minVal + ((float)rand() / VALVE_RAND_MAX) * (maxVal - minVal);
 }
 
 // Apply velocity and acceleration to position and acceleration to velocity.
@@ -401,49 +400,23 @@ inline void RenderParticle_ColorSizeAngles(
  	pBuilder->AdvanceVertex();
 }
 
-//inline float GetAlphaDistanceFade(
-//	const Vector &pos,
-//	const float fadeNearDist,
-//	const float fadeFarDist)
-//{
-//	if(-pos.z > fadeFarDist)
-//	{
-//		return 1;
-//	}
-//	else if(-pos.z > fadeNearDist)
-//	{
-//		return (-pos.z - fadeNearDist) / (fadeFarDist - fadeNearDist);
-//	}
-//	else
-//	{
-//		return 0;
-//	}
-//}
-
-// If you can find a MAX_VIEW_DISTANCE or something, maybe use that instead of 65536.
 inline float GetAlphaDistanceFade(
-	const Vector& pos,
-	const float fadeNearMin = 0,
-	const float fadeNearMax = 0,
-	const float fadeFarMin = 65536,
-	const float fadeFarMax = 65536)
+	const Vector &pos,
+	const float fadeNearDist,
+	const float fadeFarDist)
+{
+	if(-pos.z > fadeFarDist)
 	{
-		if (-pos.z < fadeNearMin || -pos.z > fadeFarMax)
-		{
-			return 0;
-		}
-		else if (-pos.z < fadeNearMax && fadeNearMax != fadeNearMin)
-		{
-			return (-pos.z - fadeNearMin) / (fadeNearMax - fadeNearMin);
-		}
-		else if (-pos.z > fadeFarMin && fadeFarMax != fadeFarMin)
-		{
-			return 1 - ((-pos.z - fadeFarMin) / (fadeFarMax - fadeFarMin));
-		}
-		else
-		{
-			return 1;
-		}
+		return 1;
+	}
+	else if(-pos.z > fadeNearDist)
+	{
+		return (-pos.z - fadeNearDist) / (fadeFarDist - fadeNearDist);
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 

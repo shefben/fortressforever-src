@@ -27,18 +27,19 @@ enum
 	SF_TRIGGER_ONLY_PLAYER_ALLY_NPCS		= 0x10,		// *if* NPCs can fire this trigger, this flag means only player allies do so
 	SF_TRIGGER_ONLY_CLIENTS_IN_VEHICLES		= 0x20,		// *if* Players can fire this trigger, this flag means only players inside vehicles can 
 	SF_TRIGGER_ALLOW_ALL					= 0x40,		// Everything can fire this trigger EXCEPT DEBRIS!
+	SF_TRIGGER_ONLY_CLIENTS_OUT_OF_VEHICLES	= 0x200,	// *if* Players can fire this trigger, this flag means only players outside vehicles can 
 	SF_TRIG_PUSH_ONCE						= 0x80,		// trigger_push removes itself after firing once
 	SF_TRIG_PUSH_AFFECT_PLAYER_ON_LADDER	= 0x100,	// if pushed object is player on a ladder, then this disengages them from the ladder (HL2only)
-	SF_TRIGGER_ONLY_CLIENTS_OUT_OF_VEHICLES = 0x200,	// *if* Players can fire this trigger, this flag means only players outside vehicles can 
 	SF_TRIG_TOUCH_DEBRIS 					= 0x400,	// Will touch physics debris objects
 	SF_TRIGGER_ONLY_NPCS_IN_VEHICLES		= 0X800,	// *if* NPCs can fire this trigger, only NPCs in vehicles do so (respects player ally flag too)
 	SF_TRIGGER_DISALLOW_BOTS                = 0x1000,   // Bots are not allowed to fire this trigger
-
+#ifdef FF
 	// New FF stuff.  Be careful not to add too many or we'll run out of bits
 	// Also, there's already a #define SF_VPHYSICS_MOTION_MOVEABLE	0x1000 ... and also 0x800 is skipped; possibly reserved?
 	SF_TRIGGER_ALLOW_FF_GRENADES = 0x2000,	// Allow grenades
 	SF_TRIGGER_ALLOW_FF_BUILDABLES = 0x4000,	// Allow buildables
 	//SF_TRIGGER_ALLOW_FF_INFOSCRIPTS			= 0x8000,	// info_ff_scripts
+#endif
 };
 
 // DVS TODO: get rid of CBaseToggle
@@ -60,12 +61,13 @@ public:
 	void Spawn( void );
 	void UpdateOnRemove( void );
 	void TouchTest(  void );
-
+#ifdef FF
 	virtual Class_T Classify( void ) { return CLASS_TRIGGER; }
-
+#endif
 	// Input handlers
 	virtual void InputEnable( inputdata_t &inputdata );
 	virtual void InputDisable( inputdata_t &inputdata );
+	virtual void InputDisableAndEndTouch( inputdata_t &inputdata );
 	virtual void InputToggle( inputdata_t &inputdata );
 	virtual void InputTouchTest ( inputdata_t &inputdata );
 
@@ -78,7 +80,7 @@ public:
 	virtual void EndTouch(CBaseEntity *pOther);
 	virtual void StartTouchAll() {}
 	virtual void EndTouchAll() {}
-	bool IsTouching( CBaseEntity *pOther );
+	virtual bool IsTouching( const CBaseEntity *pOther ) const;
 
 	CBaseEntity *GetTouchedEntityOfType( const char *sClassName );
 
@@ -122,9 +124,9 @@ public:
 	void MultiTouch( CBaseEntity *pOther );
 	void MultiWaitOver( void );
 	void ActivateMultiTrigger(CBaseEntity *pActivator);
-
+#ifdef FF
 	virtual Class_T Classify( void ) { return CLASS_TRIGGER_MULTIPLE; }
-
+#endif
 	DECLARE_DATADESC();
 
 	// Outputs
@@ -208,9 +210,9 @@ public:
 	void EndTouch( CBaseEntity *pOther );
 	bool HurtEntity( CBaseEntity *pOther, float damage );
 	int HurtAllTouchers( float dt );
-
+#ifdef FF
 	virtual Class_T Classify(void) { return CLASS_TRIGGER_HURT; }
-
+#endif
 	DECLARE_DATADESC();
 
 	float	m_flOriginalDamage;	// Damage as specified by the level designer.
@@ -236,7 +238,7 @@ public:
 };
 
 bool IsTakingTriggerHurtDamageAtPoint( const Vector &vecPoint );
-
+#ifdef FF
 // ##################################################################################
 //	>> func_ff_script
 // ##################################################################################
@@ -283,5 +285,5 @@ protected:
 public:
 	virtual void	Precache();
 };
-
+#endif // FF
 #endif // TRIGGERS_H

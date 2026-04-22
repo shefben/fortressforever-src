@@ -113,13 +113,13 @@ void NDebugOverlay::Line( const Vector &origin, const Vector &target, int r, int
 	Vector clientForward;
 	player->EyeVectors( &clientForward );
 
-	/*Vector toOrigin		= origin - player->GetAbsOrigin();
+	Vector toOrigin		= origin - player->GetAbsOrigin();
 	Vector toTarget		= target - player->GetAbsOrigin();
  	float  dotOrigin	= DotProduct(clientForward,toOrigin);
  	float  dotTarget	= DotProduct(clientForward,toTarget);
 	
 	if (dotOrigin < 0 && dotTarget < 0) 
-		return;*/
+		return;
 
 	if ( debugoverlay )
 	{
@@ -250,6 +250,17 @@ void NDebugOverlay::ScreenText( float flXpos, float flYpos, const char *text, in
 	{
 		debugoverlay->AddScreenTextOverlay( flXpos, flYpos, duration, r, g, b, a, text );
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Add debug overlay text with screen position and line offset
+//-----------------------------------------------------------------------------
+void NDebugOverlay::ScreenTextLine( float flXpos, float flYpos, int iLine, const char *text, int r, int g, int b, int a, float duration )
+{
+    if ( debugoverlay )
+    {
+        debugoverlay->AddScreenTextOverlay( flXpos, flYpos, iLine, duration, r, g, b, a, text );
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -640,7 +651,10 @@ void NDebugOverlay::Circle( const Vector &position, const Vector &xAxis, const V
 		// If we have an alpha value, then draw the fan
 		if ( a && i > 1 )
 		{		
-			debugoverlay->AddTriangleOverlay( vecStart, vecLastPosition, vecPosition, r, g, b, a, bNoDepthTest, flDuration );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddTriangleOverlay( vecStart, vecLastPosition, vecPosition, r, g, b, a, bNoDepthTest, flDuration );
+			}
 		}
 	}
 }

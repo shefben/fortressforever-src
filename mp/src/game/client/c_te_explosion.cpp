@@ -19,9 +19,9 @@
 #include "tier0/memdbgon.h"
 
 #define	OLD_EXPLOSION	0
-
+#ifdef FF
 static ConVar cl_explosionoverlay("cl_explosionoverlay", "0", 0);	// |-- Mirv
-
+#endif
 // Enumator class for ragdolls being affected by explosive forces
 CRagdollExplosionEnumerator::CRagdollExplosionEnumerator( Vector origin, float radius, float magnitude )
 {
@@ -57,11 +57,11 @@ CRagdollExplosionEnumerator::~CRagdollExplosionEnumerator()
 		C_BaseAnimating *pModel = static_cast< C_BaseAnimating * >( pEnt );
 
 		Vector	position = pEnt->CollisionProp()->GetCollisionOrigin();
-
+#ifdef FF
 		// Mirv: Account for the fact that explosions are moved. This shouldn't be a
 		// problem unless they are being hit right up by a ceiling
 		position += Vector(0, 0, 32.0f);
-
+#endif
 		Vector	dir		= position - m_vecOrigin;
 		float	dist	= VectorNormalize( dir );
 		float	force	= m_flMagnitude - ( ( m_flMagnitude / m_flRadius ) * dist );
@@ -178,7 +178,7 @@ void C_TEExplosion::AffectRagdolls( void )
 		return;
 
 	CRagdollExplosionEnumerator	ragdollEnum( m_vecOrigin, m_nRadius, m_nMagnitude );
-	partition->EnumerateElementsInSphere( PARTITION_CLIENT_RESPONSIVE_EDICTS, m_vecOrigin, m_nRadius, false, &ragdollEnum );
+	::partition->EnumerateElementsInSphere( PARTITION_CLIENT_RESPONSIVE_EDICTS, m_vecOrigin, m_nRadius, false, &ragdollEnum );
 }
 
 //
@@ -264,9 +264,11 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 		WaterExplosionEffect().Create( m_vecOrigin, m_nMagnitude, m_fScale, m_nFlags );
 		return;
 	}
-
-	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) && cl_explosionoverlay.GetBool())	// |-- Mirv: Can disable overlay
-	{
+#ifndef FF
+	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) )
+#else
+	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) && cl_explosionoverlay.GetBool() )	// |-- Mirv: Can disable overlay
+#endif	{
 		if ( CExplosionOverlay *pOverlay = new CExplosionOverlay )
 		{
 			pOverlay->m_flLifetime	= 0;
@@ -306,8 +308,11 @@ void TE_Explosion( IRecipientFilter& filter, float delay,
 	__g_C_TEExplosion.m_nFrameRate = framerate;
 	__g_C_TEExplosion.m_nFlags = flags;
 	__g_C_TEExplosion.m_vecOrigin = *pos;
+#ifdef FF
 	__g_C_TEExplosion.m_vecNormal = normal ? *normal : Vector(0.0f, 0.0f, 0.0f);	// |-- Mirv: Argh
 																					// yeah conc explosion sometimes makes it null for some reason
+#else
+	__g_C_TEExplosion.m_vecNormal = *normal; #endif
 	__g_C_TEExplosion.m_chMaterialType = materialType;
 	__g_C_TEExplosion.m_nRadius = radius;
 	__g_C_TEExplosion.m_nMagnitude = magnitude;

@@ -87,6 +87,7 @@ class CFuncLadder;
 class CNavArea;
 class CHintSystem;
 class CAI_Expresser;
+class CVoteController;
 
 #if defined USES_ECON_ITEMS
 class CEconWearable;
@@ -224,7 +225,7 @@ public:
 	virtual void SetLocalAngles( const QAngle& angles );
 	virtual const QAngle GetLocalAngles( void );
 	virtual bool IsEFlagSet( int nEFlagMask );
-	virtual void PostClientMessagesSent(void);
+//	virtual void PostClientMessagesSent(void);
 
 	virtual void RunPlayerMove( CBotCmd *ucmd );
 	virtual void SetLastUserCommand( const CBotCmd &cmd );
@@ -247,6 +248,8 @@ protected:
 public:
 	DECLARE_DATADESC();
 	DECLARE_SERVERCLASS();
+	// script description
+	DECLARE_ENT_SCRIPTDESC();
 	
 	CBasePlayer();
 	~CBasePlayer();
@@ -317,6 +320,9 @@ public:
 	// Forces processing of usercmds (e.g., even if game is paused, etc.)
 	void					ForceSimulation();
 
+	// Process new user settings from the engine
+	void					ClientSettingsChanged();
+
 	virtual unsigned int	PhysicsSolidMaskForEntity( void ) const;
 
 	virtual void			PreThink( void );
@@ -373,7 +379,7 @@ public:
 	const char *			GetPlayerName() { return m_szNetname; }
 	void					SetPlayerName( const char *name );
 
-	int						GetUserID() { return engine->GetPlayerUserId( edict() ); }
+	int						GetUserID() const { return engine->GetPlayerUserId( edict() ); }
 	const char *			GetNetworkIDString(); 
 	virtual const Vector	GetPlayerMins( void ) const; // uses local player
 	virtual const Vector	GetPlayerMaxs( void ) const; // uses local player
@@ -384,6 +390,16 @@ public:
 	void					ViewPunchReset( float tolerance = 0 );
 	void					ShowViewModel( bool bShow );
 	void					ShowCrosshair( bool bShow );
+
+	bool					ScriptIsPlayerNoclipping( void );
+	void					SetForceLocalDraw( bool bForceLocalDraw )
+	{
+		m_Local.m_bForceLocalPlayerDraw = bForceLocalDraw;
+	}
+	bool					GetForceLocalDraw( void )
+	{
+		return m_Local.m_bForceLocalPlayerDraw;
+	}
 
 	// View model prediction setup
 	void					CalcView( Vector &eyeOrigin, QAngle &eyeAngles, float &zNear, float &zFar, float &fov );
@@ -452,8 +468,8 @@ public:
 	virtual const char*		GetSceneSoundToken( void ) { return ""; }
 
 	virtual void			OnEmitFootstepSound( const CSoundParameters& params, const Vector& vecOrigin, float fVolume ) {}
-
-	Class_T					Classify(void) { return CLASS_PLAYER; }
+#ifdef FF
+	Class_T					Classify ( void ) { return CLASS_PLAYER; } #else #Class_T Classify ( void ); #endif
 	virtual void			SetAnimation( PLAYER_ANIM playerAnim );
 	void					SetWeaponAnimType( const char *szExtention );
 
@@ -475,7 +491,7 @@ public:
 	virtual int				GetObserverMode( void ); // returns observer mode or OBS_NONE
 	virtual bool			SetObserverTarget(CBaseEntity * target);
 	virtual void			ObserverUse( bool bIsPressed ); // observer pressed use
-	virtual CBaseEntity		*GetObserverTarget( void ); // returns players targer or NULL
+	virtual CBaseEntity		*GetObserverTarget( void ); // returns players target or NULL
 	virtual CBaseEntity		*FindNextObserverTarget( bool bReverse ); // returns next/prev player to follow or NULL
 	virtual int				GetNextObserverSearchStartPoint( bool bReverse ); // Where we should start looping the player list in a FindNextObserverTarget call
 	virtual bool			IsValidObserverTarget(CBaseEntity * target); // true, if player is allowed to see this target
@@ -509,8 +525,8 @@ public:
 	CBaseEntity				*GetVehicleEntity( void );
 	bool					UsingStandardWeaponsInVehicle( void );
 	
-	void					AddPoints( int score, bool bAllowNegativeScore );
-	void					AddFortPoints(int score, const char* szDescription);
+	void					AddPoints( int score, bool bAllowNegativeScore );	#ifdef FF
+	void					AddFortPoints(int score, const char* szDescription); #endif
 	void					AddPointsToTeam( int score, bool bAllowNegativeScore );
 	virtual bool			BumpWeapon( CBaseCombatWeapon *pWeapon );
 	bool					RemovePlayerItem( CBaseCombatWeapon *pItem );
@@ -545,9 +561,9 @@ public:
 	virtual bool			IsUseableEntity( CBaseEntity *pEntity, unsigned int requiredCaps );
 	bool					ClearUseEntity();
 	CBaseEntity				*DoubleCheckUseNPC( CBaseEntity *pNPC, const Vector &vecSrc, const Vector &vecDir );
-
+#ifdef FF
 	CBasePlayer*			MyCharacterPointer(void) { return this; }
-
+#endif
 
 	// physics interactions
 	// mass/size limit set to zero for none
@@ -596,8 +612,8 @@ public:
 	float					GetTimeSinceLastUserCommand( void ) { return ( !IsConnected() || IsFakeClient() || IsBot() ) ? 0.f : gpGlobals->curtime - m_flLastUserCommandTime; }
 
 	// Team Handling
-	virtual void			ChangeTeam( int iTeamNum ) { ChangeTeam(iTeamNum,false, false); }
-	virtual void			ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent );
+	virtual void			ChangeTeam( int iTeamNum ) OVERRIDE { ChangeTeam( iTeamNum, false, false ); }
+	virtual void			ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent, bool bAutoBalance = false );
 
 	// say/sayteam allowed?
 	virtual bool		CanHearAndReadChatFrom( CBasePlayer *pPlayer ) { return true; }
@@ -666,9 +682,9 @@ public:
 
 	// Accessor methods
 	int		FragCount() const		{ return m_iFrags; }
+	int		DeathCount() const		{ return m_iDeaths; } #ifdef FF
 	int		FortPointsCount() const { return m_iFortPoints; }
-	int		DeathCount() const		{ return m_iDeaths; }
-	int		AssistsCount() const	{ return m_iAssists; }
+	int		AssistsCount() const	{ return m_iAssists; } #endif
 	bool	IsConnected() const		{ return m_iConnected != PlayerDisconnected; }
 	bool	IsDisconnecting() const	{ return m_iConnected == PlayerDisconnecting; }
 	bool	IsSuitEquipped() const	{ return m_Local.m_bWearingSuit; }
@@ -699,13 +715,13 @@ public:
 
 	void	ResetDeathCount();
 	void	IncrementDeathCount( int nCount );
-
+#ifdef FF
 	void	ResetFortPointsCount();
 	void	IncrementFortPointsCount(int nCount);
 
 	void	ResetAsisstsCount();
 	void	IncrementAssistsCount(int nCount);
-
+#endif
 	void	SetArmorValue( int value );
 	void	IncrementArmorValue( int nCount, int nMaxValue = -1 );
 
@@ -754,6 +770,7 @@ public:
 	int		GetLockViewanglesTickNumber() const { return m_iLockViewanglesTickNumber; }
 	QAngle	GetLockViewanglesData() const { return m_qangLockViewangles; }
 
+	bool	IsLerpingFOV( void ) const;
 	int		GetFOV( void );														// Get the current FOV value
 	int		GetDefaultFOV( void ) const;										// Default FOV if not specified otherwise
 	int		GetFOVForNetworking( void );										// Get the current FOV used for network computations
@@ -770,8 +787,10 @@ public:
 	void	DeactivateMovementConstraint( );
 
 	// talk control
+	virtual bool CanPlayerTalk();
 	void	NotePlayerTalked() { m_fLastPlayerTalkTime = gpGlobals->curtime; }
-	float	LastTimePlayerTalked() { return m_fLastPlayerTalkTime; }
+	float	LastTimePlayerTalked() const { return m_fLastPlayerTalkTime; }
+	bool	ArePlayerTalkMessagesAvailable();
 
 	void	DisableButtons( int nButtons );
 	void	EnableButtons( int nButtons );
@@ -798,31 +817,29 @@ public:
 	uint64		GetSteamIDAsUInt64( void );
 #endif
 
-	float GetRemainingMovementTimeForUserCmdProcessing() const { return m_flMovementTimeForUserCmdProcessingRemaining; }
-	float ConsumeMovementTimeForUserCmdProcessing( float flTimeNeeded )
+	int GetRemainingMovementTicksForUserCmdProcessing() const { return m_nMovementTicksForUserCmdProcessingRemaining; }
+	int ConsumeMovementTicksForUserCmdProcessing( int nTicks )
 	{
-		if ( m_flMovementTimeForUserCmdProcessingRemaining <= 0.0f )
+		if ( m_nMovementTicksForUserCmdProcessingRemaining < 0 )
 		{
-			return 0.0f;
+			return 0;
 		}
-		else if ( flTimeNeeded > m_flMovementTimeForUserCmdProcessingRemaining + FLT_EPSILON )
+		else if ( nTicks < m_nMovementTicksForUserCmdProcessingRemaining )
 		{
-			float flResult = m_flMovementTimeForUserCmdProcessingRemaining;
-			m_flMovementTimeForUserCmdProcessingRemaining = 0.0f;
-			return flResult;
+			m_nMovementTicksForUserCmdProcessingRemaining -= nTicks;
+			return nTicks;
 		}
 		else
 		{
-			m_flMovementTimeForUserCmdProcessingRemaining -= flTimeNeeded;
-			if ( m_flMovementTimeForUserCmdProcessingRemaining < 0.0f )
-				m_flMovementTimeForUserCmdProcessingRemaining = 0.0f;
-			return flTimeNeeded;
+			nTicks = m_nMovementTicksForUserCmdProcessingRemaining;
+			m_nMovementTicksForUserCmdProcessingRemaining = 0;
+			return nTicks;
 		}
 	}
 
 private:
 	// How much of a movement time buffer can we process from this user?
-	float				m_flMovementTimeForUserCmdProcessingRemaining;
+	int				m_nMovementTicksForUserCmdProcessingRemaining;
 
 	// For queueing up CUserCmds and running them from PhysicsSimulate
 	int					GetCommandContextCount( void ) const;
@@ -880,9 +897,8 @@ public:
 	IMPLEMENT_NETWORK_VAR_FOR_DERIVED( m_nNextThinkTick );
 	IMPLEMENT_NETWORK_VAR_FOR_DERIVED( m_vecVelocity );
 	IMPLEMENT_NETWORK_VAR_FOR_DERIVED( m_nWaterLevel );
-	CNetworkVarForDerived(int, m_nButtons);
 	
-	//int						m_nButtons;
+	int						m_nButtons;
 	int						m_afButtonPressed;
 	int						m_afButtonReleased;
 	int						m_afButtonLast;
@@ -893,15 +909,18 @@ public:
 
 	char					m_szAnimExtension[32];
 
+	bool					m_bPendingClientSettings; // User client settings changed, but we're not importing them
+							                          // until allowed
 	int						m_nUpdateRate;		// user snapshot rate cl_updaterate
 	float					m_fLerpTime;		// users cl_interp
 	bool					m_bLagCompensation;	// user wants lag compenstation
 	bool					m_bPredictWeapons; //  user has client side predicted weapons
+	bool					m_bRequestPredict; //  user has client prediction enabled
 	
 	float		GetDeathTime( void ) { return m_flDeathTime; }
-
+#ifdef FF
 	float		m_flNextSpawnDelay; // Mulch: used for kill & force spawning after spawning for first time
-
+#endif
 	void		ClearZoomOwner( void );
 
 	void		SetPreviouslyPredictedOrigin( const Vector &vecAbsOrigin );
@@ -1053,10 +1072,10 @@ private:
 	int						m_lastx, m_lasty;	// These are the previous update's crosshair angles, DON"T SAVE/RESTORE
 
 	int						m_iFrags;
+	int						m_iDeaths; #ifdef FF
 	int						m_iFortPoints;
-	int						m_iDeaths;
 	int						m_iAssists;
-
+#endif
 	float					m_flNextDecalTime;// next time this player can spray a decal
 
 	// Team Handling
@@ -1132,6 +1151,9 @@ private:
 
 	bool					m_bGamePaused;
 	float					m_fLastPlayerTalkTime;
+	float					m_flPlayerTalkAvailableMessagesTier1;
+	float					m_flPlayerTalkAvailableMessagesTier2;
+	float					m_fLastPlayerTalkAttemptTime;
 	
 	CNetworkVar( CBaseCombatWeaponHandle, m_hLastWeapon );
 
@@ -1140,8 +1162,8 @@ private:
 #endif
 
 	float					m_flOldPlayerZ;
-	float					m_flOldPlayerViewOffsetZ;
-	bool					m_bSmoothStair;					// |-- Mirv
+	float					m_flOldPlayerViewOffsetZ; #ifdef FF
+	bool					m_bSmoothStair;			#endif	// |-- Mirv
 
 	bool					m_bPlayerUnderwater;
 
@@ -1169,7 +1191,7 @@ protected:
 	friend class CCSGameMovement;	
 	friend class CHL2GameMovement;
 	friend class CDODGameMovement;
-	friend class CPortalGameMovement;
+	friend class CPortalGameMovement; #ifdef FF
 	// --> billdoor: allow access to private member variables from our player movement code
 	friend class CFFGameMovement;
 	// <-- billdoor: allow access to private member variables from our player movement code
@@ -1178,7 +1200,7 @@ protected:
 	friend class CFFPlayer;
 	// <-- Mirv: this was put in by billdoor to access the maxspeed variable
 	friend class CDODGameMovement;
-	
+#endif	
 	// Accessors for gamemovement
 	bool IsDucked( void ) const { return m_Local.m_bDucked; }
 	bool IsDucking( void ) const { return m_Local.m_bDucking; }
@@ -1225,6 +1247,23 @@ public:
 	virtual bool HasHaptics(){return m_bhasHaptics;}
 	// NVNT sets weather a user should receive haptic device messages.
 	virtual void SetHaptics(bool has) { m_bhasHaptics = has;}
+
+	const char* GetScriptOverlayMaterial() const { return m_Local.m_szScriptOverlayMaterial; }
+	void SetScriptOverlayMaterial( const char *pszMaterial )
+	{
+		if ( !pszMaterial || !*pszMaterial )
+		{
+			m_Local.m_szScriptOverlayMaterial.GetForModify()[0] = '\0';
+			return;
+		}
+
+		V_strncpy( m_Local.m_szScriptOverlayMaterial.GetForModify(), pszMaterial, MAX_PATH );
+	}
+
+	void InputSetScriptOverlayMaterial( inputdata_t &inputdata )
+	{
+		SetScriptOverlayMaterial( inputdata.value.String() );
+	}
 private:
 	// NVNT member variable holding if this user is using a haptic device.
 	bool m_bhasHaptics;
@@ -1254,6 +1293,10 @@ private:
 public:
 	virtual unsigned int PlayerSolidMask( bool brushOnly = false ) const;	// returns the solid mask for the given player, so bots can have a more-restrictive set
 
+	virtual bool BHaveChatSuspensionInCurrentMatch() { return false; }
+
+	// A voice packet from this client was received by the server
+	virtual void OnVoiceTransmit( void ) {}
 };
 
 typedef CHandle<CBasePlayer> CBasePlayerHandle;
@@ -1589,5 +1632,8 @@ enum
 	VEHICLE_ANALOG_BIAS_FORWARD,
 	VEHICLE_ANALOG_BIAS_REVERSE,
 };
+
+class CSendProxyRecipients;
+void* SendProxy_SendNonLocalDataTable( const SendProp *pProp, const void *pStruct, const void *pVarData, CSendProxyRecipients *pRecipients, int objectID );
 
 #endif // PLAYER_H

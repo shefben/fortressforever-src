@@ -1,6 +1,6 @@
 //========= Copyright Valve Corporation, All rights reserved. ============//
 //
-// Purpose:
+// Purpose: 
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -62,10 +62,11 @@ DECLARE_BUILD_FACTORY_DEFAULT_TEXT( CheckButton, CheckButton );
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
-CheckButton::CheckButton(Panel* parent, const char* panelName, const char* text) : ToggleButton(parent, panelName, text)
+CheckButton::CheckButton(Panel *parent, const char *panelName, const char *text) : ToggleButton(parent, panelName, text)
 {
-	SetContentAlignment(a_west);
+ 	SetContentAlignment(a_west);
 	m_bCheckButtonCheckable = true;
+	m_bUseSmallCheckImage = false;
 
 	// create the image
 	_checkBoxImage = new CheckImage(this);
@@ -73,23 +74,7 @@ CheckButton::CheckButton(Panel* parent, const char* panelName, const char* text)
 	SetTextImageIndex(1);
 	SetImageAtIndex(0, _checkBoxImage, CHECK_INSET);
 
-	_selectedFgColor = Color(196, 181, 80, 255);
-	_disabledFgColor = Color(130, 130, 130, 255);
-	_disabledBgColor = Color(62, 70, 55, 255);
-}
-
-CheckButton::CheckButton(Panel* parent, const char* panelName, const wchar_t* wszText) : ToggleButton(parent, panelName, wszText)
-{
-	SetContentAlignment(a_west);
-	m_bCheckButtonCheckable = true;
-
-	// create the image
-	_checkBoxImage = new CheckImage(this);
-
-	SetTextImageIndex(1);
-	SetImageAtIndex(0, _checkBoxImage, CHECK_INSET);
-
-	_selectedFgColor = Color(196, 181, 80, 255);
+	_selectedFgColor = Color( 196, 181, 80, 255 );
 	_disabledFgColor = Color(130, 130, 130, 255);
 	_disabledBgColor = Color(62, 70, 55, 255);
 }
@@ -104,7 +89,17 @@ CheckButton::~CheckButton()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CheckButton::ApplySettings( KeyValues *inResourceData )
+{
+	BaseClass::ApplySettings( inResourceData );
+
+	m_bUseSmallCheckImage = inResourceData->GetBool( "smallcheckimage", false );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
 //-----------------------------------------------------------------------------
 void CheckButton::ApplySchemeSettings(IScheme *pScheme)
 {
@@ -119,17 +114,17 @@ void CheckButton::ApplySchemeSettings(IScheme *pScheme)
 	_disabledFgColor = GetSchemeColor("CheckButton.DisabledFgColor", Color(130, 130, 130, 255), pScheme);
 	_disabledBgColor = GetSchemeColor("CheckButton.DisabledBgColor", Color(62, 70, 55, 255), pScheme);
 
-	Color bgArmedColor = GetSchemeColor( "CheckButton.ArmedBgColor", Color(62, 70, 55, 255), pScheme);
+	Color bgArmedColor = GetSchemeColor( "CheckButton.ArmedBgColor", Color(62, 70, 55, 255), pScheme); 
 	SetArmedColor( GetFgColor(), bgArmedColor );
 
-	Color bgDepressedColor = GetSchemeColor( "CheckButton.DepressedBgColor", Color(62, 70, 55, 255), pScheme);
+	Color bgDepressedColor = GetSchemeColor( "CheckButton.DepressedBgColor", Color(62, 70, 55, 255), pScheme); 
 	SetDepressedColor( GetFgColor(), bgDepressedColor );
 
-	_highlightFgColor = GetSchemeColor( "CheckButton.HighlightFgColor", Color(62, 70, 55, 255), pScheme);
+	_highlightFgColor = GetSchemeColor( "CheckButton.HighlightFgColor", Color(62, 70, 55, 255), pScheme); 
 
 	SetContentAlignment(Label::a_west);
 
-	_checkBoxImage->SetFont( pScheme->GetFont("Marlett", IsProportional()) );
+	_checkBoxImage->SetFont( pScheme->GetFont( m_bUseSmallCheckImage ? "MarlettSmall" : "Marlett", IsProportional()) );
 	_checkBoxImage->ResizeImageToContent();
 	SetImageAtIndex(0, _checkBoxImage, CHECK_INSET);
 
@@ -138,7 +133,7 @@ void CheckButton::ApplySchemeSettings(IScheme *pScheme)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: 
 //-----------------------------------------------------------------------------
 IBorder *CheckButton::GetBorder(bool depressed, bool armed, bool selected, bool keyfocus)
 {
@@ -155,7 +150,7 @@ void CheckButton::SetSelected(bool state )
 		// send a message saying we've been checked
 		KeyValues *msg = new KeyValues("CheckButtonChecked", "state", (int)state);
 		PostActionSignal(msg);
-
+		
 		BaseClass::SetSelected(state);
 	}
 }
@@ -200,14 +195,14 @@ Color CheckButton::GetButtonFgColor()
 #endif
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: 
 //-----------------------------------------------------------------------------
 void CheckButton::OnCheckButtonChecked(Panel *panel)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: 
 //-----------------------------------------------------------------------------
 void CheckButton::SetHighlightColor(Color fgColor)
 {

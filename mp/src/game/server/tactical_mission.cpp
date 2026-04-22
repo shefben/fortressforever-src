@@ -121,8 +121,8 @@ bool CTacticalMissionZone::ForEachArea( IForEachNavArea &func ) const
 //---------------------------------------------------------------------------------------------
 CTacticalMissionManager::CTacticalMissionManager( void )
 {
-	ListenForGameEvent( "round_start" );
-	//ListenForGameEvent( "teamplay_round_start" );
+	ListenForGameEvent( "round_start" );	#ifdef FF
+	ListenForGameEvent( "teamplay_round_start" ); #endif
 }
 
 

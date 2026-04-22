@@ -19,6 +19,7 @@
 #include <KeyValues.h>
 #include "hltvcamera.h"
 #ifdef TF_CLIENT_DLL
+	#include "c_tf_player.h"
 	#include "tf_weaponbase.h"
 #endif
 
@@ -31,11 +32,11 @@
 // NVNT haptics system interface
 #include "haptics/ihaptics.h"
 
-
+#ifdef FF
 #include "iinput.h"
 
 #include "c_ff_player.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -95,6 +96,22 @@ void FormatViewModelAttachment( Vector &vOrigin, bool bInverse )
 	vOrigin = pViewSetup->origin + vOut;
 }
 
+#ifdef TF_CLIENT_DLL
+bool TeamFortress_ShouldFlipClientViewModel( void )
+{
+	if ( IsLocalPlayerSpectator() )
+	{
+		// Use spectated client's handedness preference
+		C_TFPlayer *pSpecTarget = ToTFPlayer( UTIL_PlayerByIndex( GetSpectatorTarget() ) );
+		if ( pSpecTarget )
+		{
+			return pSpecTarget->m_bFlipViewModels;
+		}
+	}
+
+	return cl_flipviewmodels.GetBool();
+}
+#endif //TF_CLIENT_DLL
 
 void C_BaseViewModel::FormatViewModelAttachment( int nAttachment, matrix3x4_t &attachmentToWorld )
 {
@@ -219,7 +236,7 @@ bool C_BaseViewModel::ShouldFlipViewModel()
 	CBaseCombatWeapon *pWeapon = m_hWeapon.Get();
 	if ( pWeapon )
 	{
-		return pWeapon->m_bFlipViewModel != cl_flipviewmodels.GetBool();
+		return pWeapon->m_bFlipViewModel != TeamFortress_ShouldFlipClientViewModel();
 	}
 #endif
 
@@ -310,16 +327,29 @@ int C_BaseViewModel::DrawModel( int flags )
 		GetColorModulation( color );
 		render->SetColorModulation(	color );
 	}
-		
-	//C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+#ifndef FF
+	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+#else
 	// use the owner of the weapon instead of the local player so it works universally (for spectators, etc)
-	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
+	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner()); #endif
 	C_BaseCombatWeapon *pWeapon = GetOwningWeapon();
+
+#ifdef TF_CLIENT_DLL
+	CTFWeaponBase* pTFWeapon = dynamic_cast<CTFWeaponBase*>( pWeapon );
+	if ( ( flags & STUDIO_RENDER ) && pTFWeapon && pTFWeapon->m_viewmodelStatTrakAddon )
+	{
+		pTFWeapon->m_viewmodelStatTrakAddon->RemoveEffects( EF_NODRAW );
+		pTFWeapon->m_viewmodelStatTrakAddon->DrawModel( flags );
+		pTFWeapon->m_viewmodelStatTrakAddon->AddEffects( EF_NODRAW );
+	}
+#endif
+
 	int ret;
 	// If the local player's overriding the viewmodel rendering, let him do it
 	// Jon: override if we have an override material
-	//if ( pPlayer && pPlayer->IsOverridingViewmodel() )
-	if ((pPlayer && pPlayer->IsOverridingViewmodel()) || (pPlayer && m_pOverrideMaterial))
+#ifndef FF
+	if ( pPlayer && pPlayer->IsOverridingViewmodel() ) #else
+	if ((pPlayer && pPlayer->IsOverridingViewmodel()) || (pPlayer && m_pOverrideMaterial)) #endif
 	{
 		ret = pPlayer->DrawOverriddenViewmodel( this, flags );
 	}
@@ -345,16 +375,6 @@ int C_BaseViewModel::DrawModel( int flags )
 			pWeapon->ViewModelDrawn( this );
 		}
 	}
-
-#ifdef TF_CLIENT_DLL
-	CTFWeaponBase* pTFWeapon = dynamic_cast<CTFWeaponBase*>( pWeapon );
-	if ( ( flags & STUDIO_RENDER ) && pTFWeapon && pTFWeapon->m_viewmodelStatTrakAddon )
-	{
-		pTFWeapon->m_viewmodelStatTrakAddon->RemoveEffects( EF_NODRAW );
-		pTFWeapon->m_viewmodelStatTrakAddon->DrawModel( flags );
-		pTFWeapon->m_viewmodelStatTrakAddon->AddEffects( EF_NODRAW );
-	}
-#endif
 
 	return ret;
 }
@@ -387,7 +407,7 @@ int C_BaseViewModel::InternalDrawModel( int flags )
 // Purpose: Called by the player when the player's overriding the viewmodel drawing. Avoids infinite recursion.
 //-----------------------------------------------------------------------------
 int C_BaseViewModel::DrawOverriddenViewmodel( int flags )
-{
+{ #ifdef FF
 	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
 	if (pPlayer)
 	{
@@ -414,7 +434,7 @@ int C_BaseViewModel::DrawOverriddenViewmodel( int flags )
 			}
 		}
 	}
-
+#endif
 	return BaseClass::DrawModel( flags );
 }
 
@@ -425,14 +445,14 @@ int C_BaseViewModel::DrawOverriddenViewmodel( int flags )
 int C_BaseViewModel::GetFxBlend( void )
 {
 	// See if the local player wants to override the viewmodel's rendering
-	/*
+#ifndef FF
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 	if ( pPlayer && pPlayer->IsOverridingViewmodel() )
 	{
 		pPlayer->ComputeFxBlend();
 		return pPlayer->GetFxBlend();
 	}
-	*/
+#endif
 
 	C_BaseCombatWeapon *pWeapon = GetOwningWeapon();
 	if ( pWeapon && pWeapon->IsOverridingViewmodel() )

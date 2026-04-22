@@ -14,6 +14,7 @@
 
 class C_BaseEntity;
 class C_LocalTempEntity;
+class C_PhysPropClientside;
 struct model_t;
 
 #include "mempool.h"
@@ -26,7 +27,9 @@ enum
 	CS_SHELL_57,
 	CS_SHELL_12GAUGE,
 	CS_SHELL_556,
-	CS_SHELL_762NATO,
+	CS_SHELL_762NATO, #ifndef( FF_CLIENT_DLL )
+	CS_SHELL_338MAG
+#else
 	CS_SHELL_338MAG,
 	FF_SHELL_40MM,
 
@@ -34,7 +37,7 @@ enum
 	FF_PROJECTILE_NAIL,
 	FF_PROJECTILE_DART,
 	FF_PROJECTILE_NAIL_NG
-	// <-- Mirv
+#endif // <-- Mirv
 };
 #endif
 
@@ -81,7 +84,10 @@ public:
 	virtual void				PlaySound ( C_LocalTempEntity *pTemp, float damp ) = 0;
 	virtual void				PhysicsProp( int modelindex, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int flags, int effects = 0 ) = 0;
 	virtual C_LocalTempEntity	*ClientProjectile( const Vector& vecOrigin, const Vector& vecVelocity, const Vector& vecAccel, int modelindex, int lifetime, CBaseEntity *pOwner, const char *pszImpactEffect = NULL, const char *pszParticleEffect = NULL ) = 0;
-	virtual	void				FFProjectile(const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex) = 0;
+	virtual C_PhysPropClientside		*PhysicsProp( const model_t *pModel, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int flags, int effects = 0, int nModelIndex = -1 ) = 0;
+#ifdef FF
+	virtual	void				FFProjectile( const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex ) = 0;
+#endif
 };
 
 
@@ -136,8 +142,10 @@ public:
 	void					CSEjectBrass( const Vector &vecPosition, const QAngle &angAngles, int nType, int nShellType, CBasePlayer *pShooter );
 	void					PhysicsProp( int modelindex, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int flags, int effects = 0 );
 	C_LocalTempEntity		*ClientProjectile( const Vector& vecOrigin, const Vector& vecVelocity, const Vector& vecAcceleration, int modelindex, int lifetime, CBaseEntity *pOwner, const char *pszImpactEffect = NULL, const char *pszParticleEffect = NULL );
-	void					FFProjectile(const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex);
-
+	C_PhysPropClientside	*PhysicsProp( const model_t *pModel, int skin, const Vector& pos, const QAngle &angles, const Vector& vel, int flags, int effects = 0, int modelindex = -1 );
+#ifdef FF
+	void					FFProjectile( const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex );
+#endif
 // Data
 public:
 	enum
@@ -163,7 +171,7 @@ private:
 	struct model_t			*m_pHL1ShotgunShell;
 #endif
 
-#if defined( CSTRIKE_DLL )
+#if defined( CSTRIKE_DLL ) || defined ( SDK_DLL )
 	struct model_t			*m_pCS_9MMShell;
 	struct model_t			*m_pCS_57Shell;
 	struct model_t			*m_pCS_12GaugeShell;
@@ -171,9 +179,8 @@ private:
 	struct model_t			*m_pCS_762NATOShell;
 	struct model_t			*m_pCS_338MAGShell;
 #endif
-
+#if defined( FF_CLIENT_DLL )
 	// --> Mirv: Our models
-#if defined (FF_CLIENT_DLL)
 	struct model_t* m_pCS_9MMShell;
 	struct model_t* m_pCS_12GaugeShell;
 
@@ -181,8 +188,7 @@ private:
 
 	struct model_t* m_pFF_Nail;
 	struct model_t* m_pFF_Dart;
-#endif
-	// <-- Mirv
+#endif // <-- Mirv
 
 // Internal methods also available to children
 protected:

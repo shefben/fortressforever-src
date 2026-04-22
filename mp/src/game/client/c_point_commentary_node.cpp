@@ -231,7 +231,7 @@ void C_PointCommentaryNode::OnDataChanged( DataUpdateType_t updateType )
 	{
 		// Use the HDR / Non-HDR version based on whether we're running HDR or not
 		char *pszCommentaryFile;
-		if ( g_pMaterialSystemHardwareConfig->GetHDRType() == HDR_TYPE_NONE && m_iszCommentaryFileNoHDR && m_iszCommentaryFileNoHDR[0] )
+		if ( g_pMaterialSystemHardwareConfig->GetHDRType() == HDR_TYPE_NONE && m_iszCommentaryFileNoHDR[0] )
 		{
 			pszCommentaryFile = m_iszCommentaryFileNoHDR;
 		}
@@ -441,10 +441,10 @@ void CHudCommentary::Paint()
 	// Draw the speaker names
 	// Get our scheme and font information
 	vgui::HScheme scheme = vgui::scheme()->GetScheme( "ClientScheme" );
-	vgui::HFont hFont = vgui::scheme()->GetIScheme(scheme)->GetFont( "CommentaryDefault" );
+	vgui::HFont hFont = vgui::scheme()->GetIScheme(scheme)->GetFont( "CommentaryDefault", true );
 	if ( !hFont )
 	{
-		hFont = vgui::scheme()->GetIScheme(scheme)->GetFont( "Default" );
+		hFont = vgui::scheme()->GetIScheme(scheme)->GetFont( "Default", true );
 	}
 	vgui::surface()->DrawSetTextFont( hFont );
 	vgui::surface()->DrawSetTextColor( clr ); 

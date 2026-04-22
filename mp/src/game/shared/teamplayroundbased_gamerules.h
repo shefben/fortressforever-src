@@ -16,6 +16,7 @@
 
 #ifdef GAME_DLL
 #include "team_control_point.h"
+#include "viewport_panel_names.h"
 	extern ConVar mp_respawnwavetime;
 	extern ConVar mp_showroundtransitions;
 	extern ConVar mp_enableroundwaittime;
@@ -93,6 +94,11 @@ enum {
 	WINREASON_RD_REACTOR_CAPTURED,
 	WINREASON_RD_CORES_COLLECTED,
 	WINREASON_RD_REACTOR_RETURNED,
+	WINREASON_PD_POINTS,
+	WINREASON_SCORED,
+	WINREASON_STOPWATCH_WATCHING_ROUNDS,
+	WINREASON_STOPWATCH_WATCHING_FINAL_ROUND,
+	WINREASON_STOPWATCH_PLAYING_ROUNDS,
 #endif
 };
 
@@ -108,19 +114,6 @@ enum stalemate_reasons_t
 
 #if defined(TF_CLIENT_DLL) || defined(TF_DLL)
 
-/// Info about a player in a PVE game or any other mode that we
-/// might eventually decide to use the lobby system for.
-struct LobbyPlayerInfo_t
-{
-	int m_nEntNum; //< Index of player (1...MAX_PLAYERS), or 0 if the guy is in the lobby but not yet known to us
-	CUtlString m_sPlayerName; //< Player display name
-	CSteamID m_steamID; //< Steam ID of the player
-	int m_iTeam; //< Team selection.
-	bool m_bInLobby; //< Is this guy in the lobby?
-	bool m_bConnected; //< Is this a bot?
-	bool m_bBot; //< Is this a bot?
-	bool m_bSquadSurplus; //< Did he present a voucher to get surplus for his squad
-};
 
 #endif
 

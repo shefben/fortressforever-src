@@ -52,8 +52,8 @@ protected:
 
 	Vector	m_vecOrigin;
 	Vector	m_vecDirection;
-	float	m_flForce;
-	float	m_flScale;	// |-- Mirv: Scale now
+	float	m_flForce; #ifdef FF
+	float	m_flScale; #endif // |-- Mirv: Scale now
 	int		m_fFlags;
 
 	PMaterialHandle	m_Material_Smoke;

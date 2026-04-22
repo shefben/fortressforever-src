@@ -15,14 +15,6 @@
 #include "simtimer.h"
 #include "soundenvelope.h"
 
-// In HL2MP we need to inherit from  BaseMultiplayerPlayer!
-#if defined ( HL2MP ) && defined ( SDK2013CE )
-#include "basemultiplayerplayer.h"
-#define BASEPLAYERCLASS CBaseMultiplayerPlayer
-#else
-#define BASEPLAYERCLASS CBasePlayer
-#endif
-
 class CAI_Squad;
 class CPropCombineBall;
 
@@ -83,10 +75,10 @@ public:
 //=============================================================================
 // >> HL2_PLAYER
 //=============================================================================
-class CHL2_Player : public BASEPLAYERCLASS
+class CHL2_Player : public CBasePlayer
 {
 public:
-	DECLARE_CLASS( CHL2_Player, BASEPLAYERCLASS );
+	DECLARE_CLASS( CHL2_Player, CBasePlayer );
 
 	CHL2_Player();
 	~CHL2_Player( void );
@@ -99,6 +91,7 @@ public:
 
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
+	DECLARE_ENT_SCRIPTDESC();
 
 	virtual void		CreateCorpse( void ) { CopyToBodyQue( this ); };
 
@@ -249,9 +242,6 @@ public:
 	virtual	bool		IsHoldingEntity( CBaseEntity *pEnt );
 	virtual void		ForceDropOfCarriedPhysObjects( CBaseEntity *pOnlyIfHoldindThis );
 	virtual float		GetHeldObjectMass( IPhysicsObject *pHeldObject );
-#ifdef SDK2013CE
-	virtual CBaseEntity	*GetHeldObject( void );
-#endif // SDK2013CE
 
 	virtual bool		IsFollowingPhysics( void ) { return (m_afPhysicsFlags & PFLAG_ONBARNACLE) > 0; }
 	void				InputForceDropPhysObjects( inputdata_t &data );
@@ -271,7 +261,8 @@ public:
 	void  HandleAdmireGlovesAnimation( void );
 	void  StartAdmireGlovesAnimation( void );
 	
-	void  HandleSpeedChanges( void );
+	void HandleSpeedChanges( CMoveData *mv );
+	void ReduceTimers( CMoveData* mv );
 
 	void SetControlClass( Class_T controlClass ) { m_nControlClass = controlClass; }
 	
@@ -315,8 +306,6 @@ private:
 	//  the player and not to other players.
 	CNetworkVarEmbedded( CHL2PlayerLocalData, m_HL2Local );
 
-	float				m_flTimeAllSuitDevicesOff;
-
 	bool				m_bSprintEnabled;		// Used to disable sprint temporarily
 	bool				m_bIsAutoSprinting;		// A proxy for holding down the sprint key.
 	float				m_fAutoSprintMinTime;	// Minimum time to maintain autosprint regardless of player speed. 
@@ -341,7 +330,6 @@ private:
 	bool				m_bIgnoreFallDamageResetAfterImpact;
 
 	// Suit power fields
-	float				m_flSuitPowerLoad;	// net suit power drain (total of all device's drainrates)
 	float				m_flAdmireGlovesAnimTime;
 
 	float				m_flNextFlashlightCheckTime;

@@ -13,9 +13,9 @@
 #include "movehelper_server.h"
 #include "shake.h"				// For screen fade constants
 #include "engine/IEngineSound.h"
-
+#ifdef FF_DLL
 #include "ff_player.h"
-
+#endif
 //=============================================================================
 // HPE_BEGIN
 // [dwenger] Necessary for stats tracking

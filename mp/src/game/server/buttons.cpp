@@ -13,16 +13,16 @@
 #include "tier1/strtools.h"
 #include "buttons.h"
 #include "eventqueue.h"
-#include "omnibot_interface.h"
-
+//#include "omnibot_interface.h"
+#ifdef FF_DLL
 // --> Mirv: Temp test for triggers
 #include "ff_scriptman.h"
 //#include "ff_luaobject_wrapper.h"
 #include "ff_luacontext.h"
 // <-- Mirv: Temp test for triggers
-
-#undef MINMAX_H
-#include "minmax.h"
+#endif
+//#undef MINMAX_H
+//#include "minmax.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -309,7 +309,7 @@ void CBaseButton::InputPressOut( inputdata_t &inputdata )
 // Output : 
 //-----------------------------------------------------------------------------
 int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
-{
+{ #ifdef FF_DLL
 	CTakeDamageInfo mutableInfo = info;
 
 	// check to see if the trepids allow this button to do what it wants to
@@ -320,7 +320,7 @@ int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
 	// lua can cancel the effects of the damage by setting it to 0
 	if (mutableInfo.GetDamage() <= 0.0)
 		return 0;
-
+#endif
 	m_OnDamaged.FireOutput(m_hActivator, this);
 
 	// dvsents2: remove obselete health keyvalue from func_button
@@ -333,9 +333,9 @@ int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
 
 	if ( code == BUTTON_NOTHING )
 		return 0;
-
-	m_hActivator = /*info.GetAttacker();*/ mutableInfo.GetAttacker();
-
+#ifndef FF_DLL
+	m_hActivator = info.GetAttacker(); #else
+	m_hActivator = mutableInfo.GetAttacker(); #endif
 	// dvsents2: why would activator be NULL here?
 	if ( m_hActivator == NULL )
 		return 0;
@@ -558,7 +558,7 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 		//
 		if ( HasSpawnFlags(SF_BUTTON_TOGGLE))
 		{
-			// double check that it's allowed to toggle
+#ifdef FF_DLL // double check that it's allowed to toggle
 			//CFFLuaObjectWrapper hAllowed;
 			CFFLuaSC hAllowed(1, pActivator);
 			if (_scriptman.RunPredicates_LUA(this, &hAllowed, "allowed"))
@@ -569,7 +569,7 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 					return;
 				}
 			}
-			if ( m_sNoise != NULL_STRING )
+#endif		if ( m_sNoise != NULL_STRING )
 			{
 				CPASAttenuationFilter filter( this );
 
@@ -581,16 +581,16 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 
 				EmitSound( filter, entindex(), ep );
 			}
-
+#ifdef FF_DLL
 			_scriptman.RunPredicates_LUA(this, &hAllowed, "onuse");
-
+#endif
 			m_OnPressed.FireOutput(m_hActivator, this);
 			ButtonReturn();
 		}
 	}
 	else
 	{
-		// check with entsys to make sure it is allowed to activate
+#ifdef FF_DLL // check with entsys to make sure it is allowed to activate
 		//CFFLuaObjectWrapper hAllowed;
 		CFFLuaSC hAllowed(1, pActivator);
 		if (_scriptman.RunPredicates_LUA(this, &hAllowed, "allowed"))
@@ -603,7 +603,7 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 		}
 
 		_scriptman.RunPredicates_LUA(this, &hAllowed, "onuse");
-
+#endif
 		m_OnPressed.FireOutput(m_hActivator, this);
 		ButtonActivate( );
 	}
@@ -648,7 +648,7 @@ void CBaseButton::ButtonTouch( CBaseEntity *pOther )
 	// Ignore touches by anything but players
 	if ( !pOther->IsPlayer() )
 		return;
-
+#ifdef FF_DLL
 	//CFFLuaObjectWrapper hButtonTouch;
 	CFFLuaSC hAllowed(1, pOther);
 	if (_scriptman.RunPredicates_LUA(this, &hAllowed, "allowed"))
@@ -659,7 +659,7 @@ void CBaseButton::ButtonTouch( CBaseEntity *pOther )
 			return;
 		}
 	}
-
+#endif
 	m_hActivator = pOther;
 
 	BUTTON_CODE code = ButtonResponseToTouch();
@@ -745,12 +745,6 @@ void CBaseButton::ButtonActivate( void )
 		LinearMove( m_vecPosition2, m_flSpeed);
 	else
 		AngularMove( m_vecAngle2, m_flSpeed);
-	{
-		// Omnibot notification
-		const char* n = GetName();
-		if (!n) n = UTIL_VarArgs("button_%d", entindex());
-		Omnibot::omnibot_interface::Trigger(this, m_hActivator.Get(), n, "button_activate");
-	}
 }
 
 
@@ -857,13 +851,6 @@ void CBaseButton::ButtonBackHome( void )
 	{
 		SetThink ( &CBaseButton::ButtonSpark );
 		SetNextThink( gpGlobals->curtime + 0.5f );// no hurry
-	}
-
-	{
-		// Omnibot notification
-		const char* n = GetName();
-		if (!n) n = UTIL_VarArgs("button_%d", entindex());
-		Omnibot::omnibot_interface::Trigger(this, NULL, n, "button_reset");
 	}
 }
 
@@ -1295,7 +1282,7 @@ void CMomentaryRotButton::Lock()
 
 	SetLocalAngularVelocity( vec3_angle );
 	SetMoveDoneTime( -1 );
-	SetMoveDone( NULL );
+	SetMoveDone( nullptr );
 
 	SetNextThink( TICK_NEVER_THINK );
 	SetThink( NULL );
@@ -1540,7 +1527,7 @@ void CMomentaryRotButton::UseMoveDone( void )
 	else
 	{
 		SetThink( NULL );
-		SetMoveDone( NULL );
+		SetMoveDone( nullptr );
 	}
 }
 
@@ -1562,7 +1549,7 @@ void CMomentaryRotButton::ReturnMoveDone( void )
 		UpdateTarget( 0, NULL );
 
 		SetMoveDoneTime( -1 );
-		SetMoveDone( NULL );
+		SetMoveDone( nullptr );
 
 		SetNextThink( TICK_NEVER_THINK );
 		SetThink( NULL );

@@ -15,9 +15,9 @@
 #include "iefx.h"
 #include "dlight.h"
 #include "tier0/icommandline.h"
-
+#ifdef FF
 #include "iinput.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -219,7 +219,7 @@ void C_FireSmoke::RemoveClientOnly(void)
 	// Remove from the client entity list.
 	ClientEntityList().RemoveEntity( GetClientHandle() );
 
-	partition->Remove( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, CollisionProp()->GetPartitionHandle() );
+	::partition->Remove( PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_RESPONSIVE_EDICTS | PARTITION_CLIENT_NON_STATIC_EDICTS, CollisionProp()->GetPartitionHandle() );
 
 	RemoveFromLeafSystem();
 }
@@ -337,7 +337,7 @@ void C_EntityFlame::CreateEffect( void )
 #ifdef TF_CLIENT_DLL
 	m_hEffect = ParticleProp()->Create( "burningplayer_red", PATTACH_ABSORIGIN_FOLLOW );
 #else
-	m_hEffect = ParticleProp()->Create( "burning_character_b", PATTACH_ABSORIGIN_FOLLOW );
+	m_hEffect = ParticleProp()->Create( "burning_character", PATTACH_ABSORIGIN_FOLLOW );
 #endif
 
 	if ( m_hEffect )
@@ -345,10 +345,10 @@ void C_EntityFlame::CreateEffect( void )
 		C_BaseEntity *pEntity = m_hEntAttached;
 		m_hOldAttached = m_hEntAttached;
 
-		// --> Mirv: Don't attach to local player in first person mode
+#ifdef FF	// --> Mirv: Don't attach to local player in first person mode
 		if (pEntity == CBasePlayer::GetLocalPlayer() && !input->CAM_IsThirdPerson())
 			return;
-		// <--
+#endif	// <--
 
 		ParticleProp()->AddControlPoint( m_hEffect, 1, pEntity, PATTACH_ABSORIGIN_FOLLOW );
 		m_hEffect->SetControlPoint( 0, GetAbsOrigin() );

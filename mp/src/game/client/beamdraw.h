@@ -127,6 +127,7 @@ public:
 #endif //#ifdef PORTAL
 };
 
+
 int ScreenTransform( const Vector& point, Vector& screen );
 
 void DrawSegs( int noise_divisions, float *prgNoise, const model_t* spritemodel,

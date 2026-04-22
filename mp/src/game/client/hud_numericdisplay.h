@@ -11,8 +11,9 @@
 #endif
 
 #include <vgui_controls/Panel.h>
+#ifdef FF
 #include "ff_panel.h"
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: Base class for all the hud elements that are just a numeric display
 //			with some options for text and icons

@@ -36,7 +36,7 @@ namespace vgui
 #define CHAT_HISTORY_FADE_TIME 0.25f
 #define CHAT_HISTORY_IDLE_TIME 15.0f
 #define CHAT_HISTORY_IDLE_FADE_TIME 2.5f
-#define CHAT_HISTORY_ALPHA 115
+#define CHAT_HISTORY_ALPHA 127
 
 extern Color g_ColorBlue;
 extern Color g_ColorRed;
@@ -265,9 +265,9 @@ public:
 
 	// IGameEventListener interface:
 	virtual void FireGameEvent( IGameEvent *event);
-
+#ifdef FF
 	void StartInputMessage(const char* _msg); // drevil
-
+#endif
 	CHudChatHistory			*GetChatHistory();
 
 	void					FadeChatHistory();
@@ -306,8 +306,8 @@ protected:
 	CBaseHudChatLine		*FindUnusedChatLine( void );
 
 	CBaseHudChatInputLine	*m_pChatInput;
-	CBaseHudChatLine		*m_ChatLine;
-	CBaseHudChatLine* m_ChatLines[CHAT_INTERFACE_LINES];
+	CBaseHudChatLine		*m_ChatLine; #ifdef FF
+	CBaseHudChatLine* m_ChatLines[CHAT_INTERFACE_LINES]; #endif
 	int					m_iFontHeight;
 
 	CHudChatHistory			*m_pChatHistory;
@@ -340,6 +340,7 @@ public:
 	CBaseHudChatEntry( vgui::Panel *parent, char const *panelName, vgui::Panel *pChat )
 		: BaseClass( parent, panelName )
 	{
+		SetProportional( true );
 		SetCatchEnterKey( true );
 		SetAllowNonAsciiCharacters( true );
 		SetDrawLanguageIDAtLeft( true );
@@ -397,7 +398,6 @@ public:
 	CBaseHudChatInputLine( vgui::Panel *parent, char const *panelName );
 
 	void			SetPrompt( const wchar_t *prompt );
-	void			GetPrompt(wchar_t* buffer, int buffersizebytes);
 	void			ClearEntry( void );
 	void			SetEntry( const wchar_t *entry );
 	void			GetMessageText( OUT_Z_BYTECAP(buffersizebytes) wchar_t *buffer, int buffersizebytes );
@@ -405,8 +405,8 @@ public:
 	virtual void	PerformLayout();
 	virtual void	ApplySchemeSettings(vgui::IScheme *pScheme);
 
-	vgui::Panel		*GetInputPanel( void );
-	CBaseHudChatEntry* GetChatEntryInput() { return m_pInput; }
+	vgui::Panel		*GetInputPanel( void ); #ifdef FF
+	CBaseHudChatEntry* GetChatEntryInput() { return m_pInput; } #endif
 	virtual vgui::VPANEL GetCurrentKeyFocus() { return m_pInput->GetVPanel(); } 
 
 	virtual void Paint()

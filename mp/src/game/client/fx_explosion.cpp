@@ -19,8 +19,6 @@
 #include "fx_line.h"
 #include "fx_water.h"
 
-#include "utlqueue.h"
-
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -37,7 +35,7 @@ CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade1" )
 CLIENTEFFECT_MATERIAL( "effects/splash3" )
 CLIENTEFFECT_MATERIAL( "effects/splashwake1" )
 CLIENTEFFECT_REGISTER_END()
-
+#ifdef FF
 CUtlQueue<float> m_QueueExplosions;
 static float g_flFractional = 1.0f;;
 
@@ -48,7 +46,7 @@ void ClearExplosions()
 {
 	m_QueueExplosions.RemoveAll();
 }
-
+#endif
 //
 // CExplosionParticle
 //
@@ -175,9 +173,9 @@ float C_BaseExplosionEffect::ScaleForceByDeviation( Vector &deviant, Vector &sou
 	return dot;
 }
 
-
+#ifdef FF
 static ConVar cl_reducedexplosions("cl_reduced_explosions", "0", FCVAR_ARCHIVE);
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : position - 

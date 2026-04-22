@@ -10,8 +10,9 @@
 #ifdef _WIN32
 #pragma once
 #endif
-
-//#include "shareddefs.h"
+#ifndef FF
+#include "shareddefs.h"
+#endif
 #include "const.h"
 #include "c_baseentity.h"
 #include <igameresources.h>
@@ -29,13 +30,13 @@ public:
 					C_PlayerResource();
 	virtual			~C_PlayerResource();
 
-public : // IGameResources intreface
+public : // IGameResources interface
 
 	// Team data access 
-	virtual int		GetTeamScore( int index );
-	virtual float	GetTeamScoreTime(int index);
-	virtual int		GetTeamFortPoints(int index);
-	virtual int		GetTeamDeaths(int index);
+	virtual int		GetTeamScore( int index );	#ifdef FF
+	virtual float	GetTeamScoreTime( int index );
+	virtual int		GetTeamFortPoints( int index );
+	virtual int		GetTeamDeaths( int index );	#endif
 	virtual const char *GetTeamName( int index );
 	virtual const Color&GetTeamColor( int index );
 
@@ -54,44 +55,52 @@ public : // IGameResources intreface
 	virtual int		GetDeaths( int index );
 	virtual int		GetTeam( int index );
 	virtual int		GetFrags( int index );
-	virtual int		GetFortPoints(int index);
-	virtual int		GetHealth(int index);
-	virtual int		GetArmor(int index);
-	virtual int		GetAssists(int index);
+	virtual int		GetFortPoints( int index );
+	virtual int		GetHealth( int index );
+	virtual int		GetArmor( int index );
+	virtual int		GetAssists( int index );
 
 	// --> Mirv: Extra's needed for menus
-	virtual int		GetClass(int index);
-	virtual int		GetChannel(int index);
-	virtual int		GetTeamClassLimits(int index, int classindex);
-	virtual int		GetTeamLimits(int index);
+	virtual int		GetClass( int index );
+	virtual int		GetChannel( int index );
+	virtual int		GetTeamClassLimits( int index, int classindex );
+	virtual int		GetTeamLimits( int index );
 	// <-- Mirv: Extra's needed for menus
 
 	virtual void ClientThink();
-	virtual	void OnDataChanged(DataUpdateType_t updateType);
+	virtual	void	OnDataChanged(DataUpdateType_t updateType);
+
+	virtual int		GetUserID( int index );
+
+	uint32 GetAccountID( int iIndex );
+	bool IsValid( int iIndex );
 
 protected:
 	void	UpdatePlayerName( int slot );
 
 	// Data for each player that's propagated to all clients
 	// Stored in individual arrays so they can be sent down via datatables
-	string_t	m_szName[MAX_PLAYERS+1];
-	int		m_iPing[MAX_PLAYERS+1];
-	int		m_iScore[MAX_PLAYERS+1];
-	int		m_iFortPoints[MAX_PLAYERS + 1];
-	int		m_iDeaths[MAX_PLAYERS+1];
-	bool	m_bConnected[MAX_PLAYERS+1];
-	int		m_iTeam[MAX_PLAYERS+1];
-	bool	m_bAlive[MAX_PLAYERS+1];
-	int		m_iHealth[MAX_PLAYERS+1];
-	int		m_iArmor[MAX_PLAYERS + 1];
+	string_t	m_szName[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iPing[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iScore[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iDeaths[MAX_PLAYERS_ARRAY_SAFE];
+	bool	m_bConnected[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iTeam[MAX_PLAYERS_ARRAY_SAFE];
+	bool	m_bAlive[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iHealth[MAX_PLAYERS_ARRAY_SAFE];
 	Color	m_Colors[MAX_TEAMS];
-	int		m_iClass[MAX_PLAYERS + 1];	// |-- Mirv: Current class
-	int		m_iChannel[MAX_PLAYERS + 1];	// |-- Mirv: For voice channels
-	int		m_iAssists[MAX_PLAYERS + 1];
-	string_t m_szUnconnectedName;
+	uint32	m_iAccountID[MAX_PLAYERS_ARRAY_SAFE];
+	bool	m_bValid[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iUserID[MAX_PLAYERS_ARRAY_SAFE];
+	string_t m_szUnconnectedName; #ifdef FF
+	int		m_iFortPoints[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iArmor[MAX_PLAYERS_ARRAY_SAFE];
+	int		m_iClass[MAX_PLAYERS_ARRAY_SAFE];	// |-- Mirv: Current class
+	int		m_iChannel[MAX_PLAYERS_ARRAY_SAFE];	// |-- Mirv: For voice channels
+	int		m_iAssists[MAX_PLAYERS_ARRAY_SAFE];
 
 public:
-	bool	m_bIsIntermission;
+	bool	m_bIsIntermission;	#endif
 };
 
 extern C_PlayerResource *g_PR;

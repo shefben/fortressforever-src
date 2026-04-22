@@ -36,7 +36,6 @@ public:
 	virtual IViewPortPanel* CreatePanelByName(const char *szPanelName);
 	virtual IViewPortPanel* FindPanelByName(const char *szPanelName);
 	virtual IViewPortPanel* GetActivePanel( void );
-	virtual IViewPortPanel* GetLastActivePanel( void );
 	virtual void RemoveAllPanels( void);
 
 	virtual void ShowPanel( const char *pName, bool state );

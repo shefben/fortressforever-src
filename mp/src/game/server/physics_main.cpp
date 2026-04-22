@@ -7,14 +7,12 @@
 
 
 #include "cbase.h"
-
-#ifdef SDK2013CE
-#include <typeinfo>
-
-#else
-
-#ifdef _WIN32
+#if defined( WIN32 ) && _MSC_VER <= 1920
 #include "typeinfo.h"
+// BUGBUG: typeinfo stomps some of the warning settings (in yvals.h)
+#pragma warning(disable:4244)
+#elif defined( WIN32 )
+#include <typeinfo>
 // BUGBUG: typeinfo stomps some of the warning settings (in yvals.h)
 #pragma warning(disable:4244)
 #elif POSIX
@@ -22,7 +20,6 @@
 #else
 #error "need typeinfo defined"
 #endif
-#endif // SDK2013CE
 
 #include "player.h"
 #include "ai_basenpc.h"
@@ -133,7 +130,7 @@ void CPhysicsPushedEntities::UnlinkPusherList( int *pPusherHandles )
 {
 	for ( int i = m_rgPusher.Count(); --i >= 0; )
 	{
-		pPusherHandles[i] = partition->HideElement( m_rgPusher[i].m_pEntity->CollisionProp()->GetPartitionHandle() );
+		pPusherHandles[i] = ::partition->HideElement( m_rgPusher[i].m_pEntity->CollisionProp()->GetPartitionHandle() );
 	}
 }
 
@@ -141,7 +138,7 @@ void CPhysicsPushedEntities::RelinkPusherList( int *pPusherHandles )
 {
 	for ( int i = m_rgPusher.Count(); --i >= 0; )
 	{
-		partition->UnhideElement( m_rgPusher[i].m_pEntity->CollisionProp()->GetPartitionHandle(), pPusherHandles[i] );
+		::partition->UnhideElement( m_rgPusher[i].m_pEntity->CollisionProp()->GetPartitionHandle(), pPusherHandles[i] );
 	}
 }
 
@@ -703,7 +700,7 @@ void CPhysicsPushedEntities::GenerateBlockingEntityList()
 
 		Vector vecAbsMins, vecAbsMaxs;
 		pPusher->CollisionProp()->WorldSpaceAABB( &vecAbsMins, &vecAbsMaxs );
-		partition->EnumerateElementsInBox( PARTITION_ENGINE_NON_STATIC_EDICTS, vecAbsMins, vecAbsMaxs, false, &blockerEnum );
+		::partition->EnumerateElementsInBox( PARTITION_ENGINE_NON_STATIC_EDICTS, vecAbsMins, vecAbsMaxs, false, &blockerEnum );
 
 		//Go back throught the generated list.
 	}
@@ -743,7 +740,7 @@ void CPhysicsPushedEntities::GenerateBlockingEntityListAddBox( const Vector &vec
 			}
 		}
 
-		partition->EnumerateElementsInBox( PARTITION_ENGINE_NON_STATIC_EDICTS, vecAbsMins, vecAbsMaxs, false, &blockerEnum );
+		::partition->EnumerateElementsInBox( PARTITION_ENGINE_NON_STATIC_EDICTS, vecAbsMins, vecAbsMaxs, false, &blockerEnum );
 
 		//Go back throught the generated list.
 	}
@@ -757,7 +754,8 @@ void CPhysicsPushedEntities::GenerateBlockingEntityListAddBox( const Vector &vec
 //-----------------------------------------------------------------------------
 void CPhysicsPushedEntities::SetupAllInHierarchy( CBaseEntity *pParent )
 {
-	if (!pParent)
+	// Server-only entities do not have a valid partition
+	if ( !pParent || pParent->IsEFlagSet( EFL_SERVER_ONLY ) )
 		return;
 
 	VPROF("CPhysicsPushedEntities::SetupAllInHierarchy");
@@ -951,8 +949,8 @@ void CBaseEntity::PhysicsDispatchThink( BASEPTR thinkFunc )
 	if ( thinkLimit )
 	{
 		// calculate running time of the AI in milliseconds
-		float ftime = ( engine->Time() - startTime ) * 1000.0f;
-		if ( ftime > thinkLimit )
+		float time = ( engine->Time() - startTime ) * 1000.0f;
+		if ( time > thinkLimit )
 		{
 #if defined( _XBOX ) && !defined( _RETAIL )
 			if ( vprof_think_limit.GetBool() )
@@ -965,14 +963,14 @@ void CBaseEntity::PhysicsDispatchThink( BASEPTR thinkFunc )
 			CAI_BaseNPC *pNPC = MyNPCPointer();
 			if (pNPC && pNPC->GetCurSchedule())
 			{
-				pNPC->ReportOverThinkLimit( ftime );
+				pNPC->ReportOverThinkLimit( time );
 			}
 			else
 			{
 #ifdef _WIN32
-				Msg( "%s(%s) thinking for %.02f ms!!!\n", GetClassname(), typeid(this).raw_name(), ftime );
+				Msg( "%s(%s) thinking for %.02f ms!!!\n", GetClassname(), typeid(this).raw_name(), time );
 #elif POSIX
-				Msg( "%s(%s) thinking for %.02f ms!!!\n", GetClassname(), typeid(this).name(), ftime );
+				Msg( "%s(%s) thinking for %.02f ms!!!\n", GetClassname(), typeid(this).name(), time );
 #else
 #error "typeinfo"
 #endif
