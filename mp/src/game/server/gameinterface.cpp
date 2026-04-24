@@ -671,8 +671,7 @@ bool CServerGameDLL::DLLInit( CreateInterfaceFn appSystemFactory,
 
 	// init the cvar list first in case inits want to reference them
 	InitializeCvars();
-#ifdef FF_DLL
-	// --> Mirv: Default max_updaterate to tickrate
+#ifdef FF_DLL // --> Mirv: Default max_updaterate to tickrate
 	ConVar* sv_maxupdaterate = cvar->FindVar("sv_maxupdaterate");
 	ConVar* sv_maxcmdrate = cvar->FindVar("sv_maxcmdrate");
 
@@ -684,8 +683,7 @@ bool CServerGameDLL::DLLInit( CreateInterfaceFn appSystemFactory,
 	}
 	sv_maxupdaterate->SetValue(nTickRate);
 	sv_maxcmdrate->SetValue(nTickRate);
-	// <-- Mirv
-#endif
+#endif	// <-- Mirv
 	// Initialize the particle system
 	if ( !g_pParticleSystemMgr->Init( g_pParticleSystemQuery ) )
 	{
@@ -993,12 +991,10 @@ bool CServerGameDLL::LevelInit( const char *pMapName, char const *pMapEntities, 
 
 	ResetWindspeed();
 	UpdateChapterRestrictions( pMapName );
-#ifdef FF
-	// Added: Initialize Lua stuff
+#ifdef FF // Added: Initialize Lua stuff
 	_scheduleman.Init();
 	_timerman.Init();
 	_scriptman.LevelInit(pMapName);
-
 #endif
 
 	if ( IsX360() && !background && (gpGlobals->maxClients == 1) && (g_nCurrentChapterIndex >= 0) )
@@ -1074,7 +1070,8 @@ bool CServerGameDLL::LevelInit( const char *pMapName, char const *pMapEntities, 
 		}
 
 		// Clear out entity references, and parse the entities into it.
-#ifndef FF_DLL	g_MapEntityRefs.Purge();
+#ifndef FF_DLL
+	g_MapEntityRefs.Purge();
 		CMapLoadEntityFilter filter;
 		MapEntity_ParseAllEntities( pMapEntities, &filter );
 
@@ -2844,7 +2841,6 @@ void CServerGameClients::ClientDisconnect( edict_t *pEdict )
 				g_pGameRules->ClientDisconnected( pEdict );
 				gamestats->Event_PlayerDisconnected( player );
 			}
-
 #ifdef FF_DLL
 			player->SetMaxSpeed(0.0f);	// FF: moved this SetMaxSpeed call below ClientDisconnected
 #endif

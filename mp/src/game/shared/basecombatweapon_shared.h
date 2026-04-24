@@ -371,9 +371,10 @@ public:
 	virtual int				GetSecondaryAmmoType( void )  const { return m_iSecondaryAmmoType; }
 	virtual int				Clip1() { return m_iClip1; }
 	virtual int				Clip2() { return m_iClip2; }
+#ifdef FF
 	void					Clip1(int count) { m_iClip1 = clamp(count, 0, GetMaxClip1()); }
 	void					Clip2(int count) { m_iClip2 = clamp(count, 0, GetMaxClip1()); }
-
+#endif
 	// Ammo quantity queries for weapons that do not use clips. These are only
 	// used to determine how much ammo is in a weapon that does not have an owner.
 	// That is, a weapon that's on the ground for the player to get ammo out of.

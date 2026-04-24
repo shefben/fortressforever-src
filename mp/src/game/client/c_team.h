@@ -34,9 +34,11 @@ public:
 	virtual char	*Get_Name( void );
 	virtual int		Get_Score( void );
 	virtual int		Get_Deaths( void );
-	virtual int		Get_Ping( void ); #ifdef FF
+	virtual int		Get_Ping( void );
+#ifdef FF
 	virtual int		Get_FortPoints(void);
-	virtual float	Get_ScoreTime(void); #endif
+	virtual float	Get_ScoreTime(void);
+#endif
 
 	// Player Handling
 	virtual int		Get_Number_Players( void );
@@ -64,7 +66,8 @@ public:
 	// Data received from the server
 	CUtlVector< int > m_aPlayers;
 	char	m_szTeamname[ MAX_TEAM_NAME_LENGTH ];
-	int		m_iScore; #ifdef FF
+	int		m_iScore;
+#ifdef FF
 	int		m_iFortPoints;
 	// Bug #0000529: Total death column doesn't work
 	int		m_iDeaths;	// Mulch: receive team deaths from server
@@ -73,7 +76,8 @@ public:
 	int		m_iRoundsWon;
 #ifndef FF
 	// Data for the scoreboard
-	int		m_iDeaths; #endif
+	int		m_iDeaths;
+#endif
 	int		m_iPing;
 	int		m_iPacketloss;
 	int		m_iTeamNum;

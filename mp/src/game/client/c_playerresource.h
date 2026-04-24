@@ -33,10 +33,12 @@ public:
 public : // IGameResources interface
 
 	// Team data access 
-	virtual int		GetTeamScore( int index );	#ifdef FF
+	virtual int		GetTeamScore( int index );
+#ifdef FF
 	virtual float	GetTeamScoreTime( int index );
 	virtual int		GetTeamFortPoints( int index );
-	virtual int		GetTeamDeaths( int index );	#endif
+	virtual int		GetTeamDeaths( int index );
+#endif
 	virtual const char *GetTeamName( int index );
 	virtual const Color&GetTeamColor( int index );
 
@@ -55,8 +57,9 @@ public : // IGameResources interface
 	virtual int		GetDeaths( int index );
 	virtual int		GetTeam( int index );
 	virtual int		GetFrags( int index );
-	virtual int		GetFortPoints( int index );
 	virtual int		GetHealth( int index );
+#ifdef FF
+	virtual int		GetFortPoints( int index );
 	virtual int		GetArmor( int index );
 	virtual int		GetAssists( int index );
 
@@ -66,7 +69,7 @@ public : // IGameResources interface
 	virtual int		GetTeamClassLimits( int index, int classindex );
 	virtual int		GetTeamLimits( int index );
 	// <-- Mirv: Extra's needed for menus
-
+#endif
 	virtual void ClientThink();
 	virtual	void	OnDataChanged(DataUpdateType_t updateType);
 
@@ -92,7 +95,8 @@ protected:
 	uint32	m_iAccountID[MAX_PLAYERS_ARRAY_SAFE];
 	bool	m_bValid[MAX_PLAYERS_ARRAY_SAFE];
 	int		m_iUserID[MAX_PLAYERS_ARRAY_SAFE];
-	string_t m_szUnconnectedName; #ifdef FF
+	string_t m_szUnconnectedName;
+#ifdef FF
 	int		m_iFortPoints[MAX_PLAYERS_ARRAY_SAFE];
 	int		m_iArmor[MAX_PLAYERS_ARRAY_SAFE];
 	int		m_iClass[MAX_PLAYERS_ARRAY_SAFE];	// |-- Mirv: Current class
@@ -100,7 +104,8 @@ protected:
 	int		m_iAssists[MAX_PLAYERS_ARRAY_SAFE];
 
 public:
-	bool	m_bIsIntermission;	#endif
+	bool	m_bIsIntermission;
+#endif
 };
 
 extern C_PlayerResource *g_PR;

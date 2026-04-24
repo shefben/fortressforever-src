@@ -126,8 +126,8 @@ static void WriteAchievementGlobalState( KeyValues *pKV, bool bPersistToSteamClo
 
         if (pRemoteStorage)
         {
-            uint64 availableBytes = 0;
-			uint64 totalBytes = 0;
+	        uint64 availableBytes = 0;
+            uint64 totalBytes = 0;
             if ( pRemoteStorage->GetQuota( &totalBytes, &availableBytes ) )
             {
                 if ( totalBytes > 0 )
@@ -627,10 +627,10 @@ void CAchievementMgr::DownloadUserData()
 	if ( IsPC() )
 	{
 #ifndef NO_STEAM
-		if ( SteamUserStats() )
+		if ( steamapicontext->SteamUserStats() )
 		{
 			// request stat download; will get called back at OnUserStatsReceived when complete
-			SteamUserStats()->RequestCurrentStats();
+			steamapicontext->SteamUserStats()->RequestCurrentStats();
 		}
 #endif
 	}
@@ -714,11 +714,11 @@ void CAchievementMgr::UploadUserData()
 	if ( IsPC() )
 	{
 #ifndef NO_STEAM
-		if ( SteamUserStats() )
+		if ( steamapicontext->SteamUserStats() )
 		{
 			// Upload current Steam client achievements & stats state to Steam.  Will get called back at OnUserStatsStored when complete.
 			// Only values previously set via SteamUserStats() get uploaded
-			SteamUserStats()->StoreStats();
+			steamapicontext->SteamUserStats()->StoreStats();
 			m_bSteamDataDirty = false;
 		}
 #endif
@@ -801,7 +801,7 @@ void CAchievementMgr::LoadGlobalState()
     // HPE_END
     //=============================================================================
 
-	KeyValues *pKV = new KeyValues("GameState" );
+	KeyValuesAD pKV("GameState" );
 	if ( pKV->LoadFromFile( filesystem, szFilename, "MOD" ) )
 	{
 		KeyValues *pNode = pKV->GetFirstSubKey();
@@ -944,11 +944,11 @@ void CAchievementMgr::AwardAchievement( int iAchievementID )
 	if ( IsPC() )
 	{		
 #ifndef NO_STEAM
-		if ( SteamUserStats() )
+		if ( steamapicontext->SteamUserStats() )
 		{
 			VPROF_BUDGET( "AwardAchievement", VPROF_BUDGETGROUP_STEAM );
 			// set this achieved in the Steam client
-			bool bRet = SteamUserStats()->SetAchievement( pAchievement->GetName() );
+			bool bRet = steamapicontext->SteamUserStats()->SetAchievement( pAchievement->GetName() );
 			//		Assert( bRet );
 			if ( bRet )
 			{
@@ -1107,7 +1107,7 @@ bool CAchievementMgr::CheckAchievementsEnabled()
 #ifndef NO_STEAM
 			// Cheats get turned on automatically if you run with -dev which many people do internally, so allow cheats if developer is turned on and we're not running
 			// on Steam public
-			if ( developer.GetInt() == 0 || !SteamUtils() || (k_EUniversePublic == SteamUtils()->GetConnectedUniverse()) )
+			if ( developer.GetInt() == 0 || ( k_EUniverseInvalid == GetUniverse() ) || ( k_EUniversePublic == GetUniverse() ) )
 			{
 				Msg( "Achievements disabled: cheats turned on in this app session.\n" );
 				return false;
@@ -1147,7 +1147,7 @@ bool CalcPlayersOnFriendsList( int iMinFriends )
 	if ( IsPC() )
 	{
 #ifndef NO_STEAM
-		if ( !SteamFriends() || !SteamUtils() || !g_pGameRules->IsMultiplayer() )
+		if ( !steamapicontext->SteamFriends() || !steamapicontext->SteamUtils() || !g_pGameRules->IsMultiplayer() )
 #endif
 			return false;
 
@@ -1180,8 +1180,8 @@ bool CalcPlayersOnFriendsList( int iMinFriends )
 					continue;
 #ifndef NO_STEAM
 				// check and see if they're on the local player's friends list
-				CSteamID steamID( pi.friendsID, 1, SteamUtils()->GetConnectedUniverse(), k_EAccountTypeIndividual );
-				if ( !SteamFriends()->HasFriend( steamID, /*k_EFriendFlagImmediate*/ 0x04 ) )
+				CSteamID steamID( pi.friendsID, 1, GetUniverse(), k_EAccountTypeIndividual );
+				if ( !steamapicontext->SteamFriends()->HasFriend( steamID, /*k_EFriendFlagImmediate*/ 0x04 ) )
 					continue;
 #endif
 			}
@@ -1221,16 +1221,16 @@ bool CalcHasNumClanPlayers( int iClanTeammates )
 		if ( CalcPlayerCount()-1 < iClanTeammates )
 			return false;
 
-		if ( !SteamFriends() || !SteamUtils() || !g_pGameRules->IsMultiplayer() )
+		if ( !steamapicontext->SteamFriends() || !steamapicontext->SteamUtils() || !g_pGameRules->IsMultiplayer() )
 			return false;
 
 		// determine local player team
 		int iLocalPlayerIndex =  GetLocalPlayerIndex();
 
-		for ( int iClan = 0; iClan < SteamFriends()->GetClanCount(); iClan++ )
+		for ( int iClan = 0; iClan < steamapicontext->SteamFriends()->GetClanCount(); iClan++ )
 		{
 			int iClanMembersOnTeam = 0;
-			CSteamID clanID = SteamFriends()->GetClanByIndex( iClan );
+			CSteamID clanID = steamapicontext->SteamFriends()->GetClanByIndex( iClan );
 			// enumerate all players
 			for( int iPlayerIndex = 1 ; iPlayerIndex <= MAX_PLAYERS; iPlayerIndex++ )
 			{
@@ -1240,8 +1240,8 @@ bool CalcHasNumClanPlayers( int iClanTeammates )
 					if ( engine->GetPlayerInfo( iPlayerIndex, &pi ) && ( pi.friendsID ) )
 					{	
 						// check and see if they're on the local player's friends list
-						CSteamID steamID( pi.friendsID, 1, SteamUtils()->GetConnectedUniverse(), k_EAccountTypeIndividual );
-						if ( SteamFriends()->IsUserInSource( steamID, clanID ) )
+						CSteamID steamID( pi.friendsID, 1, GetUniverse(), k_EAccountTypeIndividual );
+						if ( steamapicontext->SteamFriends()->IsUserInSource( steamID, clanID ) )
 						{
 							iClanMembersOnTeam++;
 							if ( iClanMembersOnTeam == iClanTeammates )
@@ -1332,9 +1332,9 @@ void CAchievementMgr::ResetAchievements()
 	}
 
 #ifndef NO_STEAM
-	if ( SteamUserStats() )
+	if ( steamapicontext->SteamUserStats() )
 	{
-		SteamUserStats()->StoreStats();
+		steamapicontext->SteamUserStats()->StoreStats();
 	}
 #endif
 	if ( cc_achievement_debug.GetInt() > 0 )
@@ -1363,9 +1363,9 @@ void CAchievementMgr::ResetAchievement( int iAchievementID )
 	{
 		ResetAchievement_Internal( pAchievement );
 #ifndef NO_STEAM
-		if ( SteamUserStats() )
+		if ( steamapicontext->SteamUserStats() )
 		{
-			SteamUserStats()->StoreStats();
+			steamapicontext->SteamUserStats()->StoreStats();
 		}
 #endif
 		if ( cc_achievement_debug.GetInt() > 0 )
@@ -1669,8 +1669,8 @@ int CAchievementMgr::GetAchievementCount()
 //-----------------------------------------------------------------------------
 void CAchievementMgr::Steam_OnUserStatsReceived( UserStatsReceived_t *pUserStatsReceived )
 {
-	Assert( SteamUserStats() );
-	if ( !SteamUserStats() )
+	Assert( steamapicontext->SteamUserStats() );
+	if ( !steamapicontext->SteamUserStats() )
 		return;
 
 	if ( cc_achievement_debug.GetInt() > 0 )
@@ -1732,7 +1732,7 @@ void CAchievementMgr::Steam_OnUserStatsStored( UserStatsStored_t *pUserStatsStor
 						// Get the unlocked time from Steam
 						uint32 unlockTime;
 						bool bAchieved;
-						bool bRet = SteamUserStats()->GetAchievementAndUnlockTime( pAchievement->GetName(), &bAchieved, &unlockTime );
+						bool bRet = steamapicontext->SteamUserStats()->GetAchievementAndUnlockTime( pAchievement->GetName(), &bAchieved, &unlockTime );
 						if ( bRet && bAchieved )
 						{
 							// set the unlock time
@@ -1785,9 +1785,9 @@ void CAchievementMgr::ResetAchievement_Internal( CBaseAchievement *pAchievement 
 	Assert( pAchievement );
 
 #ifndef NO_STEAM
-	if ( SteamUserStats() )
+	if ( steamapicontext->SteamUserStats() )
 	{
-		SteamUserStats()->ClearAchievement( pAchievement->GetName() );		
+		steamapicontext->SteamUserStats()->ClearAchievement( pAchievement->GetName() );		
 	}
 #endif	
 	pAchievement->SetAchieved( false );
@@ -1846,7 +1846,7 @@ void CAchievementMgr::UpdateStateFromSteam_Internal()
 		// Get the achievement status, and the time it was unlocked if unlocked.
 		// If the return value is true, but the unlock time is zero, that means it was unlocked before Steam 
 		// began tracking achievement unlock times (December 2009). Time is seconds since January 1, 1970.
-		bool bRet = SteamUserStats()->GetAchievementAndUnlockTime( pAchievement->GetName(), &bAchieved, &unlockTime );
+		bool bRet = steamapicontext->SteamUserStats()->GetAchievementAndUnlockTime( pAchievement->GetName(), &bAchieved, &unlockTime );
 
 		if ( bRet )
 		{
@@ -1864,7 +1864,7 @@ void CAchievementMgr::UpdateStateFromSteam_Internal()
 			int iValue;
 			char pszProgressName[1024];
 			Q_snprintf( pszProgressName, 1024, "%s_STAT", pAchievement->GetStat() );
-			bRet = SteamUserStats()->GetStat( pszProgressName, &iValue );
+			bRet = steamapicontext->SteamUserStats()->GetStat( pszProgressName, &iValue );
 			if ( bRet )
 			{
 				pAchievement->SetCount( iValue );

@@ -155,7 +155,8 @@ static	kbutton_t	in_score;
 static	kbutton_t	in_break;
 static	kbutton_t	in_zoom;
 static  kbutton_t   in_grenade1;
-static  kbutton_t   in_grenade2; #ifdef FF
+static  kbutton_t   in_grenade2;
+#ifdef FF
 static  kbutton_t   in_togglegrenade1;
 static  kbutton_t   in_togglegrenade2;
 #endif
@@ -508,11 +509,13 @@ void IN_Grenade2Up( const CCommand &args ) { KeyUp( &in_grenade2, args[1] ); }
 void IN_Grenade2Down( const CCommand &args ) { KeyDown( &in_grenade2, args[1] ); }
 void IN_XboxStub( const CCommand &args ) { /*do nothing*/ }
 void IN_Attack3Down( const CCommand &args ) { KeyDown(&in_attack3, args[1] );}
-void IN_Attack3Up( const CCommand &args ) { KeyUp(&in_attack3, args[1] );} #ifdef FF
+void IN_Attack3Up( const CCommand &args ) { KeyUp(&in_attack3, args[1] );}
+#ifdef FF
 void IN_ToggleGrenade1Down( const CCommand &args ) { KeyDown( &in_togglegrenade1, args[1] ); }
 void IN_ToggleGrenade1Up( const CCommand &args ) { KeyUp( &in_togglegrenade1, args[1] ); }
 void IN_ToggleGrenade2Down(const CCommand &args ) { KeyDown( &in_togglegrenade2, args[1] ); }
-void IN_ToggleGrenade2Up( const CCommand& args ) { KeyUp( &in_togglegrenade2, args[1] ); } #endif
+void IN_ToggleGrenade2Up( const CCommand& args ) { KeyUp( &in_togglegrenade2, args[1] ); }
+#endif
 
 void IN_DuckToggle( const CCommand &args ) 
 { 
@@ -1028,8 +1031,7 @@ void CInput::ScaleMovements( CUserCmd *cmd )
 
 	// clip to maxspeed
 	// FIXME FIXME:  This doesn't work
-#ifdef FF
-	// --> Mirv: FIXED FIXED
+#ifdef FF	// --> Mirv: FIXED FIXED
 	if (Client_IsIntermission())
 	{
 		cmd->forwardmove = 0.0f;
@@ -1076,8 +1078,7 @@ void CInput::ScaleMovements( CUserCmd *cmd )
 	// drags it back. Therefore lop off the fraction now.
 	cmd->forwardmove = (int) cmd->forwardmove;
 	cmd->sidemove = (int) cmd->sidemove;
-#endif
-	// <-- Mirv
+#endif	// <-- Mirv
 	return;
 
 	/*
@@ -1642,9 +1643,11 @@ int CInput::GetButtonBits( int bResetState )
 	CalcButtonBits( bits, IN_ZOOM, s_ClearInputState, &in_zoom, bResetState );
 	CalcButtonBits( bits, IN_GRENADE1, s_ClearInputState, &in_grenade1, bResetState );
 	CalcButtonBits( bits, IN_GRENADE2, s_ClearInputState, &in_grenade2, bResetState );
-	CalcButtonBits( bits, IN_ATTACK3, s_ClearInputState, &in_attack3, bResetState ); #ifdef FF
+	CalcButtonBits( bits, IN_ATTACK3, s_ClearInputState, &in_attack3, bResetState );
+#ifdef FF
 	CalcButtonBits( bits, IN_TOGGLEGRENADE1, s_ClearInputState, &in_togglegrenade1, bResetState );
-	CalcButtonBits( bits, IN_TOGGLEGRENADE2, s_ClearInputState, &in_togglegrenade2, bResetState ); #endif
+	CalcButtonBits( bits, IN_TOGGLEGRENADE2, s_ClearInputState, &in_togglegrenade2, bResetState );
+#endif
 
 	if ( KeyState(&in_ducktoggle) )
 	{

@@ -805,10 +805,12 @@ EXPOSE_SINGLE_INTERFACE_GLOBALVAR( CHLClient, IBaseClientDLL, CLIENT_DLL_INTERFA
 // Precaches a material
 //-----------------------------------------------------------------------------
 void PrecacheMaterial( const char *pMaterialName )
-{ #ifndef FF
+{
+#ifndef FF
 	gHLClient.PrecacheMaterial( pMaterialName );
 #else
 	gFFClient.PrecacheMaterial( pMaterialName );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1006,15 +1008,8 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 
 	if (!g_pMatSystemSurface)
 		return false;
-#ifdef FF
-	#ifdef WORKSHOP_IMPORT_ENABLED
-		if ( !ConnectDataModel( appSystemFactory ) )
-			return false;
-		if ( InitDataModel() != INIT_OK )
-			return false;
-		InitFbx();
-	#endif
-#endif
+
+
 	// it's ok if this is NULL. That just means the sourcevr.dll wasn't found
 	if ( CommandLine()->CheckParm( "-vr" ) )
 		g_pSourceVR = (ISourceVirtualReality *)appSystemFactory(SOURCE_VIRTUAL_REALITY_INTERFACE_VERSION, NULL);
@@ -1131,10 +1126,12 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	}
 
 	view->Init();
-	vieweffects->Init(); #ifdef FF
+	vieweffects->Init();
+#ifdef FF
 	ffvieweffects->Init();	// |-- Mirv
 
-	_discord.Init();	#endif
+	_discord.Init();
+#endif
 
 	C_BaseTempEntity::PrecacheTempEnts();
 
@@ -1309,16 +1306,10 @@ void CHLClient::Shutdown( void )
 	
 	ParticleMgr()->Term();
 	
-	vgui::BuildGroup::ClearResFileCache(); #ifdef FF
-	ClearKeyValuesCache();
-
-	#ifdef WORKSHOP_IMPORT_ENABLED
-		ShutdownDataModel();
-		DisconnectDataModel();
-		ShutdownFbx();
-	#endif
-
-	_discord.Shutdown(); #endif
+	vgui::BuildGroup::ClearResFileCache();
+#ifdef FF
+	_discord.Shutdown();
+#endif
 #ifndef NO_STEAM
 	ClientSteamContext().Shutdown();
 #endif
@@ -1794,7 +1785,8 @@ void CHLClient::LevelInitPostEntity( )
 		//if( pPanel )
 		//   pPanel->ShowPanel( true );
 		// <-- Mirv
-	} #endif
+	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1971,7 +1963,8 @@ void OnMaterialStringTableChanged( void *object, INetworkStringTable *stringTabl
 #ifndef FF
 	gHLClient.PrecacheMaterial( newString );
 #else
-	gFFClient.PrecacheMaterial( newString ); #endif
+	gFFClient.PrecacheMaterial( newString );
+#endif
 	RequestCacheUsedMaterials();
 }
 

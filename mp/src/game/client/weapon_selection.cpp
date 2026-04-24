@@ -106,10 +106,12 @@ void CBaseHudWeaponSelection::Reset(void)
 	gWR.Reset();
 
 	// Start hidden
-	m_bSelectionVisible = false; #ifdef FF
+	m_bSelectionVisible = false;
+#ifdef FF
 	m_flSelectionTime = gpGlobals->curtime - 10.0f;	// |-- Mirv: Make sure starts in past
-	#else
+#else
 		m_flSelectionTime = gpGlobals->curtime;
+#endif
 	gHUD.UnlockRenderGroup( gHUD.LookupRenderGroupIndexByName( "weapon_selection" ) );
 }
 
@@ -149,7 +151,8 @@ void CBaseHudWeaponSelection::VidInit(void)
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CBaseHudWeaponSelection::OnThink( void )
-{#ifndef FF
+{
+#ifndef FF
 	// Don't allow weapon selection if we're frozen in place
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 	if ( pPlayer->GetFlags() & FL_FROZEN || pPlayer->IsPlayerDead() )
@@ -158,7 +161,8 @@ void CBaseHudWeaponSelection::OnThink( void )
 		{
 			CancelWeaponSelection();
 		}
-	} #endif
+	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -235,8 +239,10 @@ bool CBaseHudWeaponSelection::IsInSelectionMode()
 void CBaseHudWeaponSelection::OpenSelection( void )
 {
 	m_bSelectionVisible = true;
-	gHUD.LockRenderGroup( gHUD.LookupRenderGroupIndexByName( "weapon_selection" ) ); #ifdef FF
-	ShowSelection(); #endif
+	gHUD.LockRenderGroup( gHUD.LookupRenderGroupIndexByName( "weapon_selection" ) );
+#ifdef FF
+	ShowSelection();
+#endif
 }
 #ifdef FF
 void CBaseHudWeaponSelection::ShowSelection(void)
@@ -427,7 +433,8 @@ bool CBaseHudWeaponSelection::HandleHudMenuInput( int iSlot )
 //          the CHudMenu is open
 //-----------------------------------------------------------------------------
 bool CBaseHudWeaponSelection::IsHudMenuPreventingWeaponSelection()
-{ #ifdef FF
+{
+#ifdef FF
 	// Don't allow weapon selection if we're frozen in place
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 	if ( pPlayer->GetFlags() & FL_FROZEN || pPlayer->IsPlayerDead() )
@@ -453,13 +460,15 @@ void CBaseHudWeaponSelection::SelectSlot( int iSlot )
 		return;
 	}
 #ifndef FF
-	UpdateSelectionTime(); #endif
+	UpdateSelectionTime();
+#endif
 	SelectWeaponSlot( iSlot );
 #ifdef FF
 	if (hud_fastswitch.GetInt() == 0)
 		UpdateSelectionTime();
 	else if (hud_weaponselect.GetBool())
-		QuicklyFadeOut(); #endif
+		QuicklyFadeOut();
+#endif
 }
 
 //-----------------------------------------------------------------------------

@@ -56,7 +56,6 @@
 #define	FTENT_FFPROJECTILE		0x04000000	// This is a FF projectile (most likely nail)
 #define FTENT_FFOPTEFFECT		0x08000000	// This projectile's effect is optional
 #endif	// <-- Mirv
-
 class C_LocalTempEntity;
 
 typedef int (*pfnDrawHelper)( C_LocalTempEntity *entity, int flags );

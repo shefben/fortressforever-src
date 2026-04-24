@@ -84,7 +84,9 @@ bool CBaseCombatCharacter::Weapon_CanSwitchTo( CBaseCombatWeapon *pWeapon )
 #if !defined( FF )
 	if ( !pWeapon->HasAnyAmmo() && !GetAmmoCount( pWeapon->m_iPrimaryAmmoType ) )
 		return false;
-#else if (!pWeapon->CanBeSelected())
+#else
+	if ( !pWeapon->CanBeSelected() )
+		return false;
 #endif
 	if ( !pWeapon->CanDeploy() )
 		return false;

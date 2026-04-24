@@ -304,11 +304,13 @@ bool C_SoundscapeSystem::Init()
 	m_loopingSoundId = 0;
 
 	const char *mapname = MapName();
-	const char *mapSoundscapeFilename = NULL; #ifdef FF
+	const char *mapSoundscapeFilename = NULL;
+#ifdef FF
 	const char *mapSoundscapeFilenameFF = NULL; // for the FF method of using maps/mapname_soundscapes.txt
 #endif
 	if ( mapname && *mapname )
-	{ #ifndef FF // Jon - 2/14/2007: Let's support both methods.
+	{
+#ifndef FF // Jon - 2/14/2007: Let's support both methods.
 		mapSoundscapeFilename = VarArgs( "scripts/soundscapes_%s.txt", mapname );
 #else
 		// Let's load map soundscape files without worrying about the manifest.
@@ -332,7 +334,8 @@ bool C_SoundscapeSystem::Init()
 
 		// NULL their ends just in case
 		mapSoundscapeFilename[255] = 0;
-		mapSoundscapeFilenameFF[255] = 0; #endif
+		mapSoundscapeFilenameFF[255] = 0;
+#endif
 	}
 
 	KeyValues *manifest = new KeyValues( SOUNDSCAPE_MANIFEST_FILE );

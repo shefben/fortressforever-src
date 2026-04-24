@@ -86,8 +86,10 @@ class CHudVote;
 static vgui::HContext s_hVGuiContext = DEFAULT_VGUI_CONTEXT;
 
 #ifndef FF // Yeah, don't want this to be a cheat in the mod
-ConVar cl_drawhud( "cl_drawhud", "1", FCVAR_CHEAT, "Enable the rendering of the hud" ); #else
-ConVar cl_drawhud("cl_drawhud", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Enable the rendering of the hud"); #endif
+ConVar cl_drawhud( "cl_drawhud", "1", FCVAR_CHEAT, "Enable the rendering of the hud" );
+#else
+ConVar cl_drawhud("cl_drawhud", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Enable the rendering of the hud");
+#endif
 ConVar hud_takesshots( "hud_takesshots", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Auto-save a scoreboard screenshot at the end of a map." );
 ConVar hud_freezecamhide( "hud_freezecamhide", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Hide the HUD during freeze-cam" );
 ConVar cl_show_num_particle_systems( "cl_show_num_particle_systems", "0", FCVAR_CLIENTDLL, "Display the number of active particle systems." );
@@ -529,7 +531,8 @@ void ClientModeShared::OverrideMouseInput( float *x, float *y )
 		pWeapon->OverrideMouseInput( x, y );
 	}
 #ifdef FF
-	HudContextMenuInput(x, y); #endif	// |-- Mirv: Feed into our menu
+	HudContextMenuInput(x, y);	// |-- Mirv: Feed into our menu
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -999,7 +1002,8 @@ void ClientModeShared::LevelShutdown( void )
 	enginesound->SetPlayerDSP( filter, 0, true );
 #ifdef FF
 	if( !engine->IsConnected() )
-		C_BaseEntity::EmitSound(filter, SOUND_FROM_LOCAL_PLAYER, "MenuMusic.Music"); #endif
+		C_BaseEntity::EmitSound(filter, SOUND_FROM_LOCAL_PLAYER, "MenuMusic.Music");
+#endif
 }
 
 
@@ -1200,8 +1204,10 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 			wchar_t wszTeam[64];
 			C_Team *pTeam = GetGlobalTeam( team );
 			if ( pTeam )
-			{ #ifndef FF
-				g_pVGuiLocalize->ConvertANSIToUnicode( pTeam->Get_Name(), wszTeam, sizeof(wszTeam) ); #else
+			{
+#ifndef FF
+				g_pVGuiLocalize->ConvertANSIToUnicode( pTeam->Get_Name(), wszTeam, sizeof(wszTeam) );
+#else
 				// --> Mirv: Team localisation fix. This might be more a fundamental issue with the limitations of Printf that needs sorting though
 				wchar_t* szName = g_pVGuiLocalize->Find(pTeam->Get_Name());
 				char szbuf[256];
@@ -1218,7 +1224,8 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 				//hudChat->Printf(CHAT_FILTER_TEAMCHANGE, "Player %s joined team %s\n", pPlayer->GetPlayerName(), pszName);
 				// <-- Mirv: Team localisation fix. This might be more a fundamental issue with the limitations of Printf that needs sorting though
 				g_pVGuiLocalize->ConvertANSIToUnicode( pszName, wszTeam, sizeof(wszTeam) );
-#endif			}
+#endif
+			}
 			else
 			{
 				_snwprintf ( wszTeam, sizeof( wszTeam ) / sizeof( wchar_t ), L"%d", team );
@@ -1241,7 +1248,8 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 				g_pVGuiLocalize->ConvertUnicodeToANSI( wszLocalized, szLocalized, sizeof(szLocalized) );
 #ifdef FF
 				Color col = GetCustomClientColor( -1, team );
-				hudChat->SetCustomColor( col ); #endif
+				hudChat->SetCustomColor( col );
+#endif
 				hudChat->Printf( CHAT_FILTER_TEAMCHANGE, "%s", szLocalized );
 			}
 		}
@@ -1269,15 +1277,19 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 		wchar_t wszNewName[ MAX_PLAYER_NAME_LENGTH ];
 		UTIL_GetFilteredPlayerNameAsWChar( iPlayerIndex, event->GetString( "newname" ), wszNewName );
 
-		wchar_t wszLocalized[100]; #ifndef FF
-		g_pVGuiLocalize->ConstructString_safe( wszLocalized, g_pVGuiLocalize->Find( "#game_player_changed_name" ), 2, wszOldName, wszNewName ); #else
-		g_pVGuiLocalize->ConstructString( wszLocalized, sizeof( wszLocalized ), g_pVGuiLocalize->Find( "#FF_Name_Change" ), 2, wszOldName, wszNewName ); #endif
+		wchar_t wszLocalized[100];
+#ifndef FF
+		g_pVGuiLocalize->ConstructString_safe( wszLocalized, g_pVGuiLocalize->Find( "#game_player_changed_name" ), 2, wszOldName, wszNewName );
+#else
+		g_pVGuiLocalize->ConstructString( wszLocalized, sizeof( wszLocalized ), g_pVGuiLocalize->Find( "#FF_Name_Change" ), 2, wszOldName, wszNewName );
+#endif
 
 		char szLocalized[100];
 		g_pVGuiLocalize->ConvertUnicodeToANSI( wszLocalized, szLocalized, sizeof(szLocalized) );
 #ifdef FF
 		Color col = GetCustomClientColor( iPlayerIndex );
-		hudChat->SetCustomColor( col ); #endif
+		hudChat->SetCustomColor( col );
+#endif
 		hudChat->Printf( CHAT_FILTER_NAMECHANGE, "%s", szLocalized );
 	}
 	else if ( Q_strcmp( "teamplay_broadcast_audio", eventname ) == 0 )

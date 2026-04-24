@@ -156,7 +156,8 @@ bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType
 			else if ( pEntity )
 			{
 #ifndef FF		// Here we deal with decals on entities.
-				pEntity->AddDecal( vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal ); #else
+				pEntity->AddDecal( vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal );
+#else
 				bool bDraw = true;
 				if (ffdev_disableentitydecals.GetBool())
 				{
@@ -165,7 +166,8 @@ bool Impact( Vector &vecOrigin, Vector &vecStart, int iMaterial, int iDamageType
 				}
 				if (bDraw)
 					pEntity->AddDecal(vecStart, traceExt, vecOrigin, iHitbox, decalNumber, true, tr, maxLODToDecal);
-#endif		}
+#endif
+			}
 		}
 	}
 	else

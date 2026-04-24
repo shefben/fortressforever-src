@@ -195,7 +195,8 @@ bool CSoundscapeSystem::Init()
 		if ( mapSoundscapeFilename && filesystem->FileExists( mapSoundscapeFilename ) )
 		{
 			AddSoundscapeFile( mapSoundscapeFilename );
-		} #endif
+		}
+		#endif
 	}
 	else
 	{

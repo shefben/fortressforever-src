@@ -800,10 +800,12 @@ void CBaseHudChat::MsgFunc_SayText( bf_read &msg )
 }
 
 int CBaseHudChat::GetFilterForString( const char *pString )
-{ #ifndef FF
+{
+#ifndef FF
 	if ( !Q_stricmp( pString, "#HL_Name_Change" ) ) 
 #else
-	if ( !Q_stricmp( pString, "#FF_Name_Change" ) ) #endif
+	if ( !Q_stricmp( pString, "#FF_Name_Change" ) )
+#endif
 	{
 		return CHAT_FILTER_NAMECHANGE;
 	}
@@ -861,7 +863,8 @@ void CBaseHudChat::MsgFunc_SayText2( bf_read &msg )
 		Msg( "%s\n", RemoveColorMarkup(ansiString) );
 #ifndef FF
 		CLocalPlayerFilter filter;
-		C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" ); #endif
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
+#endif
 	}
 	else
 	{
@@ -1229,9 +1232,10 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 	m_pChatInput->RequestFocus();
 	m_pChatInput->SetPaintBorderEnabled( true );
 	m_pChatInput->SetMouseInputEnabled( true );
-
-#ifdef FF // Mirv: Remove the scoreboard if it is showing
-	gViewPortInterface->ShowPanel(PANEL_SCOREBOARD, false); #endif
+#ifdef FF
+	// Mirv: Remove the scoreboard if it is showing
+	gViewPortInterface->ShowPanel(PANEL_SCOREBOARD, false);
+#endif
 	//Place the mouse cursor near the text so people notice it.
 	int x, y, w, h;
 	GetChatHistory()->GetBounds( x, y, w, h );
@@ -1485,7 +1489,8 @@ void CBaseHudChatLine::InsertAndColorizeText( wchar_t *buf, int clientIndex )
 						bDone = true;
 					}
 				}
-				break; #ifdef FF
+				break;
+#ifdef FF
 			case '^':
 			{
 				if ( *(txt + 1) >= '0' && *(txt + 1) <= '9' )
@@ -1548,7 +1553,8 @@ void CBaseHudChatLine::InsertAndColorizeText( wchar_t *buf, int clientIndex )
 					bDone = true;
 				}
 				break;
-			} #endif
+			}
+#endif
 			default:
 				++txt;
 			}

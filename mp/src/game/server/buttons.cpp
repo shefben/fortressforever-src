@@ -309,7 +309,8 @@ void CBaseButton::InputPressOut( inputdata_t &inputdata )
 // Output : 
 //-----------------------------------------------------------------------------
 int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
-{ #ifdef FF_DLL
+{
+#ifdef FF_DLL
 	CTakeDamageInfo mutableInfo = info;
 
 	// check to see if the trepids allow this button to do what it wants to
@@ -334,8 +335,10 @@ int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
 	if ( code == BUTTON_NOTHING )
 		return 0;
 #ifndef FF_DLL
-	m_hActivator = info.GetAttacker(); #else
-	m_hActivator = mutableInfo.GetAttacker(); #endif
+	m_hActivator = info.GetAttacker();
+#else
+	m_hActivator = mutableInfo.GetAttacker();
+#endif
 	// dvsents2: why would activator be NULL here?
 	if ( m_hActivator == NULL )
 		return 0;
@@ -569,7 +572,8 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 					return;
 				}
 			}
-#endif		if ( m_sNoise != NULL_STRING )
+#endif
+			if ( m_sNoise != NULL_STRING )
 			{
 				CPASAttenuationFilter filter( this );
 

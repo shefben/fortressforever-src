@@ -1299,7 +1299,8 @@ int SENTENCEG_PickRndSz(const char *szgroupname)
 void SENTENCEG_PlaySentenceIndex( edict_t *entity, int iSentenceIndex, float volume, soundlevel_t soundlevel, int flags, int pitch )
 {
 	if ( iSentenceIndex >= 0 )
-	{ #ifndef FF
+	{
+#ifndef FF
 		CPASAttenuationFilter filter( GetContainingEntity( entity ), soundlevel );
 		CBaseEntity::EmitSentenceByIndex( filter, ENTINDEX(entity), CHAN_VOICE, iSentenceIndex, volume, soundlevel, flags, pitch );
 #else	// Jiggles: We don't want to send this to other players -- just use a SingleRecipientFilter

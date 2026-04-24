@@ -44,7 +44,8 @@ protected:
 	CNetworkArray( uint32, m_iAccountID, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_bValid, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_iUserID, MAX_PLAYERS_ARRAY_SAFE );
-	CNetworkArray( int, m_iFortPoints, MAX_PLAYERS_ARRAY_SAFE ); #ifdef FF
+#ifdef FF
+	CNetworkArray( int, m_iFortPoints, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_iArmor, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_iClass, MAX_PLAYERS_ARRAY_SAFE );	// |-- Mirv: Class info
 

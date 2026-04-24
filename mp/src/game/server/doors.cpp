@@ -363,7 +363,8 @@ void CBaseDoor::Spawn()
 }
 
 void CBaseDoor::MovingSoundThink( void )
-{ #ifndef FF_DLL
+{
+#ifndef FF_DLL
 		CPASAttenuationFilter filter( this );
 #else	// 
 		// --> Mirv: Bug #0000094: Door sounds aren't heard when they're emitted from inside the "void."
@@ -514,19 +515,23 @@ void CBaseDoor::Activate( void )
 	}
 	
 	switch ( m_toggle_state )
-	{ #ifndef FF_DLL
+	{
+#ifndef FF_DLL
 	case TS_AT_TOP:
 		UpdateAreaPortals( true );
-		break; #endif
+		break;
+#endif
 	case TS_AT_BOTTOM:
 		UpdateAreaPortals( false );
-		break; #ifdef FF_DLL
+		break;
+#ifdef FF_DLL
 	case TS_GOING_DOWN:
 	case TS_GOING_UP:
 	case TS_AT_TOP:
 	default:
 		UpdateAreaPortals(true);
-		break; #endif
+		break;
+#endif
 	}
 
 #ifdef HL1_DLL
@@ -894,7 +899,11 @@ void CBaseDoor::InputLock( inputdata_t &inputdata )
 void CBaseDoor::InputOpen( inputdata_t &inputdata )
 {
 	// jon: if already open and being told to open, stay open...
-	if (#ifndef FF_DLL m_toggle_state != TS_AT_TOP && #endif m_toggle_state != TS_GOING_UP )
+#ifndef FF
+	if (m_toggle_state != TS_AT_TOP && m_toggle_state != TS_GOING_UP )
+#else
+	if ( m_toggle_state != TS_GOING_UP )
+#endif
 	{	
 		// I'm locked, can't open
 		if (m_bLocked)
@@ -981,8 +990,11 @@ int CBaseDoor::DoorActivate( )
 		// play door unlock sounds
 		PlayLockSounds(this, &m_ls, FALSE, FALSE);
 
-		// jon: if already open and being told to open, stay open...
-		if ( #ifndef FF_DLL m_toggle_state != TS_AT_TOP && #endif m_toggle_state != TS_GOING_UP )
+#ifndef FF // jon: if already open and being told to open, stay open...
+		if ( m_toggle_state != TS_AT_TOP && m_toggle_state != TS_GOING_UP )
+#else
+		if ( m_toggle_state != TS_GOING_UP )
+#endif
 		{
 			DoorGoUp();
 		}
@@ -1101,7 +1113,8 @@ void CBaseDoor::DoorGoUp( void )
 void CBaseDoor::DoorHitTop( void )
 {
 	if ( !HasSpawnFlags( SF_DOOR_SILENT ) )
-	{ #ifndef FF_DLL
+	{
+		#ifndef FF_DLL
 		CPASAttenuationFilter filter( this );
 		#else
 		// --> Mirv: Bug #0000094: Door sounds aren't heard when they're emitted from inside the "void."
@@ -1300,7 +1313,8 @@ void CBaseDoor::Blocked( CBaseEntity *pOther )
 			EntityPhysics_CreateSolver( this, pOther, true, 4.0f );
 		}
 		else
-		{ #ifdef FF_DLL
+		{
+			#ifdef FF_DLL
 			if ( pOther->Classify() == CLASS_PIPEBOMB )
 			{
 				CFFProjectilePipebomb* pEnt = static_cast<CFFProjectilePipebomb*>(pOther);
@@ -1323,7 +1337,8 @@ void CBaseDoor::Blocked( CBaseEntity *pOther )
 	}
 	// If set, ignore non-player ents that block us.  Mainly of use in multiplayer to prevent exploits.
 	else if ( pOther && !pOther->IsPlayer() && m_bIgnoreNonPlayerEntsOnBlock )
-	{ #ifdef FF_DLL
+	{
+		#ifdef FF_DLL
 		// This doesn't actually prevent door movement being stopped...
 		// Disable collisions with the blocking entity so we can resume opening/closing
 		// and not spam collision sounds

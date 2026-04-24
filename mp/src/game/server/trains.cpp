@@ -1453,12 +1453,15 @@ void CFuncTrackTrain::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 
 		delta = ((int)(m_flSpeed * 4) / (int)m_maxSpeed)*0.25 + 0.25 * delta;
 		if ( delta > 1 )
-			delta = 1;	#ifndef FF
+			delta = 1;
+	#ifndef FF
 		else if ( delta < -0.25 )
-			delta = -0.25; #else
+			delta = -0.25;
+	#else
 		// jon: allow backwards at full speed
 		else if ( delta < -1 )
-			delta = -1;	#endif
+			delta = -1;
+	#endif
 		if ( m_spawnflags & SF_TRACKTRAIN_FORWARDONLY )
 		{
 			if ( delta < 0 )
@@ -1702,12 +1705,15 @@ void CFuncTrackTrain::Blocked( CBaseEntity *pOther )
 		VectorNormalize(vecNewVelocity);
 		vecNewVelocity *= m_flBlockDamage;
 		pOther->SetAbsVelocity( vecNewVelocity );
-	} #ifndef FF
+	}
+	#ifdef FF
 	// We want this physics interaction to always be checked regardless of spawnflag.
 	// Mappers and Valve don't set this because it makes players get stuck or pushed outside the map...
 	// But I can't think of a good reason not to let trains handle being blocked by physics entities
-	if ( !pOther->IsPlayer() ) #else
-	if ( Has SpawnFlags(SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER) )
+	if ( !pOther->IsPlayer() )
+	#else
+	if ( HasSpawnFlags(SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER) )
+	#endif
 	{
 		CBaseEntity *pPhysicsBlocker = FindPhysicsBlockerForHierarchy(this);
 		if ( pPhysicsBlocker )

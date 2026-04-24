@@ -178,10 +178,10 @@ void DeactivateVguiScreen( C_BaseEntity *pVguiScreen );
 //-----------------------------------------------------------------------------
 void SetVGuiScreenButtonState( C_BaseEntity *pVguiScreen, int nButtonState );
 
-	#ifdef FF
+#ifdef FF
 	// Called at shutdown.
 	void ClearKeyValuesCache();
-	#endif
+#endif
 
 #endif // C_VGUISCREEN_H
   

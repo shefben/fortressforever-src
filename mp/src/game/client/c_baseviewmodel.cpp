@@ -331,7 +331,8 @@ int C_BaseViewModel::DrawModel( int flags )
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 #else
 	// use the owner of the weapon instead of the local player so it works universally (for spectators, etc)
-	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner()); #endif
+	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
+#endif
 	C_BaseCombatWeapon *pWeapon = GetOwningWeapon();
 
 #ifdef TF_CLIENT_DLL
@@ -348,8 +349,10 @@ int C_BaseViewModel::DrawModel( int flags )
 	// If the local player's overriding the viewmodel rendering, let him do it
 	// Jon: override if we have an override material
 #ifndef FF
-	if ( pPlayer && pPlayer->IsOverridingViewmodel() ) #else
-	if ((pPlayer && pPlayer->IsOverridingViewmodel()) || (pPlayer && m_pOverrideMaterial)) #endif
+	if ( pPlayer && pPlayer->IsOverridingViewmodel() )
+#else
+	if ((pPlayer && pPlayer->IsOverridingViewmodel()) || (pPlayer && m_pOverrideMaterial))
+#endif
 	{
 		ret = pPlayer->DrawOverriddenViewmodel( this, flags );
 	}
@@ -407,7 +410,8 @@ int C_BaseViewModel::InternalDrawModel( int flags )
 // Purpose: Called by the player when the player's overriding the viewmodel drawing. Avoids infinite recursion.
 //-----------------------------------------------------------------------------
 int C_BaseViewModel::DrawOverriddenViewmodel( int flags )
-{ #ifdef FF
+{
+#ifdef FF
 	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
 	if (pPlayer)
 	{
@@ -534,7 +538,6 @@ void C_BaseViewModel::OnDataChanged( DataUpdateType_t updateType )
 {
 	SetPredictionEligible( true );
 	BaseClass::OnDataChanged(updateType);
-
 #ifdef FF
 	if ( m_iArmModelIndex != -1 )
 	{

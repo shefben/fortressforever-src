@@ -40,8 +40,10 @@ public:
 	// Data Handling
 	//-----------------------------------------------------------------------------
 	virtual int			GetTeamNumber( void ) const;
-	virtual const char *GetName( void ) const;	#ifdef FF
-	virtual void		SetName( const char* pszName ); #endif
+	virtual const char *GetName( void ) const;
+#ifdef FF
+	virtual void		SetName( const char* pszName );
+#endif
 	virtual void		UpdateClientData( CBasePlayer *pPlayer );
 	virtual bool		ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const;
 
@@ -68,7 +70,8 @@ public:
 	virtual void AddScore( int iScore );
 	virtual void SetScore( int iScore );
 	virtual int  GetScore( void ) const;
-	virtual void ResetScores( void ); #ifdef FF
+	virtual void ResetScores( void );
+#ifdef FF
 	virtual float GetScoreTime(void);
 	virtual void AddFortPoints(int iFortPoints);
 	virtual void SetFortPoints(int iFortPoints);
@@ -94,8 +97,10 @@ public:
 	// Data
 	CNetworkString( m_szTeamname, MAX_TEAM_NAME_LENGTH );
 	CNetworkVar( int, m_iScore );
-	CNetworkVar( int, m_iRoundsWon ); #ifndef FF
-	int		m_iDeaths; #else
+	CNetworkVar( int, m_iRoundsWon );
+#ifndef FF
+	int		m_iDeaths;
+#else
 	CNetworkVar( int, m_iFortPoints );
 	// Bug #0000529: Total death column doesn't work
 	CNetworkVar( int, m_iDeaths );	// Mulch: send deaths to client

@@ -50,8 +50,6 @@ int ParticleSmokeGrenade::UpdateTransmitState( void )
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
 #endif // FF_DLL
-
-
 	if ( IsEffectActive( EF_NODRAW ) )
 		return SetTransmitState( FL_EDICT_DONTSEND );
 

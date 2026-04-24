@@ -36,12 +36,10 @@
 #include "ilagcompensationmanager.h"
 
 #ifdef FF_DLL
-
 // --> Mirv: Temp test for triggers
 #include "ff_scriptman.h"
 #include "ff_luacontext.h"
 // <-- Mirv: Temp test for triggers
-
 #endif
 
 #ifdef HL2_DLL
@@ -390,10 +388,10 @@ void CBaseTrigger::InitTrigger( )
 bool CBaseTrigger::PassesTriggerFilters(CBaseEntity *pOther)
 {
 #ifdef FF_DLL	// Check for removed state here
-	if (Classify() == CLASS_TRIGGERSCRIPT)
+	if ( Classify() == CLASS_TRIGGERSCRIPT )
 	{
 		CFuncFFScript* pScript = dynamic_cast<CFuncFFScript*>(this);
-		if (pScript && pScript->IsRemoved())
+		if ( pScript && pScript->IsRemoved() )
 			return false;
 	}
 #endif
@@ -402,10 +400,14 @@ bool CBaseTrigger::PassesTriggerFilters(CBaseEntity *pOther)
 		(HasSpawnFlags(SF_TRIGGER_ALLOW_CLIENTS) && (pOther->GetFlags() & FL_CLIENT)) ||
 		(HasSpawnFlags(SF_TRIGGER_ALLOW_NPCS) && (pOther->GetFlags() & FL_NPC)) ||
 		(HasSpawnFlags(SF_TRIGGER_ALLOW_PUSHABLES) && FClassnameIs(pOther, "func_pushable")) ||
-		(HasSpawnFlags(SF_TRIGGER_ALLOW_PHYSICS) && pOther->GetMoveType() == MOVETYPE_VPHYSICS) #ifdef FF ||
+	#ifdef FF
+		(HasSpawnFlags(SF_TRIGGER_ALLOW_PHYSICS) && pOther->GetMoveType() == MOVETYPE_VPHYSICS) ||
 		(HasSpawnFlags(SF_TRIGGER_ALLOW_FF_GRENADES) && (pOther->GetFlags() & FL_GRENADE)) ||
 		(HasSpawnFlags(SF_TRIGGER_ALLOW_FF_BUILDABLES) && ((pOther->Classify() == CLASS_SENTRYGUN) || (pOther->Classify() == CLASS_DISPENSER)))
-#endif	//(HasSpawnFlags(SF_TRIGGER_ALLOW_FF_INFOSCRIPTS) && ((pOther->Classify() == CLASS_INFOSCRIPT)))
+		//(HasSpawnFlags(SF_TRIGGER_ALLOW_FF_INFOSCRIPTS) && ((pOther->Classify() == CLASS_INFOSCRIPT)))
+	#else
+		(HasSpawnFlags(SF_TRIGGER_ALLOW_PHYSICS) && pOther->GetMoveType() == MOVETYPE_VPHYSICS)
+	#endif
 #if defined( HL2_EPISODIC ) || defined( TF_DLL )		
 		||
 		(	HasSpawnFlags(SF_TRIG_TOUCH_DEBRIS) && 
@@ -3330,14 +3332,11 @@ void CTriggerCamera::Spawn( void )
 
 int CTriggerCamera::UpdateTransmitState()
 {
-	// --> FF
-#ifdef FF_DLL
+#ifdef FF_DLL // --> FF
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
 #endif // FF_DLL
-	// <-- FF
-
 	// always tranmit if currently used by a monitor
 	if ( m_state == USE_ON )
 	{

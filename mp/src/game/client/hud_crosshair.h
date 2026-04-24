@@ -58,7 +58,8 @@ protected:
 	// FF (SDK 2006) Legacy code
 
 	vgui::HFont		m_hPrimaryCrosshairs[CROSSHAIR_SIZES];
-	vgui::HFont		m_hSecondaryCrosshairs[CROSSHAIR_SIZES]; #endif
+	vgui::HFont		m_hSecondaryCrosshairs[CROSSHAIR_SIZES];
+#endif
 };
 
 

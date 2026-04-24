@@ -194,7 +194,9 @@ public:
 	virtual int			GetTeamIndex();
 	virtual void		ChangeTeam( int iTeamNum );
 	virtual int			GetFragCount();
+#ifdef FF
 	virtual int			GetFortPointsCount();
+#endif
 	virtual int			GetDeathCount();
 	virtual bool		IsConnected();
 	virtual int			GetArmorValue();
@@ -225,7 +227,6 @@ public:
 	virtual void SetLocalAngles( const QAngle& angles );
 	virtual const QAngle GetLocalAngles( void );
 	virtual bool IsEFlagSet( int nEFlagMask );
-//	virtual void PostClientMessagesSent(void);
 
 	virtual void RunPlayerMove( CBotCmd *ucmd );
 	virtual void SetLastUserCommand( const CBotCmd &cmd );
@@ -469,7 +470,10 @@ public:
 
 	virtual void			OnEmitFootstepSound( const CSoundParameters& params, const Vector& vecOrigin, float fVolume ) {}
 #ifdef FF
-	Class_T					Classify ( void ) { return CLASS_PLAYER; } #else #Class_T Classify ( void ); #endif
+	Class_T					Classify ( void ) { return CLASS_PLAYER; }
+#else
+	Class_T					Classify ( void );
+#endif
 	virtual void			SetAnimation( PLAYER_ANIM playerAnim );
 	void					SetWeaponAnimType( const char *szExtention );
 
@@ -482,6 +486,8 @@ public:
 	bool					IsSinglePlayerGameEnding() { return m_bSinglePlayerGameEnding == true; }
 
 	bool					HandleVoteCommands( const CCommand &args );
+
+	virtual CVoteController *GetTeamVoteController();
 	
 	// Observer functions
 	virtual bool			StartObserverMode(int mode); // true, if successful
@@ -525,8 +531,10 @@ public:
 	CBaseEntity				*GetVehicleEntity( void );
 	bool					UsingStandardWeaponsInVehicle( void );
 	
-	void					AddPoints( int score, bool bAllowNegativeScore );	#ifdef FF
-	void					AddFortPoints(int score, const char* szDescription); #endif
+	void					AddPoints( int score, bool bAllowNegativeScore );
+#ifdef FF
+	void					AddFortPoints(int score, const char* szDescription);
+#endif
 	void					AddPointsToTeam( int score, bool bAllowNegativeScore );
 	virtual bool			BumpWeapon( CBaseCombatWeapon *pWeapon );
 	bool					RemovePlayerItem( CBaseCombatWeapon *pItem );
@@ -562,7 +570,7 @@ public:
 	bool					ClearUseEntity();
 	CBaseEntity				*DoubleCheckUseNPC( CBaseEntity *pNPC, const Vector &vecSrc, const Vector &vecDir );
 #ifdef FF
-	CBasePlayer*			MyCharacterPointer(void) { return this; }
+	CBasePlayer				*MyCharacterPointer( void ) { return this; }
 #endif
 
 	// physics interactions
@@ -682,9 +690,11 @@ public:
 
 	// Accessor methods
 	int		FragCount() const		{ return m_iFrags; }
-	int		DeathCount() const		{ return m_iDeaths; } #ifdef FF
+	int		DeathCount() const		{ return m_iDeaths; }
+#ifdef FF
 	int		FortPointsCount() const { return m_iFortPoints; }
-	int		AssistsCount() const	{ return m_iAssists; } #endif
+	int		AssistsCount() const	{ return m_iAssists; }
+#endif
 	bool	IsConnected() const		{ return m_iConnected != PlayerDisconnected; }
 	bool	IsDisconnecting() const	{ return m_iConnected == PlayerDisconnecting; }
 	bool	IsSuitEquipped() const	{ return m_Local.m_bWearingSuit; }
@@ -717,10 +727,10 @@ public:
 	void	IncrementDeathCount( int nCount );
 #ifdef FF
 	void	ResetFortPointsCount();
-	void	IncrementFortPointsCount(int nCount);
+	void	IncrementFortPointsCount( int nCount );
 
 	void	ResetAsisstsCount();
-	void	IncrementAssistsCount(int nCount);
+	void	IncrementAssistsCount( int nCount );
 #endif
 	void	SetArmorValue( int value );
 	void	IncrementArmorValue( int nCount, int nMaxValue = -1 );
@@ -1072,7 +1082,8 @@ private:
 	int						m_lastx, m_lasty;	// These are the previous update's crosshair angles, DON"T SAVE/RESTORE
 
 	int						m_iFrags;
-	int						m_iDeaths; #ifdef FF
+	int						m_iDeaths;
+#ifdef FF
 	int						m_iFortPoints;
 	int						m_iAssists;
 #endif
@@ -1162,9 +1173,10 @@ private:
 #endif
 
 	float					m_flOldPlayerZ;
-	float					m_flOldPlayerViewOffsetZ; #ifdef FF
-	bool					m_bSmoothStair;			#endif	// |-- Mirv
-
+	float					m_flOldPlayerViewOffsetZ;
+#ifdef FF
+	bool					m_bSmoothStair;	// |-- Mirv
+#endif
 	bool					m_bPlayerUnderwater;
 
 	EHANDLE					m_hViewEntity;
@@ -1191,15 +1203,13 @@ protected:
 	friend class CCSGameMovement;	
 	friend class CHL2GameMovement;
 	friend class CDODGameMovement;
-	friend class CPortalGameMovement; #ifdef FF
+	friend class CPortalGameMovement;
+#ifdef FF
 	// --> billdoor: allow access to private member variables from our player movement code
 	friend class CFFGameMovement;
-	// <-- billdoor: allow access to private member variables from our player movement code
 
 	// --> Mirv: this was put in by billdoor to access the maxspeed variable
 	friend class CFFPlayer;
-	// <-- Mirv: this was put in by billdoor to access the maxspeed variable
-	friend class CDODGameMovement;
 #endif	
 	// Accessors for gamemovement
 	bool IsDucked( void ) const { return m_Local.m_bDucked; }

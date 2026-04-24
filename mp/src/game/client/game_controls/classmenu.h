@@ -32,12 +32,14 @@ class ClassPropertiesLabel;
 #endif
 namespace vgui
 {
-	class TextEntry; #ifdef FF
+	class TextEntry;
+#ifdef FF
 	class PlayerModelPanel;
 	class FFButton;
 	class ProgressBar;
 	class Section;
-	class RichText; #endif
+	class RichText;
+#endif
 }
 
 //-----------------------------------------------------------------------------

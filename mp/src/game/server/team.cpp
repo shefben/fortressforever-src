@@ -41,7 +41,8 @@ IMPLEMENT_SERVERCLASS_ST_NOBASE(CTeam, DT_Team)
 	SendPropInt( SENDINFO(m_iTeamNum), 5 ),
 	SendPropInt( SENDINFO(m_iScore), 0 ),
 	SendPropInt( SENDINFO(m_iRoundsWon), 8 ),
-	SendPropString( SENDINFO( m_szTeamname ) ), #ifdef FF
+	SendPropString( SENDINFO( m_szTeamname ) ),
+#ifdef FF
 	SendPropInt( SENDINFO(m_iFortPoints), 0 ),
 	// Bug #0000529: Total death column doesn't work
 	SendPropInt(SENDINFO(m_iDeaths), 0 ), // Mulch: send deaths to client
@@ -130,7 +131,8 @@ void CTeam::Init( const char *pName, int iNumber )
 	InitializeSpawnpoints();
 	InitializePlayers();
 
-	m_iScore = 0; #ifdef FF
+	m_iScore = 0;
+#ifdef FF
 	m_iFortPoints = 0;
 	m_iDeaths = 0;
 	m_flScoreTime = 0.0f;
@@ -294,14 +296,18 @@ CBasePlayer *CTeam::GetPlayer( int iIndex ) const
 //-----------------------------------------------------------------------------
 void CTeam::AddScore( int iScore )
 {
-	m_iScore += iScore; #ifdef FF
-	m_flScoreTime = gpGlobals->curtime; #endif
+	m_iScore += iScore;
+#ifdef FF
+	m_flScoreTime = gpGlobals->curtime;
+#endif
 }
 
 void CTeam::SetScore( int iScore )
 {
-	m_iScore = iScore; #ifdef FF
-	m_flScoreTime = gpGlobals->curtime; #endif
+	m_iScore = iScore;
+#ifdef FF
+	m_flScoreTime = gpGlobals->curtime;
+#endif
 }
 
 //-----------------------------------------------------------------------------

@@ -71,8 +71,8 @@ void CHudVoiceSelfStatus::VidInit( void )
 {
 	m_pVoiceIcon = gHUD.GetIcon( "voice_self" );
 #ifdef FF // BEG: Added by Mulchman
-	SetPaintBackgroundEnabled(false);	#endif
-	// END: Added by Mulchman
+	SetPaintBackgroundEnabled(false);
+#endif	// END: Added by Mulchman
 }
 
 bool CHudVoiceSelfStatus::ShouldDraw()
@@ -208,8 +208,8 @@ void CHudVoiceStatus::VidInit( void )
 {
 	m_pVoiceIcon = gHUD.GetIcon("voice_player");
 #ifdef FF // BEG: Added by Mulchman
-	SetPaintBackgroundEnabled(false); #endif
-	// END: Added by Mulchman
+	SetPaintBackgroundEnabled(false);
+#endif	// END: Added by Mulchman
 }
 
 void CHudVoiceStatus::OnThink( void )

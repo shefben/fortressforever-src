@@ -2305,8 +2305,10 @@ void EffectsPrecache( void *pUser )
 
 	if ( gpGlobals->maxClients > 1 )
 	{
-		CBaseEntity::PrecacheScriptSound( "HudChat.Message" ); #ifndef FF_DLL
-		CBaseEntity::PrecacheScriptSound( "HudChat.TeamMessage" ); #endif
+		CBaseEntity::PrecacheScriptSound( "HudChat.Message" );
+		#ifndef FF_DLL
+		CBaseEntity::PrecacheScriptSound( "HudChat.TeamMessage" );
+		#endif
 	}
 
 #ifdef TF_DLL

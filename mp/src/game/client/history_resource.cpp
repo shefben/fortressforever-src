@@ -117,7 +117,8 @@ void CHudHistoryResource::SetHistoryGap( int iNewHistoryGap )
 // Purpose: adds an element to the history
 //-----------------------------------------------------------------------------
 void CHudHistoryResource::AddToHistory( C_BaseCombatWeapon *weapon )
-{ #ifdef FF
+{
+#ifdef FF
 	return;	// |-- Mirv: Don't show any weapons as pickup icons
 #endif
 	// don't draw exhaustable weapons (grenades) since they'll have an ammo pickup icon as well
@@ -178,7 +179,8 @@ void CHudHistoryResource::AddToHistory( int iType, int iId, int iCount )
 #else // Get the item's icon
 	CHudTexture* icon = gHUD.GetIcon(FF_GetAmmoName(iId));
 
-	AddIconToHistory(iType, iId, NULL, iCount, icon); #endif
+	AddIconToHistory(iType, iId, NULL, iCount, icon);
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -370,15 +372,15 @@ void CHudHistoryResource::Paint( void )
 			bool bUseAmmoFullMsg = false;
 
 			// get the icon and number to draw
-			const CHudTexture *itemIcon = NULL; #ifdef FF
-			const CHudTexture *itemAmmoIcon = NULL; #endif
+			const CHudTexture *itemIcon = NULL;
+			const CHudTexture *itemAmmoIcon = NULL;
 			int iAmount = 0;
 			bool bHalfHeight = true;
 
-			switch (m_PickupHistory[i].type)
+			switch ( m_PickupHistory[i].type )
 			{
 			case HISTSLOT_AMMO:
-			{
+				{
 				if (!m_PickupHistory[i].icon)
 					itemIcon = gWR.GetAmmoIconFromWeapon(m_PickupHistory[i].iId);
 				else

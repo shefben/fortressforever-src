@@ -44,7 +44,7 @@
 #ifdef HL2_DLL
 #include "weapon_physcannon.h"
 #endif
-
+#ifdef FF_DLL
 #include "ff_player.h"
 
 #include "ff_buildableobject.h"
@@ -53,7 +53,7 @@
 #include "ff_buildable_dispenser.h"
 #include "ff_scriptman.h"
 #include "ff_luacontext.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -65,7 +65,7 @@ extern CBaseEntity*	FindPickerEntity( CBasePlayer* pPlayer );
 extern bool IsInCommentaryMode( void );
 
 ConVar  *sv_cheats = NULL;
-
+#ifdef FF_DLL
 // Parse out % commands.
 // return the number of command chars used, 1 or 2
 inline int FF_ParsePercentCommand(edict_t* pEdict, const char* cCommand, char* pszText, int iDestLen)
@@ -365,7 +365,7 @@ enum eAllowPointServerCommand {
 	eAllowOfficial,
 	eAllowAlways
 };
-
+#endif
 #ifdef TF_DLL
 // The default value here should match the default of the convar
 eAllowPointServerCommand sAllowPointServerCommand = eAllowOfficial;

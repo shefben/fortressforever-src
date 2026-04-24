@@ -1765,9 +1765,11 @@ const Vector& C_BaseEntity::GetAbsOrigin( void ) const
 // Output : const
 //-----------------------------------------------------------------------------
 const QAngle& C_BaseEntity::GetAbsAngles( void ) const
-{#ifdef FF
+{
+#ifdef FF
 	if (!s_bAbsQueriesValid && sDebugAbsQueriesValid.GetBool())
-		Warning("!s_bAbsQueriesValid: %s\n", const_cast<C_BaseEntity*>(this)->GetClassname()); #endif
+		Warning("!s_bAbsQueriesValid: %s\n", const_cast<C_BaseEntity*>(this)->GetClassname());
+#endif
 	//Assert( s_bAbsQueriesValid );
 	const_cast<C_BaseEntity*>(this)->CalcAbsolutePosition();
 	return m_angAbsRotation;
@@ -3372,7 +3374,6 @@ void C_BaseEntity::ComputeFxBlend( void )
 	if ( m_nFXComputeFrame == gpGlobals->framecount )
 		return;
 
-	MDLCACHE_CRITICAL_SECTION();
 	int blend=0;
 	float offset;
 
@@ -3739,21 +3740,22 @@ void C_BaseEntity::AddBrushModelDecal( const Ray_t& ray, const Vector& decalCent
 	effects->DecalShoot( decalIndex, index, 
 		model, GetAbsOrigin(), GetAbsAngles(), decalCenter, 0, 0 );
 }
-
+#ifdef FF
 extern ConVar	ffdev_disableentitydecals;
-
+#endif
 //-----------------------------------------------------------------------------
 // A method to apply a decal to an entity
 //-----------------------------------------------------------------------------
 void C_BaseEntity::AddDecal( const Vector& rayStart, const Vector& rayEnd,
 		const Vector& decalCenter, int hitbox, int decalIndex, bool doTrace, trace_t& tr, int maxLODToDecal )
 {
+#ifdef FF
 	if (ffdev_disableentitydecals.GetBool())
 	{
 		if (Classify() != CLASS_NONE && Classify() < NUM_AI_CLASSES)
 			return;
 	}
-
+#endif
 	Ray_t ray;
 	ray.Init( rayStart, rayEnd );
 
@@ -4966,9 +4968,9 @@ C_BaseEntity *C_BaseEntity::CreatePredictedEntityByName( const char *classname, 
 				return ent;
 			}
 		}
-
-		// Mirv: For predicted rockets...
-		//return NULL;
+#ifndef FF	// Mirv: For predicted rockets...
+		return NULL;
+#endif
 	}
 
 	// Try to create it
@@ -5702,13 +5704,6 @@ RenderGroup_t C_BaseEntity::GetRenderGroup()
 	// Don't sort things that don't need rendering
 	if ( m_nRenderMode == kRenderNone )
 		return RENDER_GROUP_OPAQUE_ENTITY;
-
-	// When an entity has a material proxy, we have to recompute
-	// translucency here because the proxy may have changed it.
-	if (modelinfo->ModelHasMaterialProxy( GetModel() ))
-	{
-		modelinfo->RecomputeTranslucency( const_cast<model_t*>(GetModel()), GetSkin(), GetBody(), GetClientRenderable() );
-	}
 
 	// NOTE: Bypassing the GetFXBlend protection logic because we want this to
 	// be able to be called from AddToLeafSystem.

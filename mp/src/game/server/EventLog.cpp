@@ -10,7 +10,8 @@
 #include "team.h"
 #include "KeyValues.h"
 #ifdef FF_DLL
-#include "ff_shareddefs.h" #endif
+#include "ff_shareddefs.h"
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -123,19 +124,19 @@ bool CEventLog::PrintPlayerEvent( IGameEvent *event )
 	{
 		const int attackerid = event->GetInt("attacker" );
 
-		const int assisterid = event->GetInt("killassister");
-
-//#ifdef HL2MP
-		const char* weapon = event->GetString("weapon");
+#ifdef HL2MP || #ifdef FF
+		const char *weapon = event->GetString( "weapon" );
+	#ifdef FF
 		int damagetype = event->GetInt("damagetype");
-//#endif
+	#endif
+#endif
 		
 		CBasePlayer *pAttacker = UTIL_PlayerByUserId( attackerid );
 		CTeam *team = pPlayer->GetTeam();
 		CTeam *attackerTeam = NULL;
-
+#ifdef FF
 		CBasePlayer* pAssister = assisterid > -1 ? UTIL_PlayerByUserId(assisterid) : NULL;
-		
+#endif
 		if ( pAttacker )
 		{
 			attackerTeam = pAttacker->GetTeam();
@@ -143,7 +144,7 @@ bool CEventLog::PrintPlayerEvent( IGameEvent *event )
 		if ( pPlayer == pAttacker && pPlayer )  
 		{  
 
-//#ifdef HL2MP
+/#ifdef HL2MP
 			UTIL_LogPrintf( "\"%s<%i><%s><%s>\" committed suicide with \"%s\"\n",  
 							pPlayer->GetPlayerName(),
 							userid,

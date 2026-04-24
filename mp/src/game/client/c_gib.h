@@ -19,7 +19,8 @@ class C_Gib : public C_BaseAnimating
 	typedef C_BaseAnimating BaseClass;
 public:
 #ifdef FF
-	C_Gib(); #endif
+	C_Gib();
+#endif
 	~C_Gib( void );
 
 	static C_Gib	*CreateClientsideGib( const char *pszModelName, Vector vecOrigin, Vector vecForceDir, AngularImpulse vecAngularImp, float flLifetime = DEFAULT_GIB_LIFETIME );
@@ -39,7 +40,8 @@ protected:
 
 #ifdef FF
 	bool	m_bDecal;
-	static int m_iBloodDecal; #endif
+	static int m_iBloodDecal;
+#endif
 };
 
 #ifdef HL2_CLIENT_DLL

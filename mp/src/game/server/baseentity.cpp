@@ -301,8 +301,9 @@ IMPLEMENT_SERVERCLASS_ST_NOBASE( CBaseEntity, DT_BaseEntity )
 	SendPropEHandle (SENDINFO(m_hEffectEntity)),
 	SendPropEHandle (SENDINFO_NAME(m_hMoveParent, moveparent)),
 	SendPropInt		(SENDINFO(m_iParentAttachment), NUM_PARENTATTACHMENT_BITS, SPROP_UNSIGNED),
+#ifdef FF
 	SendPropInt		(SENDINFO(m_takedamage), 3, SPROP_UNSIGNED),
-
+#endif
 	SendPropInt		(SENDINFO_NAME( m_MoveType, movetype ), MOVETYPE_MAX_BITS, SPROP_UNSIGNED ),
 	SendPropInt		(SENDINFO_NAME( m_MoveCollide, movecollide ), MOVECOLLIDE_MAX_BITS, SPROP_UNSIGNED ),
 #if PREDICTION_ERROR_CHECK_LEVEL > 1 
@@ -1710,16 +1711,16 @@ int CBaseEntity::TakeDamage( const CTakeDamageInfo &inputInfo )
 	{
 		CTakeDamageInfo info = inputInfo;
 		
-		// --> Mirv: No scaling
+#ifndef FF	// --> Mirv: No scaling
 		// Scale the damage by the attacker's modifier.
-		/*if ( info.GetAttacker() )
+		if ( info.GetAttacker() )
 		{
 			info.ScaleDamage( info.GetAttacker()->GetAttackDamageScale( this ) );
-		}*/
+		}
 
 		// Scale the damage by my own modifiers
-		//info.ScaleDamage( GetReceivedDamageScale( info.GetAttacker() ) );
-		// <-- Mirv: No scaling
+		info.ScaleDamage( GetReceivedDamageScale( info.GetAttacker() ) );
+#endif	// <-- Mirv: No scaling
 
 		//Msg("%s took %.2f Damage, at %.2f\n", GetClassname(), info.GetDamage(), gpGlobals->curtime );
 

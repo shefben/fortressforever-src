@@ -73,8 +73,10 @@ void CHudMenu::Init( void )
 	HOOK_HUD_MESSAGE( CHudMenu, ShowMenu );
 
 	m_bMenuTakesInput = false;
-	m_bMenuDisplayed = false; #ifdef FF
-	m_bIsFromMenuMan = false; #endif
+	m_bMenuDisplayed = false;
+#ifdef FF
+	m_bIsFromMenuMan = false;
+#endif
 	m_bitsValidSlots = 0;
 	m_Processed.RemoveAll();
 	m_nMaxPixels = 0;
@@ -111,7 +113,8 @@ void CHudMenu::VidInit( void )
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CHudMenu::OnThink()
-{#ifdef FF
+{
+#ifdef FF
 	if ( m_bIsFromMenuMan )
 		return;
 #endif
@@ -389,8 +392,10 @@ void CHudMenu::HideMenu( void )
 //-----------------------------------------------------------------------------
 void CHudMenu::ShowMenu( const char * menuName, int validSlots )
 {
-	m_flShutoffTime = -1; #ifdef FF
-	m_flExpireTime = -1; #endif
+	m_flShutoffTime = -1;
+#ifdef FF
+	m_flExpireTime = -1;
+#endif
 	m_bitsValidSlots = validSlots;
 	m_fWaitingForMore = 0;
 
@@ -473,8 +478,10 @@ void CHudMenu::MsgFunc_ShowMenu( bf_read &msg)
 {
 	m_bitsValidSlots = (short)msg.ReadWord();
 	int DisplayTime = msg.ReadChar();
-	int NeedMore = msg.ReadByte(); #ifdef FF
-	bool bIsFromMenuMan = false; #endif
+	int NeedMore = msg.ReadByte();
+#ifdef FF
+	bool bIsFromMenuMan = false;
+#endif
 
 	if ( DisplayTime > 0 )
 	{
@@ -482,9 +489,12 @@ void CHudMenu::MsgFunc_ShowMenu( bf_read &msg)
 
 	}
 	else
-	{ #ifndef FF
-		m_flShutoffTime = -1; #else
-		m_flShutoffTime = m_flExpireTime = -1; #endif
+	{
+#ifndef FF
+		m_flShutoffTime = -1;
+#else
+		m_flShutoffTime = m_flExpireTime = -1;
+#endif
 	}
 
 	if ( m_bitsValidSlots )
@@ -522,16 +532,20 @@ void CHudMenu::MsgFunc_ShowMenu( bf_read &msg)
 		m_flSelectionTime = gpGlobals->curtime;
 	}
 	else
-	{ #ifdef FF
+	{
+#ifdef FF
 		char szString[2048];
 		msg.ReadString( szString, sizeof(szString) );
 
-		bIsFromMenuMan = msg.ReadByte(); #endif
+		bIsFromMenuMan = msg.ReadByte();
+#endif
 		HideMenu();
 	}
 
-	m_fWaitingForMore = NeedMore;	#ifdef FF
-	m_bIsFromMenuMan = bIsFromMenuMan; #endif
+	m_fWaitingForMore = NeedMore;
+#ifdef FF
+	m_bIsFromMenuMan = bIsFromMenuMan;
+#endif
 }
 
 //-----------------------------------------------------------------------------

@@ -224,13 +224,11 @@ void VGui_CreateGlobalPanels( void )
 	// Create mp3 player off of tool parent panel
 	MP3Player_Create( toolParent );
 #endif
-#ifdef FF
-	// --> Mirv: Create extra gameui panels
+#ifdef FF // --> Mirv: Create extra gameui panels
 	ffoptions->Create(uiParent);
 	ffgamemodes->Create(uiParent);
 	fftraining->Create(uiParent);
-	// <-- Mirv
-#endif
+#endif // <-- Mirv
 #ifdef SIXENSE
 	g_pSixenseInput->CreateGUI( gameToolParent );
 #endif
@@ -254,12 +252,12 @@ void VGui_Shutdown()
 	messagechars->Destroy();
 	loadingdisc->Destroy();
 	internalCenterPrint->Destroy();
-#ifdef FF	// Mirv: Destroy extra gameui panels
+#ifdef FF // Mirv: Destroy extra gameui panels
 	ffoptions->Destroy();
 	ffgamemodes->Destroy();
 	fftraining->Destroy();
 #endif	// <-- Mirv
-	if (g_pClientMode)
+	if ( g_pClientMode )
 	{
 		g_pClientMode->VGui_Shutdown();
 	}

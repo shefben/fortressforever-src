@@ -752,7 +752,6 @@ int CFire::UpdateTransmitState()
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
 #endif // FF_DLL
-
 	// Don't want to be FL_EDICT_DONTSEND because our fire entity may make us transmit.
 	return SetTransmitState( FL_EDICT_ALWAYS );
 }

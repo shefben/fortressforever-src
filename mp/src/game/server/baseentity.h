@@ -33,7 +33,9 @@ class IResponseSystem;
 class IEntitySaveUtils;
 class CRecipientFilter;
 class CStudioHdr;
-#ifdef FF_DLL class CSpriteTrail; #endif
+#ifdef FF_DLL
+class CSpriteTrail;
+#endif
 template<typename T, typename U>
 struct IsSame
 {
@@ -450,7 +452,9 @@ public:
 	DECLARE_DATADESC();
 	// script description
 	DECLARE_ENT_SCRIPTDESC();
-	#ifdef FF_DLL	void PrintDeleteInfo();	#endif
+	#ifdef FF_DLL
+	void PrintDeleteInfo();
+	#endif
 	// memory handling
     void *operator new( size_t stAllocateBlock );
     void *operator new( size_t stAllocateBlock, int nBlockUse, const char *pFileName, int nLine );
@@ -497,7 +501,9 @@ public:
 	bool					IsCurrentlyTouching( void ) const;
 	const Vector&			GetAbsOrigin( void ) const;
 	const QAngle&			GetAbsAngles( void ) const;
-#ifdef FF_DLL	Vector		GetAbsFacing() const; #endif
+#ifdef FF_DLL
+	Vector		GetAbsFacing() const;
+#endif
 
 	SolidType_t				GetSolid() const;
 	int			 			GetSolidFlags( void ) const;
@@ -676,7 +682,10 @@ public:
 	CBaseEntity* GetParent();
 	int			GetParentAttachment();
 
-	string_t	GetEntityName(); #ifdef FF_DLL const char* GetName() { return STRING(GetEntityName()); } #endif
+	string_t	GetEntityName();
+	#ifdef FF_DLL
+	const char* GetName() { return STRING(GetEntityName()); }
+	#endif
 	const char *GetEntityNameAsCStr();	// This method is temporary for VSCRIPT functionality until we figure out what to do with string_t (sjb)
 	const char *GetPreTemplateName(); // Not threadsafe. Get the name stripped of template unique decoration
 
@@ -991,7 +1000,9 @@ protected:
 
 private:
 	CBaseEntity( CBaseEntity& );
-#ifdef FF_DLL CSpriteTrail* m_pSpriteTrail; #endif
+#ifdef FF_DLL
+CSpriteTrail* m_pSpriteTrail;
+#endif
 
 	// list handling
 	friend class CGlobalEntityList;
@@ -1015,7 +1026,10 @@ public:
 
 // Classify - returns the type of group (i.e, "houndeye", or "human military" so that NPCs with different classnames
 // still realize that they are teammates. (overridden for NPCs that form groups)
-	virtual Class_T Classify ( void ) #ifdef FF_DLL { return CLASS_NONE; } #endif
+	virtual Class_T Classify ( void )
+	#ifdef FF_DLL
+	{ return CLASS_NONE; }
+	#endif
 	virtual void	DeathNotice ( CBaseEntity *pVictim ) {}// NPC maker children use this to tell the NPC maker that they have died.
 	virtual bool	ShouldAttractAutoAim( CBaseEntity *pAimingEnt ) { return ((GetFlags() & FL_AIMTARGET) != 0); }
 	virtual float	GetAutoAimRadius();
@@ -1072,7 +1086,9 @@ public:
 	CAI_BaseNPC				*MyNPCPointer( void ); 
 	virtual CBaseCombatCharacter *MyCombatCharacterPointer( void ) { return NULL; }
 	virtual INextBot		*MyNextBotPointer( void ) { return NULL; }
-#ifdef FF_DLL	virtual CBasePlayer*	MyCharacterPointer(void) { return NULL; } #endif
+#ifdef FF_DLL
+	virtual CBasePlayer*	MyCharacterPointer(void) { return NULL; }
+#endif
 	virtual float			GetDelay( void ) { return 0; }
 	virtual bool			IsMoving( void );
 	bool					IsWorld() { return entindex() == 0; }
@@ -1082,11 +1098,12 @@ public:
 
 	void			AddPoints( int score, bool bAllowNegativeScore );
 	void			AddPointsToTeam( int score, bool bAllowNegativeScore );
-	void			RemoveAllDecals( void ); #ifdef FF_DLL
+	void			RemoveAllDecals( void );
+	#ifdef FF_DLL
 	void	        StartTrail(int teamId);
 	void	        StartTrail(int teamId, float startWidth, float endWidth, float lifetime);
 	void	        StopTrail(void);
-#endif
+	#endif
 	virtual bool	OnControls( CBaseEntity *pControls ) { return false; }
 	virtual bool	HasTarget( string_t targetname );
 	virtual	bool	IsPlayer( void ) const { return false; }
@@ -1623,16 +1640,22 @@ public:
 	void					SetLocalTransform( const matrix3x4_t &localTransform );
 
 	// See CSoundEmitterSystem
-#ifdef FF_DLL	void PlaySound(const char* soundname); #endif
+#ifdef FF_DLL
+	void PlaySound(const char* soundname);
+#endif
 	void					EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );
-#ifdef FF_DLL	void EmitSoundShared(const char* soundname, float soundtime = 0.0f, float* duration = NULL); #endif
+#ifdef FF_DLL
+	void EmitSoundShared(const char* soundname, float soundtime = 0.0f, float* duration = NULL);
+#endif
 	void					EmitSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );
 	void					ScriptEmitSound( const char *soundname );
 	void					ScriptStopSound( const char *soundname );
 	float					ScriptSoundDuration( const char *soundname, const char *actormodel );
 	void					StopSound( const char *soundname );
 	void					StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
-#ifdef FF_DLL	void StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); #endif // Jon: for AC stuff
+#ifdef FF_DLL
+	void StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
+	#endif
 	void					GenderExpandString( char const *in, char *out, int maxlen );
 
 	virtual void ModifyEmitSoundParams( EmitSound_t &params );
@@ -1645,7 +1668,9 @@ public:
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, HSOUNDSCRIPTHANDLE& handle, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void StopSound( int iEntIndex, const char *soundname );
-#ifdef FF_DLL	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); #endif // Jon: for AC stuff
+#ifdef FF_DLL
+	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); // Jon: for AC stuff
+#endif
 	static soundlevel_t LookupSoundLevel( const char *soundname );
 	static soundlevel_t LookupSoundLevel( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
 
@@ -1844,7 +1869,11 @@ public:
 	// Add a discontinuity to a step
 	bool					AddStepDiscontinuity( float flTime, const Vector &vecOrigin, const QAngle &vecAngles );
 	int						GetFirstThinkTick();	// get first tick thinking on any context
-#ifdef FF_DLL protected: #else private: #endif	// |-- Mirv: Changed from private
+#ifdef FF_DLL
+protected:
+#else
+private:
+#endif	// |-- Mirv: Changed from private
 	// origin and angles to use in step calculations
 	virtual	Vector			GetStepOrigin( void ) const;
 	virtual	QAngle			GetStepAngles( void ) const;

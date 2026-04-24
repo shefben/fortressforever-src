@@ -536,7 +536,8 @@ void MuzzleFlashCallback( const CEffectData &data )
 			// Mirv: Fix for SG muzzleflashes
 			tempents->MuzzleFlash(data.m_fFlags & (~MUZZLEFLASH_FIRSTPERSON), data.m_hEntity, data.m_nAttachmentIndex, (data.m_fFlags & MUZZLEFLASH_FIRSTPERSON) != 0);
 			return;
-#endif	}
+#endif
+		}
 		else
 		{
 			vecOrigin = pRenderable->GetRenderOrigin();

@@ -409,9 +409,8 @@ void CAI_BaseNPC::InitDefaultActivitySR(void)
 	ADD_ACTIVITY_TO_SR(ACT_VM_FINISHRELOAD_WITH4);
 	ADD_ACTIVITY_TO_SR(ACT_VM_FINISHRELOAD_WITH5);
 	ADD_ACTIVITY_TO_SR(ACT_VM_FINISHRELOAD_WITH6);
+#endif	// <-- Mirv: Anims
 
-	// <-- Mirv: Anims
-#endif
 //===========================
 // HL2 Specific Activities
 //===========================

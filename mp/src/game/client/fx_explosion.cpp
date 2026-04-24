@@ -240,7 +240,7 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, float s
 //-----------------------------------------------------------------------------
 void C_BaseExplosionEffect::CreateCore( void )
 {
-	if (m_fFlags & TE_EXPLFLAG_NOFIREBALL)
+	if ( m_fFlags & TE_EXPLFLAG_NOFIREBALL )
 		return;
 
 	Vector	offset;
@@ -275,30 +275,30 @@ void C_BaseExplosionEffect::CreateCore( void )
 	}
 
 	//FIXME: Better sampling area
-	offset = m_vecOrigin + (m_vecDirection * 32.0f);
+	offset = m_vecOrigin + ( m_vecDirection * 32.0f );
 
 	//Find area ambient light color and use it to tint smoke
-	Vector worldLight = WorldGetLightForPoint(offset, true);
-
+	Vector worldLight = WorldGetLightForPoint( offset, true );
+	
 	Vector	tint;
 	float	luminosity;
-	if (worldLight == vec3_origin)
+	if ( worldLight == vec3_origin )
 	{
 		tint = vec3_origin;
 		luminosity = 0.0f;
 	}
 	else
 	{
-		UTIL_GetNormalizedColorTintAndLuminosity(worldLight, &tint, &luminosity);
+		UTIL_GetNormalizedColorTintAndLuminosity( worldLight, &tint, &luminosity );
 	}
 
 	// We only take a portion of the tint
-	tint = (tint * 0.25f) + (Vector(0.75f, 0.75f, 0.75f));
-
+	tint = (tint * 0.25f)+(Vector(0.75f,0.75f,0.75f));
+	
 	// Rescale to a character range
 	luminosity *= 255;
 
-	if ((m_fFlags & TE_EXPLFLAG_NOFIREBALLSMOKE) == 0)
+	if ( (m_fFlags & TE_EXPLFLAG_NOFIREBALLSMOKE) == 0 )
 	{
 		//
 		// Smoke - basic internal filler
@@ -308,9 +308,9 @@ void C_BaseExplosionEffect::CreateCore( void )
 
 		for (i = 0; i < number; i++)
 		{
-			pParticle = (SimpleParticle*)pSimple->AddParticle(sizeof(SimpleParticle), m_Material_Smoke, m_vecOrigin);
+			pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), m_Material_Smoke, m_vecOrigin );
 
-			if (pParticle != NULL)
+			if ( pParticle != NULL )
 			{
 				pParticle->m_flLifetime = 0.0f;
 
@@ -565,14 +565,14 @@ void C_BaseExplosionEffect::CreateCore( void )
 		}
 #endif // !_XBOX
 
-		//
-		// Fireballs
-		//
+	//
+	// Fireballs
+	//
 
-		if (m_Material_FireCloud == NULL)
-		{
-			m_Material_FireCloud = pSimple->GetPMaterial("effects/fire_cloud2");
-		}
+	if ( m_Material_FireCloud == NULL )
+	{
+		m_Material_FireCloud = pSimple->GetPMaterial( "effects/fire_cloud2" );
+	}
 
 #ifndef _XBOX
 		int numFireballs = (int)ceil(32 * g_flFractional);
@@ -846,7 +846,10 @@ float C_BaseExplosionEffect::Probe( const Vector &origin, Vector *vecDirection, 
 	(*vecDirection) = -(*vecDirection) * (1.0f-tr.fraction);
 
 #if __EXPLOSION_DEBUG
-	debugoverlay->AddLineOverlay( m_vecOrigin, endpos, (255*(1.0f-tr.fraction)), (255*tr.fraction), 0, false, 3 );
+	if ( debugoverlay )
+	{
+		debugoverlay->AddLineOverlay( m_vecOrigin, endpos, (255*(1.0f-tr.fraction)), (255*tr.fraction), 0, false, 3 );
+	}
 #endif
 
 	assert(( 1.0f - tr.fraction ) >= 0.0f );
@@ -1234,7 +1237,10 @@ void C_WaterExplosionEffect::CreateDebris( void )
 			pParticle->m_vecVelocity *= fForce;
 			
 			#if __EXPLOSION_DEBUG
-			debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
+			}
 			#endif
 
 			pParticle->m_uchColor[0] = m_vecColor.x * 255;
@@ -1487,7 +1493,10 @@ void C_MegaBombExplosionEffect::CreateCore( void )
 			pParticle->m_vecVelocity *= fForce * ( 16.0f * (vDev*vDev*0.5f) );
 
 			#if __EXPLOSION_DEBUG
-			debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
+			if ( debugoverlay )
+			{
+				debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
+			}
 			#endif
 
 			int nColor = random->RandomInt( 128, 255 );

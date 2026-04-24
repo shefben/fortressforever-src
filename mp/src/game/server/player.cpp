@@ -81,7 +81,7 @@
 #include "combine_mine.h"
 #include "weapon_physcannon.h"
 #endif
-
+#ifdef FF
 // For the upcast in CommitSuicide
 #include "ff_player.h"
 
@@ -90,7 +90,7 @@
 
 // Forward declare
 class CFFPlayer;
-
+#endif
 ConVar autoaim_max_dist( "autoaim_max_dist", "2160" ); // 2160 = 180 feet
 ConVar autoaim_max_deflect( "autoaim_max_deflect", "0.99" );
 
@@ -104,6 +104,11 @@ ConVar	spec_freeze_traveltime( "spec_freeze_traveltime", "0.4", FCVAR_CHEAT | FC
 
 ConVar sv_bonus_challenge( "sv_bonus_challenge", "0", FCVAR_REPLICATED, "Set to values other than 0 to select a bonus map challenge type." );
 
+ConVar sv_chat_bucket_size_tier1( "sv_chat_bucket_size_tier1", "4", FCVAR_NONE, "The maximum size of the short term chat msg bucket." );
+ConVar sv_chat_seconds_per_msg_tier1( "sv_chat_seconds_per_msg_tier1", "3", FCVAR_NONE, "The number of seconds to accrue an additional short term chat msg." );
+ConVar sv_chat_bucket_size_tier2( "sv_chat_bucket_size_tier2", "30", FCVAR_NONE, "The maximum size of the long term chat msg bucket." );
+ConVar sv_chat_seconds_per_msg_tier2( "sv_chat_seconds_per_msg_tier2", "10", FCVAR_NONE, "The number of seconds to accrue an additional long term chat msg." );
+
 static ConVar sv_maxusrcmdprocessticks( "sv_maxusrcmdprocessticks", "24", FCVAR_NOTIFY, "Maximum number of client-issued usrcmd ticks that can be replayed in packet loss conditions, 0 to allow no restrictions" );
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -115,21 +120,20 @@ static ConVar physicsshadowupdate_render( "physicsshadowupdate_render", "0" );
 bool IsInCommentaryMode( void );
 bool IsListeningToCommentary( void );
 
-//#if !defined( CSTRIKE_DLL )
-//ConVar cl_sidespeed( "cl_sidespeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
-//ConVar cl_upspeed( "cl_upspeed", "320", FCVAR_REPLICATED | FCVAR_CHEAT );
-//ConVar cl_forwardspeed( "cl_forwardspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
-//ConVar cl_backspeed( "cl_backspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
-//#endif // CSTRIKE_DLL
-
+#if !defined( CSTRIKE_DLL )
+ConVar cl_sidespeed( "cl_sidespeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
+ConVar cl_upspeed( "cl_upspeed", "320", FCVAR_REPLICATED | FCVAR_CHEAT );
+ConVar cl_forwardspeed( "cl_forwardspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
+ConVar cl_backspeed( "cl_backspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
+#endif // CSTRIKE_DLL
+#if defined( FF_DLL )
 // YoYo178: match values from in_main.cpp to avoid the
 // "parent and child convars with different values" error
-#if !defined( CSTRIKE_DLL )
 ConVar cl_sidespeed( "cl_sidespeed", "1000", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_upspeed( "cl_upspeed", "1000", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_forwardspeed( "cl_forwardspeed", "1000", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_backspeed( "cl_backspeed", "1000", FCVAR_REPLICATED | FCVAR_CHEAT );
-#endif // CSTRIKE_DLL
+#endif // FF_DLL
 
 // This is declared in the engine, too
 ConVar	sv_noclipduringpause( "sv_noclipduringpause", "0", FCVAR_REPLICATED | FCVAR_CHEAT, "If cheats are enabled, then you can noclip with the game paused (for doing screenshots, etc.)." );
@@ -345,7 +349,9 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_iBonusChallenge, FIELD_INTEGER ),
 	DEFINE_FIELD( m_lastDamageAmount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_tbdPrev, FIELD_TIME ),
-	//DEFINE_FIELD( m_flStepSoundTime, FIELD_TIME ),	|-- Mirv: Removed to fix footsteps
+#ifndef FF
+	DEFINE_FIELD( m_flStepSoundTime, FIELD_TIME ),	|-- Mirv: Removed to fix footsteps
+#endif
 	DEFINE_ARRAY( m_szNetname, FIELD_CHARACTER, MAX_PLAYER_NAME_LENGTH ),
 
 	//DEFINE_FIELD( m_flgeigerRange, FIELD_FLOAT ),	// Don't restore, reset in Precache()
@@ -379,11 +385,13 @@ BEGIN_DATADESC( CBasePlayer )
 	//DEFINE_FIELD( m_lasty, FIELD_INTEGER ),
 
 	DEFINE_FIELD( m_iFrags, FIELD_INTEGER ),
-	DEFINE_FIELD( m_iFortPoints, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iDeaths, FIELD_INTEGER ),
 	DEFINE_FIELD( m_bAllowInstantSpawn, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flNextDecalTime, FIELD_TIME ),
+#ifdef FF
+	DEFINE_FIELD( m_iFortPoints, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iAssists, FIELD_INTEGER ),
+#endif
 	//DEFINE_AUTO_ARRAY( m_szTeamName, FIELD_STRING ), // mp
 
 	//DEFINE_FIELD( m_iConnected, FIELD_INTEGER ),
@@ -427,6 +435,9 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_bitsDamageType, FIELD_INTEGER ),
 	DEFINE_AUTO_ARRAY( m_rgbTimeBasedDamage, FIELD_CHARACTER ),
 	DEFINE_FIELD( m_fLastPlayerTalkTime, FIELD_FLOAT ),
+	DEFINE_FIELD( m_fLastPlayerTalkAttemptTime, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flPlayerTalkAvailableMessagesTier1, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flPlayerTalkAvailableMessagesTier2, FIELD_FLOAT ),
 	DEFINE_FIELD( m_hLastWeapon, FIELD_EHANDLE ),
 
 #if !defined( NO_ENTITY_PREDICTION )
@@ -472,7 +483,7 @@ BEGIN_DATADESC( CBasePlayer )
 
 	DEFINE_FIELD( m_nNumCrateHudHints, FIELD_INTEGER ),
 
-
+	DEFINE_INPUTFUNC( FIELD_STRING, "SetScriptOverlayMaterial", InputSetScriptOverlayMaterial ),
 
 	// DEFINE_FIELD( m_nBodyPitchPoseParam, FIELD_INTEGER ),
 	// DEFINE_ARRAY( m_StepSoundCache, StepSoundCache_t,  2  ),
@@ -613,19 +624,25 @@ CBasePlayer::CBasePlayer( )
 
 	m_hZoomOwner = NULL;
 
+	m_bPendingClientSettings = false;
 	m_nUpdateRate = 20;  // cl_updaterate defualt
 	m_fLerpTime = 0.1f; // cl_interp default
 	m_bPredictWeapons = true;
+	m_bRequestPredict = true;
 	m_bLagCompensation = false;
 	m_flLaggedMovementValue = 1.0f;
 	m_StuckLast = 0;
 	m_impactEnergyScale = 1.0f;
 	m_fLastPlayerTalkTime = 0.0f;
+	m_fLastPlayerTalkAttemptTime = 0.0f;
+	m_flPlayerTalkAvailableMessagesTier1 = 1.0f;
+	m_flPlayerTalkAvailableMessagesTier2 = 10.0f;
 	m_PlayerInfo.SetParent( this );
 
 	ResetObserverMode();
+#ifdef FF
 	ResetFortPointsCount();
-
+#endif
 	m_surfaceProps = 0;
 	m_pSurfaceData = NULL;
 	m_surfaceFriction = 1.0f;
@@ -642,14 +659,14 @@ CBasePlayer::CBasePlayer( )
 	m_nNumCrouches = 0;
 	m_bDuckToggled = false;
 	m_bPhysicsWasFrozen = false;
-
+#ifdef FF
 	// Mulch:
 	// -1 = just joined map/need to force spawn once team/class have been chosen
 	// 0 - x = respawn delay (like when typing "kill" in the console)
 	m_flNextSpawnDelay = -1.0f;
 
 	ResetAsisstsCount();
-
+#endif
 	// Used to mask off buttons
 	m_afButtonDisabled = 0;
 	m_afButtonForced = 0;
@@ -664,8 +681,11 @@ CBasePlayer::CBasePlayer( )
 	m_vecConstraintCenter = vec3_origin;
 
 	m_flLastUserCommandTime = 0.f;
+#ifndef FF
+	m_nMovementTicksForUserCmdProcessingRemaining = 0;
+#else
 	m_flMovementTimeForUserCmdProcessingRemaining = 0.0f;
-
+#endif
 	m_flLastObjectiveTime = -1.f;
 }
 
@@ -681,6 +701,11 @@ CBasePlayer::~CBasePlayer( )
 //-----------------------------------------------------------------------------
 void CBasePlayer::UpdateOnRemove( void )
 {
+	if ( !g_pGameRules->IsMultiplayer() && g_pScriptVM )
+	{
+		g_pScriptVM->SetValue( "player", SCRIPT_VARIANT_NULL );
+	}
+
 	VPhysicsDestroyObject();
 
 	// Remove him from his current team
@@ -712,14 +737,11 @@ void CBasePlayer::SetupVisibility( CBaseEntity *pViewEntity, unsigned char *pvs,
 
 int	CBasePlayer::UpdateTransmitState()
 {
-	// --> FF
-#ifdef GAME_DLL
+#ifdef FF_DLL // --> FF
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-#endif // GAME_DLL
-	// <-- FF
-
+#endif // FF_DLL
 	// always call ShouldTransmit() for players
 	return SetTransmitState( FL_EDICT_FULLCHECK );
 }
@@ -872,14 +894,13 @@ void CBasePlayer::DeathSound( const CTakeDamageInfo &info )
 	{
 		EmitSound( "Player.Death" );
 	}
-
-	// --> Mirv: Don't play suit sound'
+#ifndef FF // --> Mirv: Don't play suit sound'
 	// play one of the suit death alarms
-	/*if ( IsSuitEquipped() )
+	if ( IsSuitEquipped() )
 	{
 		UTIL_EmitGroupnameSuit(edict(), "HEV_DEAD");
-	}*/
-	// <-- Mirv: Don't play suit sound
+	}
+#endif // <-- Mirv: Don't play suit sound
 }
 
 // override takehealth
@@ -1606,13 +1627,14 @@ void CBasePlayer::RemoveAllItems( bool removeSuit )
 	}
 
 	UpdateClientData();
-
+#ifdef FF
 	IGameEvent* pEvent = gameeventmanager->CreateEvent("player_removeallitems");
 	if (pEvent)
 	{
 		pEvent->SetInt("userid", GetUserID());
 		gameeventmanager->FireEvent(pEvent, true);
 	}
+#endif
 }
 
 bool CBasePlayer::IsDead() const
@@ -2032,6 +2054,7 @@ void CBasePlayer::WaterMove()
 			m_bitsDamageType &= ~DMG_DROWN;
 			m_rgbTimeBasedDamage[itbd_DrownRecover] = 0;
 		}
+
 	}
 	else
 	{	// fully under water
@@ -2792,58 +2815,55 @@ bool CBasePlayer::IsValidObserverTarget(CBaseEntity * target)
 
 	// MOD AUTHORS: Add checks on target here or in derived method
 
-	if (target->IsPlayer())	// track players
-	{
-		CBasePlayer * player = ToBasePlayer( target );
+	if( !target->IsPlayer() || !target->Classify() == CLASS_INFOSCRIPT )	// only track players and info_ff_scripts
+		return false;
 
-		/* Don't spec observers or players who haven't picked a class yet
- 		if ( player->IsObserver() )
-			return false;	*/
+	CBasePlayer * player = ToBasePlayer( target );
 
-		if( player == this )
-			return false; // We can't observe ourselves.
+	/* Don't spec observers or players who haven't picked a class yet
+ 	if ( player->IsObserver() )
+		return false;	*/
 
-		// gibbed players have EF_NODRAW effect active, so make an exception for LIFE_DEAD players
-		if ( player->m_lifeState != LIFE_DEAD && player->m_lifeState != LIFE_RESPAWNABLE && player->IsEffectActive( EF_NODRAW ) ) // don't watch invisible players
-			return false;
+	if( player == this )
+		return false; // We can't observe ourselves.
+
+	if ( player->m_lifeState != LIFE_DEAD && player->m_lifeState != LIFE_RESPAWNABLE && player->IsEffectActive( EF_NODRAW ) ) // don't watch invisible players
+		return false; // gibbed players have EF_NODRAW effect active, so don't spectate LIFE_DEAD players
 
 		// 0001670: Player you are spectating changes when they die
 		// Commenting out the death check as dead players are actually valid targets (since they respawn almost instantly anyway...)
 		// Might want to alter this to be controllable by lua in future as certain game types may not allow respawning  -> Defrag
 
-		//if ( player->m_lifeState == LIFE_RESPAWNABLE ) // target is dead, waiting for respawn
-			//return false;
+	if ( player->m_lifeState == LIFE_RESPAWNABLE ) // target is dead, waiting for respawn
+		return false;
 
-		if ( player->m_lifeState == LIFE_DEAD || player->m_lifeState == LIFE_DYING )
+	if ( player->m_lifeState == LIFE_DEAD || player->m_lifeState == LIFE_DYING )
+	{
+		if ( (player->m_flDeathTime + DEATH_ANIMATION_TIME ) < gpGlobals->curtime )
 		{
-			if ( (player->m_flDeathTime + DEATH_ANIMATION_TIME ) < gpGlobals->curtime )
-			{
-				return false;	// allow watching until 3 seconds after death to see death animation
-			}
-		}
-		
-		// check forcecamera settings for active players
-		if ( GetTeamNumber() != TEAM_SPECTATOR )
-		{
-			switch ( mp_forcecamera.GetInt() )	
-			{
-				case OBS_ALLOW_ALL	:	break;
-				case OBS_ALLOW_TEAM :	if ( GetTeamNumber() != target->GetTeamNumber() )
-											 return false;
-										break;
-				case OBS_ALLOW_NONE :	return false;
-			}
+			return false;	// allow watching until 3 seconds after death to see death animation
 		}
 	}
-	else if (target->Classify() == CLASS_INFOSCRIPT) // track info_ff_scripts
+		
+	// check forcecamera settings for active players
+	if ( GetTeamNumber() != TEAM_SPECTATOR )
 	{
-		CFFInfoScript* pInfoScript = static_cast<CFFInfoScript*>(target);
+		switch ( mp_forcecamera.GetInt() )	
+		{
+			case OBS_ALLOW_ALL	:	break;
+			case OBS_ALLOW_TEAM :	if ( GetTeamNumber() != target->GetTeamNumber() )
+										 return false;
+									break;
+			case OBS_ALLOW_NONE :	return false;
+		}
+	}
+	if ( target->Classify() == CLASS_INFOSCRIPT ) // track info_ff_scripts
+	{
+		CFFInfoScript* pInfoScript = static_cast<CFFInfoScript*>( target );
 
-		if (pInfoScript->IsRemoved())
+		if ( pInfoScript->IsRemoved() )
 			return false;
 	}
-	else
-		return false; // not one of the trackable entity types
 	
 	return true;	// passed all test
 }
@@ -3047,11 +3067,12 @@ void CBasePlayer::Duck( )
 //
 // ID's player as such.
 //
-//Class_T  CBasePlayer::Classify ( void )
-//{
-//	return CLASS_PLAYER;
-//}
-
+#ifndef FF
+Class_T  CBasePlayer::Classify ( void )
+{
+	return CLASS_PLAYER;
+}
+#endif
 
 void CBasePlayer::ResetFragCount()
 {
@@ -3062,10 +3083,12 @@ void CBasePlayer::ResetFragCount()
 void CBasePlayer::IncrementFragCount( int nCount )
 {
 	m_iFrags += nCount;
+#ifdef FF
 	m_iFrags = min(m_iFrags, 9999);	// |-- Mirv: Added to placate the trepids
+#endif
 	pl.frags = m_iFrags;
 }
-
+#ifdef FF
 void CBasePlayer::ResetFortPointsCount()
 {
 	m_iFortPoints = 0;
@@ -3089,7 +3112,7 @@ void CBasePlayer::IncrementAssistsCount(int nCount)
 {
 	m_iAssists += nCount;
 }
-
+#endif
 void CBasePlayer::ResetDeathCount()
 {
 	m_iDeaths = 0;
@@ -3122,7 +3145,7 @@ void CBasePlayer::AddPoints( int score, bool bAllowNegativeScore )
 	m_iFrags += score;
 	pl.frags = m_iFrags;
 }
-
+#ifdef FF
 void CBasePlayer::AddFortPoints(int iFortpoints, const char* szDescription)
 {
 	m_iFortPoints += iFortpoints;
@@ -3144,7 +3167,7 @@ void CBasePlayer::AddFortPoints(int iFortpoints, const char* szDescription)
 	WRITE_LONG(m_iFortPoints);
 	MessageEnd();
 }
-
+#endif
 void CBasePlayer::AddPointsToTeam( int score, bool bAllowNegativeScore )
 {
 	if ( GetTeam() )
@@ -3270,6 +3293,16 @@ int CBasePlayer::DetermineSimulationTicks( void )
 		simulation_ticks += ctx->numcmds + ctx->dropped_packets;
 	}
 
+	// Only allow rewinding if we actually behind by at least that many ticks.
+	// This doesn't quite guarantee that m_nTickBase is monotonically increasing, but it gets close and prevents users
+	// from manipulating the game time by more than 0.25s.
+	//
+	// REI- Ideally I'd like to put more serious restrictions on user command timing here, to lockstep the clients
+	// a bit harder and prevent even this 0.25s manipulation, but my experiments so far led to unacceptable hitching
+	// even for legitimate users.
+	if ( simulation_ticks > m_nMovementTicksForUserCmdProcessingRemaining )
+		simulation_ticks = m_nMovementTicksForUserCmdProcessingRemaining;
+
 	return simulation_ticks;
 }
 
@@ -3349,6 +3382,9 @@ void CBasePlayer::AdjustPlayerTimeBase( int simulation_ticks )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 void CBasePlayer::RunNullCommand( void )
 {
 	CUserCmd cmd;	// NULL command
@@ -3405,6 +3441,9 @@ void CBasePlayer::PhysicsSimulate( void )
 	}
 	
 	m_nSimulationTick = gpGlobals->tickcount;
+
+	// Grant the client some time buffer to execute user commands
+	m_nMovementTicksForUserCmdProcessingRemaining++;
 
 	// See how many CUserCmds are queued up for running
 	int simulation_ticks = DetermineSimulationTicks();
@@ -3512,6 +3551,15 @@ void CBasePlayer::PhysicsSimulate( void )
 
 	float vphysicsArrivalTime = TICK_INTERVAL;
 
+	// Now run the commands
+	MoveHelperServer()->SetHost( this );
+
+	// Suppress predicted events, etc.
+	if ( IsPredictingWeapons() )
+	{
+		IPredictionSystem::SuppressHostEvents( this );
+	}
+
 #ifdef _DEBUG
 	if ( sv_player_net_suppress_usercommands.GetBool() )
 	{
@@ -3522,36 +3570,11 @@ void CBasePlayer::PhysicsSimulate( void )
 	int numUsrCmdProcessTicksMax = sv_maxusrcmdprocessticks.GetInt();
 	if ( gpGlobals->maxClients != 1 && numUsrCmdProcessTicksMax ) // don't apply this filter in SP games
 	{
-		// Grant the client some time buffer to execute user commands
-		m_flMovementTimeForUserCmdProcessingRemaining += TICK_INTERVAL;
-
-		// but never accumulate more than N ticks
-		if ( m_flMovementTimeForUserCmdProcessingRemaining > numUsrCmdProcessTicksMax * TICK_INTERVAL )
-			m_flMovementTimeForUserCmdProcessingRemaining = numUsrCmdProcessTicksMax * TICK_INTERVAL;
-	}
-	else
-	{
-		// Otherwise we don't care to track time
-		m_flMovementTimeForUserCmdProcessingRemaining = FLT_MAX;
-	}
-
-	// Now run the commands
-	if ( commandsToRun > 0 )
-	{
-		m_flLastUserCommandTime = savetime;
-
-		MoveHelperServer()->SetHost( this );
-
-		// Suppress predicted events, etc.
-		if ( IsPredictingWeapons() )
-		{
-			IPredictionSystem::SuppressHostEvents( this );
-		}
-
 		for ( int i = 0; i < commandsToRun; ++i )
 		{
 			PlayerRunCommand( &vecAvailCommands[ i ], MoveHelperServer() );
-
+			m_flLastUserCommandTime = savetime;
+		
 			// Update our vphysics object.
 			if ( m_pPhysicsController )
 			{
@@ -3561,50 +3584,71 @@ void CBasePlayer::PhysicsSimulate( void )
 				vphysicsArrivalTime += TICK_INTERVAL;
 			}
 		}
+	}
+	else if ( GetTimeSinceLastUserCommand() > sv_player_usercommand_timeout.GetFloat() )
+	{
+		// no usercommand from player after some threshold
+		// server should start RunNullCommand as if client sends an empty command so that Think and gamestate related things run properly
+		RunNullCommand();
+	}
 
-		// Always reset after running commands
-		IPredictionSystem::SuppressHostEvents( NULL );
-
-		MoveHelperServer()->SetHost( NULL );
-
-		// Copy in final origin from simulation
-		CPlayerSimInfo *pi = NULL;
-		if ( m_vecPlayerSimInfo.Count() > 0 )
+	int nMaxTicks = sv_maxusrcmdprocessticks.GetInt();
+	if ( nMaxTicks && gpGlobals->maxClients != 1 ) // Don't apply this filter in SP games
+	{
+		if ( m_nMovementTicksForUserCmdProcessingRemaining > nMaxTicks )
 		{
-			pi = &m_vecPlayerSimInfo[ m_vecPlayerSimInfo.Tail() ];
-			pi->m_flTime = Plat_FloatTime();
-			pi->m_vecAbsOrigin = GetAbsOrigin();
-			pi->m_flGameSimulationTime = gpGlobals->curtime;
-			pi->m_nNumCmds = commandsToRun;
+			//DevMsg( "Client %s dropped too many packets, simulating last cmd\n", m_szNetname );
+			
+			// Run a copy of the user's last command
+			// but make sure it's valid
+			CUserCmd cmd = m_LastCmd;
+			cmd.tick_count = gpGlobals->tickcount;
+			cmd.viewangles = EyeAngles();
+			pl.fixangle = FIXANGLE_NONE; // this forces use of cmd.viewangles directly, not as a relative value
+			PlayerRunCommand( &cmd, MoveHelperServer() );
+
+			if ( m_nMovementTicksForUserCmdProcessingRemaining > nMaxTicks )
+			{
+				// If this happens the user managed to execute a 'null' command that didn't make it through simulation.
+				// This means we should adjust the code above to make sure it always generates a valid command.
+				//Assert( false ); // security failure, airstuck!
+
+				// still make sure to avoid speedhax
+				m_nMovementTicksForUserCmdProcessingRemaining = nMaxTicks;
+			}
+			
+			// Update our vphysics object.
+			if ( m_pPhysicsController )
+			{
+				VPROF( "CBasePlayer::PhysicsSimulate-UpdateVPhysicsPosition" );
+				// If simulating at 2 * TICK_INTERVAL, add an extra TICK_INTERVAL to position arrival computation
+				UpdateVPhysicsPosition( m_vNewVPhysicsPosition, m_vNewVPhysicsVelocity, vphysicsArrivalTime );
+				vphysicsArrivalTime += TICK_INTERVAL;
+			}
 		}
+	}
+
+	// Always reset after running commands
+	IPredictionSystem::SuppressHostEvents( NULL );
+
+	MoveHelperServer()->SetHost( NULL );
+
+	// Copy in final origin from simulation
+	CPlayerSimInfo *pi = NULL;
+	if ( m_vecPlayerSimInfo.Count() > 0 )
+	{
+		pi = &m_vecPlayerSimInfo[ m_vecPlayerSimInfo.Tail() ];
+		pi->m_flTime = Plat_FloatTime();
+		pi->m_vecAbsOrigin = GetAbsOrigin();
+		pi->m_flGameSimulationTime = gpGlobals->curtime;
+		pi->m_nNumCmds = commandsToRun;
 	}
 
 	// Restore the true server clock
 	// FIXME:  Should this occur after simulation of children so
 	//  that they are in the timespace of the player?
 	gpGlobals->curtime		= savetime;
-	gpGlobals->frametime	= saveframetime;	
-
-	// Since this isn't called for bots.. call it here?
-	if (m_pPhysicsController && IsBot())
-	{
-		UpdateVPhysicsPosition(m_vNewVPhysicsPosition, m_vNewVPhysicsVelocity, gpGlobals->frametime);
-	}
-
-// 	// Kick the player if they haven't sent a user command in awhile in order to prevent clients
-// 	// from using packet-level manipulation to mess with gamestate.  Not sending usercommands seems
-// 	// to have all kinds of bad effects, such as stalling a bunch of Think()'s and gamestate handling.
-// 	// An example from TF: A medic stops sending commands after deploying an uber on another player.
-// 	// As a result, invuln is permanently on the heal target because the maintenance code is stalled.
-// 	if ( GetTimeSinceLastUserCommand() > player_usercommand_timeout.GetFloat() )
-// 	{
-// 		// If they have an active netchan, they're almost certainly messing with usercommands?
-// 		INetChannelInfo *pNetChanInfo = engine->GetPlayerNetInfo( entindex() );
-// 		if ( pNetChanInfo && pNetChanInfo->GetTimeSinceLastReceived() < 5.f )
-// 		{
-// 			engine->ServerCommand( UTIL_VarArgs( "kickid %d %s\n", GetUserID(), "UserCommand Timeout" ) );
-// 		}
-// 	}
+	gpGlobals->frametime	= saveframetime;
 }
 
 unsigned int CBasePlayer::PhysicsSolidMaskForEntity() const
@@ -3618,6 +3662,81 @@ unsigned int CBasePlayer::PhysicsSolidMaskForEntity() const
 void CBasePlayer::ForceSimulation()
 {
 	m_nSimulationTick = -1;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Callback from engine when this player's client settings (userinfo) change
+//-----------------------------------------------------------------------------
+void CBasePlayer::ClientSettingsChanged()
+{
+	if ( !g_pGameRules->IsConnectedUserInfoChangeAllowed( this ) )
+	{
+		m_bPendingClientSettings = true;
+		return;
+	}
+
+	#define QUICKGETCVARVALUE(v) (engine->GetClientConVarValue( this->entindex(), v ))
+
+	// get network setting for prediction & lag compensation
+
+	// Unfortunately, we have to duplicate the code in cdll_bounded_cvars.cpp here because the client
+	// doesn't send the virtualized value up (because it has no way to know when the virtualized value
+	// changes). Possible todo: put the responsibility on the bounded cvar to notify the engine when
+	// its virtualized value has changed.
+
+	this->m_nUpdateRate = Q_atoi( QUICKGETCVARVALUE("cl_updaterate") );
+	static const ConVar *pMinUpdateRate = g_pCVar->FindVar( "sv_minupdaterate" );
+	static const ConVar *pMaxUpdateRate = g_pCVar->FindVar( "sv_maxupdaterate" );
+	if ( pMinUpdateRate && pMaxUpdateRate )
+		this->m_nUpdateRate = clamp( this->m_nUpdateRate, (int) pMinUpdateRate->GetFloat(), (int) pMaxUpdateRate->GetFloat() );
+
+	bool useInterpolation = Q_atoi( QUICKGETCVARVALUE("cl_interpolate") ) != 0;
+	if ( useInterpolation )
+	{
+		float flLerpRatio = Q_atof( QUICKGETCVARVALUE("cl_interp_ratio") );
+		if ( flLerpRatio == 0 )
+			flLerpRatio = 1.0f;
+		float flLerpAmount = Q_atof( QUICKGETCVARVALUE("cl_interp") );
+
+		static const ConVar *pMin = g_pCVar->FindVar( "sv_client_min_interp_ratio" );
+		static const ConVar *pMax = g_pCVar->FindVar( "sv_client_max_interp_ratio" );
+		if ( pMin && pMax && pMin->GetFloat() != -1 )
+		{
+			flLerpRatio = clamp( flLerpRatio, pMin->GetFloat(), pMax->GetFloat() );
+		}
+		else
+		{
+			if ( flLerpRatio == 0 )
+				flLerpRatio = 1.0f;
+		}
+		// #define FIXME_INTERP_RATIO
+		this->m_fLerpTime = MAX( flLerpAmount, flLerpRatio / this->m_nUpdateRate );
+	}
+	else
+	{
+		this->m_fLerpTime = 0.0f;
+	}
+
+#if !defined( NO_ENTITY_PREDICTION )
+	bool usePrediction = Q_atoi( QUICKGETCVARVALUE("cl_predict")) != 0;
+
+	if ( usePrediction )
+	{
+		this->m_bRequestPredict  = true;
+		this->m_bPredictWeapons  = Q_atoi( QUICKGETCVARVALUE("cl_predictweapons")) != 0;
+		this->m_bLagCompensation = Q_atoi( QUICKGETCVARVALUE("cl_lagcompensation")) != 0;
+	}
+	else
+#endif
+	{
+		this->m_bRequestPredict  = false;
+		this->m_bPredictWeapons  = false;
+		this->m_bLagCompensation = false;
+	}
+
+	#undef QUICKGETCVARVALUE
+
+	m_bPendingClientSettings = false;
 }
 
 ConVar sv_usercmd_custom_random_seed( "sv_usercmd_custom_random_seed", "1", FCVAR_CHEAT, "When enabled server will populate an additional random seed independent of the client" );
@@ -4726,6 +4845,12 @@ void CBasePlayer::ForceOrigin( const Vector &vecOrigin )
 //-----------------------------------------------------------------------------
 void CBasePlayer::PostThink()
 {
+	// Attempt to apply pending client settings
+	if ( m_bPendingClientSettings )
+	{
+		ClientSettingsChanged();
+	}
+
 	m_vecSmoothedVelocity = m_vecSmoothedVelocity * SMOOTHING_FACTOR + GetAbsVelocity() * ( 1 - SMOOTHING_FACTOR );
 
 	if ( !g_fGameOver && !m_iPlayerLocked )
@@ -5266,6 +5391,11 @@ void CBasePlayer::Spawn( void )
 	// track where we are in the nav mesh
 	UpdateLastKnownArea();
 
+	if ( !g_pGameRules->IsMultiplayer() && g_pScriptVM )
+	{
+		g_pScriptVM->SetValue( "player", GetScriptInstance() );
+	}
+
 	m_weaponFiredTimer.Invalidate();
 }
 
@@ -5457,6 +5587,11 @@ void CBasePlayer::OnRestore( void )
 	m_nVehicleViewSavedFrame = 0;
 
 	m_nBodyPitchPoseParam = LookupPoseParameter( "body_pitch" );
+
+	if ( gpGlobals->eLoadType == MapLoad_Transition )
+	{
+		g_pScriptVM->SetValue( "player", GetScriptInstance() );
+	}
 }
 
 /* void CBasePlayer::SetTeamName( const char *pTeamName )
@@ -5529,18 +5664,18 @@ void CBasePlayer::CommitSuicide( bool bExplode /*= false*/, bool bForce /*= fals
 
 	// Bug #0000700: people with infection should give medic kill if they suicide
 	CFFPlayer* pPlayer = ToFFPlayer(this);
-	if (pPlayer)
+	if ( pPlayer )
 	{
-		if (pPlayer->GetSpecialInfectedDeath() && pPlayer->IsInfected() && pPlayer->GetInfector())
+		if ( pPlayer->GetSpecialInfectedDeath() && pPlayer->IsInfected() && pPlayer->GetInfector() )
 		{
-			CTakeDamageInfo info(pPlayer->GetInfector(), pPlayer->GetInfector(), pPlayer->GetHealth(), fDamage); // |-- Mirv: pInflictor = NULL so that death message is "x died."
+			CTakeDamageInfo info( pPlayer->GetInfector(), pPlayer->GetInfector(), pPlayer->GetHealth(), fDamage ); // |-- Mirv: pInflictor = NULL so that death message is "x died."
 			pPlayer->TakeDamage(info);
 		}
 		else
 		{
 			int iGib = bExplode ? 999 : 10;
-			CTakeDamageInfo info(NULL, this, pPlayer ? pPlayer->GetHealth() + iGib : 0, fDamage); // |-- Mirv: pInflictor = NULL so that death message is "x died."
-			pPlayer->TakeDamage(info);
+			CTakeDamageInfo info( NULL, this, pPlayer ? pPlayer->GetHealth() + iGib : 0, fDamage ); // |-- Mirv: pInflictor = NULL so that death message is "x died."
+			pPlayer->TakeDamage( info );
 		}
 	}
 
@@ -5725,6 +5860,16 @@ bool CBasePlayer::GetInVehicle( IServerVehicle *pVehicle, int nRole )
 
 	OnVehicleStart();
 
+	if ( IsPlayer() )
+	{
+		IGameEvent *event = gameeventmanager->CreateEvent( "enter_vehicle" );
+		if ( event )
+		{
+			event->SetInt( "vehicle", pVehicle->GetVehicleEnt()->entindex() );
+			gameeventmanager->FireEvent( event );
+		}
+	}
+
 	return true;
 }
 
@@ -5760,12 +5905,12 @@ void CBasePlayer::LeaveVehicle( const Vector &vecExitPoint, const QAngle &vecExi
 	}
 	OnVehicleEnd( vNewPos );
 	SetAbsOrigin( vNewPos );
-	qAngles[ROLL] = 0; // |- mulch
 	SetAbsAngles( qAngles );
 	// Clear out any leftover velocity
 	SetAbsVelocity( vec3_origin );
-
-	//qAngles[ROLL] = 0; |- mulch
+#ifdef FF // |- mulch
+	qAngles[ROLL] = 0;
+#endif
 	SnapEyeAngles( qAngles );
 
 #ifndef HL2_DLL
@@ -5799,8 +5944,25 @@ void CBasePlayer::LeaveVehicle( const Vector &vecExitPoint, const QAngle &vecExi
 
 	// Just cut all of the rumble effects. 
 	RumbleEffect( RUMBLE_STOP_ALL, 0, RUMBLE_FLAGS_NONE );
+
+	if ( IsPlayer() )
+	{
+		IGameEvent *event = gameeventmanager->CreateEvent( "leave_vehicle" );
+		if ( event )
+		{
+			event->SetInt( "vehicle", pVehicle->GetVehicleEnt()->entindex() );
+			gameeventmanager->FireEvent( event );
+		}
+	}
 }
 
+//-----------------------------------------------------------------------------
+// Used by vscript to determine if the player is noclipping
+//-----------------------------------------------------------------------------
+bool CBasePlayer::ScriptIsPlayerNoclipping( void )
+{
+	return ( GetMoveType() == MOVETYPE_NOCLIP );
+}
 
 //==============================================
 // !!!UNDONE:ultra temporary SprayCan entity to apply
@@ -6460,7 +6622,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		break;
 
 	case 103:
-		// What the hell are you doing?
+		// What are you doing?
 		pEntity = FindEntityForward( this, true );
 		if ( pEntity )
 		{
@@ -6655,18 +6817,18 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 		}
 
 		RemoveAllItems( true );
-
+#ifdef FF
 		// dexter - if a FF Player, be sure to remove buildables
 		// note: could we just remove this console command and force the player to use existing team spec/menu code?
 		CFFPlayer* pPlayer = ToFFPlayer(this);
-		if (pPlayer)
+		if ( pPlayer )
 		{
 			//DevMsg("removing buildables from steamid %s", pPlayer->m_PlayerInfo.GetNetworkIDString());
 			pPlayer->RemoveProjectiles();
 			pPlayer->RemoveBackpacks();
 			pPlayer->RemoveBuildables();
 		}
-
+#endif
 		ChangeTeam( TEAM_SPECTATOR );
 
 		StartObserverMode( OBS_MODE_ROAMING );
@@ -6681,14 +6843,14 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 			AttemptToExitFreezeCam();
 			return true;
 		}
-
+#ifdef FF
 		// not spectating anyone, or no players to spectate, force free roam
 		// no more getting stuck in air when spec_mode is changed while moving in free roam
 		if( GetObserverMode() == OBS_MODE_ROAMING && !GetObserverTarget() )
 		{
 			return true;
 		}
-
+#endif
 		// not allowed to change spectator modes when mp_fadetoblack is being used
 		if ( mp_fadetoblack.GetBool() )
 		{
@@ -6725,7 +6887,7 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 		{
 			// set new spectator mode, don't allow OBS_MODE_NONE
 			if ( !SetObserverMode( mode ) )
-				ClientPrint( this, HUD_PRINTCONSOLE, "#Spectator_Mode_Unkown");
+				ClientPrint( this, HUD_PRINTCONSOLE, "#Spectator_Mode_Unknown");
 			else
 				engine->ClientCommand( edict(), "cl_spec_mode %d", mode );
 		}
@@ -6756,7 +6918,7 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 		
 		return true;
 	}
-	else if ( stricmp( cmd, "spec_prev" ) == 0 ) // chase prevoius player
+	else if ( stricmp( cmd, "spec_prev" ) == 0 ) // chase previous player
 	{
 		if ( GetObserverMode() > OBS_MODE_FIXED )
 		{
@@ -6771,10 +6933,9 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 		{
 			AttemptToExitFreezeCam();
 		}
-		
+
 		return true;
 	}
-	
 	else if ( stricmp( cmd, "spec_player" ) == 0 ) // chase next player
 	{
 		if ( GetObserverMode() > OBS_MODE_FIXED && args.ArgC() == 2 )
@@ -6832,7 +6993,7 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 	{
 		if ( ( GetObserverMode() == OBS_MODE_FIXED ||
 			   GetObserverMode() == OBS_MODE_ROAMING ||
-			   GetObserverMode() > OBS_MODE_FIXED) &&
+			   GetObserverMode() > OBS_MODE_FIXED ) &&
 			 args.ArgC() == 6 )
 		{
 			// if is a spec and in a valid obs mode but not in roaming yet, then force roaming
@@ -6840,9 +7001,9 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 				SetObserverMode(OBS_MODE_ROAMING);
 
 			Vector origin;
-			origin.x = atof( args[1] );
-			origin.y = atof( args[2] );
-			origin.z = atof( args[3] );
+ 			origin.x = clamp( atof( args[1] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+ 			origin.y = clamp( atof( args[2] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
+ 			origin.z = clamp( atof( args[3] ), MIN_COORD_FLOAT, MAX_COORD_FLOAT );
 
 			QAngle angle;
 			angle.x = atof( args[4] );
@@ -6985,7 +7146,7 @@ bool CBasePlayer::RemovePlayerItem( CBaseCombatWeapon *pItem )
 	{
 		ResetAutoaim( );
 		pItem->Holster( );
-		pItem->SetNextThink( TICK_NEVER_THINK );; // crowbar may be trying to swing again, etc
+		pItem->SetNextThink( TICK_NEVER_THINK ); // crowbar may be trying to swing again, etc
 		pItem->SetThink( NULL );
 	}
 
@@ -7079,7 +7240,9 @@ void CBasePlayer::UpdateClientData( void )
 		gInitHUD = false;
 
 		UserMessageBegin( user, "ResetHUD" );
-			//WRITE_BYTE( 0 );
+#ifndef FF
+			WRITE_BYTE( 0 );
+#endif
 		MessageEnd();
 
 		if ( !m_fGameHUDInitialized )
@@ -7161,7 +7324,7 @@ void CBasePlayer::UpdateClientData( void )
 	m_Local.m_bPoisoned = ( m_bitsDamageType & DMG_POISON ) 
 						&& ( m_nPoisonDmg > m_nPoisonRestored ) 
 						&& ( m_iHealth < 100 );
-
+#ifdef FF
 	// --> Mirv: Damage indicators too
 	if (m_DmgTake || m_DmgSave || m_bitsHUDDamage != m_bitsDamageType)
 	{
@@ -7196,7 +7359,7 @@ void CBasePlayer::UpdateClientData( void )
 		m_bitsDamageType &= DMG_TIMEBASED;
 	}
 	// <-- Mirv: Damage indicators too
-
+#endif
 	// Check if the bonus progress HUD element should be displayed
 	if ( m_iBonusChallenge == 0 && m_iBonusProgress == 0 && !( m_Local.m_iHideHUD & HIDEHUD_BONUS_PROGRESS ) )
 		m_Local.m_iHideHUD |= HIDEHUD_BONUS_PROGRESS;
@@ -7225,6 +7388,7 @@ void CBasePlayer::RumbleEffect( unsigned char index, unsigned char rumbleData, u
 	return;
 #endif
 }
+
 void CBasePlayer::EnableControl(bool fControl)
 {
 	if (!fControl)
@@ -7818,7 +7982,7 @@ void CBasePlayer::PlayWearableAnimsForPlaybackEvent( wearableanimplayback_t iPla
 // Purpose: Put the player in the specified team
 //-----------------------------------------------------------------------------
 
-void CBasePlayer::ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent)
+void CBasePlayer::ChangeTeam( int iTeamNum, bool bAutoTeam, bool bSilent, bool bAutoBalance /*= false*/ )
 {
 	if ( !GetGlobalTeam( iTeamNum ) )
 	{
@@ -7943,6 +8107,18 @@ BEGIN_DATADESC( CStripWeapons )
 	DEFINE_INPUTFUNC( FIELD_VOID, "StripWeaponsAndSuit", InputStripWeaponsAndSuit ),
 END_DATADESC()
 	
+BEGIN_ENT_SCRIPTDESC( CBasePlayer, CBaseCombatCharacter, "The player entity." )
+	DEFINE_SCRIPTFUNC_NAMED( ScriptIsPlayerNoclipping, "IsNoclipping", "Returns true if the player is in noclip mode." ) 
+	DEFINE_SCRIPTFUNC( ViewPunch, "Ow! Punches the player's view" ) 
+	DEFINE_SCRIPTFUNC( ViewPunchReset, "Reset's the player's view punch" ) 
+	DEFINE_SCRIPTFUNC( SnapEyeAngles, "Snap the player's eye angles to this." ) 
+	DEFINE_SCRIPTFUNC( GetPlayerMins, "" ) 
+	DEFINE_SCRIPTFUNC( GetPlayerMaxs, "" ) 
+	DEFINE_SCRIPTFUNC( SetForceLocalDraw, "Forces the player to be drawn as if they are third person" )
+	DEFINE_SCRIPTFUNC( GetForceLocalDraw, "Gets the state of whether the player is being forced by SetForceLocalDraw to be drawn" )
+	DEFINE_SCRIPTFUNC( GetScriptOverlayMaterial, "Gets the current view overlay material" )
+	DEFINE_SCRIPTFUNC( SetScriptOverlayMaterial, "Sets a view overlay material" )
+END_SCRIPTDESC();
 
 void CStripWeapons::InputStripWeapons(inputdata_t &data)
 {
@@ -8262,13 +8438,6 @@ void CMovementSpeedMod::InputSpeedMod(inputdata_t &data)
 }
 
 
-void SendProxy_CropFlagsToPlayerFlagBitsLength( const SendProp *pProp, const void *pStruct, const void *pVarData, DVariant *pOut, int iElement, int objectID)
-{
-	int mask = (1<<PLAYER_FLAG_BITS) - 1;
-	int data = *(int *)pVarData;
-
-	pOut->m_Int = ( data & mask );
-}
 // -------------------------------------------------------------------------------- //
 // SendTable for CPlayerState.
 // -------------------------------------------------------------------------------- //
@@ -8289,14 +8458,17 @@ void SendProxy_CropFlagsToPlayerFlagBitsLength( const SendProp *pProp, const voi
 #ifndef HL2_DLL
 		SendPropFloat		( SENDINFO_VECTORELEM(m_vecViewOffset, 0), 8, SPROP_ROUNDDOWN, -32.0, 32.0f),
 		SendPropFloat		( SENDINFO_VECTORELEM(m_vecViewOffset, 1), 8, SPROP_ROUNDDOWN, -32.0, 32.0f),
-		//SendPropFloat		( SENDINFO_VECTORELEM(m_vecViewOffset, 2), 20, SPROP_CHANGES_OFTEN,	0.0f, 256.0f),
+	#ifndef FF
+		SendPropFloat		( SENDINFO_VECTORELEM(m_vecViewOffset, 2), 20, SPROP_CHANGES_OFTEN,	0.0f, 256.0f),
+	#else
 		SendPropFloat		( SENDINFO_VECTORELEM(m_vecViewOffset, 2), 10, SPROP_CHANGES_OFTEN, -10.0f, 128.0f),	// |-- Mirv: Adjusted for TFC style bboxes
+	#endif
 #endif
 
 		SendPropFloat		( SENDINFO(m_flFriction),		8,	SPROP_ROUNDDOWN,	0.0f,	4.0f),
-
-		//SendPropArray3	( SENDINFO_ARRAY3(m_iAmmo), SendPropInt( SENDINFO_ARRAY(m_iAmmo), -1, SPROP_VARINT | SPROP_UNSIGNED ) ),
-			
+#ifndef FF
+		SendPropArray3		( SENDINFO_ARRAY3(m_iAmmo), SendPropInt( SENDINFO_ARRAY(m_iAmmo), -1, SPROP_VARINT | SPROP_UNSIGNED ) ),
+#endif
 		SendPropInt			( SENDINFO( m_fOnTarget ), 2, SPROP_UNSIGNED ),
 
 		SendPropInt			( SENDINFO( m_nTickBase ), -1, SPROP_CHANGES_OFTEN ),
@@ -8356,8 +8528,9 @@ void SendProxy_CropFlagsToPlayerFlagBitsLength( const SendProp *pProp, const voi
 
 		SendPropEHandle(SENDINFO(m_hVehicle)),
 		SendPropEHandle(SENDINFO(m_hUseEntity)),
-		//SendPropInt	(SENDINFO(m_iHealth), -1, SPROP_VARINT | SPROP_CHANGES_OFTEN ),
-		// 
+#ifndef FF
+		SendPropInt		(SENDINFO(m_iHealth), -1, SPROP_VARINT | SPROP_CHANGES_OFTEN ),
+#else
 		// Added by Mulch for testing
 		SendPropInt		(SENDINFO(m_iHealth), 10),
 		SendPropInt		(SENDINFO(m_iMaxHealth), 10), //AfterShock: we should work this out from class
@@ -8366,7 +8539,7 @@ void SendProxy_CropFlagsToPlayerFlagBitsLength( const SendProp *pProp, const voi
 
 		SendPropArray3(SENDINFO_ARRAY3(m_iAmmo), SendPropInt(SENDINFO_ARRAY(m_iAmmo), 10, SPROP_UNSIGNED), SendProxy_OnlyToObservers),
 		// Added by Mulch for testing
-
+#endif
 		SendPropInt		(SENDINFO(m_lifeState), 3, SPROP_UNSIGNED ),
 		SendPropInt		(SENDINFO(m_iBonusProgress), 15 ),
 		SendPropInt		(SENDINFO(m_iBonusChallenge), 4 ),
@@ -8957,6 +9130,58 @@ void CBasePlayer::DeactivateMovementConstraint( )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Fight chat spam with a two tiered token bucket
+//-----------------------------------------------------------------------------
+bool CBasePlayer::ArePlayerTalkMessagesAvailable( void )
+{
+	// How long since we last tried to chat?
+	float flTimeElapsedSinceLastMsg = gpGlobals->curtime - m_fLastPlayerTalkAttemptTime;
+	m_fLastPlayerTalkAttemptTime = gpGlobals->curtime;
+
+	// The max messages we can have available
+	// Tier 1 is for short-term spam
+	float flTotalBucketSizeTier1 = sv_chat_bucket_size_tier1.GetFloat();	
+	// rate at which we gain new messages, this slows if we continue to try to spam messages
+	float flSecondsPerMessageTier1 = sv_chat_seconds_per_msg_tier1.GetFloat() - MIN( 0.0f, m_flPlayerTalkAvailableMessagesTier1 );
+
+	// We'll count partial counts of accruing message throughout, as it'll be more consistent
+	float flMessagesGainedTier1 = MAX( 0, flTimeElapsedSinceLastMsg / flSecondsPerMessageTier1 );
+
+	// But we will allow the counter to go negative, so if you keep trying to spam you have to work your way out of a hole.
+	m_flPlayerTalkAvailableMessagesTier1 = MAX( -2.5f, MIN( flTotalBucketSizeTier1, m_flPlayerTalkAvailableMessagesTier1 + flMessagesGainedTier1 ) - 1.0f ); 
+
+	// Tier2 is for curbing longer-term consistent spamming
+	// We'll only allow the long term bucket to accrue if we're not currently in a spammy state
+	if ( m_flPlayerTalkAvailableMessagesTier1 > 0 )
+	{
+		float flTotalBucketSizeTier2 = sv_chat_bucket_size_tier2.GetFloat();
+		float flSecondsPerMessageTier2 = sv_chat_seconds_per_msg_tier2.GetFloat();
+
+		float flMessagesGainedTier2 = MAX( 0, flTimeElapsedSinceLastMsg / flSecondsPerMessageTier2 );
+		m_flPlayerTalkAvailableMessagesTier2 = MAX( 0, MIN( flTotalBucketSizeTier2, m_flPlayerTalkAvailableMessagesTier2 + flMessagesGainedTier2 ) - 1.0f );
+		//Msg( "Elapsed : %f2  Gained : %f2 / %f2 \n", flTimeElapsedSinceLastMsg, flMessagesGainedTier1, flMessagesGainedTier2 );
+	}
+
+	//Msg( "Remaining Msgs : %f2 / %f2\n", m_flPlayerTalkAvailableMessagesTier1, m_flPlayerTalkAvailableMessagesTier2 );
+
+	return m_flPlayerTalkAvailableMessagesTier1 > 1.0f && m_flPlayerTalkAvailableMessagesTier2 > 1.0f;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Check if a player can use chat commands at the moment
+//-----------------------------------------------------------------------------
+bool CBasePlayer::CanPlayerTalk()
+{
+	const float talk_interval = 0.66; // min time between say commands from a client
+
+	bool bRateLimitAllowed = LastTimePlayerTalked() + talk_interval < gpGlobals->curtime;
+
+	bool bTokenBucketLimitAllowed = ArePlayerTalkMessagesAvailable();
+
+	return bRateLimitAllowed && bTokenBucketLimitAllowed;
+}
+
+//-----------------------------------------------------------------------------
 // Perhaps a poorly-named function. This function traces against the supplied
 // NPC's hitboxes (instead of hull). If the trace hits a different NPC, the 
 // new NPC is selected. Otherwise, the supplied NPC is determined to be the 
@@ -9151,20 +9376,50 @@ bool CBasePlayer::HasAnyAmmoOfType( int nAmmoIndex )
 	return false;
 }
 
+CVoteController *CBasePlayer::GetTeamVoteController()
+{
+	return g_voteControllerGlobal;
+}
+
 bool CBasePlayer::HandleVoteCommands( const CCommand &args )
 {
-	if( g_voteController == NULL )
+	if( !g_voteControllerGlobal && !GetTeamVoteController()  )
 		return false;
 
 	if(  FStrEq( args[0], "Vote" ) )
 	{
-		if( args.ArgC() < 2 )
+		if( args.ArgC() < 3 )
 			return true;
 
-		const char *arg2 = args[1];
+		const char *pszVoteIdx = args[1];
+		int nVoteIdx = V_atoi( pszVoteIdx );
+
+		const char *arg2 = args[2];
 		char szResultString[MAX_COMMAND_LENGTH];
 
-		CVoteController::TryCastVoteResult nTryResult = g_voteController->TryCastVote( entindex(), arg2 );
+		CVoteController *pVoteController = NULL;
+
+		// Is there a global or team vote to participate in and if so, which?
+		if ( g_voteControllerGlobal && g_voteControllerGlobal->IsAVoteInProgress() && g_voteControllerGlobal->GetVoteID() == nVoteIdx )
+		{
+			pVoteController = g_voteControllerGlobal;
+		}
+		else if ( GetTeamVoteController() && GetTeamVoteController()->IsAVoteInProgress() && GetTeamVoteController()->GetVoteID() == nVoteIdx )
+		{
+			pVoteController = GetTeamVoteController();
+		}
+		else
+		{
+			Q_snprintf( szResultString, MAX_COMMAND_LENGTH, "Vote failed: no vote with ID %d in progress.\n", nVoteIdx );
+			DevMsg( "%s", szResultString );
+
+			return true;
+		}
+
+		if ( !pVoteController )
+			return true;
+
+		CVoteController::TryCastVoteResult nTryResult = pVoteController->TryCastVote( entindex(), arg2 );
 		switch( nTryResult )
 		{
 		case CVoteController::CAST_OK:
@@ -9392,13 +9647,13 @@ int	CPlayerInfo::GetFragCount()
 	Assert( m_pParent );
 	return m_pParent->FragCount(); 
 }
-
+#ifdef FF
 int	CPlayerInfo::GetFortPointsCount()
 {
 	Assert(m_pParent);
 	return m_pParent->FortPointsCount();
 }
-
+#endif
 int	CPlayerInfo::GetDeathCount() 
 { 
 	Assert( m_pParent );
@@ -9605,7 +9860,7 @@ const QAngle CPlayerInfo::GetLocalAngles( void )
 		return QAngle();
 	}
 }
-
+#ifdef FF
 void CPlayerInfo::PostClientMessagesSent(void)
 {
 	Assert(m_pParent);
@@ -9614,7 +9869,7 @@ void CPlayerInfo::PostClientMessagesSent(void)
 		m_pParent->PostClientMessagesSent();
 	}
 }
-
+#endif
 bool CPlayerInfo::IsEFlagSet( int nEFlagMask ) 
 { 
 	Assert( m_pParent );
@@ -9784,3 +10039,22 @@ uint64 CBasePlayer::GetSteamIDAsUInt64( void )
 	return 0;
 }
 #endif // NO_STEAM
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Filters updates to a variable so that only non-local players see
+// the changes.  This is so we can send a low-res origin to non-local players
+// while sending a hi-res one to the local player.
+// Input  : *pVarData - 
+//			*pOut - 
+//			objectID - 
+//-----------------------------------------------------------------------------
+
+void* SendProxy_SendNonLocalDataTable( const SendProp *pProp, const void *pStruct, const void *pVarData, CSendProxyRecipients *pRecipients, int objectID )
+{
+	pRecipients->SetAllRecipients();
+	pRecipients->ClearRecipient( objectID - 1 );
+	return ( void * )pVarData;
+}
+REGISTER_SEND_PROXY_NON_MODIFIED_POINTER( SendProxy_SendNonLocalDataTable );
+

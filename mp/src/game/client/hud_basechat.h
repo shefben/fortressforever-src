@@ -306,8 +306,10 @@ protected:
 	CBaseHudChatLine		*FindUnusedChatLine( void );
 
 	CBaseHudChatInputLine	*m_pChatInput;
-	CBaseHudChatLine		*m_ChatLine; #ifdef FF
-	CBaseHudChatLine* m_ChatLines[CHAT_INTERFACE_LINES]; #endif
+	CBaseHudChatLine		*m_ChatLine;
+#ifdef FF
+	CBaseHudChatLine* m_ChatLines[CHAT_INTERFACE_LINES];
+#endif
 	int					m_iFontHeight;
 
 	CHudChatHistory			*m_pChatHistory;
@@ -405,8 +407,10 @@ public:
 	virtual void	PerformLayout();
 	virtual void	ApplySchemeSettings(vgui::IScheme *pScheme);
 
-	vgui::Panel		*GetInputPanel( void ); #ifdef FF
-	CBaseHudChatEntry* GetChatEntryInput() { return m_pInput; } #endif
+	vgui::Panel		*GetInputPanel( void );
+#ifdef FF
+	CBaseHudChatEntry* GetChatEntryInput() { return m_pInput; }
+#endif
 	virtual vgui::VPANEL GetCurrentKeyFocus() { return m_pInput->GetVPanel(); } 
 
 	virtual void Paint()

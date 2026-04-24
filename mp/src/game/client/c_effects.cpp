@@ -1343,7 +1343,8 @@ protected:
 	CSmartPtr<CEmberEmitter> m_pEmitter;
 #ifdef FF
 	bool	m_bNeedToSetOrigin;	// |-- Mirv
-#endif};
+#endif
+};
 
 //Receive datatable
 IMPLEMENT_CLIENTCLASS_DT( C_Embers, DT_Embers, CEmbers )
