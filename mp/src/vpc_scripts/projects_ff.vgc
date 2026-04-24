@@ -13,7 +13,6 @@ $Project "captioncompiler"
 	"utils\captioncompiler\captioncompiler.vpc" [$WIN32]
 }
 
-
 $Project "client"
 {
 	"game\client\client_ff.vpc"		[($WIN32||$POSIX) && $FF]

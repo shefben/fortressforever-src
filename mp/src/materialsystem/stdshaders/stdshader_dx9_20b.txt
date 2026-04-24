@@ -2,8 +2,11 @@
 // Standard shaders collection
 //
 //  These shaders are compiled as the following shader models:
+//	    _ps11.vcs
+//	    _ps14.vcs
 //	    _ps20.vcs
 //	    _ps20b.vcs
+//	    _vs11.vcs
 //	    _vs20.vcs
 //
 
