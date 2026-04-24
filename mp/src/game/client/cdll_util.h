@@ -82,8 +82,10 @@ int		GetSpectatorTarget();
 int		GetSpectatorMode( void );
 bool	IsPlayerIndex( int index );
 void	UpdateLocalPlayerVisionFlags();
-int		GetLocalPlayerIndex( void );	#ifdef FF
-int		GetLocalPlayerOrObserverTargetIndex(void); #endif
+int		GetLocalPlayerIndex( void );
+#ifdef FF
+int		GetLocalPlayerOrObserverTargetIndex(void);
+#endif
 int		GetLocalPlayerVisionFilterFlags( bool bWeaponsCheck = false );
 bool	IsLocalPlayerUsingVisionFilterFlags( int nFlags, bool bWeaponsCheck = false );
 int		GetLocalPlayerTeam( void );

@@ -41,7 +41,9 @@ typedef enum {
 	DEPLOY,
 
 	// Add new shoot sound types here
-#ifdef( FF )	COCK, STOP, #endif
+#ifdef( FF )
+	COCK, STOP,
+ #endif
 	NUM_SHOOT_SOUND_TYPES,
 } WeaponSound_t;
 

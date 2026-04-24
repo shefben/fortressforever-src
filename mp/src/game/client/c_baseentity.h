@@ -647,12 +647,13 @@ public:
 
 	void	EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 #ifdef FF
-	void	EmitSoundShared(const char* soundname, float soundtime = 0.0f, float* duration = NULL);  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
+	void	EmitSoundShared(const char *soundname, float soundtime = 0.0f, float *duration = NULL);  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 #endif
 	void	EmitSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 	void	StopSound( const char *soundname );
-	void	StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle ); #ifdef FF
-	void	StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
+	void	StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
+#ifdef FF
+	void	StopSoundInChannel(const char *soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
 #endif
 	void	GenderExpandString( char const *in, char *out, int maxlen );
 
@@ -665,7 +666,7 @@ public:
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, HSOUNDSCRIPTHANDLE& handle, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void StopSound( int iEntIndex, const char *soundname );
 #ifdef FF
-	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); // Jon: for AC stuff
+	static void StopSoundInChannel(int iEntIndex, const char *soundname, const int channel); // Jon: for AC stuff
 #endif
 	static soundlevel_t LookupSoundLevel( const char *soundname );
 	static soundlevel_t LookupSoundLevel( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
@@ -1104,7 +1105,7 @@ public:
 	// Sets physics parameters
 	void				SetFriction( float flFriction );
 #ifdef FF
-	float				GetFriction(void) const;
+	float				GetFriction( void ) const;
 #endif
 	void				SetGravity( float flGravity );
 	float				GetGravity( void ) const;
@@ -2071,7 +2072,8 @@ inline void C_BaseEntity::SetFriction( float flFriction )
 inline float C_BaseEntity::GetFriction() const
 {
 	return m_flFriction;
-} #endif
+}
+#endif
 
 inline void C_BaseEntity::SetGravity( float flGravity ) 
 { 

@@ -192,9 +192,12 @@ public:
 	virtual void	TeamChange( int iNewTeam );
 
 	// Flashlight
-	void	Flashlight( void );	#ifndef FF
-	void	UpdateFlashlight( void ); #else
-	virtual void	UpdateFlashlight(void); #endif
+	void	Flashlight( void );
+#ifndef FF
+	void	UpdateFlashlight( void );
+#else
+	virtual void	UpdateFlashlight(void);
+#endif
 
 	// Weapon selection code
 	virtual bool				IsAllowedToSwitchWeapons( void ) { return !IsObserver(); }
@@ -555,9 +558,10 @@ private:
 	CHandle< C_BaseViewModel >	m_hViewModel[ MAX_VIEWMODELS ];		
 	
 	float					m_flOldPlayerZ;
-	float					m_flOldPlayerViewOffsetZ; #ifdef FF
-	bool					m_bSmoothStair;	#endif					// |-- Mirv
-	
+	float					m_flOldPlayerViewOffsetZ;
+#ifdef FF
+	bool					m_bSmoothStair;					// |-- Mirv
+#endif
 	Vector	m_vecVehicleViewOrigin;		// Used to store the calculated view of the player while riding in a vehicle
 	QAngle	m_vecVehicleViewAngles;		// Vehicle angles
 	float	m_flVehicleViewFOV;
