@@ -25,11 +25,11 @@ $Project "fgdlib"
 	"fgdlib\fgdlib.vpc" [$WINDOWS]
 }
 
-//$Project "game_shader_generic_example"
-//{
-//	"materialsystem\stdshaders\game_shader_generic_example_hl2mp.vpc" [$HL2MP]
-//	"materialsystem\stdshaders\game_shader_generic_example_tf.vpc" [$TF]
-//}
+$Project "game_shader_generic_example"
+{
+	"materialsystem\stdshaders\game_shader_generic_example_hl2mp.vpc" [$HL2MP]
+	"materialsystem\stdshaders\game_shader_generic_example_tf.vpc" [$TF]
+}
 
 $Project "game_shader_dx9"
 {

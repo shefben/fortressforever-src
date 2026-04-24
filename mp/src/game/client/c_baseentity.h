@@ -68,8 +68,7 @@ typedef unsigned int			AimEntsListHandle_t;
 
 extern void RecvProxy_IntToColor32( const CRecvProxyData *pData, void *pStruct, void *pOut );
 extern void RecvProxy_LocalVelocity( const CRecvProxyData *pData, void *pStruct, void *pOut );
-
-#ifdef FF // BEG: Added by Mulchman
+#ifdef FF
 enum Class_T
 {
 	CLASS_NONE = 0,
@@ -664,7 +663,8 @@ public:
 
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, HSOUNDSCRIPTHANDLE& handle, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
-	static void StopSound( int iEntIndex, const char *soundname ); #ifdef FF
+	static void StopSound( int iEntIndex, const char *soundname );
+#ifdef FF
 	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); // Jon: for AC stuff
 #endif
 	static soundlevel_t LookupSoundLevel( const char *soundname );
@@ -1102,7 +1102,8 @@ public:
 	virtual bool		ShouldCollide( int collisionGroup, int contentsMask ) const;
 
 	// Sets physics parameters
-	void				SetFriction( float flFriction ); #ifdef FF
+	void				SetFriction( float flFriction );
+#ifdef FF
 	float				GetFriction(void) const;
 #endif
 	void				SetGravity( float flGravity );
