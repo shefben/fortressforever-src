@@ -505,7 +505,7 @@ void CFFWeaponBase::WeaponRecoil()
 //----------------------------------------------------------------------------
 // Purpose: Return a weapon's death notice name
 //----------------------------------------------------------------------------
-const char *CFFWeaponBase::GetDeathNoticeName()
+char *CFFWeaponBase::GetDeathNoticeName()
 {
 #ifdef GAME_DLL
 	return (char *) STRING(m_iClassname);

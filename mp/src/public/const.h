@@ -419,6 +419,13 @@ enum Collision_Group_t
 
 	COLLISION_GROUP_NPC_ACTOR,		// Used so NPCs in scripts ignore the player.
 	COLLISION_GROUP_NPC_SCRIPTED,	// USed for NPCs in scripts that should not collide with each other
+#ifdef FF
+	COLLISION_GROUP_BUILDABLE,		// We want buildables to block most things but have some special exceptions tbd -Green Mushy
+	COLLISION_GROUP_BUILDABLE_BUILDING,	// Jiggles: We want buildables that are being built to block player movement, but pretty much nothing else
+	COLLISION_GROUP_ROCKET,			// Projectiles that HIT PLAYERS
+	COLLISION_GROUP_TRIGGERONLY,	// Stuff that can trigger but not actually be hit
+	COLLISION_GROUP_LASER,			// Can hit even the trigger only stuff
+#endif
 
 	LAST_SHARED_COLLISION_GROUP
 };

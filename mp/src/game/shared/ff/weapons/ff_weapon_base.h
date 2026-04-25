@@ -235,7 +235,7 @@ public:
 
 	// Death notice name
 	// SDK2013: changed from 'char' to 'const char'
-	virtual const char	*GetDeathNoticeName();
+	virtual char	*GetDeathNoticeName();
 
 	// Override the deploy time to a fixed time
 	virtual bool		DefaultDeploy(char *szViewModel, char *szWeaponModel, int iActivity, char *szAnimExt);
