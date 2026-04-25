@@ -243,7 +243,7 @@ void CVoiceGameMgr::UpdateMasks()
 				if(pEnt && pEnt->IsPlayer() && 
 					(bAllTalk || m_pHelper->CanPlayerHearPlayer(pPlayer, (CBasePlayer*)pEnt, bProximity)) &&
 					(pPlayer->m_iChannel == pEnt->m_iChannel)) // |-- Mirv: They are in the same v. group
-#endif			{
+#endif				{
 					gameRulesMask[iOtherClient] = true;
 					ProximityMask[iOtherClient] = bProximity;
 				}

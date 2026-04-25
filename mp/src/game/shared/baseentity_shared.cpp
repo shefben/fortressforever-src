@@ -24,8 +24,10 @@
 
 #ifdef CLIENT_DLL
 	#include "c_te_effect_dispatch.h"
+	#ifdef FF_CLIENT_DLL
 	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
 	#include "c_ff_player.h"
+	#endif
 #else
 	#include "te_effect_dispatch.h"
 	#include "soundent.h"
@@ -33,10 +35,10 @@
 	#include "player_pickup.h"
 	#include "waterbullet.h"
 	#include "func_break.h"
-
+	#ifdef FF_DLL
 	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
 	#include "ff_player.h"
-
+	#endif
 #ifdef HL2MP
 	#include "te_hl2mp_shotgun_shot.h"
 #endif
@@ -693,15 +695,15 @@ void CBaseEntity::DecalTrace( trace_t *pTrace, char const *decalName )
 			return;
 	}
 
-	int index = decalsystem->GetDecalIndexForName( decalName );
-	if ( index < 0 )
+	int indexD = decalsystem->GetDecalIndexForName( decalName );
+	if ( indexD < 0 )
 		return;
 
 	Assert( pTrace->m_pEnt );
 
 	CBroadcastRecipientFilter filter;
 	te->Decal( filter, 0.0, &pTrace->endpos, &pTrace->startpos,
-		pTrace->GetEntityIndex(), pTrace->hitbox, index );
+		pTrace->GetEntityIndex(), pTrace->hitbox, indexD );
 }
 
 //-----------------------------------------------------------------------------
@@ -1437,9 +1439,9 @@ bool CBaseEntity::IsBSPModel() const
 	if ( GetSolid() == SOLID_BSP )
 		return true;
 	
-	const model_t *model = modelinfo->GetModel( GetModelIndex() );
+	const model_t *pModel = modelinfo->GetModel( GetModelIndex() );
 
-	if ( GetSolid() == SOLID_VPHYSICS && modelinfo->GetModelType( model ) == mod_brush )
+	if ( GetSolid() == SOLID_VPHYSICS && modelinfo->GetModelType( pModel ) == mod_brush )
 		return true;
 
 	return false;
@@ -1873,7 +1875,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		// Now hit all triggers along the ray that respond to shots...
 		// Clip the ray to the first collided solid returned from traceline
 		//CTakeDamageInfo triggerInfo( pAttacker, pAttacker, info.m_flDamage, nDamageType );
-		CTakeDamageInfo triggerInfo(this, pAttacker, /*info.m_flDamage*/flDmg, nDamageType); // |-- Mirv: Split damage into shots
+		CTakeDamageInfo triggerInfo( this, pAttacker, /*info.m_flDamage*/flDmg, nDamageType ); // |-- Mirv: Split damage into shots
 		CalculateBulletDamageForce( &triggerInfo, info.m_iAmmoType, vecDir, tr.endpos );
 		triggerInfo.ScaleDamageForce( info.m_flDamageForceScale );
 		triggerInfo.SetAmmoType( info.m_iAmmoType );

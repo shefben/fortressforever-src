@@ -54,7 +54,7 @@ public:
 	}
 
 #ifdef FF	// --> Mirv: Update colour too
-	virtual Vector UpdateColor(const SimpleParticle* pParticle)
+	virtual Vector UpdateColor( const SimpleParticle *pParticle )
 	{
 		Vector	color;
 

@@ -40,7 +40,7 @@ public:
 
 	virtual void OpenSelection( void );
 #ifdef FF
-	virtual void ShowSelection(void);
+	virtual void ShowSelection( void );
 #endif
 	virtual void HideSelection( void );
 
@@ -102,7 +102,7 @@ protected:
 
 	void	UpdateSelectionTime( void );
 #ifdef FF
-	void	QuicklyFadeOut(void);
+	void	QuicklyFadeOut( void );
 #endif
 
 	float	m_flSelectionTime;	// most recent time at which weapon selection had input

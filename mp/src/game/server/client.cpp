@@ -680,8 +680,7 @@ void Host_Say( edict_t *pEdict, const CCommand &args, bool teamonly )
 	const char *pszPlayerName = pPlayer ? pPlayer->GetPlayerName():"Console";
 
 	if ( pszPrefix && strlen( pszPrefix ) > 0 )
-	{
-		// Mulch: don't do CS:S style locations
+	{	// Mulch: don't do CS:S style locations
 		//if ( pszLocation && strlen( pszLocation ) )
 		//{
 		//	Q_snprintf( text, sizeof(text), "%s %s @ %s: ", pszPrefix, pszPlayerName, pszLocation );
@@ -851,7 +850,7 @@ void ClientPrecache( void )
 	CBaseEntity::PrecacheModel( "sprites/purpleglow1.vmt" );	
 	CBaseEntity::PrecacheModel( "sprites/purplelaser1.vmt" );	
 	
-#ifndef HL2MP || ifndef FF
+#ifndef HL2MP || !defined( FF )
 	CBaseEntity::PrecacheScriptSound( "Hud.Hint" );
 #endif // HL2MP
 	CBaseEntity::PrecacheScriptSound( "Player.FallDamage" );

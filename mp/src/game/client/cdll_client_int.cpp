@@ -369,7 +369,7 @@ bool g_bLevelInitialized;
 bool g_bTextMode = false;
 
 #ifdef FF // --> Mirv: For the hud hints loading/saving & effects control
-extern void HudHintLoad(const char* pMapName);
+extern void HudHintLoad( const char *pMapName );
 extern void HudHintSave();
 
 extern void ClearAllowedEffects();
@@ -1049,14 +1049,14 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 		return false;
 
 #ifdef FF // --> Mirv: Default value for cl_updaterate up to 33
-	ConVar* cl_updaterate = cvar->FindVar("cl_updaterate");
-	ConVar* cl_cmdrate = cvar->FindVar("cl_cmdrate");
-	cl_updaterate->SetValue(66);
-	cl_cmdrate->SetValue(66);
+	ConVar* cl_updaterate = cvar->FindVar( "cl_updaterate" );
+	ConVar* cl_cmdrate = cvar->FindVar( "cl_cmdrate" );
+	cl_updaterate->SetValue( 66 );
+	cl_cmdrate->SetValue( 66 );
 
 	// Turn off r_dynamic until our wrapper sets it
-	// ConVar *r_dynamic = cvar->FindVar("r_dynamic");
-	// r_dynamic->SetValue(0);
+	// ConVar *r_dynamic = cvar->FindVar( "r_dynamic" );
+	// r_dynamic->SetValue( 0 );
 	// <-- Mirv
 #endif // there are lots of dlight options now, so nevermind -- Jon
 
@@ -1693,7 +1693,7 @@ void CHLClient::LevelInitPreEntity( char const* pMapName )
 	ffvieweffects->LevelInit();	// |-- Mirv
 
 	// --> Mirv: Initialise hud hints & clear effect data
-	HudHintLoad(pMapName);
+	HudHintLoad( pMapName );
 	ClearAllowedEffects();
 #endif // <-- Mirv
 	
@@ -1767,15 +1767,15 @@ void CHLClient::LevelInitPostEntity( )
 	C_PhysPropClientside::RecreateAll();
 	internalCenterPrint->Clear();
 #ifdef FF
-	if (!engine->IsHLTV())
+	if ( !engine->IsHLTV() )
 	{
 		// BEG: Added by Mulchman for team menu
 		// Show the team menu selection every time we start a level
-		gViewPortInterface->ShowPanel(PANEL_TEAM, true);
+		gViewPortInterface->ShowPanel( PANEL_TEAM, true );
 	}
 	// Show the class menu selection every time we start a level
 	//gViewPortInterface->ShowPanel( PANEL_CLASS, true );
-	if (!engine->IsHLTV() || (engine->IsHLTV() && !engine->IsPlayingDemo()))
+	if ( !engine->IsHLTV() || ( engine->IsHLTV() && !engine->IsPlayingDemo() ) )
 	{
 		if (sv_motd_enable.GetBool())
 			gViewPortInterface->ShowPanel(PANEL_INFO, true);
@@ -1861,10 +1861,10 @@ void CHLClient::LevelShutdown( void )
 
 	//-- Added by L0ki --
 	// Hide these panels so the game doesnt crash on us
-	gViewPortInterface->ShowPanel(PANEL_INFO, false);
-	gViewPortInterface->ShowPanel(PANEL_TEAM, false);
-	gViewPortInterface->ShowPanel(PANEL_CLASS, false);
-	gViewPortInterface->ShowPanel(PANEL_MAP, false);
+	gViewPortInterface->ShowPanel( PANEL_INFO, false );
+	gViewPortInterface->ShowPanel( PANEL_TEAM, false );
+	gViewPortInterface->ShowPanel( PANEL_CLASS, false );
+	gViewPortInterface->ShowPanel( PANEL_MAP, false );
 #endif
 	internalCenterPrint->Clear();
 
@@ -2796,13 +2796,13 @@ CSteamID GetSteamIDForPlayerIndex( int iPlayerIndex )
 #endif
 #ifdef FF
 // Wrapper CVAR for an archiveable r_dynamic
-void FF_Dynamic_Callback(IConVar* var, const char* pOldValue, float flOldValue)
+void FF_Dynamic_Callback(IConVar *var, const char *pOldValue, float flOldValue)
 {
-	ConVarRef r_dynamic_ff(var->GetName());
-	ConVar* c = cvar->FindVar("r_dynamic");
+	ConVarRef r_dynamic_ff( var->GetName() );
+	ConVar* c = cvar->FindVar( "r_dynamic" );
 	if (c)
-		c->SetValue(r_dynamic_ff.GetString());
+		c->SetValue( r_dynamic_ff.GetString() );
 }
 
-ConVar r_dynamic_ff("r_dynamic_ff", "1", FCVAR_ARCHIVE, "", FF_Dynamic_Callback);
+ConVar r_dynamic_ff( "r_dynamic_ff", "1", FCVAR_ARCHIVE, "", FF_Dynamic_Callback );
 #endif

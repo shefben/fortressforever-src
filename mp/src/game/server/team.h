@@ -42,7 +42,7 @@ public:
 	virtual int			GetTeamNumber( void ) const;
 	virtual const char *GetName( void ) const;
 #ifdef FF
-	virtual void		SetName( const char* pszName );
+	virtual void		SetName( const char *pszName );
 #endif
 	virtual void		UpdateClientData( CBasePlayer *pPlayer );
 	virtual bool		ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const;
@@ -72,14 +72,14 @@ public:
 	virtual int  GetScore( void ) const;
 	virtual void ResetScores( void );
 #ifdef FF
-	virtual float GetScoreTime(void);
-	virtual void AddFortPoints(int iFortPoints);
-	virtual void SetFortPoints(int iFortPoints);
-	virtual int  GetFortPoints(void);
+	virtual float GetScoreTime( void );
+	virtual void AddFortPoints( int iFortPoints );
+	virtual void SetFortPoints( int iFortPoints );
+	virtual int  GetFortPoints( void );
 	// Bug #0000529: Total death column doesn't work
-	virtual void AddDeaths(int iScore);	// Mulch
-	virtual int  GetDeaths(void);	// Mulch
-	virtual void SetDeaths(int iDeaths);
+	virtual void AddDeaths( int iScore );	// Mulch
+	virtual int  GetDeaths( void );	// Mulch
+	virtual void SetDeaths( int iDeaths );
 #endif
 	// Round scoring
 	virtual int GetRoundsWon( void ) const { return m_iRoundsWon; }

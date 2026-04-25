@@ -15,6 +15,7 @@
 #include "tier0/vprof.h"
 #include "checksum_crc.h"
 #include "tier0/icommandline.h"
+#include "util_shared.h"
 
 #if defined( TF_CLIENT_DLL ) || defined( TF_DLL )
 #include "tf_shareddefs.h"
@@ -38,9 +39,6 @@
 #include "tier0/memdbgon.h"
 
 static ConVar sv_soundemitter_trace( "sv_soundemitter_trace", "0", FCVAR_REPLICATED, "Show all EmitSound calls including their symbolic name and the actual wave file they resolved to\n" );
-#ifdef STAGING_ONLY
-static ConVar sv_snd_filter( "sv_snd_filter", "", FCVAR_REPLICATED, "Filters out all sounds not containing the specified string before being emitted\n" );
-#endif // STAGING_ONLY
 
 extern ISoundEmitterSystemBase *soundemitterbase;
 static ConVar *g_pClosecaption = NULL;
@@ -469,21 +467,6 @@ public:
 		if ( !params.soundname[0] )
 			return;
 
-#ifdef STAGING_ONLY
-		if ( sv_snd_filter.GetString()[ 0 ] && !V_stristr( params.soundname, sv_snd_filter.GetString() ))
-		{
-			return;
-		}
-
-		if ( !Q_strncasecmp( params.soundname, "vo", 2 ) &&
-			!( params.channel == CHAN_STREAM ||
-			   params.channel == CHAN_VOICE  ||
-			   params.channel == CHAN_VOICE2 ) )
-		{
-			DevMsg( "EmitSound:  Voice wave file %s doesn't specify CHAN_VOICE, CHAN_VOICE2 or CHAN_STREAM for sound %s\n",
-				params.soundname, ep.m_pSoundName );
-		}
-#endif // STAGING_ONLY
 
 		// handle SND_CHANGEPITCH/SND_CHANGEVOL and other sound flags.etc.
 		if( ep.m_nFlags & SND_CHANGE_PITCH )
@@ -572,12 +555,6 @@ public:
 	{
 		VPROF( "CSoundEmitterSystem::EmitSound (calls engine)" );
 
-#ifdef STAGING_ONLY
-		if ( sv_snd_filter.GetString()[ 0 ] && !V_stristr( ep.m_pSoundName, sv_snd_filter.GetString() ))
-		{
-			return;
-		}
-#endif // STAGING_ONLY
 
 		if ( ep.m_pSoundName && 
 			( Q_stristr( ep.m_pSoundName, ".wav" ) || 
@@ -824,12 +801,6 @@ public:
 			return;
 		}
 
-#ifdef STAGING_ONLY
-		if ( sv_snd_filter.GetString()[ 0 ] && !V_stristr( params.soundname, sv_snd_filter.GetString() ))
-		{
-			return;
-		}
-#endif // STAGING_ONLY
 
 		if( iFlags & SND_CHANGE_PITCH )
 		{
@@ -990,12 +961,6 @@ public:
 
 	void EmitAmbientSound( int entindex, const Vector &origin, const char *pSample, float volume, soundlevel_t soundlevel, int flags, int pitch, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
 	{
-#ifdef STAGING_ONLY
-		if ( sv_snd_filter.GetString()[ 0 ] && !V_stristr( pSample, sv_snd_filter.GetString() ))
-		{
-			return;
-		}
-#endif // STAGING_ONLY
 
 #if !defined( CLIENT_DLL )
 		CUtlVector< Vector > dummyorigins;
@@ -1078,7 +1043,7 @@ void S_SoundEmitterSystemFlush( void )
 #if defined( CLIENT_DLL )
 CON_COMMAND_F( cl_soundemitter_flush, "Flushes the sounds.txt system (client only)", /*FCVAR_CHEAT*/ FCVAR_CLIENTDLL ) // not enough args so added FCVAR_CLIENTDLL
 #else
-CON_COMMAND_F( sv_soundemitter_flush, "Flushes the sounds.txt system (server only)", FCVAR_CHEAT)
+CON_COMMAND_F( sv_soundemitter_flush, "Flushes the sounds.txt system (server only)", FCVAR_CHEAT )
 #endif
 {
 	S_SoundEmitterSystemFlush( );
@@ -1099,7 +1064,7 @@ CON_COMMAND_F( sv_soundemitter_filecheck, "Report missing wave files for sounds 
 	DevMsg( "---------------------------\nTotal missing files %i\n", missing );
 }
 
-CON_COMMAND_F( sv_findsoundname, "Find sound names which reference the specified wave files.", /*FCVAR_DEVELOPMENTONLY*/ FCVAR_CHEAT)
+CON_COMMAND_F( sv_findsoundname, "Find sound names which reference the specified wave files.", /*FCVAR_DEVELOPMENTONLY*/ FCVAR_CHEAT )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() )
 		return;
@@ -1212,7 +1177,7 @@ static ConCommand Command_Playgamesound( "playgamesound", Playgamesound_f, "Play
 // Purpose:  Non-static override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 // Input  : *soundname - 
 //-----------------------------------------------------------------------------
-void CBaseEntity::EmitSoundShared(const char* soundname, float soundtime /*= 0.0f*/, float* duration /*=NULL*/)
+void CBaseEntity::EmitSoundShared( const char *soundname, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
 {
 	//VPROF( "CBaseEntity::EmitSound" );
 	VPROF_BUDGET("CBaseEntity::EmitSound", _T("CBaseEntity::EmitSound"));
@@ -1223,7 +1188,7 @@ void CBaseEntity::EmitSoundShared(const char* soundname, float soundtime /*= 0.0
 	// FF: AfterShock: Don't send to self. This fixes clientside prediction on sounds and means we can just do 1 shared EmitSound(bla)
 	if (gpGlobals->maxClients > 1)
 	{
-		CBasePlayer* pPlayer = ToBasePlayer(this);
+		CBasePlayer *pPlayer = ToBasePlayer(this);
 		if (pPlayer)
 			filter.RemoveRecipient(pPlayer);
 	}
@@ -1428,7 +1393,7 @@ void CBaseEntity::StopSound( int iEntIndex, int iChannel, const char *pSample )
 
 
 // Jon: so we can stop sounds in a specific channel that's different from what the script defines
-void CBaseEntity::StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel)
+void CBaseEntity::StopSoundInChannel(const char *soundname, HSOUNDSCRIPTHANDLE& handle, const int channel)
 {
 #if defined( CLIENT_DLL )
 	if (entindex() == -1)
@@ -1443,7 +1408,7 @@ void CBaseEntity::StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& 
 }
 
 // Jon: so we can stop sounds in a specific channel that's different from what the script defines
-void CBaseEntity::StopSoundInChannel(int iEntIndex, const char* soundname, const int channel)
+void CBaseEntity::StopSoundInChannel(int iEntIndex, const char *soundname, const int channel)
 {
 	g_SoundEmitterSystem.StopSoundInChannel(iEntIndex, soundname, channel);
 }
@@ -1481,12 +1446,6 @@ int SENTENCEG_Lookup(const char *sample)
 
 void UTIL_EmitAmbientSound( int entindex, const Vector &vecOrigin, const char *samp, float vol, soundlevel_t soundlevel, int fFlags, int pitch, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
 {
-#ifdef STAGING_ONLY
-	if ( sv_snd_filter.GetString()[ 0 ] && !V_stristr( samp, sv_snd_filter.GetString() ))
-	{
-		return;
-	}
-#endif // STAGING_ONLY
 
 	if (samp && *samp == '!')
 	{
@@ -1558,6 +1517,14 @@ HSOUNDSCRIPTHANDLE CBaseEntity::PrecacheScriptSound( const char *soundname )
 	return soundemitterbase->GetSoundIndex( soundname );
 #endif
 }
+
+#if !defined ( CLIENT_DLL )
+// Same as server version of above, but signiture changed so it can be deduced by the macros
+void CBaseEntity::VScriptPrecacheScriptSound( const char *soundname )
+{
+	g_SoundEmitterSystem.PrecacheScriptSound( soundname );
+}
+#endif // !CLIENT_DLL
 
 void CBaseEntity::PrefetchScriptSound( const char *soundname )
 {

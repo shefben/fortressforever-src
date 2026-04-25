@@ -260,7 +260,7 @@ public:
 	//===============================
 	virtual void GoToIntermission( void );
 	virtual void LoadMapCycleFile( void );
-	void ChangeLevelToMap( const char* pszMap );
+	void ChangeLevelToMap( const char *pszMap );
 
 	float m_flIntermissionEndTime;
 	//===============================

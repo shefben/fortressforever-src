@@ -29,7 +29,7 @@ static CHudTexture *FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, 
 	return list[ idx ];
 }
 #ifdef FF
-CHudTexture* FindHudTextureInDict(CUtlDict< CHudTexture*, int >& list, const char* psz);	// |-- Mirv: Now defined in hud.cpp
+CHudTexture* FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, const char *psz );	// |-- Mirv: Now defined in hud.cpp
 #endif
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -167,12 +167,13 @@ void WeaponsResource::LoadWeaponSprites( WEAPON_FILE_INFO_HANDLE hWeaponFileInfo
 				pHudHR->SetHistoryGap( pWeaponInfo->iconInactive->Height() );
 			}
 #ifdef FF
-			if (strlen(pWeaponInfo->szClassName) > 3)
+			if ( strlen(pWeaponInfo->szClassName) > 3 )
 			{
-				Q_snprintf(p->szShortName, 63, "weapon_%s", pWeaponInfo->szClassName + 3);
-				gHUD.AddSearchableHudIconToList(*p);
+				Q_snprintf( p->szShortName, 63, "weapon_%s", pWeaponInfo->szClassName + 3 );
+				gHUD.AddSearchableHudIconToList( *p );
 			}
-#endif	}
+#endif
+		}
 
 		p = FindHudTextureInDict( tempList, "weapon_s" );
 		if ( p )
@@ -217,37 +218,37 @@ void WeaponsResource::LoadWeaponSprites( WEAPON_FILE_INFO_HANDLE hWeaponFileInfo
 		}
 #ifdef FF
 		// --> Mirv:
-		p = FindHudTextureInDict(tempList, "deathnotice");
-		if (p)
+		p = FindHudTextureInDict( tempList, "deathnotice" );
+		if ( p )
 		{
-			if (strlen(pWeaponInfo->szClassName) > 3)
+			if ( strlen(pWeaponInfo->szClassName) > 3 )
 			{
-				Q_snprintf(p->szShortName, 63, "death_%s", pWeaponInfo->szClassName + 3);
-				gHUD.AddSearchableHudIconToList(*p);
+				Q_snprintf( p->szShortName, 63, "death_%s", pWeaponInfo->szClassName + 3 );
+				gHUD.AddSearchableHudIconToList( *p );
 			}
 		}
 		// <--
 
 		// --> Jon:
-		p = FindHudTextureInDict(tempList, "deathnotice_headshot");
-		if (p)
+		p = FindHudTextureInDict( tempList, "deathnotice_headshot" );
+		if ( p )
 		{
-			if (strlen(pWeaponInfo->szClassName) > 3)
+			if ( strlen(pWeaponInfo->szClassName) > 3 )
 			{
-				Q_snprintf(p->szShortName, 63, "death_BOOM_HEADSHOT_%s", pWeaponInfo->szClassName + 3);
-				gHUD.AddSearchableHudIconToList(*p);
+				Q_snprintf( p->szShortName, 63, "death_BOOM_HEADSHOT_%s", pWeaponInfo->szClassName + 3 );
+				gHUD.AddSearchableHudIconToList( *p );
 			}
 		}
 		// <--
 
 		// --> squeek
-		p = FindHudTextureInDict(tempList, "deathnotice_backstab");
-		if (p)
+		p = FindHudTextureInDict( tempList, "deathnotice_backstab" );
+		if ( p )
 		{
-			if (strlen(pWeaponInfo->szClassName) > 3)
+			if ( strlen(pWeaponInfo->szClassName) > 3 )
 			{
-				Q_snprintf(p->szShortName, 63, "death_backstab_%s", pWeaponInfo->szClassName + 3);
-				gHUD.AddSearchableHudIconToList(*p);
+				Q_snprintf( p->szShortName, 63, "death_backstab_%s", pWeaponInfo->szClassName + 3 );
+				gHUD.AddSearchableHudIconToList( *p );
 			}
 		}
 #endif	// <-- squeek

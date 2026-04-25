@@ -34,9 +34,12 @@ const char *pWeaponSoundCategories[ NUM_SHOOT_SOUND_TYPES ] =
 	"special2",
 	"special3",
 	"taunt",
-	"deploy" #if defined( FF_CLIENT_DLL ),
-	"cock",			// |-- Mirv: Cock sfx
-	"stop"	#endif	// |-- Mirv: Stops weapon sounds
+	#if !defined( FF_CLIENT_DLL )
+	"deploy"
+	#else
+	"cock",	// |-- Mirv: Cock sfx
+	"stop"	// |-- Mirv: Stops weapon sounds
+	#endif
 };
 #else
 extern const char *pWeaponSoundCategories[ NUM_SHOOT_SOUND_TYPES ];

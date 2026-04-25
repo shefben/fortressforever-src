@@ -1408,8 +1408,8 @@ void C_Embers::AddEntity( void )
 		return;
 
 #ifdef FF	// --> Mirv: Moved here from the constructor
-	if (m_bNeedToSetOrigin)
-		m_pEmitter->SetSortOrigin(GetAbsOrigin());
+	if ( m_bNeedToSetOrigin )
+		m_pEmitter->SetSortOrigin( GetAbsOrigin() );
 #endif	// <-- Mirv
 
 	float tempDelta = gpGlobals->frametime;

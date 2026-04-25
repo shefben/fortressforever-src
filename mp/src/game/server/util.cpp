@@ -2015,7 +2015,6 @@ void UTIL_ValidateSoundName( string_t &name, const char *defaultStr )
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: Slightly modified strtok. Does not modify the input string. Does
 //			not skip over more than one separator at a time. This allows parsing
@@ -3335,7 +3334,7 @@ void CC_CollisionTest( const CCommand &args )
 }
 static ConCommand collision_test("collision_test", CC_CollisionTest, "Tests collision system", FCVAR_CHEAT );
 #ifdef FF
-bool Util_AddDownload(const char* pszFile)
+bool Util_AddDownload( const char *pszFile)
 {
 	INetworkStringTable* pDownloadablesTable = networkstringtable->FindTable("downloadables");
 

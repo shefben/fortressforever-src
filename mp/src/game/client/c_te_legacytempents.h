@@ -28,9 +28,9 @@ enum
 	CS_SHELL_12GAUGE,
 	CS_SHELL_556,
 	CS_SHELL_762NATO,
-	#ifndef( FF_CLIENT_DLL )
+#ifndef( FF_CLIENT_DLL )
 	CS_SHELL_338MAG
-	#else
+#else
 	CS_SHELL_338MAG,
 	FF_SHELL_40MM,
 
@@ -38,7 +38,7 @@ enum
 	FF_PROJECTILE_NAIL,
 	FF_PROJECTILE_DART,
 	FF_PROJECTILE_NAIL_NG
-	#endif // <-- Mirv
+#endif // <-- Mirv
 };
 #endif
 

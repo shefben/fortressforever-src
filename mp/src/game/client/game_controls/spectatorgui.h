@@ -99,6 +99,8 @@ protected:
 	// bool m_bHelpShown;
 	// bool m_bInsetVisible;
 	bool m_bSpecScoreboard;
+
+	int m_iWasSteamController = -1;
 };
 
 
@@ -129,10 +131,13 @@ public:
 	vgui::VPANEL GetVPanel( void ) { return BaseClass::GetVPanel(); }
 	virtual void SetParent(vgui::VPANEL parent) { BaseClass::SetParent(parent); }
 
+	virtual GameActionSet_t GetPreferredActionSet() { return GAME_ACTION_SET_SPECTATOR; }
+
 private:
 	// VGUI2 overrides
 	MESSAGE_FUNC_PARAMS( OnTextChanged, "TextChanged", data );
 	virtual void OnCommand( const char *command );
+	virtual void OnKeyCodePressed(vgui::KeyCode code);
 	virtual void ApplySchemeSettings(vgui::IScheme *pScheme);
 	virtual void PerformLayout();
 

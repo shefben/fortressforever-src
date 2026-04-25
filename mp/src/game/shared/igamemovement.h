@@ -49,6 +49,7 @@ public:
 	int				m_nButtons;			// Attack buttons.
 	int				m_nOldButtons;		// From host_client->oldbuttons;
 	float			m_flForwardMove;
+	float			m_flOldForwardMove;
 	float			m_flSideMove;
 	float			m_flUpMove;
 	
@@ -74,8 +75,11 @@ public:
 
 	void			SetAbsOrigin( const Vector &vec );
 	const Vector	&GetAbsOrigin() const;
-
+#ifndef FF
+private:
+#else
 public: // YoYo178: changed from private
+#endif
 	Vector			m_vecAbsOrigin;		// edict::origin
 	//friend class CFFGameMovement; // allow CFFGameMovement to access the variable above (m_vecAbsOrigin)
 									// could also make the variable public instead

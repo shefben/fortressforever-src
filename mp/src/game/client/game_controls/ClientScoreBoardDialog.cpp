@@ -557,7 +557,9 @@ void CClientScoreBoardDialog::UpdatePlayerInfo()
 	}
 
 	if ( selectedRow != -1 )
+	{
 		m_pPlayerList->SetSelectedItem(selectedRow);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -1011,7 +1013,7 @@ void CClientScoreBoardDialog::FillScoreBoard()
 	// Update team headers
 	UpdateHeaders();
 
-	// Update player info
+	// update player info
 	UpdatePlayerInfo();
 }
 

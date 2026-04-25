@@ -179,7 +179,7 @@ int C_LocalTempEntity::DrawStudioModel( int modelFlags )
 	if ( !GetModelPtr() )
 		return drawn;
 #ifdef FF
-	/// TODO: Aftershock needs to do whatever he wants with this...
+	// TODO: Aftershock needs to do whatever he wants with this...
 	if (this->modelFlags & FTENT_FFPROJECTILE && m_vecTempEntVelocity != vec3_origin && cl_nail_trail.GetBool())
 	{
 		Vector vecDir = CurrentViewOrigin() - GetAbsOrigin();
@@ -342,7 +342,7 @@ bool C_LocalTempEntity::Frame( float frametime, int framenumber )
 	m_vecTempEntVelocity = m_vecTempEntVelocity + ( m_vecTempEntAcceleration * frametime );
 
 #ifdef FF // --> Mirv: FF Projectiles like nails and darts
-	if (flags & FTENT_FFPROJECTILE)
+	if ( flags & FTENT_FFPROJECTILE )
 	{
 		// Start off by advancing the projectile
 		SetLocalOrigin(GetLocalOrigin() + m_vecTempEntVelocity * frametime);
@@ -391,11 +391,11 @@ bool C_LocalTempEntity::Frame( float frametime, int framenumber )
 				data.m_vNormal = pm.plane.normal;
 				data.m_nSurfaceProp = pm.surface.surfaceProps;
 
-#ifdef GAME_DLL
+			#ifdef GAME_DLL
 				data.m_nEntIndex = pm.GetEntityIndex();
-#else
+			#else
 				data.m_hEntity = pm.m_pEnt;
-#endif
+			#endif
 
 				// The actual effect isn't needed
 				if (flags & FTENT_FFOPTEFFECT)
@@ -1887,7 +1887,7 @@ C_LocalTempEntity * CTempEnts::SpawnTempModel( const model_t *pModel, const Vect
 void CTempEnts::MuzzleFlash( int type, ClientEntityHandle_t hEntity, int attachmentIndex, bool firstPerson )
 {
 #ifdef FF // Mirv: Optionally disable'd muzzle flashes
-	if (cl_disablemuzzleflashes.GetBool())
+	if ( cl_disablemuzzleflashes.GetBool() )
 		return;
 #endif
 	switch( type )
@@ -1973,7 +1973,7 @@ void CTempEnts::MuzzleFlash( const Vector& pos1, const QAngle& angles, int type,
 
 #else // Mirv: Optionally disable'd muzzle flashes
 #ifdef FF
-	if (cl_disablemuzzleflashes.GetBool())
+	if ( cl_disablemuzzleflashes.GetBool() )
 		return;
 #endif
 	//NOTENOTE: This function is becoming obsolete as the muzzles are moved over to being local to attachments
@@ -3056,11 +3056,13 @@ void CTempEnts::MuzzleFlash_SMG1_Player( ClientEntityHandle_t hEntity, int attac
 
 void CTempEnts::MuzzleFlash_Shotgun_Player( ClientEntityHandle_t hEntity, int attachmentIndex )
 {
-	VPROF_BUDGET( "MuzzleFlash_Shotgun_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING ); #ifndef FF
+	VPROF_BUDGET( "MuzzleFlash_Shotgun_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+#ifndef FF
 	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "MuzzleFlash_Shotgun_Player" );
 
-	pSimple->SetDrawBeforeViewModel( true ); #else
-	CSmartPtr<CLocalSpaceEmitter> pSimple = CLocalSpaceEmitter::Create("MuzzleFlash_SMG1_Player", hEntity, attachmentIndex, FLE_VIEWMODEL);
+	pSimple->SetDrawBeforeViewModel( true );
+#else
+	CSmartPtr<CLocalSpaceEmitter> pSimple = CLocalSpaceEmitter::Create( "MuzzleFlash_SMG1_Player", hEntity, attachmentIndex, FLE_VIEWMODEL );
 #endif
 	CacheMuzzleFlashes();
 
@@ -3547,7 +3549,7 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 		hitsound = TE_RIFLE_SHELL;
 		pModel = m_pCS_338MAGShell;
 		break;
-}
+	}
 #endif
 
 #if defined ( FF_CLIENT_DLL )
@@ -3568,7 +3570,6 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 		break;
 	}
 #endif
-
 	if ( pModel == NULL )
 		return;
 
@@ -3610,7 +3611,7 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 	pTemp->m_vecTempEntAngVelocity[1] = random->RandomFloat(-256,256);
 	pTemp->m_vecTempEntAngVelocity[2] = 0;
 #if defined( FF_CLIENT_DLL )
-	if (shellType == FF_SHELL_40MM)
+	if ( shellType == FF_SHELL_40MM )
 		pTemp->m_vecTempEntAngVelocity = QAngle(0, 0, 0);
 #endif
 	pTemp->SetRenderMode( kRenderNormal );
@@ -3649,7 +3650,7 @@ void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVeloci
 }
 
 #ifdef FF // --> Mirv: A FF projectile
-extern bool AllowEffects(int iEntityIndex, float flNewDelay);
+extern bool AllowEffects( int iEntityIndex, float flNewDelay );
 
 void CTempEnts::FFProjectile(const Vector& vecPosition, const QAngle& angVelocity, int iSpeed, int projectileType, int entIndex)
 {

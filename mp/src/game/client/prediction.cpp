@@ -195,13 +195,12 @@ void CPrediction::CheckError( int commands_acknowledged )
 				np.time_to_live = 2.0f;
 
 				engine->Con_NXPrintf( &np, "pred error %6.3f units (%6.3f %6.3f %6.3f)", len, delta.x, delta.y, delta.z );
-#ifdef FF
-				// --> Mirv: Draw it on now too
+#ifdef FF		// --> Mirv: Draw it on now too
 				int b = clamp((len / 32.0f) * 255, 0, 255);
 				debugoverlay->AddLineOverlay(predicted_origin + Vector(0, 0, 5), origin, b, b, b, false, 5.0f);
 				debugoverlay->AddLineOverlay(predicted_origin - Vector(0, 0, 5), origin, b, b, b, false, 5.0f);
-				// <-- Mirv
-#endif		}
+#endif			// <-- Mirv
+			}
 		}
 	}
 #endif

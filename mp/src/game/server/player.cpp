@@ -350,7 +350,7 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_lastDamageAmount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_tbdPrev, FIELD_TIME ),
 #ifndef FF
-	DEFINE_FIELD( m_flStepSoundTime, FIELD_TIME ),	|-- Mirv: Removed to fix footsteps
+	DEFINE_FIELD( m_flStepSoundTime, FIELD_FLOAT ),	|-- Mirv: Removed to fix footsteps
 #endif
 	DEFINE_ARRAY( m_szNetname, FIELD_CHARACTER, MAX_PLAYER_NAME_LENGTH ),
 
@@ -970,7 +970,7 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 			//  If an NPC check if friendly fire is disallowed
 			// --------------------------------------------------
 			// --> Mirv: All this disabled so we can impact friendlies
-			/*CAI_BaseNPC* pNPC = info.GetAttacker()->MyNPCPointer();
+			/*CAI_BaseNPC *pNPC = info.GetAttacker()->MyNPCPointer();
 			if ( pNPC && (pNPC->CapabilitiesGet() & bits_CAP_NO_HIT_PLAYER) && pNPC->IRelationType( this ) != D_HT )
 				return;
 
@@ -985,7 +985,7 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 		SetLastHitGroup( ptr->hitgroup );
 
 		// --> Mirv: No location damage please
-		/*switch (ptr->hitgroup)
+		/*switch ( ptr->hitgroup )
 		{
 		case HITGROUP_GENERIC:
 			break;
@@ -1021,7 +1021,7 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 			if (g_pGameRules->FCanTakeDamage(ToFFPlayer(this), info.GetAttacker()))
 			{
 				SpawnBlood(ptr->endpos, vecDir, BloodColor(), info.GetDamage());// a little surface blood.
-				TraceBleed(info.GetDamage(), vecDir, ptr, info.GetDamageType());
+				TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
 			}
 		}
 
@@ -1191,7 +1191,8 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 		return 0;
 	// go take the damage first
 
-	if ( !g_pGameRules->FCanTakeDamage(this, info.GetAttacker()/*, inputInfo*/))
+	
+	if ( !g_pGameRules->FCanTakeDamage( this, info.GetAttacker()/*, inputInfo*/ ) )
 	{
 		// Refuse the damage
 		return 0;
@@ -2033,7 +2034,7 @@ void CBasePlayer::WaterMove()
 		{
 			// --> Mirv: Fix the bubbly spawn start
 			if (GetTeamNumber() != TEAM_SPECTATOR && GetTeamNumber() != TEAM_UNASSIGNED)
-				EmitSound("Player.DrownStart");
+				EmitSound( "Player.DrownStart" );
 			// <-- Mirv: Fix the bubbly spawn start
 		}
 
@@ -2243,7 +2244,7 @@ void CBasePlayer::PlayerDeathThink(void)
 	{
 		respawn(this, !IsObserver());
 	}
-
+	
 	// Bug #0000578: Suiciding using /kill doesn't cause a respawn delay
 	float fTimeDelta = m_flDeathTime + m_flNextSpawnDelay - gpGlobals->curtime;
 
@@ -2780,7 +2781,7 @@ bool CBasePlayer::SetObserverTarget(CBaseEntity *target)
 	// reason is, if we switch obs mode from in eye or to a new target
 	// update conc status appropriately (remove/update).
 
-	CFFPlayer* pFFSelf = ToFFPlayer(this);
+	CFFPlayer *pFFSelf = ToFFPlayer(this);
 	if (pFFSelf)
 	{
 		if (m_iObserverMode == OBS_MODE_IN_EYE)
@@ -2815,7 +2816,7 @@ bool CBasePlayer::IsValidObserverTarget(CBaseEntity * target)
 
 	// MOD AUTHORS: Add checks on target here or in derived method
 
-	if( !target->IsPlayer() || !target->Classify() == CLASS_INFOSCRIPT )	// only track players and info_ff_scripts
+	if ( !target->IsPlayer() || !target->Classify() == CLASS_INFOSCRIPT )	// only track players and info_ff_scripts
 		return false;
 
 	CBasePlayer * player = ToBasePlayer( target );
@@ -4771,7 +4772,7 @@ void FixPlayerCrouchStuck( CBasePlayer *pPlayer )
 
 	// Move up as many as 18 pixels if the player is stuck.
 	int i;
-	Vector org = pPlayer->GetAbsOrigin();;
+	Vector org = pPlayer->GetAbsOrigin();
 	for ( i = 0; i < 18; i++ )
 	{
 		UTIL_TraceHull( pPlayer->GetAbsOrigin(), pPlayer->GetAbsOrigin(), 
@@ -5663,7 +5664,7 @@ void CBasePlayer::CommitSuicide( bool bExplode /*= false*/, bool bForce /*= fals
 	//Event_Killed( info );
 
 	// Bug #0000700: people with infection should give medic kill if they suicide
-	CFFPlayer* pPlayer = ToFFPlayer(this);
+	CFFPlayer *pPlayer = ToFFPlayer(this);
 	if ( pPlayer )
 	{
 		if ( pPlayer->GetSpecialInfectedDeath() && pPlayer->IsInfected() && pPlayer->GetInfector() )
@@ -6109,7 +6110,7 @@ CBaseEntity	*CBasePlayer::GiveNamedItem( const char *pszName, int iSubType )
 
 	// <-- Mirv
 
-	IGameEvent* pEvent = gameeventmanager->CreateEvent("player_additem");
+	IGameEvent *pEvent = gameeventmanager->CreateEvent("player_additem");
 	if (pEvent)
 	{
 		pEvent->SetInt("userid", GetUserID());
@@ -6417,7 +6418,7 @@ static void CreateJalopy( CBasePlayer *pPlayer )
 #ifdef SDK2013CE
 	CBaseEntity *pJeep = (CBaseEntity *)CreateEntityByName( "prop_vehicle_jalopy" );
 #else
-	CBaseEntity* pJeep = (CBaseEntity *)CreateEntityByName( "prop_vehicle_jeep" );
+	CBaseEntity *pJeep = (CBaseEntity *)CreateEntityByName( "prop_vehicle_jeep" );
 #endif // SDK2013CE
 	if ( pJeep )
 	{
@@ -6430,7 +6431,7 @@ static void CreateJalopy( CBasePlayer *pPlayer )
 #ifdef SDK2013CE
 		pJeep->KeyValue( "targetname", "jalopy" );
 #else
-		pJeep->KeyValue("targetname", "jeep");
+		pJeep->KeyValue( "targetname", "jeep" );
 #endif // SDK2013CE
 		pJeep->KeyValue( "vehiclescript", "scripts/vehicles/jalopy.txt" );
 		DispatchSpawn( pJeep );
@@ -6942,7 +6943,7 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 		{
 			int index = atoi( args[1] );
 
-			CBasePlayer * target;
+			CBasePlayer *target;
 
 			if ( index == 0 )
 			{
@@ -9650,7 +9651,7 @@ int	CPlayerInfo::GetFragCount()
 #ifdef FF
 int	CPlayerInfo::GetFortPointsCount()
 {
-	Assert(m_pParent);
+	Assert( m_pParent );
 	return m_pParent->FortPointsCount();
 }
 #endif
@@ -9861,10 +9862,10 @@ const QAngle CPlayerInfo::GetLocalAngles( void )
 	}
 }
 #ifdef FF
-void CPlayerInfo::PostClientMessagesSent(void)
+void CPlayerInfo::PostClientMessagesSent( void )
 {
-	Assert(m_pParent);
-	if (m_pParent->IsBot())
+	Assert( m_pParent );
+	if ( m_pParent->IsBot() )
 	{
 		m_pParent->PostClientMessagesSent();
 	}

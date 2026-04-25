@@ -19,21 +19,23 @@ IMPLEMENT_SERVERCLASS_ST_NOBASE(CPlayerResource, DT_PlayerResource)
 //	SendPropArray( SendPropString( SENDINFO(m_szName[0]) ), SENDARRAYINFO(m_szName) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iPing), SendPropInt( SENDINFO_ARRAY(m_iPing), 10, SPROP_UNSIGNED ) ),
 //	SendPropArray( SendPropInt( SENDINFO_ARRAY(m_iPacketloss), 7, SPROP_UNSIGNED ), m_iPacketloss ),
-	SendPropArray3(SENDINFO_ARRAY3(m_iScore), SendPropInt( SENDINFO_ARRAY(m_iScore), 15 ) ),	// |- Mirv: Upped transmission bits from 12->15
-	SendPropArray3(SENDINFO_ARRAY3(m_iFortPoints), SendPropInt( SENDINFO_ARRAY(m_iFortPoints), 20 ) ),	// |- Shock: Upped transmission bits from 15->20 (needs to be big!)
+	SendPropArray3( SENDINFO_ARRAY3(m_iScore), SendPropInt( SENDINFO_ARRAY(m_iScore), 15 ) ),	// |- Mirv: Upped transmission bits from 12->15
 	SendPropArray3( SENDINFO_ARRAY3(m_iDeaths), SendPropInt( SENDINFO_ARRAY(m_iDeaths), 12 ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_bConnected), SendPropInt( SENDINFO_ARRAY(m_bConnected), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iTeam), SendPropInt( SENDINFO_ARRAY(m_iTeam), 4 ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_bAlive), SendPropInt( SENDINFO_ARRAY(m_bAlive), 1, SPROP_UNSIGNED ) ),
 	SendPropArray3( SENDINFO_ARRAY3(m_iHealth), SendPropInt( SENDINFO_ARRAY(m_iHealth), -1, SPROP_VARINT | SPROP_UNSIGNED ) ),
-	SendPropArray3(SENDINFO_ARRAY3(m_iArmor), SendPropInt( SENDINFO_ARRAY(m_iArmor), 9, SPROP_UNSIGNED)),
-	SendPropArray3(SENDINFO_ARRAY3(m_iClass), SendPropInt( SENDINFO_ARRAY(m_iClass), 5 ) ),	// |-- Mirv: Current class
-
-	SendPropArray3(SENDINFO_ARRAY3(m_iChannel), SendPropInt( SENDINFO_ARRAY(m_iChannel), 4 ) ), // |-- Mirv: Channel info
-
-	SendPropArray3(SENDINFO_ARRAY3(m_iAssists), SendPropInt( SENDINFO_ARRAY(m_iAssists), 12 ) ),
-
-	SendPropBool(SENDINFO(m_bIsIntermission)),
+#ifdef FF
+	SendPropArray3( SENDINFO_ARRAY3(m_iFortPoints), SendPropInt( SENDINFO_ARRAY(m_iFortPoints), 20 ) ),	// |- Shock: Upped transmission bits from 15->20 (needs to be big!)
+	SendPropArray3( SENDINFO_ARRAY3(m_iArmor), SendPropInt( SENDINFO_ARRAY(m_iArmor), 9, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3(m_iClass), SendPropInt( SENDINFO_ARRAY(m_iClass), 5 ) ),	// |-- Mirv: Current class
+	SendPropArray3( SENDINFO_ARRAY3(m_iChannel), SendPropInt( SENDINFO_ARRAY(m_iChannel), 4 ) ), // |-- Mirv: Channel info
+	SendPropArray3( SENDINFO_ARRAY3(m_iAssists), SendPropInt( SENDINFO_ARRAY(m_iAssists), 12 ) ),
+	SendPropBool( SENDINFO(m_bIsIntermission) ),
+#endif
+	SendPropArray3( SENDINFO_ARRAY3(m_iAccountID), SendPropInt( SENDINFO_ARRAY(m_iAccountID), 32, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3(m_bValid), SendPropInt( SENDINFO_ARRAY(m_bValid), 1, SPROP_UNSIGNED ) ),
+	SendPropArray3( SENDINFO_ARRAY3( m_iUserID ), SendPropInt( SENDINFO_ARRAY( m_iUserID ) ) ),
 END_SEND_TABLE()
 
 BEGIN_DATADESC( CPlayerResource )
@@ -131,8 +133,8 @@ void CPlayerResource::UpdatePlayerData( void )
 			m_iTeam.Set( i, pPlayer->GetTeamNumber() );
 			m_bAlive.Set( i, pPlayer->IsAlive()?1:0 );
 			m_iHealth.Set(i, MAX( 0, pPlayer->GetHealth() ) );
-			m_iArmor.Set(i, MAX( 0, pPlayer->GetArmor() ) );
-			m_iClass.Set(i, pPlayer->GetClassSlot() );	// |-- Mirv: Update our class
+			m_iArmor.Set( i, MAX( 0, pPlayer->GetArmor() ) );
+			m_iClass.Set( i, pPlayer->GetClassSlot() );	// |-- Mirv: Update our class
 			m_iAssists.Set( i, pPlayer->AssistsCount() );
 
 			// Don't update ping / packetloss everytime

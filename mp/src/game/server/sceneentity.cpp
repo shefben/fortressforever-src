@@ -4445,8 +4445,7 @@ int CSceneEntity::UpdateTransmitState()
 	// always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-#endif // FF_DLL
-	// <-- FF
+#endif	// <-- FF
 	if ( !ShouldNetwork() )
 	{
 		return SetTransmitState( FL_EDICT_DONTSEND );

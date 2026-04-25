@@ -684,7 +684,7 @@ public:
 
 	string_t	GetEntityName();
 	#ifdef FF_DLL
-	const char* GetName() { return STRING(GetEntityName()); }
+	const char *GetName() { return STRING(GetEntityName()); }
 	#endif
 	const char *GetEntityNameAsCStr();	// This method is temporary for VSCRIPT functionality until we figure out what to do with string_t (sjb)
 	const char *GetPreTemplateName(); // Not threadsafe. Get the name stripped of template unique decoration
@@ -1001,7 +1001,7 @@ protected:
 private:
 	CBaseEntity( CBaseEntity& );
 #ifdef FF_DLL
-CSpriteTrail* m_pSpriteTrail;
+CSpriteTrail *m_pSpriteTrail;
 #endif
 
 	// list handling
@@ -1087,7 +1087,7 @@ public:
 	virtual CBaseCombatCharacter *MyCombatCharacterPointer( void ) { return NULL; }
 	virtual INextBot		*MyNextBotPointer( void ) { return NULL; }
 #ifdef FF_DLL
-	virtual CBasePlayer*	MyCharacterPointer(void) { return NULL; }
+	virtual CBasePlayer		*MyCharacterPointer(void) { return NULL; }
 #endif
 	virtual float			GetDelay( void ) { return 0; }
 	virtual bool			IsMoving( void );
@@ -1100,9 +1100,9 @@ public:
 	void			AddPointsToTeam( int score, bool bAllowNegativeScore );
 	void			RemoveAllDecals( void );
 	#ifdef FF_DLL
-	void	        StartTrail(int teamId);
-	void	        StartTrail(int teamId, float startWidth, float endWidth, float lifetime);
-	void	        StopTrail(void);
+	void	        StartTrail( int teamId );
+	void	        StartTrail( int teamId, float startWidth, float endWidth, float lifetime );
+	void	        StopTrail( void );
 	#endif
 	virtual bool	OnControls( CBaseEntity *pControls ) { return false; }
 	virtual bool	HasTarget( string_t targetname );
@@ -1344,8 +1344,8 @@ public:
 
 	#ifdef FF_DLL
 	// --> Added by Mulch for testing
-	CNetworkVarForDerived(int, m_iArmor);
-	CNetworkVarForDerived(int, m_iMaxArmor);
+	CNetworkVarForDerived( int, m_iArmor );
+	CNetworkVarForDerived( int, m_iMaxArmor );
 	// <-- Added by Mulch for testing
 	#endif
 	// Damage filtering
@@ -1634,7 +1634,7 @@ public:
 	int						GetFlags( void ) const;
 	void					ClearFlags( void );
 #ifdef FF_DLL
-	bool					IsOnFire(void) const { return (GetFlags() & FL_ONFIRE) ? true : false; }
+	bool					IsOnFire( void ) const { return ( GetFlags() & FL_ONFIRE ) ? true : false; }
 #endif
 	// Sets the local position from a transform
 	void					SetLocalTransform( const matrix3x4_t &localTransform );
@@ -1645,7 +1645,7 @@ public:
 #endif
 	void					EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );
 #ifdef FF_DLL
-	void EmitSoundShared(const char* soundname, float soundtime = 0.0f, float* duration = NULL);
+	void EmitSoundShared( const char *soundname, float soundtime = 0.0f, float *duration = NULL );
 #endif
 	void					EmitSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );
 	void					ScriptEmitSound( const char *soundname );
@@ -1654,7 +1654,7 @@ public:
 	void					StopSound( const char *soundname );
 	void					StopSound( const char *soundname, HSOUNDSCRIPTHANDLE& handle );
 #ifdef FF_DLL
-	void StopSoundInChannel(const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
+	void StopSoundInChannel( const char *soundname, HSOUNDSCRIPTHANDLE& handle, const int channel); // Jon: for AC stuff
 	#endif
 	void					GenderExpandString( char const *in, char *out, int maxlen );
 
@@ -1669,7 +1669,7 @@ public:
 	static void EmitSound( IRecipientFilter& filter, int iEntIndex, const char *soundname, HSOUNDSCRIPTHANDLE& handle, const Vector *pOrigin = NULL, float soundtime = 0.0f, float *duration = NULL );
 	static void StopSound( int iEntIndex, const char *soundname );
 #ifdef FF_DLL
-	static void StopSoundInChannel(int iEntIndex, const char* soundname, const int channel); // Jon: for AC stuff
+	static void StopSoundInChannel( int iEntIndex, const char *soundname, const int channel ); // Jon: for AC stuff
 #endif
 	static soundlevel_t LookupSoundLevel( const char *soundname );
 	static soundlevel_t LookupSoundLevel( const char *soundname, HSOUNDSCRIPTHANDLE& handle );

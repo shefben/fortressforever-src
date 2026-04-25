@@ -744,7 +744,7 @@ void CViewRender::SetUpViews()
 	}
 	// <-- Mirv
 #endif
-	if (UseVR())
+	if ( UseVR() )
 	{
 		// Let the headtracking read the status of the HMD, etc.
 		// This call can go almost anywhere, but it needs to know the player FOV for sniper weapon zoom, etc

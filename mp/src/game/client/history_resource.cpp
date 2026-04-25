@@ -179,7 +179,7 @@ void CHudHistoryResource::AddToHistory( int iType, int iId, int iCount )
 #else // Get the item's icon
 	CHudTexture* icon = gHUD.GetIcon(FF_GetAmmoName(iId));
 
-	AddIconToHistory(iType, iId, NULL, iCount, icon);
+	AddIconToHistory( iType, iId, NULL, iCount, icon );
 #endif
 }
 
@@ -389,51 +389,51 @@ void CHudHistoryResource::Paint( void )
 			}
 			break;
 			case HISTSLOT_AMMODENIED:
-			{
-				itemIcon = gWR.GetAmmoIconFromWeapon(m_PickupHistory[i].iId);
-				iAmount = 0;
-				bUseAmmoFullMsg = true;
-				// display as red
-				clr = gHUD.m_clrCaution;
-				clr[3] = MIN(scale, 255);
-			}
-			break;
+				{
+					itemIcon = gWR.GetAmmoIconFromWeapon( m_PickupHistory[i].iId );
+					iAmount = 0;
+					bUseAmmoFullMsg = true;
+					// display as red
+					clr = gHUD.m_clrCaution;	
+					clr[3] = MIN( scale, 255 );
+				}
+				break;
 
 			case HISTSLOT_WEAP:
-			{
-				C_BaseCombatWeapon* pWeapon = m_PickupHistory[i].m_hWeapon;
-				if (!pWeapon)
-					return;
-
-				if (!pWeapon->HasAmmo())
 				{
-					// if the weapon doesn't have ammo, display it as red
-					clr = gHUD.m_clrCaution;
-					clr[3] = MIN(scale, 255);
+					C_BaseCombatWeapon *pWeapon = m_PickupHistory[i].m_hWeapon;
+					if ( !pWeapon )
+						return;
+
+					if ( !pWeapon->HasAmmo() )
+					{
+						// if the weapon doesn't have ammo, display it as red
+						clr = gHUD.m_clrCaution;	
+						clr[3] = MIN( scale, 255 );
+					}
+
+					itemIcon = pWeapon->GetSpriteInactive();
+					bHalfHeight = false;
 				}
-
-				itemIcon = pWeapon->GetSpriteInactive();
-				bHalfHeight = false;
-			}
-			break;
+				break;
 			case HISTSLOT_ITEM:
-			{
-				if (!m_PickupHistory[i].iId)
-					continue;
+				{
+					if ( !m_PickupHistory[i].iId )
+						continue;
 
-				itemIcon = m_PickupHistory[i].icon;
-				bHalfHeight = false;
-			}
-			break;
+					itemIcon = m_PickupHistory[i].icon;
+					bHalfHeight = false;
+				}
+				break;
 			default:
 				// unknown history type
-				Assert(0);
+				Assert( 0 );
 				break;
 			}
 
 			// --> Mirv: Draw proper icons
 
-			if (clr[3])
+			if ( clr[3] )
 			{
 				// valid drawing will occur
 				m_bNeedsDraw = true;
@@ -449,7 +449,7 @@ void CHudHistoryResource::Paint( void )
 
 			int ypos = tall - (m_flHistoryGap * (i + 1));
 
-			if (itemIcon)
+			if ( itemIcon )
 			{
 				if (itemIcon->bRenderUsingFont)
 				{
@@ -474,7 +474,7 @@ void CHudHistoryResource::Paint( void )
 				_snwprintf( text, sizeof( text ) / sizeof(wchar_t), L"%i", m_PickupHistory[i].iCount );
 
 				// offset the number to sit properly next to the icon
-				ypos -= (surface()->GetFontTall(m_hNumberFont) - iconTall) / 2;
+				ypos -= ( surface()->GetFontTall( m_hNumberFont ) - iconTall ) / 2;
 
 				vgui::surface()->DrawSetTextFont( m_hNumberFont );
 				vgui::surface()->DrawSetTextColor( clr );
@@ -484,7 +484,7 @@ void CHudHistoryResource::Paint( void )
 			else if ( bUseAmmoFullMsg )
 			{
 				// offset the number to sit properly next to the icon
-				ypos -= (surface()->GetFontTall(m_hTextFont) - iconTall) / 2;
+				ypos -= ( surface()->GetFontTall( m_hTextFont ) - iconTall ) / 2;
 
 				vgui::surface()->DrawSetTextFont( m_hTextFont );
 				vgui::surface()->DrawSetTextColor( clr );

@@ -28,27 +28,31 @@
 
 #ifdef CLIENT_DLL
 	#include "c_te_effect_dispatch.h"
+	#include <vgui/ILocalize.h>
+	extern vgui::ILocalize *g_pVGuiLocalize;
 #else
 	#include "te_effect_dispatch.h"
 
 bool NPC_CheckBrushExclude( CBaseEntity *pEntity, CBaseEntity *pBrush );
 #endif
-
+#ifdef FF
 #include "ff_triggerclip.h"
 #include "ff_gamerules.h"
 
-#ifdef CLIENT_DLL
-#include "c_ff_team.h"
-#include "c_ff_player.h"
-#include "c_te_effect_dispatch.h"
-#else
-#include "ff_team.h"
-#include "ff_player.h"
-#include "te_effect_dispatch.h"
-#include "ff_info_script.h"
+	#ifdef CLIENT_DLL
+	#include "c_ff_team.h"
+	#include "c_ff_player.h"
+	#include "c_te_effect_dispatch.h"
+	#else
+	#include "ff_team.h"
+	#include "ff_player.h"
+	#include "te_effect_dispatch.h"
+	#include "ff_info_script.h"
 
-//bool NPC_CheckBrushExclude(CBaseEntity* pEntity, CBaseEntity* pBrush);
+//bool NPC_CheckBrushExclude(CBaseEntity *pEntity, CBaseEntity *pBrush);
+	#endif
 #endif
+#include "steam/steam_api.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -199,7 +203,7 @@ Vector SharedRandomVector( const char *sharedname, float minVal, float maxVal, i
 
 	int seed = SeedFileLineHash( CBaseEntity::GetPredictionRandomSeed(), sharedname, additionalSeed );
 	RandomSeed( seed );
-	return RandomVector(minVal, maxVal);
+	return RandomVector( minVal, maxVal );
 }
 
 QAngle SharedRandomAngle( const char *sharedname, float minVal, float maxVal, int additionalSeed /*=0*/ )
@@ -1416,6 +1420,26 @@ float CountdownTimer::Now( void ) const
 	{
 		return ToBasePlayer( ClientEntityList().GetEnt( entindex ) );
 	}
+#endif
+
+
+CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID )
+{
+	CSteamID steamIDPlayer;
+	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+		if ( !pPlayer )
+			continue;
+
+		if ( !pPlayer->GetSteamID( &steamIDPlayer ) )
+			continue;
+
+		if ( steamIDPlayer == steamID )
+			return pPlayer;
+	}
+	return NULL;
+}
 
 //=============================================================================
 // HPE_BEGIN:
@@ -1556,4 +1580,268 @@ const char* UTIL_GetActiveHolidayString()
 #else
 	return NULL;
 #endif
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+const char* UTIL_GetActiveOperationString()
+{
+#if defined( TF_DLL ) || defined( TF_CLIENT_DLL )
+	if ( GetItemSchema() )
+	{
+		FOR_EACH_DICT_FAST( GetItemSchema()->GetOperationDefinitions(), iOperation )
+		{
+			CEconOperationDefinition *pOperation = GetItemSchema()->GetOperationDefinitions()[iOperation];
+			if ( !pOperation || !pOperation->IsActive() || !pOperation->IsCampaign() )
+				continue;
+
+			return pOperation->GetName();
+		}
+	}
+#endif
+
+	return NULL;
+}
+
+extern ISoundEmitterSystemBase *soundemitterbase;
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+const char *UTIL_GetRandomSoundFromEntry( const char* pszEntryName )
+{
+	Assert( pszEntryName );
+
+	if ( pszEntryName )
+	{
+		int soundIndex = soundemitterbase->GetSoundIndex( pszEntryName );
+		CSoundParametersInternal *internal = ( soundIndex != -1 ) ? soundemitterbase->InternalGetParametersForSound( soundIndex ) : NULL;
+		// See if we need to pick a random one
+		if ( internal )
+		{
+			int wave = RandomInt( 0, internal->NumSoundNames() - 1 );
+			pszEntryName = soundemitterbase->GetWaveName( internal->GetSoundNames()[wave].symbol );
+		}
+	}
+
+	return pszEntryName;
+}
+
+/// Clamp and round float vals to int.  The values are in the 0...255 range.
+Color FloatRGBAToColor( float r, float g, float b, float a )
+{
+	return Color(
+		(unsigned char)clamp(r + .5f, 0.0, 255.0f),
+		(unsigned char)clamp(g + .5f, 0.0, 255.0f),
+		(unsigned char)clamp(b + .5f, 0.0, 255.0f),
+		(unsigned char)clamp(a + .5f, 0.0, 255.0f)
+	);
+}
+
+float LerpFloat( float x0, float x1, float t )
+{
+	return x0 + (x1 - x0) * t;
+}
+
+Color LerpColor( const Color &c0, const Color &c1, float t )
+{
+	if ( t <= 0.0f ) return c0;
+	if ( t >= 1.0f ) return c1;
+	return FloatRGBAToColor(
+		LerpFloat( (float)c0.r(), (float)c1.r(), t ),
+		LerpFloat( (float)c0.g(), (float)c1.g(), t ),
+		LerpFloat( (float)c0.b(), (float)c1.b(), t ),
+		LerpFloat( (float)c0.a(), (float)c1.a(), t )
+	);
+}
+
+ISteamUtils* GetSteamUtils()
+{
+#ifdef GAME_DLL
+	// Use steamgameserver context if this isn't a client/listenserver.
+	if ( engine->IsDedicatedServer() )
+	{
+		return steamgameserverapicontext ? steamgameserverapicontext->SteamGameServerUtils() : NULL;
+	}
+#endif
+	return steamapicontext ? steamapicontext->SteamUtils() : NULL;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+EUniverse GetUniverse()
+{
+	if ( !GetSteamUtils() )
+		return k_EUniverseInvalid;
+
+	static EUniverse steamUniverse = GetSteamUtils()->GetConnectedUniverse();
+	return steamUniverse;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+CSteamID SteamIDFromDecimalString( const char *pszUint64InDecimal )
+{
+	uint64 ulSteamID = 0;
+	if ( sscanf( pszUint64InDecimal, "%llu", &ulSteamID ) )
+	{
+		return CSteamID( ulSteamID );
+	}
+	else
+	{
+		Assert( false );
+		return CSteamID();
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Try to parse an un-ambiguous steamID from a string
+//
+//  Accepts
+//  - Formatted SteamID ([U:1:1234])
+//  - SteamID64 (76561123412341234)
+//  - Legacy SteamID (STEAM_0:1:1234) (if bAllowSteam2)
+//-----------------------------------------------------------------------------
+CSteamID UTIL_SteamIDFromProperString( const char *pszInput, bool bAllowSteam2 /* = true */ )
+{
+	// Formatted SteamID or SteamID64
+	{
+		CSteamID steamID;
+		bool bMatch = steamID.SetFromStringStrict( pszInput, GetUniverse() );
+		if ( bMatch && steamID.IsValid() )
+			{ return steamID; }
+	}
+
+	// Legacy SteamID?
+	const char szPrefix[] = "STEAM_";
+	if ( bAllowSteam2 && V_strlen( pszInput ) >= (int)V_ARRAYSIZE( szPrefix ) &&
+	     V_strncmp( szPrefix, pszInput, V_ARRAYSIZE( szPrefix ) - 1 ) == 0 )
+	{
+		CSteamID steamID;
+		bool bMatch = SteamIDFromSteam2String( pszInput, GetUniverse(), &steamID );
+		if ( bMatch && steamID.IsValid() )
+			{ return steamID; }
+	}
+
+	return CSteamID();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Try to parse a string referring to a steam account to a CSteamID.
+//
+//   This is intended for fuzzy user input -- NOT guaranteed to find a unique
+//   or un-ambiugous result
+//-----------------------------------------------------------------------------
+CSteamID UTIL_GuessSteamIDFromFuzzyInput( const char *pszInputRaw, bool bCurrentUniverse /* = true */ )
+{
+	if( !pszInputRaw )
+	{
+		return CSteamID();
+	}
+
+	EUniverse localUniverse = GetUniverse();
+
+	CUtlString strInput( pszInputRaw );
+	strInput.Trim();
+
+	// Is this a proper string once trimmed?
+	CSteamID steamID = UTIL_SteamIDFromProperString( strInput, true );
+	if ( steamID.IsValid() && ( !bCurrentUniverse || steamID.GetEUniverse() == localUniverse ) )
+		{ return steamID; }
+
+	// Check for all digits representing a 32bit number
+	//
+	// SteamIDFromProperString would've checked for a 64bit staemID, but if it is 32bit we can assume account ID for
+	// current universe
+	bool bAllDigits = true;
+	for ( int i = 0; bAllDigits && i < strInput.Length(); i++ )
+		{ bAllDigits = bAllDigits && V_isdigit( strInput[i] ); }
+
+	if ( bAllDigits )
+	{
+		uint64_t ullParsed = V_atoi64( strInput );
+		if ( ullParsed > 0 && ullParsed < UINT32_MAX ) // 0 and ~0 are bogus accountID values
+		{
+			CSteamID steamID( (uint32_t)ullParsed, localUniverse, k_EAccountTypeIndividual );
+			if ( steamID.IsValid() )
+				{ return steamID; }
+		}
+	}
+
+	// See if it's a profile link. If it is, clip the SteamID from it.
+	if ( V_strncmp( strInput, "http://", 7 ) == 0 )
+		{ strInput = strInput.Slice( 0, 7 ); }
+	if ( V_strncmp( strInput, "https://", 8 ) == 0 )
+		{ strInput = strInput.Slice( 0, 8 ); }
+	if ( V_strncmp( strInput, "www.", 4 ) == 0 )
+		{ strInput = strInput.Slice( 0, 4 ); }
+
+	const char pszProfilePrepend[] = "steamcommunity.com/profiles/";
+	const size_t lenProfilePrepend = V_ARRAYSIZE( pszProfilePrepend ) - 1;
+	if ( strInput.Length() > (int)lenProfilePrepend &&
+	     V_strncmp( pszProfilePrepend, strInput, lenProfilePrepend ) == 0 )
+	{
+		// Read up to ? or # or /
+		const char *pEnd = strchr( strInput + lenProfilePrepend, '?' );
+		const char *pPound = strchr( strInput + lenProfilePrepend, '#' );
+		if ( pPound < pEnd ) { pEnd = pPound; }
+		const char *pSlash = strchr( strInput + lenProfilePrepend, '/' );
+		if ( pSlash < pEnd ) { pEnd = pSlash; }
+
+		strInput = strInput.Slice( lenProfilePrepend, pEnd ? ( pEnd - strInput.Get() ) : strInput.Length() );
+
+		// /profiles/[U:1:2] *does* work, but STEAM_BLAH does not
+		CSteamID steamID = UTIL_SteamIDFromProperString( strInput.Get(), /* bAllowSteam2 */ false );
+		if ( steamID.IsValid() && ( !bCurrentUniverse || steamID.GetEUniverse() == localUniverse ) )
+			{ return steamID; }
+	}
+
+	return CSteamID();
+}
+
+#define WORKSHOP_PREFIX_1		"workshop/"
+#define MAP_WORKSHOP_PREFIX_1	"maps/" WORKSHOP_PREFIX_1
+
+#define WORKSHOP_PREFIX_2		"workshop\\"
+#define MAP_WORKSHOP_PREFIX_2	"maps\\" WORKSHOP_PREFIX_2
+
+const char *GetCleanMapName( const char *pszUnCleanMapName, char (&pszTmp)[256])
+{
+#if defined( TF_DLL ) || defined( TF_CLIENT_DLL )
+	bool bPrefixMaps = true;
+	const char *pszMapAfterPrefix = StringAfterPrefixCaseSensitive( pszUnCleanMapName, MAP_WORKSHOP_PREFIX_1 );
+	if ( !pszMapAfterPrefix )
+		pszMapAfterPrefix = StringAfterPrefixCaseSensitive( pszUnCleanMapName, MAP_WORKSHOP_PREFIX_2 );
+
+	if ( !pszMapAfterPrefix )
+	{
+		bPrefixMaps = false;
+		pszMapAfterPrefix = StringAfterPrefixCaseSensitive( pszUnCleanMapName, WORKSHOP_PREFIX_1 );
+		if ( !pszMapAfterPrefix )
+			pszMapAfterPrefix = StringAfterPrefixCaseSensitive( pszUnCleanMapName, WORKSHOP_PREFIX_2 );
+	}
+
+	if ( pszMapAfterPrefix )
+	{
+		if ( bPrefixMaps )
+		{
+			V_strcpy_safe( pszTmp, "maps" CORRECT_PATH_SEPARATOR_S );
+			V_strcat_safe( pszTmp, pszMapAfterPrefix );
+		}
+		else
+		{
+			V_strcpy_safe( pszTmp, pszMapAfterPrefix );
+		}
+
+		char *pszUGC = V_strstr( pszTmp, ".ugc" );
+		if ( pszUGC )
+			*pszUGC = '\0';
+
+		return pszTmp;
+	}
+#endif
+
+	return pszUnCleanMapName;
 }

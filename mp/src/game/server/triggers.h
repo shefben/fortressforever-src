@@ -211,7 +211,7 @@ public:
 	bool HurtEntity( CBaseEntity *pOther, float damage );
 	int HurtAllTouchers( float dt );
 #ifdef FF
-	virtual Class_T Classify(void) { return CLASS_TRIGGER_HURT; }
+	virtual Class_T Classify( void ) { return CLASS_TRIGGER_HURT; }
 #endif
 	DECLARE_DATADESC();
 
@@ -265,7 +265,7 @@ public:
 	virtual void	LuaRemove(void) { SetRemoved(); Disable(); }
 	virtual void	LuaSetLocation();
 
-	virtual Class_T Classify(void) { return CLASS_TRIGGERSCRIPT; }
+	virtual Class_T Classify( void ) { return CLASS_TRIGGERSCRIPT; }
 
 	virtual void	SetActive(void);
 	virtual void	SetInactive(void);

@@ -163,7 +163,7 @@ protected:
 
 	// BEG: Added by Mulchman
 	// finds the player in the scoreboard
-	int FindItemIDForPlayerIndex( int playerIndex );
+	int FindItemIDForPlayerIndex(int playerIndex);
 	int FindPlayerIndexForItemID( int iItemID );
 	// END: Added by Mulchman
 

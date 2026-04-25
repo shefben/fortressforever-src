@@ -523,8 +523,8 @@ void CTakeDamageInfo::SetCritType( ECritType eType )
 //-----------------------------------------------------------------------------
 // Purpose: Convert ammo type to lua range
 //-----------------------------------------------------------------------------
-int CTakeDamageInfo::GetAmmoTypeLua(void)
+int CTakeDamageInfo::GetAmmoTypeLua( void )
 {
-	return LookupAmmoLua(GetAmmoType());
+	return LookupAmmoLua( GetAmmoType() );
 }
 #endif

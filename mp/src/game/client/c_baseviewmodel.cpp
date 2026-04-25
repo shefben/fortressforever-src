@@ -140,7 +140,7 @@ void C_BaseViewModel::UncorrectViewModelAttachment( Vector &vOrigin )
 void C_BaseViewModel::FireEvent( const Vector& origin, const QAngle& angles, int event, const char *options )
 {
 	// Mirv: Don't do any viewmodel stuff in third person
-	if (input->CAM_IsThirdPerson())
+	if ( input->CAM_IsThirdPerson() )
 		return;
 
 	// We override sound requests so that we can play them locally on the owning player
@@ -331,7 +331,7 @@ int C_BaseViewModel::DrawModel( int flags )
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 #else
 	// use the owner of the weapon instead of the local player so it works universally (for spectators, etc)
-	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
+	C_FFPlayer* pPlayer = ToFFPlayer( GetOwner() );
 #endif
 	C_BaseCombatWeapon *pWeapon = GetOwningWeapon();
 
@@ -351,7 +351,7 @@ int C_BaseViewModel::DrawModel( int flags )
 #ifndef FF
 	if ( pPlayer && pPlayer->IsOverridingViewmodel() )
 #else
-	if ((pPlayer && pPlayer->IsOverridingViewmodel()) || (pPlayer && m_pOverrideMaterial))
+	if ( ( pPlayer && pPlayer->IsOverridingViewmodel() ) || ( pPlayer && m_pOverrideMaterial ) )
 #endif
 	{
 		ret = pPlayer->DrawOverriddenViewmodel( this, flags );
@@ -412,29 +412,29 @@ int C_BaseViewModel::InternalDrawModel( int flags )
 int C_BaseViewModel::DrawOverriddenViewmodel( int flags )
 {
 #ifdef FF
-	C_FFPlayer* pPlayer = ToFFPlayer(GetOwner());
+	C_FFPlayer* pPlayer = ToFFPlayer( GetOwner() );
 	if (pPlayer)
 	{
-		if (!pPlayer->IsCloaked())
+		if ( !pPlayer->IsCloaked() )
 		{
-			ReleaseOverrideMaterial(FF_CLOAK_MATERIAL);
+			ReleaseOverrideMaterial( FF_CLOAK_MATERIAL );
 
 			if ( m_hArmModel.Get() )
 			{
-				m_hArmModel->ReleaseOverrideMaterial(FF_CLOAK_MATERIAL);
+				m_hArmModel->ReleaseOverrideMaterial( FF_CLOAK_MATERIAL );
 			}
 		}
 		else
 		{
 			// don't draw if cloaked and basically not moving
-			if (pPlayer->GetLocalVelocity().Length() < 1.0f)
+			if ( pPlayer->GetLocalVelocity().Length() < 1.0f )
 				return 1;
 
-			FindOverrideMaterial(FF_CLOAK_MATERIAL, FF_CLOAK_TEXTURE_GROUP);
+			FindOverrideMaterial( FF_CLOAK_MATERIAL, FF_CLOAK_TEXTURE_GROUP );
 
 			if ( m_hArmModel.Get() )
 			{
-				m_hArmModel->FindOverrideMaterial(FF_CLOAK_MATERIAL, FF_CLOAK_TEXTURE_GROUP);
+				m_hArmModel->FindOverrideMaterial( FF_CLOAK_MATERIAL, FF_CLOAK_TEXTURE_GROUP );
 			}
 		}
 	}

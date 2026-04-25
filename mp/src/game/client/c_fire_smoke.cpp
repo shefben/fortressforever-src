@@ -344,9 +344,8 @@ void C_EntityFlame::CreateEffect( void )
 	{
 		C_BaseEntity *pEntity = m_hEntAttached;
 		m_hOldAttached = m_hEntAttached;
-
-#ifdef FF	// --> Mirv: Don't attach to local player in first person mode
-		if (pEntity == CBasePlayer::GetLocalPlayer() && !input->CAM_IsThirdPerson())
+#ifdef FF // --> Mirv: Don't attach to local player in first person mode
+		if ( pEntity == CBasePlayer::GetLocalPlayer() && !input->CAM_IsThirdPerson() )
 			return;
 #endif	// <--
 

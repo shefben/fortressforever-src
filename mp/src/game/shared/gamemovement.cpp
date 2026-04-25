@@ -14,6 +14,9 @@
 #include "decals.h"
 #include "coordsize.h"
 #include "rumble_shared.h"
+#ifdef CLIENT_DLL
+#include "prediction.h"
+#endif
 
 #if defined(HL2_DLL) || defined(HL2_CLIENT_DLL)
 	#include "hl_movedata.h"
@@ -27,18 +30,23 @@
 
 #include "filesystem.h"
 #include <stdarg.h>
-
+#ifdef FF
 #include "ff_utils.h"
-
+#endif
 extern IFileSystem *filesystem;
 
 #ifndef CLIENT_DLL
 	#include "env_player_surface_trigger.h"
+	#ifdef FF_CLIENT_DLL
 	#include "ff_player.h"				// |-- Mirv: Fall sounds
+	#endif
 	static ConVar dispcoll_drawplane( "dispcoll_drawplane", "0" );
 #else
-#include "c_ff_player.h"					// |-- Mirv: Fall sounds
+	#ifdef FF_DLL
+	#include "c_ff_player.h"					// |-- Mirv: Fall sounds
+	#endif
 #endif
+
 
 // tickcount currently isn't set during prediction, although gpGlobals->curtime and
 // gpGlobals->frametime are. We should probably set tickcount (to player->m_nTickBase),
@@ -59,11 +67,6 @@ ConVar player_limit_jump_speed( "player_limit_jump_speed", "1", FCVAR_REPLICATED
 // duck controls. Its value is meaningless anytime we don't have the options window open.
 ConVar option_duck_method("option_duck_method", "1", FCVAR_REPLICATED|FCVAR_ARCHIVE );// 0 = HOLD to duck, 1 = Duck is a toggle
 
-#ifdef STAGING_ONLY
-#ifdef CLIENT_DLL
-ConVar debug_latch_reset_onduck( "debug_latch_reset_onduck", "1", FCVAR_CHEAT );
-#endif
-#endif
 
 // [MD] I'll remove this eventually. For now, I want the ability to A/B the optimizations.
 bool g_bMovementOptimizations = true;
@@ -1362,7 +1365,7 @@ void CGameMovement::CheckWaterJump( void )
 			VectorCopy( vecEnd, vecStart );
 			vecEnd.z -= 1024.0f;
 			TracePlayerBBox( vecStart, vecEnd, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, tr );
-			if ( ( tr.fraction < 1.0f ) && (tr.plane.normal.z >= 1.0))  // Jiggles: Was "tr.plain.normal.z >= 0.7"
+			if ( ( tr.fraction < 1.0f ) && ( tr.plane.normal.z >= 1.0 ) )  // Jiggles: Was "tr.plain.normal.z >= 0.7"
 																		//		    I changed it to 1.0 to try and prevent the water jump
 																		//			from triggering when the player was merely walking out 
 																		//			of the water on a slope (see Mantis issue 1164)
@@ -2825,7 +2828,7 @@ int CGameMovement::TryPlayerMove( Vector *pFirstDest, trace_t *pFirstTrace )
 				}
 				else
 				{
-					ClipVelocity(original_velocity, planes[i], new_velocity, 1.0 + sv_bounce.GetFloat() * (1 - /*player->m_surfaceFriction*/ 1.0f));	// |-- Mirv: More TFC Feeling (tm) friction
+					ClipVelocity( original_velocity, planes[i], new_velocity, 1.0 + sv_bounce.GetFloat() * (1 - /*player->m_surfaceFriction*/ 1.0f));	// |-- Mirv: More TFC Feeling (tm) friction
 				}
 			}
 
@@ -4018,7 +4021,7 @@ void CGameMovement::CategorizePosition( void )
 //-----------------------------------------------------------------------------
 void CGameMovement::CheckFalling( void )
 {
-	CFFPlayer* pPlayer = ToFFPlayer(player);
+	CFFPlayer *pPlayer = ToFFPlayer(player);
 
 	// Jiggles: To stop players from double jumping off other players
 	if (player->GetGroundEntity() && player->GetGroundEntity()->IsPlayer())
@@ -4267,11 +4270,11 @@ void CGameMovement::FinishUnDuck( void )
 
 	// The extra check (m_Local.m_bDucked) added because players were popping up 
 	// into the air when they hadn't yet been moved down for the duck
-	if (player->GetGroundEntity() != NULL && player->m_Local.m_bDucked)
+	if ( player->GetGroundEntity() != NULL && player->m_Local.m_bDucked )
 	{
-		for (i = 0; i < 3; i++)
+		for ( i = 0; i < 3; i++ )
 		{
-			newOrigin[i] += (VEC_DUCK_HULL_MIN[i] - VEC_HULL_MIN[i]);
+			newOrigin[i] += ( VEC_DUCK_HULL_MIN[i] - VEC_HULL_MIN[i] );
 		}
 	}
 	//trace = pmove->PM_PlayerTrace( newOrigin, newOrigin, PM_NORMAL, -1 );
@@ -4472,7 +4475,7 @@ void CGameMovement::StartUnDuckJump( void )
 
 	Vector hullSizeNormal = VEC_HULL_MAX_SCALED( player ) - VEC_HULL_MIN_SCALED( player );
 	Vector hullSizeCrouch = VEC_DUCK_HULL_MAX_SCALED( player ) - VEC_DUCK_HULL_MIN_SCALED( player );
-	Vector viewDelta = (hullSizeNormal - hullSizeCrouch) / 2.0f;	// |-- Mirv: We only want half the difference
+	Vector viewDelta = ( hullSizeNormal - hullSizeCrouch ) / 2.0f;	// |-- Mirv: We only want half the difference
 	Vector out;
 	VectorAdd( mv->GetAbsOrigin(), viewDelta, out );
 	mv->SetAbsOrigin( out );
@@ -4567,7 +4570,7 @@ void CGameMovement::Duck( void )
 	//int duckchange		= buttonsChanged & IN_DUCK ? 1 : 0;
 	//int duckpressed		= nButtonPressed & IN_DUCK ? 1 : 0;
 
-	if (mv->m_nButtons & IN_DUCK)
+	if ( mv->m_nButtons & IN_DUCK )
 	{
 		mv->m_nOldButtons |= IN_DUCK;
 	}
@@ -4929,8 +4932,8 @@ void CGameMovement::PlayerMove( void )
 	// If statement modifed by Mulch so players don't
 	// get randomly stuck on ladders while flying around in observer mode
 
-	// Don't run ladder code if dead or on a train	
-	if (!player->pl.deadflag && !(player->GetFlags() & FL_ONTRAIN) && (player->GetMoveType() != MOVETYPE_OBSERVER))
+	// Don't run ladder code if dead or on a train
+	if ( !player->pl.deadflag && !(player->GetFlags() & FL_ONTRAIN) && (player->GetMoveType() != MOVETYPE_OBSERVER) )
 	{
 		// If was not on a ladder now, but was on one before, 
 		//  get off of the ladder
@@ -5031,6 +5034,7 @@ void CGameMovement::PerformFlyCollisionResolution( trace_t &pm, Vector &move )
 				backoff = 2.0 - /*player->m_surfaceFriction*/ 1.0f;	// |-- Mirv: More TFC Feeling (tm) friction
 			else
 				backoff = 1;
+
 
 			ClipVelocity (mv->m_vecVelocity, pm.plane.normal, mv->m_vecVelocity, backoff);
 		}

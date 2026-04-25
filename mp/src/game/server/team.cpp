@@ -160,7 +160,7 @@ const char *CTeam::GetName( void ) const
 //-----------------------------------------------------------------------------
 // Purpose: Set the team's name
 //-----------------------------------------------------------------------------
-void CTeam::SetName(const char* pszName)
+void CTeam::SetName( const char *pszName )
 {
 	Q_strncpy(m_szTeamname.GetForModify(), pszName, MAX_TEAM_NAME_LENGTH);
 }
@@ -321,13 +321,13 @@ int CTeam::GetScore( void ) const
 //-----------------------------------------------------------------------------
 // Purpose: Add / Remove score for this team
 //-----------------------------------------------------------------------------
-void CTeam::AddFortPoints(int iFortPoints)
+void CTeam::AddFortPoints( int iFortPoints )
 {
 	m_iFortPoints += iFortPoints;
 	//m_flScoreTime = gpGlobals->curtime;
 }
 
-void CTeam::SetFortPoints(int iFortPoints)
+void CTeam::SetFortPoints( int iFortPoints )
 {
 	m_iFortPoints = iFortPoints;
 	//m_flScoreTime = gpGlobals->curtime;
@@ -336,7 +336,7 @@ void CTeam::SetFortPoints(int iFortPoints)
 //-----------------------------------------------------------------------------
 // Purpose: Get this team's score
 //-----------------------------------------------------------------------------
-int CTeam::GetFortPoints(void)
+int CTeam::GetFortPoints( void )
 {
 	return m_iFortPoints;
 }
@@ -344,7 +344,7 @@ int CTeam::GetFortPoints(void)
 //-----------------------------------------------------------------------------
 // Purpose: Get the time this team last scored
 //-----------------------------------------------------------------------------
-float CTeam::GetScoreTime(void)
+float CTeam::GetScoreTime( void )
 {
 	return m_flScoreTime;
 }
@@ -353,7 +353,7 @@ float CTeam::GetScoreTime(void)
 // Purpose: Add / Remove deaths for this team
 // Bug #0000529: Total death column doesn't work
 //-----------------------------------------------------------------------------
-void CTeam::AddDeaths(int iScore)
+void CTeam::AddDeaths( int iScore )
 {
 	m_iDeaths += iScore;
 }
@@ -362,7 +362,7 @@ void CTeam::AddDeaths(int iScore)
 // Purpose: Get this team's deaths
 // Bug #0000529: Total death column doesn't work
 //-----------------------------------------------------------------------------
-int CTeam::GetDeaths(void)
+int CTeam::GetDeaths( void )
 {
 	return m_iDeaths;
 }
@@ -370,7 +370,7 @@ int CTeam::GetDeaths(void)
 //-----------------------------------------------------------------------------
 // Purpose: Set the team's deaths
 //-----------------------------------------------------------------------------
-void CTeam::SetDeaths(int iDeaths)
+void CTeam::SetDeaths( int iDeaths )
 {
 	m_iDeaths = iDeaths;
 }

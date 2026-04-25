@@ -88,7 +88,7 @@ static vgui::HContext s_hVGuiContext = DEFAULT_VGUI_CONTEXT;
 #ifndef FF // Yeah, don't want this to be a cheat in the mod
 ConVar cl_drawhud( "cl_drawhud", "1", FCVAR_CHEAT, "Enable the rendering of the hud" );
 #else
-ConVar cl_drawhud("cl_drawhud", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Enable the rendering of the hud");
+ConVar cl_drawhud( "cl_drawhud", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Enable the rendering of the hud" );
 #endif
 ConVar hud_takesshots( "hud_takesshots", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Auto-save a scoreboard screenshot at the end of a map." );
 ConVar hud_freezecamhide( "hud_freezecamhide", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Hide the HUD during freeze-cam" );
@@ -518,7 +518,7 @@ bool ClientModeShared::ShouldDrawParticles( )
 	return true;
 }
 #ifdef FF
-void HudContextMenuInput(float* x, float* y);	// |-- Mirv: Radial context menu
+void HudContextMenuInput( float *x, float *y );	// |-- Mirv: Radial context menu
 #endif
 //-----------------------------------------------------------------------------
 // Purpose: Allow weapons to override mouse input (for binoculars)
@@ -531,7 +531,7 @@ void ClientModeShared::OverrideMouseInput( float *x, float *y )
 		pWeapon->OverrideMouseInput( x, y );
 	}
 #ifdef FF
-	HudContextMenuInput(x, y);	// |-- Mirv: Feed into our menu
+	HudContextMenuInput( x, y );	// |-- Mirv: Feed into our menu
 #endif
 }
 
@@ -672,7 +672,7 @@ void ClientModeShared::ProcessInput(bool bActive)
 	gHUD.ProcessInput( bActive );
 }
 #ifdef FF
-extern int HudContextMenuInput(int down, int keynum, const char* pszCurrentBinding); // |-- Mirv: For context menu
+extern int HudContextMenuInput( int down, int keynum, const char *pszCurrentBinding ); // |-- Mirv: For context menu
 #endif
 //-----------------------------------------------------------------------------
 // Purpose: We've received a keypress from the engine. Return 1 if the engine is allowed to handle it.
@@ -687,37 +687,37 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 	{
 		//////////////////////////////////////////////////////////////////////////
 		// Say
-		bool bMessageMode = !Q_strncmp(pszCurrentBinding, "messagemode", 11);
-		bool bSay = !Q_strcmp(pszCurrentBinding, "say");
-		if (bMessageMode || bSay)
+		bool bMessageMode = !Q_strncmp( pszCurrentBinding, "messagemode", 11 );
+		bool bSay = !Q_strcmp( pszCurrentBinding, "say" );
+		if ( bMessageMode || bSay )
 		{
-			if (down)
+			if ( down )
 			{
 				if (bMessageMode)
-					StartMessageMode(MM_MESSAGEMODE);
+					StartMessageMode( MM_MESSAGEMODE );
 				else
-					StartMessageMode(MM_SAY);
+					StartMessageMode( MM_SAY );
 			}
 			return 0;
 
 			// Support starting the message partially filled in
-			if (bMessageMode && m_pChatElement)
+			if ( bMessageMode && m_pChatElement )
 			{
 				const char* pStartStr = pszCurrentBinding + 11;
-				while (pStartStr && *pStartStr && *pStartStr == ' ')
+				while ( pStartStr && *pStartStr && *pStartStr == ' ' )
 					++pStartStr;
-				m_pChatElement->StartInputMessage(pStartStr);
+				m_pChatElement->StartInputMessage( pStartStr );
 			}
 			return 0;
 		}
 		//////////////////////////////////////////////////////////////////////////
 		// TeamSay
-		bool bSayTeam = !Q_strcmp(pszCurrentBinding, "say_team");
-		if (bSayTeam)
+		bool bSayTeam = !Q_strcmp( pszCurrentBinding, "say_team" );
+		if ( bSayTeam )
 		{
-			if (down)
+			if ( down )
 			{
-				StartMessageMode(MM_SAY_TEAM);
+				StartMessageMode( MM_SAY_TEAM );
 			}
 			return 0;
 		}

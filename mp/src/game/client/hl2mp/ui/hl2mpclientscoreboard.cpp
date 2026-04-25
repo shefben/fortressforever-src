@@ -452,8 +452,10 @@ void CHL2MPClientScoreBoardDialog::AddHeader()
 	m_pPlayerList->AddSection(0, "");
 	m_pPlayerList->SetSectionAlwaysVisible(0);
 	m_pPlayerList->AddColumnToSection(0, "avatar", "", 0, m_iAvatarWidth * 2 );
-	m_pPlayerList->AddColumnToSection(0, "name", "", 0, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_NAME_WIDTH ) - ( m_iAvatarWidth * 2 ) ); #ifdef FF
-	m_pPlayerList->AddColumnToSection(0, "class", "", 0, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_CLASS_WIDTH ) - ( m_iAvatarWidth * 2) ); #endif
+	m_pPlayerList->AddColumnToSection(0, "name", "", 0, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_NAME_WIDTH ) - ( m_iAvatarWidth * 2 ) );
+#ifdef FF
+	m_pPlayerList->AddColumnToSection(0, "class", "", 0, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_CLASS_WIDTH ) - ( m_iAvatarWidth * 2) );
+#endif
 	m_pPlayerList->AddColumnToSection(0, "frags", "#PlayerScore", 0 | SectionedListPanel::COLUMN_RIGHT, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_SCORE_WIDTH ) );
 	m_pPlayerList->AddColumnToSection(0, "deaths", "#PlayerDeath", 0 | SectionedListPanel::COLUMN_RIGHT, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_DEATH_WIDTH ) );
 	m_pPlayerList->AddColumnToSection(0, "ping", "#PlayerPing", 0 | SectionedListPanel::COLUMN_RIGHT, scheme()->GetProportionalScaledValueEx( GetScheme(), CSTRIKE_PING_WIDTH ) );
@@ -520,8 +522,10 @@ bool CHL2MPClientScoreBoardDialog::GetPlayerScoreInfo(int playerIndex, KeyValues
 	kv->SetInt("team", g_PR->GetTeam( playerIndex ) );
 	kv->SetString("name", g_PR->GetPlayerName(playerIndex) );
 	kv->SetInt("deaths", g_PR->GetDeaths( playerIndex ));
-	kv->SetInt("frags", g_PR->GetPlayerScore( playerIndex )); #ifdef FF
-	kv->SetString("class", ""); #endif
+	kv->SetInt("frags", g_PR->GetPlayerScore( playerIndex ));
+#ifdef FF
+	kv->SetString("class", "");
+#endif
 	
 	if (g_PR->GetPing( playerIndex ) < 1)
 	{

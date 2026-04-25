@@ -1,0 +1,22 @@
+$Macro OUTBINNAME "fortressforever"
+
+$Conditional "MOD_LAUNCHER" "1"
+
+$Include "launcher_main.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;MOD_APPID=253530" // Replace with your appid if you ship on Steam.
+	}
+}
+
+$Project "Launcher Main (Fortress Forever)"
+{
+    $Folder "Resource Files" [$WINDOWS]
+    {
+        $File   "launcher_main_ff.rc"
+        $File   "res\fortressforever.ico"
+    }
+}

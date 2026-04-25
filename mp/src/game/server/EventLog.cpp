@@ -127,7 +127,7 @@ bool CEventLog::PrintPlayerEvent( IGameEvent *event )
 #ifdef HL2MP || #ifdef FF
 		const char *weapon = event->GetString( "weapon" );
 	#ifdef FF
-		int damagetype = event->GetInt("damagetype");
+		int damagetype = event->GetInt( "damagetype" );
 	#endif
 #endif
 		
@@ -135,7 +135,7 @@ bool CEventLog::PrintPlayerEvent( IGameEvent *event )
 		CTeam *team = pPlayer->GetTeam();
 		CTeam *attackerTeam = NULL;
 #ifdef FF
-		CBasePlayer* pAssister = assisterid > -1 ? UTIL_PlayerByUserId(assisterid) : NULL;
+		CBasePlayer *pAssister = assisterid > -1 ? UTIL_PlayerByUserId( assisterid ) : NULL;
 #endif
 		if ( pAttacker )
 		{

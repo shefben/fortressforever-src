@@ -3752,7 +3752,7 @@ void C_BaseEntity::AddDecal( const Vector& rayStart, const Vector& rayEnd,
 #ifdef FF
 	if (ffdev_disableentitydecals.GetBool())
 	{
-		if (Classify() != CLASS_NONE && Classify() < NUM_AI_CLASSES)
+		if ( Classify() != CLASS_NONE && Classify() < NUM_AI_CLASSES )
 			return;
 	}
 #endif
@@ -5997,8 +5997,11 @@ float C_BaseEntity::GetInterpolationAmount( int flags )
 	const bool bPlayingNonLocallyRecordedDemo = bPlayingDemo && !engine->IsPlayingDemoALocallyRecordedDemo();
 	if ( bPlayingMultiplayer || bPlayingNonLocallyRecordedDemo )
 	{
-		//return AdjustInterpolationAmount( this, TICKS_TO_TIME( TIME_TO_TICKS( GetClientInterpAmount() ) + serverTickMultiple ) );
+	#ifndef FF
+		return AdjustInterpolationAmount( this, TICKS_TO_TIME( TIME_TO_TICKS( GetClientInterpAmount() ) + serverTickMultiple ) );
+	#else
 		return AdjustInterpolationAmount(this, TICKS_TO_TIME(TIME_TO_TICKS(flInterp) + serverTickMultiple));	// |-- Mirv: Use dynamic interp
+	#endif
 	}
 
 	int expandedServerTickMultiple = serverTickMultiple;

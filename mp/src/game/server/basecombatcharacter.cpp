@@ -2455,7 +2455,7 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 
 			Event_Killed( info );
 #ifdef FF_DLL
-			if (ToFFPlayer(this))
+			if ( ToFFPlayer( this ) )
 			{
 				// -------------------------------------------------------------------
 				// Keep the lua player_killed stuff after we've actually died
@@ -2464,9 +2464,9 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 				// -------------------------------------------------------------------
 				// TODO: Change killer to an object
 				CFFLuaSC hPlayerKilled;
-				hPlayerKilled.Push(ToFFPlayer(this));
-				hPlayerKilled.Push(&info);
-				_scriptman.RunPredicates_LUA(NULL, &hPlayerKilled, "player_killed");
+				hPlayerKilled.Push(ToFFPlayer( this ));
+				hPlayerKilled.Push( &info );
+				_scriptman.RunPredicates_LUA( NULL, &hPlayerKilled, "player_killed" );
 			}
 #endif
 			// Only classes that specifically request it are gibbed

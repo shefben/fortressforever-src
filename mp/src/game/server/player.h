@@ -533,7 +533,7 @@ public:
 	
 	void					AddPoints( int score, bool bAllowNegativeScore );
 #ifdef FF
-	void					AddFortPoints(int score, const char* szDescription);
+	void					AddFortPoints( int score, const char *szDescription );
 #endif
 	void					AddPointsToTeam( int score, bool bAllowNegativeScore );
 	virtual bool			BumpWeapon( CBaseCombatWeapon *pWeapon );
@@ -563,7 +563,7 @@ public:
 
 	virtual bool			CanBreatheUnderwater() const { return false; }
 	virtual void			PlayerUse( void );
-	virtual void			PlayUseDenySound() { EmitSound("Player.UseDeny"); }
+	virtual void			PlayUseDenySound() { EmitSound( "Player.UseDeny" ); }
 
 	virtual CBaseEntity		*FindUseEntity( void );
 	virtual bool			IsUseableEntity( CBaseEntity *pEntity, unsigned int requiredCaps );
@@ -690,7 +690,7 @@ public:
 
 	// Accessor methods
 	int		FragCount() const		{ return m_iFrags; }
-	int		DeathCount() const		{ return m_iDeaths; }
+	int		DeathCount() const		{ return m_iDeaths;}
 #ifdef FF
 	int		FortPointsCount() const { return m_iFortPoints; }
 	int		AssistsCount() const	{ return m_iAssists; }

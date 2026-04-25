@@ -14,10 +14,10 @@
 #include "filesystem.h"
 #include "mp_shareddefs.h"
 #include "utlbuffer.h"
-
+#ifdef FF
 #include "ff_projectile_base.h"
 #include "ff_weapon_base.h"
-
+#endif
 #ifdef CLIENT_DLL
 
 #else
@@ -40,7 +40,7 @@
 	#include "team.h"
 	#include "usermessages.h"
 	#include "tier0/icommandline.h"
-
+#ifdef FF
 	#include "ff_player.h"
 
 	// BEG: Added by Mulchman for Buildable Objects
@@ -55,9 +55,19 @@
 	#include "ff_scriptman.h"
 
 	#include "omnibot_interface.h"
-
+#endif
 #ifdef NEXT_BOT
 	#include "NextBotManager.h"
+#endif
+
+#ifdef TF_DLL
+	#include <unordered_set>
+	#include "hl2orange.spa.h"
+#endif
+
+// TODO Why did we add this to the base class guys.
+#if defined ( TF_DLL ) || defined ( TF_CLIENT_DLL )
+	#include "player_vs_environment/tf_population_manager.h"
 #endif
 
 #endif
@@ -363,7 +373,7 @@ bool CMultiplayRules::Init()
 	// override some values for multiplay.
 
 		// suitcharger
-#if !defined( TF_DLL ) && !defined( FF_DLL )
+#ifndef TF_DLL && !defined( FF_DLL )
 //=============================================================================
 // HPE_BEGIN:
 // [menglish] CS doesn't have the suitcharger either
@@ -1093,7 +1103,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 				gameeventmanager->FireEvent(event);
 			}
 		}
-		Omnibot::Notify_Death(pVictim, pKiller, killer_weapon_name);
+
 	}
 
 	//=========================================================
@@ -1365,19 +1375,19 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			pPlayer->ShowViewPortPanel( PANEL_SCOREBOARD );
 
 			// --> Mirv: Lock into place too
-			CFFPlayer* pFFPlayer = ToFFPlayer(pPlayer);
+			CFFPlayer *pFFPlayer = ToFFPlayer(pPlayer);
 			pFFPlayer->LockPlayerInPlace();
 			pFFPlayer->AddFlag(FL_FROZEN);
 
 			if (Q_atoi(engine->GetClientConVarValue(pFFPlayer->entindex(), "hud_takesshots")))
 				engine->ClientCommand(pFFPlayer->edict(), "jpeg");
 
-			if (CFFWeaponBase* pWeapon = pFFPlayer->GetActiveFFWeapon())
+			if (CFFWeaponBase *pWeapon = pFFPlayer->GetActiveFFWeapon())
 				pWeapon->Holster();
 			// <-- Mirv
 		}
 
-		IGameEvent* pEvent = gameeventmanager->CreateEvent("game_end");
+		IGameEvent *pEvent = gameeventmanager->CreateEvent("game_end");
 		if (pEvent)
 		{
 			//////////////////////////////////////////////////////////////////////////
@@ -1879,6 +1889,18 @@ ConVarRef suitcharger( "sk_suitcharger" );
 
 		return BaseClass::ClientCommand( pEdict, args );
 	}
+
+#ifdef TF_DLL
+	#define ACHIEVEMENT_LIST_(id) id
+	#define ACHIEVEMENT_LIST(className, achievementID, achievementName, iPointValue) \
+		ACHIEVEMENT_LIST_(achievementID),
+
+	static const std::unordered_set<int> g_ValidAchiementIdxs = {{
+		#include "achievements_tf_list.inc"
+	}};
+
+	#undef ACHIEVEMENT_LIST
+#endif
 
 	void CMultiplayRules::ClientCommandKeyValues( edict_t *pEntity, KeyValues *pKeyValues )
 	{

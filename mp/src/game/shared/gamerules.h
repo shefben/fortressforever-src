@@ -123,6 +123,8 @@ public:
 	CGameRules(void);
 	virtual ~CGameRules( void );
 
+	virtual void	LevelShutdownPostEntity() OVERRIDE;
+
 	// Damage Queries - these need to be implemented by the various subclasses (single-player, multi-player, etc).
 	// The queries represent queries against damage types and properties.
 	virtual bool	Damage_IsTimeBased( int iDmgType ) = 0;			// Damage types that are time-based.
@@ -175,8 +177,8 @@ public:
 
 	// These aren't pure virtual functions so that they don't 
 	// break all the other derived gamerule classes
-	virtual int		PlayerRelationship(CBaseEntity* pPlayer, CBaseEntity* pTarget) { AssertMsg(0, "This should not be called!"); return 0; }
-	virtual bool	FCanTakeDamage(CBaseEntity* pVictim, CBaseEntity* pAttacker) { AssertMsg(0, "This should not be called!"); return TRUE; }
+	virtual int		PlayerRelationship( CBaseEntity *pPlayer, CBaseEntity *pTarget) { AssertMsg(0, "This should not be called!"); return 0; }
+	virtual bool	FCanTakeDamage( CBaseEntity *pVictim, CBaseEntity *pAttacker) { AssertMsg(0, "This should not be called!"); return TRUE; }
 	// <-- Mirv
 
 	virtual bool InRoundRestart( void ) { return false; }
@@ -273,7 +275,7 @@ public:
 	virtual bool IsTeamplay( void ) { return FALSE; };// is this deathmatch game being played with team rules?
 	virtual bool IsCoOp( void ) = 0;// is this a coop game?
 	virtual const char *GetGameDescription( void ) { return "Half-Life 2"; }  // this is the game name that gets seen in the server browser
-	virtual void SetGameDescription(const char* szGameDescription) { return; }  // this is the game name that gets seen in the server browser
+	virtual void SetGameDescription(const char *szGameDescription ) { return; }  // this is the game name that gets seen in the server browser
 	
 // Client connection/disconnection
 	virtual bool ClientConnected( edict_t *pEntity, const char *pszName, const char *pszAddress, char *reject, int maxrejectlen ) = 0;// a client just connected to the server (player hasn't spawned yet)
@@ -301,7 +303,7 @@ public:
 	virtual bool FPlayerCanRespawn( CBasePlayer *pPlayer ) = 0;// is this player allowed to respawn now?
 	virtual float FlPlayerSpawnTime( CBasePlayer *pPlayer ) = 0;// When in the future will this player be able to spawn?
 	virtual CBaseEntity *GetPlayerSpawnSpot( CBasePlayer *pPlayer );// Place this player on their spawnspot and face them the proper direction.
-	virtual Vector GetPlayerSpawnSpotOffset(const CBasePlayer* pPlayer, const Vector vecOrigin, const Vector vecPlayerBoundsMins, const Vector vecPlayerBoundsMaxs);// for moving the spawn spot around the original spawn spot if other players are inside it
+	virtual Vector GetPlayerSpawnSpotOffset( const CBasePlayer *pPlayer, const Vector vecOrigin, const Vector vecPlayerBoundsMins, const Vector vecPlayerBoundsMaxs );// for moving the spawn spot around the original spawn spot if other players are inside it
 	virtual bool IsSpawnPointValid( CBaseEntity *pSpot, CBasePlayer *pPlayer );
 
 	virtual bool AllowAutoTargetCrosshair( void ) { return TRUE; };
@@ -429,6 +431,19 @@ public:
 	virtual bool IsHolidayActive( /*EHoliday*/ int eHoliday ) const { return false; }
 
 	virtual bool IsManualMapChangeOkay( const char **pszReason ){ return true; }
+
+	virtual void RegisterScriptFunctions() { }
+
+	virtual void SaveConvar( const ConVarRef & cvar );
+	virtual void RevertSavedConvars();
+	virtual bool HasSavedConvar( const string_t cvarName );
+
+#ifdef GAME_DLL
+	virtual bool IsOfficialMap() { return false; }
+#endif
+
+protected:
+	CUtlVector< string_t > m_SavedConvars;
 
 #ifndef CLIENT_DLL
 private:

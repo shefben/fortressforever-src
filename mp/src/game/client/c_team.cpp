@@ -33,7 +33,8 @@ IMPLEMENT_CLIENTCLASS_DT_NOBASE(C_Team, DT_Team, CTeam)
 	RecvPropInt( RECVINFO(m_iTeamNum)),
 	RecvPropInt( RECVINFO(m_iScore)),
 	RecvPropInt( RECVINFO(m_iRoundsWon) ),
-	RecvPropString( RECVINFO(m_szTeamname)), #ifdef FF
+	RecvPropString( RECVINFO(m_szTeamname)),
+#ifdef FF
 	RecvPropInt(RECVINFO(m_iFortPoints)),
 	// Bug #0000529: Total death column doesn't work
 	RecvPropInt(RECVINFO(m_iDeaths)),	// Mulch: receive team deaths from server
@@ -55,9 +56,11 @@ BEGIN_PREDICTION_DATA( C_Team )
 	DEFINE_PRED_FIELD( m_iDeaths, FIELD_INTEGER, FTYPEDESC_PRIVATE ),
 	DEFINE_PRED_FIELD( m_iPing, FIELD_INTEGER, FTYPEDESC_PRIVATE ),
 	DEFINE_PRED_FIELD( m_iPacketloss, FIELD_INTEGER, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_FIELD( m_iTeamNum, FIELD_INTEGER, FTYPEDESC_PRIVATE ), #ifdef FF
+	DEFINE_PRED_FIELD( m_iTeamNum, FIELD_INTEGER, FTYPEDESC_PRIVATE ),
+#ifdef FF
 	DEFINE_PRED_FIELD( m_iFortPoints, FIELD_INTEGER, FTYPEDESC_PRIVATE ),
-	DEFINE_PRED_FIELD( m_flScoreTime, FIELD_TIME, FTYPEDESC_PRIVATE ), #endif
+	DEFINE_PRED_FIELD( m_flScoreTime, FIELD_TIME, FTYPEDESC_PRIVATE ),
+#endif
 END_PREDICTION_DATA();
 
 // Global list of client side team entities
@@ -77,9 +80,11 @@ C_Team::C_Team()
 
 	m_iDeaths = 0;
 	m_iPing = 0;
-	m_iPacketloss = 0; #ifdef FF
+	m_iPacketloss = 0;
+#ifdef FF
 	m_iFortPoints = 0;
-	m_flScoreTime = 0.0f; #endif
+	m_flScoreTime = 0.0f;
+#endif
 
 	// Add myself to the global list of team entities
 	g_Teams.AddToTail( this );
@@ -146,10 +151,10 @@ int C_Team::Get_Deaths( void )
 	return m_iDeaths;
 }
 
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-#ifdef FF
 int C_Team::Get_FortPoints( void )
 {
 	return m_iFortPoints;

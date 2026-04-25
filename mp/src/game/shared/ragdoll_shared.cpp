@@ -1185,7 +1185,7 @@ void C_BaseAnimating::IgniteRagdoll( C_BaseAnimating *pSource )
 #if !defined( FF )
 		C_ClientRagdoll *pRagdoll = dynamic_cast< C_ClientRagdoll * > ( this );
 #else
-		C_BaseAnimatingOverlay* pRagdoll = dynamic_cast<C_BaseAnimatingOverlay*> (this); // Mirv: Use anim overlay instead
+		C_BaseAnimatingOverlay *pRagdoll = dynamic_cast< C_BaseAnimatingOverlay * > ( this ); // Mirv: Use anim overlay instead
 #endif
 
 		if ( pFireChild )

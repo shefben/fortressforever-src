@@ -39,7 +39,7 @@ public:
 	void	SetHitboxFireScale( float flHitboxFireScale );
 #ifdef FF_DLL
 	// Mulchman
-	void	Extinguish(void);
+	void	Extinguish( void );
 #endif
 	float	GetRemainingLife( void );
 	int		GetNumHitboxFires( void );

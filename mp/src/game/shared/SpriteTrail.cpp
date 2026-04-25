@@ -19,12 +19,12 @@
 #include "tier0/vprof.h"
 
 extern CEngineSprite *Draw_SetSpriteTexture( const model_t *pSpriteModel, int frame, int rendermode );
-
+#ifdef FF
 ConVar grenadetrails("cl_grenadetrails", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE);
 ConVar pipetrails("cl_pipetrails", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE);
 ConVar flagtrails("cl_flagtrails", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Turns on/off all trails attached to flags and all other Lua-based INFO_FF_SCRIPT objects.");
 ConVar cl_spritetrail_maxlength("cl_spritetrail_maxlength", "1000", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "The maximum length of a sprite trail segment; setting this too high can lead to performance issues.");
-
+#endif
 #endif // CLIENT_DLL
 
 // memdbgon must be the last include file in a .cpp file!!!

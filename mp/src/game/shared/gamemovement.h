@@ -19,8 +19,8 @@
 #define CTEXTURESMAX		512			// max number of textures loaded
 #define CBTEXTURENAMEMAX	13			// only load first n chars of name
 
-//#define GAMEMOVEMENT_DUCK_TIME			1000.0f		// ms
-#define GAMEMOVEMENT_DUCK_TIME				400.0f		// |-- Mirv: Inline with TFC value now
+//#define GAMEMOVEMENT_DUCK_TIME				1000.0f		// ms
+#define GAMEMOVEMENT_DUCK_TIME					400.0f		// |-- Mirv: Inline with TFC value now
 #define GAMEMOVEMENT_JUMP_TIME				510.0f		// ms approx - based on the 21 unit height jump
 #define GAMEMOVEMENT_JUMP_HEIGHT			21.0f		// units
 #define GAMEMOVEMENT_TIME_TO_UNDUCK			( TIME_TO_UNDUCK * 1000.0f )		// ms
@@ -164,11 +164,11 @@ protected:
 	virtual void	FullLadderMove();
 
 	// Movement while building
-	virtual void	FullBuildMove(void);
+	virtual void	FullBuildMove( void );
 
 	// The basic solid body movement clip that slides along multiple planes
 	virtual int		TryPlayerMove( Vector *pFirstDest=NULL, trace_t *pFirstTrace=NULL );
-	
+
 	virtual bool	LadderMove( void );
 	virtual bool	OnLadder( trace_t &trace );
 	virtual float	LadderDistance( void ) const { return 2.0f; }	///< Returns the distance a player can be from a ladder and still attach to it
@@ -226,6 +226,7 @@ protected:
 	void			FinishUnDuckJump( trace_t &trace );
 	void			SetDuckedEyeOffset( float duckFraction );
 	void			FixPlayerCrouchStuck( bool moveup );
+	void			ResetDuckLatched();
 
 	float			SplineFraction( float value, float scale );
 
@@ -269,8 +270,8 @@ protected:
 	};
 
 	// Cache used to remove redundant calls to GetPointContents().
-	int m_CachedGetPointContents[ MAX_PLAYERS ][ MAX_PC_CACHE_SLOTS ];
-	Vector m_CachedGetPointContentsPoint[ MAX_PLAYERS ][ MAX_PC_CACHE_SLOTS ];	
+	int m_CachedGetPointContents[ MAX_PLAYERS_ARRAY_SAFE ][ MAX_PC_CACHE_SLOTS ];
+	Vector m_CachedGetPointContentsPoint[ MAX_PLAYERS_ARRAY_SAFE ][ MAX_PC_CACHE_SLOTS ];	
 
 	Vector			m_vecProximityMins;		// Used to be globals in sv_user.cpp.
 	Vector			m_vecProximityMaxs;
@@ -280,7 +281,7 @@ protected:
 //private:
 	int				m_iSpeedCropped;
 
-	float			m_flStuckCheckTime[MAX_PLAYERS+1][2]; // Last time we did a full test
+	float			m_flStuckCheckTime[MAX_PLAYERS_ARRAY_SAFE][2]; // Last time we did a full test
 
 	// special function for teleport-with-duck for episodic
 #ifdef HL2_EPISODIC

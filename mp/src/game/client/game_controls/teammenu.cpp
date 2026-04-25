@@ -401,11 +401,12 @@ void CTeamMenu::ShowPanel(bool bShow)
 	}
 	else
 	{
-		SetVisible(false);
-		SetMouseInputEnabled(false);
-		SetKeyBoardInputEnabled(false);
+		SetVisible( false );
+		SetMouseInputEnabled( false );
+		SetKeyBoardInputEnabled( false );
 	}
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose: Don't need anything yet

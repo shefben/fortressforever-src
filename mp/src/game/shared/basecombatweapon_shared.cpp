@@ -2426,7 +2426,7 @@ bool CBaseCombatWeapon::SetIdealActivity( Activity ideal )
 	{
 		//Set our activity to the ideal
 		SetActivity( m_IdealActivity );
-		//SetSequence( m_nIdealSequence );
+		//SetSequence( m_nIdealSequence );	
 		// The weapon model sequence need clamping to either idle or firing for now
 		// Need to call ResetSequenceInfo for the muzzleflashes
 		// Melee weapons won't have a fire animation (for now)

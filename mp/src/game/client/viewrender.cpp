@@ -2318,14 +2318,12 @@ void CViewRender::RenderView( const CViewSetup &viewRender, int nClearFlags, int
 		bool bClear = false;
 		bool bPaintMainMenu = false;
 		ITexture *pTexture = NULL;
-#ifdef FF
-		// --> Mirv: 
+#ifdef FF // --> Mirv: 
 		// Reduce the depth range so that our hud stuff isn't affected
 		// by the world/viewmodel.
 		// this line errors in SDK2013
 		//pRenderContext->DepthRange( 0.0f, 0.1f );
-		// <--
-#endif
+#endif	// <--
 		if( UseVR() )
 		{
 			if( g_ClientVirtualReality.ShouldRenderHUDInWorld() )

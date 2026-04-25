@@ -90,8 +90,8 @@ END_SCRIPTDESC();
 ConVar weapon_showproficiency( "weapon_showproficiency", "0" );
 extern ConVar ai_debug_shoot_positions;
 #ifdef FF_DLL
-extern void PrecacheFileGrenadeInfoDatabase(IFileSystem* filesystem, const unsigned char* pICEKey);
-extern void PrecacheFilePlayerClassInfoDatabase(IFileSystem* filesystem, const unsigned char* pICEKey);
+extern void PrecacheFileGrenadeInfoDatabase( IFileSystem *filesystem, const unsigned char *pICEKey);
+extern void PrecacheFilePlayerClassInfoDatabase( IFileSystem *filesystem, const unsigned char *pICEKey);
 #endif
 //-----------------------------------------------------------------------------
 // Purpose: Precache global weapon sounds
@@ -112,8 +112,8 @@ void W_Precache(void)
 #ifndef TF_DLL
 	#ifdef FF_DLL
 	// --> Mirv: Add some more here
-	PrecacheFileGrenadeInfoDatabase(filesystem, g_pGameRules->GetEncryptionKey());
-	PrecacheFilePlayerClassInfoDatabase(filesystem, g_pGameRules->GetEncryptionKey());
+	PrecacheFileGrenadeInfoDatabase( filesystem, g_pGameRules->GetEncryptionKey() );
+	PrecacheFilePlayerClassInfoDatabase( filesystem, g_pGameRules->GetEncryptionKey() );
 	// <--
 	#endif
 	g_sModelIndexFireball = CBaseEntity::PrecacheModel ("sprites/zerogxplode.vmt");// fireball

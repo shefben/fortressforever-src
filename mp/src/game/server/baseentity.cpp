@@ -62,7 +62,7 @@
 #include "env_debughistory.h"
 #include "tier1/utlstring.h"
 #include "utlhashtable.h"
-
+//#include "vscript_server.h"
 #include "SpriteTrail.h"
 #include "triggers.h"
 
@@ -4050,12 +4050,10 @@ int	CBaseEntity::SetTransmitState( int nFlag)
 
 int CBaseEntity::UpdateTransmitState()
 {
-	#ifdef FF_DLL
-	// always transmit if you're an objective
+#ifdef FF_DLL // always transmit if you're an objective
 	if (m_ObjectivePlayerRefs.Count() > 0)
 		return SetTransmitState(FL_EDICT_ALWAYS);
-	// <-- FF
-	#endif
+#endif // <-- FF
 	// If you get this assert, you should be calling DispatchUpdateTransmitState
 	// instead of UpdateTransmitState.
 	Assert( g_nInsideDispatchUpdateTransmitState > 0 );
@@ -8173,10 +8171,10 @@ bool CLogicalEntity::KeyValue( const char *szKeyName, const char *szValue )
 	return BaseClass::KeyValue( szKeyName, szValue );
 }
 #ifdef FF_DLL
-void CBaseEntity::PlaySound(const char* soundname)
+void CBaseEntity::PlaySound( const char *soundname)
 {
-	CPASAttenuationFilter sndFilter(this);
-	EmitSound(sndFilter, entindex(), soundname);
+	CPASAttenuationFilter sndFilter( this );
+	EmitSound( sndFilter, entindex(), soundname );
 }
 #endif
 //-----------------------------------------------------------------------------

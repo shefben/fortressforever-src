@@ -48,7 +48,6 @@ protected:
 	CNetworkArray( int, m_iFortPoints, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_iArmor, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkArray( int, m_iClass, MAX_PLAYERS_ARRAY_SAFE );	// |-- Mirv: Class info
-
 	CNetworkArray( int, m_iChannel, MAX_PLAYERS_ARRAY_SAFE );	// |-- Mirv: Channel info
 	CNetworkArray( int, m_iAssists, MAX_PLAYERS_ARRAY_SAFE );
 	CNetworkVar( bool, m_bIsIntermission );

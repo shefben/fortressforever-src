@@ -12,8 +12,9 @@
 //=============================================================================//
 #include "cbase.h"
 #include "basetempentity.h"
+#ifdef FF
 #include "te_firebullets.h"
-
+#endif
 #define NUM_BULLET_SEED_BITS 8
 
 

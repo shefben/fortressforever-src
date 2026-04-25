@@ -251,7 +251,7 @@ int KB_ConvertString( char *in, char **ppout )
 				*pOut++ = *pEnd++;
 			}
 
-			if (pBinding)
+			if ( pBinding )
 			{
 				*pOut++ = ']';
 			}
@@ -1802,16 +1802,16 @@ static ConCommand endzoom("-zoom", IN_ZoomUp);
 #ifdef FF
 // === Grenades ===
 // Hold
-static ConCommand startgrenade1("+gren1", IN_Grenade1Down);
-static ConCommand endgrenade1("-gren1", IN_Grenade1Up);
-static ConCommand startgrenade2("+gren2", IN_Grenade2Down);
-static ConCommand endgrenade2("-gren2", IN_Grenade2Up);
+static ConCommand startgrenade1( "+gren1", IN_Grenade1Down );
+static ConCommand endgrenade1( "-gren1", IN_Grenade1Up );
+static ConCommand startgrenade2( "+gren2", IN_Grenade2Down );
+static ConCommand endgrenade2( "-gren2", IN_Grenade2Up );
 
 // Toggle
-static ConCommand starttogglegrenade1("+togglegren1", IN_ToggleGrenade1Down);
-static ConCommand endtogglegrenade1("-togglegren1", IN_ToggleGrenade1Up);
-static ConCommand starttogglegrenade2("+togglegren2", IN_ToggleGrenade2Down);
-static ConCommand endtogglegrenade2("-togglegren2", IN_ToggleGrenade2Up);
+static ConCommand starttogglegrenade1( "+togglegren1", IN_ToggleGrenade1Down );
+static ConCommand endtogglegrenade1( "-togglegren1", IN_ToggleGrenade1Up );
+static ConCommand starttogglegrenade2( "+togglegren2", IN_ToggleGrenade2Down );
+static ConCommand endtogglegrenade2( "-togglegren2", IN_ToggleGrenade2Up );
 // ================
 #endif
 static ConCommand startattack3("+attack3", IN_Attack3Down);
@@ -1819,25 +1819,25 @@ static ConCommand endattack3("-attack3", IN_Attack3Up);
 
 #ifdef FF
 // BEG: Added by Mulchman for team & class changing
-static ConCommand changeteam("changeteam", IN_ChangeTeam);
-static ConCommand changeclass("changeclass", IN_ChangeClass);
+static ConCommand changeteam( "changeteam", IN_ChangeTeam );
+static ConCommand changeclass( "changeclass", IN_ChangeClass );
 // END: Added by Mulchman for team & class changing
 
-static ConCommand serverinfo("serverinfo", IN_ServerInfo);
+static ConCommand serverinfo( "serverinfo", IN_ServerInfo );
 
 // BEG: Mulch: For medic & engy hud radial style menu
-static ConCommand startMedEngyMenu("+medengymenu", IN_MedEngyMenuDown);
-static ConCommand endMedEngymenu("-medengymenu", IN_MedEngyMenuUp);
+static ConCommand startMedEngyMenu( "+medengymenu", IN_MedEngyMenuDown );
+static ConCommand endMedEngymenu( "-medengymenu", IN_MedEngyMenuUp );
 // END: Mulch: For medic & engy hud radial style menu
 
 // BEGIN: Jiggles: For display of the Hint Center
-static ConCommand startHintCenter("+hintcenter", IN_HintCenterDown);
-static ConCommand endHintCenter("-hintcenter", IN_HintCenterUp);
+static ConCommand startHintCenter( "+hintcenter", IN_HintCenterDown );
+static ConCommand endHintCenter( "-hintcenter", IN_HintCenterUp );
 // END: Jiggles: For display of the Hint Center
 
 // BEGIN: Jiggles: For display of the Map Screenshot
-static ConCommand startMapShot("+mapshot", IN_MapShotDown);
-static ConCommand endMapShot("-mapshot", IN_MapShotUp);
+static ConCommand startMapShot( "+mapshot", IN_MapShotDown );
+static ConCommand endMapShot( "-mapshot", IN_MapShotUp );
 // END: Jiggles: For display of the Map Screenshot
 #endif
 
@@ -1917,3 +1917,4 @@ void CInput::LevelInit( void )
 	m_EntityGroundContact.RemoveAll();
 #endif
 }
+

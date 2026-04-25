@@ -106,7 +106,7 @@ public:
 
 	void	SetAnimationExtension( const char *pExtension );
 #ifdef FF
-	Class_T			Classify(void) { return CLASS_PLAYER; }
+	Class_T			Classify( void ) { return CLASS_PLAYER; }
 #endif
 	C_BaseViewModel		*GetViewModel( int viewmodelindex = 0, bool bObserverOK=true );
 	C_BaseCombatWeapon	*GetActiveWeapon( void ) const;
@@ -196,7 +196,7 @@ public:
 #ifndef FF
 	void	UpdateFlashlight( void );
 #else
-	virtual void	UpdateFlashlight(void);
+	virtual void	UpdateFlashlight( void );
 #endif
 
 	// Weapon selection code

@@ -57,8 +57,7 @@ CRagdollExplosionEnumerator::~CRagdollExplosionEnumerator()
 		C_BaseAnimating *pModel = static_cast< C_BaseAnimating * >( pEnt );
 
 		Vector	position = pEnt->CollisionProp()->GetCollisionOrigin();
-#ifdef FF
-		// Mirv: Account for the fact that explosions are moved. This shouldn't be a
+#ifdef FF // Mirv: Account for the fact that explosions are moved. This shouldn't be a
 		// problem unless they are being hit right up by a ceiling
 		position += Vector(0, 0, 32.0f);
 #endif
@@ -268,7 +267,8 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) )
 #else
 	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) && cl_explosionoverlay.GetBool() )	// |-- Mirv: Can disable overlay
-#endif	{
+#endif
+	{
 		if ( CExplosionOverlay *pOverlay = new CExplosionOverlay )
 		{
 			pOverlay->m_flLifetime	= 0;
@@ -312,7 +312,8 @@ void TE_Explosion( IRecipientFilter& filter, float delay,
 	__g_C_TEExplosion.m_vecNormal = normal ? *normal : Vector(0.0f, 0.0f, 0.0f);	// |-- Mirv: Argh
 																					// yeah conc explosion sometimes makes it null for some reason
 #else
-	__g_C_TEExplosion.m_vecNormal = *normal; #endif
+	__g_C_TEExplosion.m_vecNormal = *normal;
+#endif
 	__g_C_TEExplosion.m_chMaterialType = materialType;
 	__g_C_TEExplosion.m_nRadius = radius;
 	__g_C_TEExplosion.m_nMagnitude = magnitude;

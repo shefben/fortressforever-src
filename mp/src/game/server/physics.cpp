@@ -1189,7 +1189,6 @@ void PhysSolidOverride( solid_t &solid, string_t overrideScript )
 		#else
 			pStr = nexttoken(szToken, pStr, ',');
 		#endif
-
 		}
 		// terminate the script
 		Q_strncat( pTmpString, "}", sizeof(pTmpString), COPY_ALL_CHARACTERS );

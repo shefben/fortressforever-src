@@ -36,8 +36,8 @@ public:
 	virtual int		Get_Deaths( void );
 	virtual int		Get_Ping( void );
 #ifdef FF
-	virtual int		Get_FortPoints(void);
-	virtual float	Get_ScoreTime(void);
+	virtual int		Get_FortPoints( void );
+	virtual float	Get_ScoreTime( void );
 #endif
 
 	// Player Handling

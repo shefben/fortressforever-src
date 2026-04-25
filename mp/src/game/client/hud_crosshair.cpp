@@ -17,14 +17,14 @@
 #include "VGuiMatSurface/IMatSystemSurface.h"
 #include "client_virtualreality.h"
 #include "sourcevr/isourcevirtualreality.h"
-
+#ifdef FF
 #include "ff_weapon_base.h"
 #include "c_ff_player.h"
 #include "ff_utils.h"
 #include "ff_weapon_assaultcannon.h"
 #include "ff_weapon_sniperrifle.h"
 #include "ff_weapon_jumpgun.h"
-
+#endif
 #ifdef SIXENSE
 #include "sixense/in_sixense.h"
 #endif
@@ -36,15 +36,15 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar crosshair("crosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL);
-ConVar cl_observercrosshair("cl_observercrosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL);
-ConVar cl_acchargebar("cl_acchargebar", "0", FCVAR_ARCHIVE | FCVAR_CLIENTDLL);
-ConVar cl_pyro_fuelbar("cl_pyro_fuelbar", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL);
+ConVar crosshair( "crosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+ConVar cl_observercrosshair( "cl_observercrosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+ConVar cl_acchargebar( "cl_acchargebar", "0", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+ConVar cl_pyro_fuelbar( "cl_pyro_fuelbar", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
 
 //Tie crosshair values to cheats -GreenMushy
-ConVar cl_concaim("cl_concaim", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL, "0 = always show crosshair in center. 1 = flash trueaim after shooting. 2 = hide crosshair when conced.");
-ConVar cl_concaim_fadetime("cl_concaim_fadetime", "0.25", FCVAR_ARCHIVE | FCVAR_CLIENTDLL | FCVAR_CHEAT, "When cl_concaim is 1, controls the time the crosshair stays visible after shooting. Requires sv_cheats 1");
-ConVar cl_concaim_showtrueaim("cl_concaim_showtrueaim", "0", FCVAR_CLIENTDLL | FCVAR_CHEAT, "Good way to learn how to concaim. If set to 1, when conced, the crosshair will show exactly where you will shoot. Requires sv_cheats 1");
+ConVar cl_concaim( "cl_concaim", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL, "0 = always show crosshair in center. 1 = flash trueaim after shooting. 2 = hide crosshair when conced." );
+ConVar cl_concaim_fadetime( "cl_concaim_fadetime", "0.25", FCVAR_ARCHIVE | FCVAR_CLIENTDLL | FCVAR_CHEAT, "When cl_concaim is 1, controls the time the crosshair stays visible after shooting. Requires sv_cheats 1" );
+ConVar cl_concaim_showtrueaim( "cl_concaim_showtrueaim", "0", FCVAR_CLIENTDLL | FCVAR_CHEAT, "Good way to learn how to concaim. If set to 1, when conced, the crosshair will show exactly where you will shoot. Requires sv_cheats 1" );
 
 #define FFDEV_CONCAIM cl_concaim.GetInt()
 #define FFDEV_CONCAIM_FADETIME cl_concaim_fadetime.GetFloat()
@@ -52,39 +52,39 @@ ConVar cl_concaim_showtrueaim("cl_concaim_showtrueaim", "0", FCVAR_CLIENTDLL | F
 
 using namespace vgui;
 
-int ScreenTransform(const Vector& point, Vector& screen);
+int ScreenTransform( const Vector& point, Vector& screen );
 
 #ifdef TF_CLIENT_DLL
 // If running TF, we use CHudTFCrosshair instead (which is derived from CHudCrosshair)
 #else
-DECLARE_HUDELEMENT(CHudCrosshair);
+DECLARE_HUDELEMENT( CHudCrosshair );
 #endif
 
-CHudCrosshair::CHudCrosshair(const char* pElementName) :
-	CHudElement(pElementName), BaseClass(NULL, "HudCrosshair")
+CHudCrosshair::CHudCrosshair( const char *pElementName ) :
+		CHudElement( pElementName ), BaseClass( NULL, "HudCrosshair" )
 {
-	vgui::Panel* pParent = g_pClientMode->GetViewport();
-	SetParent(pParent);
+	vgui::Panel *pParent = g_pClientMode->GetViewport();
+	SetParent( pParent );
 
 	m_pCrosshair = 0;
 
-	m_clrCrosshair = Color(0, 0, 0, 0);
+	m_clrCrosshair = Color( 0, 0, 0, 0 );
 
 	m_vecCrossHairOffsetAngle.Init();
 
-	SetHiddenBits(/*HIDEHUD_PLAYERDEAD | */HIDEHUD_CROSSHAIR);
+	SetHiddenBits( /*HIDEHUD_PLAYERDEAD | */HIDEHUD_CROSSHAIR );
 }
 
 CHudCrosshair::~CHudCrosshair()
 {
 }
 
-void CHudCrosshair::ApplySchemeSettings(IScheme* scheme)
+void CHudCrosshair::ApplySchemeSettings( IScheme *scheme )
 {
-	BaseClass::ApplySchemeSettings(scheme);
+	BaseClass::ApplySchemeSettings( scheme );
 
 	m_pDefaultCrosshair = gHUD.GetIcon("crosshair_default");
-	SetPaintBackgroundEnabled(false);
+	SetPaintBackgroundEnabled( false );
 
 	// --> Mirv
 	vgui::HScheme CrossHairScheme = vgui::scheme()->LoadSchemeFromFile("resource/CrosshairScheme.res", "CrosshairScheme");
@@ -96,9 +96,9 @@ void CHudCrosshair::ApplySchemeSettings(IScheme* scheme)
 	}
 	// <-- Mirv
 
-	SetSize(ScreenWidth(), ScreenHeight());
+	SetSize( ScreenWidth(), ScreenHeight() );
 
-	SetForceStereoRenderToFrameBuffer(true);
+	SetForceStereoRenderToFrameBuffer( true );
 }
 
 //-----------------------------------------------------------------------------
@@ -106,24 +106,24 @@ void CHudCrosshair::ApplySchemeSettings(IScheme* scheme)
 // costly traversal.  Called per frame, return true if thinking and 
 // painting need to occur.
 //-----------------------------------------------------------------------------
-bool CHudCrosshair::ShouldDraw(void)
+bool CHudCrosshair::ShouldDraw( void )
 {
 	bool bNeedsDraw;
 
-	if (m_bHideCrosshair)
+	if ( m_bHideCrosshair )
 		return false;
 
 	C_BasePlayer* pPlayer = C_BasePlayer::GetLocalPlayer();
-	if (!pPlayer)
+	if ( !pPlayer )
 		return false;
 
-	C_BaseCombatWeapon* pWeapon = pPlayer->GetActiveWeapon();
-	if (pWeapon && !pWeapon->ShouldDrawCrosshair())
+	C_BaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
+	if ( pWeapon && !pWeapon->ShouldDrawCrosshair() )
 		return false;
 
 #ifdef PORTAL
-	C_Portal_Player* portalPlayer = ToPortalPlayer(pPlayer);
-	if (portalPlayer && portalPlayer->IsSuppressingCrosshair())
+	C_Portal_Player *portalPlayer = ToPortalPlayer(pPlayer);
+	if ( portalPlayer && portalPlayer->IsSuppressingCrosshair() )
 		return false;
 #endif // PORTAL
 
@@ -134,35 +134,34 @@ bool CHudCrosshair::ShouldDraw(void)
 	*/
 
 	// draw a crosshair only if alive or spectating in eye
-	if (IsX360())
+	if ( IsX360() )
 	{
-		bNeedsDraw = m_pCrosshair &&
+		bNeedsDraw = m_pCrosshair && 
 			!engine->IsDrawingLoadingImage() &&
-			!engine->IsPaused() &&
-			(!pPlayer->IsSuitEquipped() || g_pGameRules->IsMultiplayer()) &&
+			!engine->IsPaused() && 
+			( !pPlayer->IsSuitEquipped() || g_pGameRules->IsMultiplayer() ) &&
 			g_pClientMode->ShouldDrawCrosshair() &&
-			!(pPlayer->GetFlags() & FL_FROZEN) &&
-			(pPlayer->entindex() == render->GetViewEntity()) &&
-			(pPlayer->IsAlive() || (pPlayer->GetObserverMode() == OBS_MODE_IN_EYE) || (cl_observercrosshair.GetBool() && pPlayer->GetObserverMode() == OBS_MODE_ROAMING));
+			!( pPlayer->GetFlags() & FL_FROZEN ) &&
+			( pPlayer->entindex() == render->GetViewEntity() ) &&
+			( pPlayer->IsAlive() ||	( pPlayer->GetObserverMode() == OBS_MODE_IN_EYE ) || ( cl_observercrosshair.GetBool() && pPlayer->GetObserverMode() == OBS_MODE_ROAMING ) );
 	}
 	else
 	{
-		bNeedsDraw = m_pCrosshair &&
+		bNeedsDraw = m_pCrosshair && 
 			crosshair.GetInt() &&
 			!engine->IsDrawingLoadingImage() &&
-			!engine->IsPaused() &&
+			!engine->IsPaused() && 
 			g_pClientMode->ShouldDrawCrosshair() &&
-			!(pPlayer->GetFlags() & FL_FROZEN) &&
-			(pPlayer->entindex() == render->GetViewEntity()) &&
+			!( pPlayer->GetFlags() & FL_FROZEN ) &&
+			( pPlayer->entindex() == render->GetViewEntity() ) &&
 			!pPlayer->IsInVGuiInputMode() &&
-			(pPlayer->IsAlive() || (pPlayer->GetObserverMode() == OBS_MODE_IN_EYE) || (cl_observercrosshair.GetBool() && pPlayer->GetObserverMode() == OBS_MODE_ROAMING));
+			( pPlayer->IsAlive() ||	( pPlayer->GetObserverMode() == OBS_MODE_IN_EYE ) || ( cl_observercrosshair.GetBool() && pPlayer->GetObserverMode() == OBS_MODE_ROAMING ) );
 	}
 
-	return (bNeedsDraw && CHudElement::ShouldDraw());
+	return ( bNeedsDraw && CHudElement::ShouldDraw() );
 }
 
-extern void GetCrosshair(FFWeaponID iWeapon, char& innerChar, Color& innerCol, int& innerSize, char& outerChar, Color& outerCol, int& outerSize);	// |-- Mirv
-
+extern void GetCrosshair( FFWeaponID iWeapon, char& innerChar, Color& innerCol, int& innerSize, char& outerChar, Color& outerCol, int& outerSize ); // |-- Mirv
 #ifdef TF_CLIENT_DLL
 extern ConVar cl_crosshair_red;
 extern ConVar cl_crosshair_green;
@@ -171,13 +170,13 @@ extern ConVar cl_crosshair_scale;
 #endif
 
 
-void CHudCrosshair::GetDrawPosition(float* pX, float* pY, bool* pbBehindCamera, QAngle angleCrosshairOffset)
+void CHudCrosshair::GetDrawPosition ( float *pX, float *pY, bool *pbBehindCamera, QAngle angleCrosshairOffset )
 {
 	QAngle curViewAngles = CurrentViewAngles();
 	Vector curViewOrigin = CurrentViewOrigin();
 
 	int vx, vy, vw, vh;
-	vgui::surface()->GetFullscreenViewport(vx, vy, vw, vh);
+	vgui::surface()->GetFullscreenViewport( vx, vy, vw, vh );
 
 	float screenWidth = vw;
 	float screenHeight = vh;
@@ -188,20 +187,20 @@ void CHudCrosshair::GetDrawPosition(float* pX, float* pY, bool* pbBehindCamera, 
 	bool bBehindCamera = false;
 
 	C_BasePlayer* pPlayer = C_BasePlayer::GetLocalPlayer();
-	if ((pPlayer != NULL) && (pPlayer->GetObserverMode() == OBS_MODE_NONE))
+	if ( ( pPlayer != NULL ) && ( pPlayer->GetObserverMode()==OBS_MODE_NONE ) )
 	{
 		bool bUseOffset = false;
-
+		
 		Vector vecStart;
 		Vector vecEnd;
 
-		if (UseVR())
+		if ( UseVR() )
 		{
 			// These are the correct values to use, but they lag the high-speed view data...
 			vecStart = pPlayer->Weapon_ShootPosition();
-			Vector vecAimDirection = pPlayer->GetAutoaimVector(1.0f);
+			Vector vecAimDirection = pPlayer->GetAutoaimVector( 1.0f );
 			// ...so in some aim modes, they get zapped by something completely up-to-date.
-			g_ClientVirtualReality.OverrideWeaponHudAimVectors(&vecStart, &vecAimDirection);
+			g_ClientVirtualReality.OverrideWeaponHudAimVectors ( &vecStart, &vecAimDirection );
 			vecEnd = vecStart + vecAimDirection * MAX_TRACE_LENGTH;
 
 			bUseOffset = true;
@@ -209,36 +208,36 @@ void CHudCrosshair::GetDrawPosition(float* pX, float* pY, bool* pbBehindCamera, 
 
 #ifdef SIXENSE
 		// TODO: actually test this Sixsense code interaction with things like HMDs & stereo.
-		if (g_pSixenseInput->IsEnabled() && !UseVR())
+        if ( g_pSixenseInput->IsEnabled() && !UseVR() )
 		{
 			// Never autoaim a predicted weapon (for now)
 			vecStart = pPlayer->Weapon_ShootPosition();
 			Vector aimVector;
-			AngleVectors(CurrentViewAngles() - g_pSixenseInput->GetViewAngleOffset(), &aimVector);
+			AngleVectors( CurrentViewAngles() - g_pSixenseInput->GetViewAngleOffset(), &aimVector );
 			// calculate where the bullet would go so we can draw the cross appropriately
 			vecEnd = vecStart + aimVector * MAX_TRACE_LENGTH;
 			bUseOffset = true;
 		}
 #endif
 
-		if (bUseOffset)
+		if ( bUseOffset )
 		{
 			trace_t tr;
-			UTIL_TraceLine(vecStart, vecEnd, MASK_SHOT, pPlayer, COLLISION_GROUP_NONE, &tr);
+			UTIL_TraceLine( vecStart, vecEnd, MASK_SHOT, pPlayer, COLLISION_GROUP_NONE, &tr );
 
 			Vector screen;
 			screen.Init();
 			bBehindCamera = ScreenTransform(tr.endpos, screen) != 0;
 
-			x = 0.5f * (1.0f + screen[0]) * screenWidth + 0.5f;
-			y = 0.5f * (1.0f - screen[1]) * screenHeight + 0.5f;
+			x = 0.5f * ( 1.0f + screen[0] ) * screenWidth + 0.5f;
+			y = 0.5f * ( 1.0f - screen[1] ) * screenHeight + 0.5f;
 		}
 	}
 
 	// MattB - angleCrosshairOffset is the autoaim angle.
 	// if we're not using autoaim, just draw in the middle of the 
 	// screen
-	if (angleCrosshairOffset != vec3_angle)
+	if ( angleCrosshairOffset != vec3_angle )
 	{
 		QAngle angles;
 		Vector forward;
@@ -246,9 +245,9 @@ void CHudCrosshair::GetDrawPosition(float* pX, float* pY, bool* pbBehindCamera, 
 
 		// this code is wrong
 		angles = curViewAngles + angleCrosshairOffset;
-		AngleVectors(angles, &forward);
-		VectorAdd(curViewOrigin, forward, point);
-		ScreenTransform(point, screen);
+		AngleVectors( angles, &forward );
+		VectorAdd( curViewOrigin, forward, point );
+		ScreenTransform( point, screen );
 
 		x += 0.5f * screen[0] * screenWidth + 0.5f;
 		y += 0.5f * screen[1] * screenHeight + 0.5f;
@@ -260,17 +259,17 @@ void CHudCrosshair::GetDrawPosition(float* pX, float* pY, bool* pbBehindCamera, 
 }
 
 
-void CHudCrosshair::Paint(void)
+void CHudCrosshair::Paint( void )
 {
-	if (!m_pCrosshair)
+	if ( !m_pCrosshair )
 		return;
 
-	if (!IsCurrentViewAccessAllowed())
+	if ( !IsCurrentViewAccessAllowed() )
 		return;
 
 	C_FFPlayer* pActivePlayer = C_FFPlayer::GetLocalFFPlayerOrObserverTarget();
 
-	if (!pActivePlayer)
+	if ( !pActivePlayer )
 		return;
 
 	m_curViewAngles = CurrentViewAngles();
@@ -547,15 +546,15 @@ void CHudCrosshair::Paint(void)
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CHudCrosshair::SetCrosshairAngle(const QAngle& angle)
+void CHudCrosshair::SetCrosshairAngle( const QAngle& angle )
 {
-	VectorCopy(angle, m_vecCrossHairOffsetAngle);
+	VectorCopy( angle, m_vecCrossHairOffsetAngle );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CHudCrosshair::SetCrosshair(CHudTexture* texture, const Color& clr)
+void CHudCrosshair::SetCrosshair( CHudTexture *texture, const Color& clr )
 {
 	m_pCrosshair = texture;
 	m_clrCrosshair = clr;
@@ -566,5 +565,5 @@ void CHudCrosshair::SetCrosshair(CHudTexture* texture, const Color& clr)
 //-----------------------------------------------------------------------------
 void CHudCrosshair::ResetCrosshair()
 {
-	SetCrosshair(m_pDefaultCrosshair, Color(255, 255, 255, 255));
+	SetCrosshair( m_pDefaultCrosshair, Color(255, 255, 255, 255) );
 }

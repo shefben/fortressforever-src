@@ -1412,10 +1412,10 @@ void SENTENCEG_Init()
 	// begin jon: ability to use "maps\mapname_sentences.txt" and "scripts/sentences_common.txt" as well
 	Msg("SENTENCEG_Init: precached scripts/sentences.txt\n");
 
-	engine->PrecacheSentenceFile("scripts/sentences_common.txt");
+	engine->PrecacheSentenceFile( "scripts/sentences_common.txt" );
 	Msg("SENTENCEG_Init: precached scripts/sentences_common.txt\n");
 
-	const char* mapname = STRING(gpGlobals->mapname);
+	const char *mapname = STRING(gpGlobals->mapname);
 	if (mapname && *mapname)
 	{
 		if (filesystem->FileExists(UTIL_VarArgs("maps/%s_sentences.txt", mapname)))

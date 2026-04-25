@@ -60,14 +60,14 @@ ConVar_ServerBounded *cl_predict = &cl_predict_var;
 // cl_interp_ratio.
 // ------------------------------------------------------------------------------------------ //
 #ifdef FF
-void cc_cl_interp_changed(IConVar* pConVar, const char* pOldString, float flOldValue)
+void cc_cl_interp_changed( IConVar *pConVar, const char *pOldString, float flOldValue)
 {
 	C_BaseEntityIterator iterator;
 	C_BaseEntity* pEnt;
 
-	while ((pEnt = iterator.Next()) != NULL)
+	while ( ( pEnt = iterator.Next() ) != NULL )
 	{
-		pEnt->Interp_UpdateInterpolationAmounts(pEnt->GetVarMapping());
+		pEnt->Interp_UpdateInterpolationAmounts( pEnt->GetVarMapping() );
 	}
 }
 #endif

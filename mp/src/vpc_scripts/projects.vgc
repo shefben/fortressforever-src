@@ -17,7 +17,7 @@ $Project "client"
 {
 	"game\client\client_tf.vpc"			[$TF]
 	"game\client\client_hl2mp.vpc"		[$HL2MP]
-	"game\client\client_ff.vpc"		[$FF]
+	"game\client\client_ff.vpc"			[$FF]
 }
 
 $Project "fgdlib"

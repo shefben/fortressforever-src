@@ -1353,7 +1353,11 @@ Color CBaseHudChat::GetTextColorForClient( TextColor colorNum, int clientIndex )
 		break;
 
 	case COLOR_PLAYERNAME:
+	#ifndef FF
+		c = GetClientColor( clientIndex );
+	#else
 		c = /*GetClientColor( clientIndex );*/ GetCustomClientColor( clientIndex );
+	#endif
 		break;
 
 	case COLOR_LOCATION:
@@ -1652,9 +1656,9 @@ void CBaseHudChatLine::Colorize( int alpha )
 			InsertColorChange( color );
 			InsertString( wText );
 #ifdef FF
-			ConColorMsg(color, "%ls", wText);
+			ConColorMsg( color, "%ls", wText );
 
-			CBaseHudChat *pChat = dynamic_cast<CBaseHudChat*>(GetParent() );
+			CBaseHudChat *pChat = dynamic_cast<CBaseHudChat*>( GetParent() );
 #endif
 			if ( pChat && pChat->GetChatHistory() )
 			{	
@@ -1732,7 +1736,7 @@ This is a very long string that I am going to attempt to paste into the cs hud c
 		char szbuf[144];	// more than 128
 		Q_snprintf( szbuf, sizeof(szbuf), "%s \"%s\"", m_nMessageMode == MM_SAY ? "say" : "say_team", ansi );
 
-		C_FFPlayer* pPlayer = ToFFPlayer(C_BasePlayer::GetLocalPlayer());
+		C_FFPlayer* pPlayer = ToFFPlayer( C_BasePlayer::GetLocalPlayer() );
 		if (pPlayer)
 		{
 			std::string strcmd = szbuf;
@@ -1925,8 +1929,11 @@ void CBaseHudChat::ChatPrintf( int iPlayerIndex, int iFilter, const char *fmt, .
 	wchar_t *wbuf = static_cast<wchar_t *>( _alloca( bufSize ) );
 	if ( wbuf )
 	{
+	#ifndef FF
+		Color clrNameColor = GetClientColor( iPlayerIndex );
+	#else
 		Color clrNameColor = /*GetClientColor( iPlayerIndex );*/ GetCustomClientColor( iPlayerIndex );
-
+	#endif
 		line->SetExpireTime();
 
 		g_pVGuiLocalize->ConvertANSIToUnicode( pmsg, wbuf, bufSize);
@@ -1987,16 +1994,16 @@ void CBaseHudChat::FireGameEvent( IGameEvent *event )
 #endif
 }
 
-void CBaseHudChat::StartInputMessage(const char* _msg)
+void CBaseHudChat::StartInputMessage( const char *_msg )
 {
-	if (m_pChatInput)
+	if ( m_pChatInput )
 	{
-		if (_msg)
+		if ( _msg )
 		{
 			wchar_t wBuffer[1024];
-			g_pVGuiLocalize->ConvertANSIToUnicode(_msg, wBuffer, 1024);
-			//m_pChatInput->SetEntry(wBuffer);
-			m_pChatInput->SetPrompt(wBuffer);
+			g_pVGuiLocalize->ConvertANSIToUnicode( _msg, wBuffer, 1024 );
+			//m_pChatInput->SetEntry( wBuffer );
+			m_pChatInput->SetPrompt( wBuffer );
 			m_pChatInput->GetChatEntryInput()->GotoEndOfLine();
 		}
 	}

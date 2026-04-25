@@ -206,7 +206,7 @@ void CHudVoiceStatus::Init( void )
 
 void CHudVoiceStatus::VidInit( void )
 {
-	m_pVoiceIcon = gHUD.GetIcon("voice_player");
+	m_pVoiceIcon = gHUD.GetIcon( "voice_player" );
 #ifdef FF // BEG: Added by Mulchman
 	SetPaintBackgroundEnabled(false);
 #endif	// END: Added by Mulchman
