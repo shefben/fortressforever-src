@@ -82,14 +82,14 @@ void cc_cl_interp_all_changed( IConVar *pConVar, const char *pOldString, float f
 // <--
 
 static ConVar  cl_extrapolate( "cl_extrapolate", "1", FCVAR_CHEAT, "Enable/disable extrapolation if interpolation history runs out." );
-
+#ifdef FF
 // can't add FCVAR_CHEAT flag to this because
 // it's defined in engine without the FCVAR_CHEAT
 // flag
 static ConVar cl_interpolate("cl_interpolate", "1.0f", FCVAR_USERINFO | FCVAR_DEVELOPMENTONLY);
 
 //static ConVar  cl_interp	 ( "cl_interp", "0.1", FCVAR_USERINFO | FCVAR_DEMO, "Interpolate object positions starting this many seconds in past", true, 0.01, true, 1.0, cc_cl_interp_changed );  
-
+#endif
 static ConVar  cl_interp_npcs( "cl_interp_npcs", "0.0", FCVAR_USERINFO, "Interpolate NPC positions starting this many seconds in past (or cl_interp, if greater)" );  
 static ConVar  cl_interp_all( "cl_interp_all", "0", 0, "Disable interpolation list optimizations.", 0, 0, 0, 0, cc_cl_interp_all_changed );
 ConVar  r_drawmodeldecals( "r_drawmodeldecals", "1", FCVAR_ALLOWED_IN_COMPETITIVE );
@@ -3240,16 +3240,20 @@ void C_BaseEntity::Simulate()
 {
 	AddEntity();	// Legacy support. Once-per-frame stuff should go in Simulate().
 }
-
+#ifndef FF
+// Defined in engine
+static ConVar cl_interpolate( "cl_interpolate", "1.0f", FCVAR_USERINFO | FCVAR_DEVELOPMENTONLY );
+#endif
 // (static function)
 void C_BaseEntity::InterpolateServerEntities()
 {
 	VPROF_BUDGET( "C_BaseEntity::InterpolateServerEntities", VPROF_BUDGETGROUP_INTERPOLATION );
 
-	// fuck off!!!!
-	// s_bInterpolate = cl_interpolate.GetBool();
+#ifndef FF	// fuck off!!!!
+	s_bInterpolate = cl_interpolate.GetBool();
+#else
 	s_bInterpolate = true;
-
+#endif
 	// Don't interpolate during timedemo playback
 	if ( engine->IsPlayingTimeDemo() || engine->IsPaused() )
 	{										 
@@ -5264,10 +5268,11 @@ void C_BaseEntity::DestroyIntermediateData( void )
 void C_BaseEntity::ShiftIntermediateDataForward( int slots_to_remove, int number_of_commands_run )
 {
 #if !defined( NO_ENTITY_PREDICTION )
+	#ifdef FF
 	Assert( m_pIntermediateData );
 	if ( !m_pIntermediateData )
 		return;
-
+	#endif
 	Assert( number_of_commands_run >= slots_to_remove );
 
 	// Just moving pointers, yeah
@@ -5952,15 +5957,15 @@ static float AdjustInterpolationAmount( C_BaseEntity *pEntity, float baseInterpo
 
 	return baseInterpolation;
 }
-
+#ifdef FF
 static const ConVar* pUpdateRateCvar = NULL;
 static const ConVar* pMaxUpdateRateCvar = NULL;
 int nLastUpdateRate = 0;
-
+#endif
 //-------------------------------------
 float C_BaseEntity::GetInterpolationAmount( int flags )
 {
-	// --> Mirv: Interpolation based on ratio
+#ifdef FF	// --> Mirv: Interpolation based on ratio
 	if (!pUpdateRateCvar || !pMaxUpdateRateCvar)
 	{
 		pUpdateRateCvar = cvar->FindVar("cl_updaterate");
@@ -5976,8 +5981,7 @@ float C_BaseEntity::GetInterpolationAmount( int flags )
 	//	cc_cl_interp_changed(NULL, NULL);
 	//}
 	float flInterp = cl_interp_ratio->GetFloat() / nUpdateRate;
-	// <-- Mirv	
-
+#endif	// <-- Mirv
 	// If single player server is "skipping ticks" everything needs to interpolate for a bit longer
 	int serverTickMultiple = 1;
 	if ( IsSimulatingOnAlternateTicks() )
@@ -6000,7 +6004,7 @@ float C_BaseEntity::GetInterpolationAmount( int flags )
 	#ifndef FF
 		return AdjustInterpolationAmount( this, TICKS_TO_TIME( TIME_TO_TICKS( GetClientInterpAmount() ) + serverTickMultiple ) );
 	#else
-		return AdjustInterpolationAmount(this, TICKS_TO_TIME(TIME_TO_TICKS(flInterp) + serverTickMultiple));	// |-- Mirv: Use dynamic interp
+		return AdjustInterpolationAmount(this, TICKS_TO_TIME(TIME_TO_TICKS( flInterp ) + serverTickMultiple));	// |-- Mirv: Use dynamic interp
 	#endif
 	}
 
@@ -6023,9 +6027,11 @@ float C_BaseEntity::GetInterpolationAmount( int flags )
 	{
 		return TICK_INTERVAL * expandedServerTickMultiple;
 	}
-
-	//return AdjustInterpolationAmount( this, TICKS_TO_TIME( TIME_TO_TICKS( GetClientInterpAmount() ) + serverTickMultiple ) );
+#ifndef FF
+	return AdjustInterpolationAmount( this, TICKS_TO_TIME( TIME_TO_TICKS( GetClientInterpAmount() ) + serverTickMultiple ) );
+#else
 	return AdjustInterpolationAmount(this, TICK_INTERVAL * (TIME_TO_TICKS(flInterp) + serverTickMultiple));	// |-- Mirv: Use dynamic interp
+#endif
 }
 
 

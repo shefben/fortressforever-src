@@ -241,7 +241,7 @@ public:
 									C_BaseEntity();
 	virtual							~C_BaseEntity();
 #ifdef FF
-	virtual Class_T					Classify(void) { return CLASS_NONE; }
+	virtual Class_T					Classify( void ) { return CLASS_NONE; }
 #endif
 	static C_BaseEntity				*CreatePredictedEntityByName( const char *classname, const char *module, int line, bool persist = false );
 	

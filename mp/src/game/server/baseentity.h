@@ -1023,13 +1023,13 @@ public:
 
 	virtual IResponseSystem *GetResponseSystem();
 	virtual void	DispatchResponse( const char *conceptName );
-
+#ifndef FF
 // Classify - returns the type of group (i.e, "houndeye", or "human military" so that NPCs with different classnames
 // still realize that they are teammates. (overridden for NPCs that form groups)
-	virtual Class_T Classify ( void )
-	#ifdef FF_DLL
-	{ return CLASS_NONE; }
-	#endif
+	virtual Class_T Classify ( void );
+#else
+	virtual Class_T Classify ( void ) { return CLASS_NONE; }
+#endif
 	virtual void	DeathNotice ( CBaseEntity *pVictim ) {}// NPC maker children use this to tell the NPC maker that they have died.
 	virtual bool	ShouldAttractAutoAim( CBaseEntity *pAimingEnt ) { return ((GetFlags() & FL_AIMTARGET) != 0); }
 	virtual float	GetAutoAimRadius();
@@ -1087,7 +1087,7 @@ public:
 	virtual CBaseCombatCharacter *MyCombatCharacterPointer( void ) { return NULL; }
 	virtual INextBot		*MyNextBotPointer( void ) { return NULL; }
 #ifdef FF_DLL
-	virtual CBasePlayer		*MyCharacterPointer(void) { return NULL; }
+	virtual CBasePlayer		*MyCharacterPointer( void ) { return NULL; }
 #endif
 	virtual float			GetDelay( void ) { return 0; }
 	virtual bool			IsMoving( void );
@@ -1257,16 +1257,14 @@ public:
 
 	int		GetHealth() const		{ return m_iHealth; }
 	void	SetHealth( int amt )	{ m_iHealth = amt; }
-#ifdef FF_DLL
-	// --> Added by Mulch for testing
+#ifdef FF_DLL // --> Added by Mulch for testing
 	// Armor accessors
 	int		GetMaxArmor() const { return m_iMaxArmor; }
 	void	SetMaxArmor(int amt) { m_iMaxArmor = amt; }
 
 	int		GetArmor() const { return m_iArmor; }
 	void	SetArmor(int amt) { m_iArmor = amt; }
-	// <-- Added by Mulch for testing
-#endif
+#endif	// <-- Added by Mulch for testing
 	float HealthFraction() const;
 
 	// Ugly code to lookup all functions to make sure they are in the table when set.
@@ -1342,12 +1340,10 @@ public:
 	CNetworkVarForDerived( char, m_lifeState );
 	CNetworkVarForDerived( char , m_takedamage );
 
-	#ifdef FF_DLL
-	// --> Added by Mulch for testing
+#ifdef FF_DLL // --> Added by Mulch for testing
 	CNetworkVarForDerived( int, m_iArmor );
 	CNetworkVarForDerived( int, m_iMaxArmor );
-	// <-- Added by Mulch for testing
-	#endif
+#endif	// <-- Added by Mulch for testing
 	// Damage filtering
 	string_t	m_iszDamageFilterName;	// The name of the entity to use as our damage filter.
 	EHANDLE		m_hDamageFilter;		// The entity that controls who can damage us.
@@ -1641,7 +1637,7 @@ public:
 
 	// See CSoundEmitterSystem
 #ifdef FF_DLL
-	void PlaySound(const char* soundname);
+	void PlaySound(const char *soundname);
 #endif
 	void					EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );
 #ifdef FF_DLL
@@ -2102,12 +2098,12 @@ public:
 
 #ifdef FF_DLL	// -- luabridge3 stuff to avoid const-correctness issues, added for the sake of existing scripts
 	
-	inline Vector LUA_GetAbsVelocity(void)	{ return GetAbsVelocity();	};
-	inline Vector LUA_GetAbsOrigin(void)	{ return GetAbsOrigin();	};
-	inline Vector LUA_WorldAlignMins(void)	{ return WorldAlignMins();	};
-	inline Vector LUA_WorldAlignMaxs(void)	{ return WorldAlignMaxs();	};
-	inline QAngle LUA_GetAbsAngles(void)	{ return GetAbsAngles();	};
-	inline Vector LUA_GetAbsFacing(void)	{ return GetAbsFacing();	};
+	inline Vector LUA_GetAbsVelocity( void )	{ return GetAbsVelocity();	};
+	inline Vector LUA_GetAbsOrigin( void )	{ return GetAbsOrigin();	};
+	inline Vector LUA_WorldAlignMins( void )	{ return WorldAlignMins();	};
+	inline Vector LUA_WorldAlignMaxs( void )	{ return WorldAlignMaxs();	};
+	inline QAngle LUA_GetAbsAngles( void )	{ return GetAbsAngles();	};
+	inline Vector LUA_GetAbsFacing( void )	{ return GetAbsFacing();	};
 	
 #endif	// -- luabridge3 stuff to avoid const-correctness issues, added for the sake of existing scripts
 

@@ -10,10 +10,11 @@
 #include "mp3player.h"
 #include "KeyValues.h"
 #include "filesystem.h"
+#ifdef FF
 #include <valve_minmax_off.h>
 #include <filesystem>
 #include <valve_minmax_on.h>
-
+#endif
 #include "vgui_controls/MenuButton.h"
 #include "vgui_controls/Menu.h"
 #include "vgui_controls/Button.h"
@@ -43,9 +44,11 @@ using namespace vgui;
 
 // Singleton
 static CMP3Player *g_pPlayer = NULL;
-
+#ifndef FF_CLIENT_DLL
+vgui::Panel *GetSDKRootPanel();
+#else
 vgui::Panel *GetFFRootPanel();
-
+#endif
 // Time between songs
 #define END_GAP_TIME	1.0f
 

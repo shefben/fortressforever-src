@@ -38,7 +38,7 @@ extern IGameUIFuncs *gameuifuncs; // for key binding details
 #include <game/client/iviewport.h>
 
 #include <stdlib.h> // MAX_PATH define
-
+#ifdef FF
 #include <networkstringtabledefs.h>
 #include <cdll_client_int.h>
 #include <convar.h>
@@ -55,23 +55,25 @@ extern IGameUIFuncs *gameuifuncs; // for key binding details
 #include "ff_weapon_parse.h"
 #include "ff_utils.h"
 #include "ff_button.h"
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 using namespace vgui;
+#ifdef FF
 extern IFileSystem** pFilesystem;
 extern INetworkStringTable* g_pStringTableInfoPanel;
 extern IGameUIFuncs* gameuifuncs;
-
+#endif
 #ifdef TF_CLIENT_DLL
 #define HUD_CLASSAUTOKILL_FLAGS		( FCVAR_CLIENTDLL | FCVAR_ARCHIVE | FCVAR_USERINFO )
 #else
 #define HUD_CLASSAUTOKILL_FLAGS		( FCVAR_CLIENTDLL | FCVAR_ARCHIVE )
 #endif // !TF_CLIENT_DLL
 
+//ConVar hud_classautokill( "hud_classautokill", "1", HUD_CLASSAUTOKILL_FLAGS, "Automatically kill player after choosing a new playerclass." );
 // Button names
-const char* szClassButtons[] = { "scoutbutton", "sniperbutton", "soldierbutton",
+const char *szClassButtons[] = { "scoutbutton", "sniperbutton", "soldierbutton",
 								 "demomanbutton", "medicbutton", "hwguybutton",
 								 "pyrobutton", "spybutton", "engineerbutton",
 								 "civilianbutton" };
@@ -327,12 +329,12 @@ CClassMenu::CClassMenu(IViewPort *pViewPort) : Frame(NULL, PANEL_CLASS)
 	SetScheme("ClientScheme");
 	SetMoveable(false);
 	SetSizeable(false);
-	SetProportional(true);
 
 	// hide the system buttons
-	SetTitleBarVisible(false);
+	SetTitleBarVisible( false );
+	SetProportional(true);
 
-	m_pClassInfo = new RichText(this, "ClassInfo");
+	m_pClassInfo = new RichText( this, "ClassInfo" );
 	m_pClassInfo->SetVerticalScrollbar(false);
 	m_pClassInfo->SetBgColor(Color(0, 0, 0, 50));
 	m_pClassInfo->SetPaintBorderEnabled(true);
@@ -366,7 +368,7 @@ CClassMenu::CClassMenu(IViewPort *pViewPort) : Frame(NULL, PANEL_CLASS)
 		m_WepSlots[i] = new LoadoutLabel(this, panelName, text);
 	}
 
-	char* pszButtons[] = { "ScoutButton", "SniperButton", "SoldierButton", "DemomanButton", "MedicButton", "HwguyButton", "PyroButton", "SpyButton", "EngineerButton", "CivilianButton" };
+	char *pszButtons[] = { "ScoutButton", "SniperButton", "SoldierButton", "DemomanButton", "MedicButton", "HwguyButton", "PyroButton", "SpyButton", "EngineerButton", "CivilianButton" };
 
 	for (int iClassIndex = 0; iClassIndex < ARRAYSIZE(pszButtons); iClassIndex++)
 	{
@@ -457,7 +459,7 @@ void CClassMenu::Update()
 	{
 		Button *pClassButton = m_pClassButtons[iClassIndex];
 
-		switch (nSpacesRemaining[iClassIndex])
+		switch ( nSpacesRemaining[iClassIndex] )
 		{
 		case -1:
 //			pClassButton->SetVisible(false);
@@ -488,11 +490,28 @@ void CClassMenu::Update()
 //-----------------------------------------------------------------------------
 void CClassMenu::OnCommand( const char *command )
 {
-	if (Q_stricmp(command, "cancel"))
-		engine->ClientCmd(VarArgs("class %s", command));
+	if ( Q_stricmp( command, "vguicancel" ) ) || ( Q_stricmp( command, "cancel" ) )
+	{
+#ifndef FF
+		engine->ClientCmd( const_cast<char *>( command ) );
+#else
+		engine->ClientCmd( VarArgs( "class %s", command ) );
+#if !defined( CSTRIKE_DLL ) && !defined( TF_CLIENT_DLL )
+		// They entered a command to change their class, kill them so they spawn with 
+		// the new class right away
+		if ( hud_classautokill.GetBool() )
+		{
+			engine->ClientCmd( "kill" );
+		}
+#endif // !CSTRIKE_DLL && !TF_CLIENT_DLL
+	}
+#ifndef FF
+	Close();
 
-	m_pViewPort->ShowPanel(this, false);
-
+	gViewPortInterface->ShowBackGround( false );
+#else
+	m_pViewPort->ShowPanel( this, false );
+#endif
 	BaseClass::OnCommand( command );
 }
 

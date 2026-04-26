@@ -219,12 +219,25 @@ enum CastVote
 #define HIDEHUD_INVEHICLE			( 1<<10 )
 #define HIDEHUD_BONUS_PROGRESS		( 1<<11 )	// Hide bonus progress display (for bonus map challenges)
 
-// --> FF
+#ifdef FF// --> FF
 #define HIDEHUD_SPECTATING			( 1<<12 )	// Hide while spectating
 #define HIDEHUD_UNASSIGNED			( 1<<13 )	// Hide while the local player has not chosen a class or team
 // <-- FF
 
 #define HIDEHUD_BITCOUNT			14
+#elifndef FF
+#if defined( TF_DLL ) || defined ( TF_CLIENT_DLL )
+#define HIDEHUD_BUILDING_STATUS		        ( 1<<12 )	// Hide Engineer building status
+#define HIDEHUD_CLOAK_AND_FEIGN             ( 1<<13 )	// Hide item effect meter (cloak, etc)
+#define HIDEHUD_PIPES_AND_CHARGE            ( 1<<14 )	// Hide demo hud
+#define HIDEHUD_METAL                       ( 1<<15 )	// Metal/account hud
+#define HIDEHUD_TARGET_ID                   ( 1<<16 )	// Target ID
+#define HIDEHUD_MATCH_STATUS				( 1<<17 )	// Hide match status
+#define HIDEHUD_BITCOUNT			18
+#else
+#define HIDEHUD_BITCOUNT			12
+#endif
+#endif
 
 //===================================================================================================================
 // suit usage bits
@@ -425,7 +438,7 @@ enum PLAYER_ANIM
 	PLAYER_LEAVE_AIMING,
 };
 
-#ifdef HL2_DLL
+#ifdef HL2_DLL && #ifndef FF_DLL
 // HL2 has 600 gravity by default
 // NOTE: The discrete ticks can have quantization error, so these numbers are biased a little to
 // make the heights more exact
@@ -434,21 +447,21 @@ enum PLAYER_ANIM
 #define PLAYER_LAND_ON_FLOATING_OBJECT	173 // Can fall another 173 in/sec without getting hurt
 #define PLAYER_MIN_BOUNCE_SPEED		173
 #define PLAYER_FALL_PUNCH_THRESHOLD 303.0f // won't punch player's screen/make scrape noise unless player falling at least this fast - at least a 76" fall (sqrt( 2 * g * 76))
-#elifndef FF
+#elifdef FF_DLL
+// --> Mirv: Changed fall speed limits
+#define PLAYER_FATAL_FALL_SPEED		1024	// This is a kind of arbitary figure
+#define PLAYER_MAX_SAFE_FALL_SPEED	640		// Just a bit more than the 2fort balc drop
+#define PLAYER_LAND_ON_FLOATING_OBJECT	200		// Can go another 200 units without getting hurt
+#define PLAYER_MIN_BOUNCE_SPEED		200
+#define PLAYER_FALL_PUNCH_THRESHOLD	(float)490 // Won't punch player's screen/make scrape noise unless player falling at least this fast.
+// <-- Mirv: Changed fall speed limits
+
+#else
 #define PLAYER_FATAL_FALL_SPEED		1024 // approx 60 feet
 #define PLAYER_MAX_SAFE_FALL_SPEED	580 // approx 20 feet
 #define PLAYER_LAND_ON_FLOATING_OBJECT	200 // Can go another 200 units without getting hurt
 #define PLAYER_MIN_BOUNCE_SPEED		200
 #define PLAYER_FALL_PUNCH_THRESHOLD (float)350 // won't punch player's screen/make scrape noise unless player falling at least this fast.
-#else
-// --> Mirv: Changed fall speed limits
-#define PLAYER_FATAL_FALL_SPEED				1024	// This is a kind of arbitary figure
-#define PLAYER_MAX_SAFE_FALL_SPEED			640		// Just a bit more than the 2fort balc drop
-#define PLAYER_LAND_ON_FLOATING_OBJECT		200		// Can go another 200 units without getting hurt
-#define PLAYER_MIN_BOUNCE_SPEED				200
-#define PLAYER_FALL_PUNCH_THRESHOLD			(float)490 // Won't punch player's screen/make scrape noise unless player falling at least this fast.
-// <-- Mirv: Changed fall speed limits
-
 #endif
 #define DAMAGE_FOR_FALL_SPEED		100.0f / ( PLAYER_FATAL_FALL_SPEED - PLAYER_MAX_SAFE_FALL_SPEED ) // damage per unit per second.
 
@@ -485,9 +498,9 @@ enum PLAYER_ANIM
 #define DMG_ALWAYSGIB		(1 << 13)	// with this bit OR'd in, any damage type can be made to gib victims upon death.
 #define DMG_DROWN			(1 << 14)	// Drowning
 
-// time-based damage
+#ifdef FF // FF: time-based damage
 #define DMG_TIMEBASED		(DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN)	// mask for time-based damage
-
+#endif
 #define DMG_PARALYZE		(1 << 15)	// slows affected creature down
 #define DMG_NERVEGAS		(1 << 16)	// nerve toxins, very bad
 #define DMG_POISON			(1 << 17)	// blood poisoning - heals over time like drowning damage
@@ -514,7 +527,7 @@ enum PLAYER_ANIM
 // TODO: keep this up to date so all the mod-specific flags don't overlap anything.
 #define DMG_LASTGENERICFLAG	DMG_BUCKSHOT
 
-// these are the damage types that are allowed to gib corpses
+#ifdef FF // these are the FF damage types that are allowed to gib corpses
 #define DMG_GIB_CORPSE		( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC | DMG_CLUB )
 
 // these are the damage types that have client hud art
@@ -522,7 +535,7 @@ enum PLAYER_ANIM
 
 // these are the damage types that don't have to supply a physics force & position
 #define DMG_NO_PHYSICS_FORCE	(DMG_FALL | DMG_BURN | DMG_PLASMA | DMG_DROWN | DMG_TIMEBASED | DMG_CRUSH | DMG_PHYSGUN | DMG_PREVENT_PHYSICS_FORCE)
-
+#endif
 // settings for m_takedamage
 #define	DAMAGE_NO				0
 #define DAMAGE_EVENTS_ONLY		1		// Call damage functions, but don't modify health
@@ -684,9 +697,11 @@ enum
 	EFL_DIRTY_ABSANGVELOCITY =	(1<<13),
 	EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS	= (1<<14),
 	EFL_DIRTY_SPATIAL_PARTITION = (1<<15),
-	//	UNUSED	(NOW TAKEN)		= (1<<16),
-	EFL_NO_WEAPON_PICKUP =		(1 << 16),		// Characters can't pick up weapons
-
+#ifndef FF
+	EFL_FORCE_ALLOW_MOVEPARENT	= (1<<16),
+#else
+	EFL_NO_WEAPON_PICKUP		= (1 << 16),	// Characters can't pick up weapons
+#endif
 	EFL_IN_SKYBOX =				(1<<17),	// This is set if the entity detects that it's in the skybox.
 											// This forces it to pass the "in PVS" for transmission.
 	EFL_USE_PARTITION_WHEN_NOT_SOLID = (1<<18),	// Entities with this flag set show up in the partition even when not solid
