@@ -326,7 +326,7 @@ void CalculateExplosiveDamageForce( CTakeDamageInfo *info, const Vector &vecDir,
 	Vector vecForce = vecDir;
 	VectorNormalize( vecForce );
 	vecForce *= flForceScale;
-#ifndef( FF )
+#ifndef FF
 	vecForce *= phys_pushscale.GetFloat();
 	vecForce *= flScale;
 #else

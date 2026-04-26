@@ -1234,7 +1234,7 @@ CFuncFFScript::CFuncFFScript()
 
 	// bot info
 	m_BotTeamFlags = 0;
-	m_BotGoalType = Omnibot::kNone;
+	//m_BotGoalType = Omnibot::kNone;
 }
 
 
@@ -1323,7 +1323,7 @@ void CFuncFFScript::SetBotGoalInfo(int _type, int _team)
 {
 	m_BotGoalType = _type;
 	m_BotTeamFlags = 0;
-	const int iAllTeams =
+/*	const int iAllTeams =
 		(1 << Omnibot::TF_TEAM_BLUE) |
 		(1 << Omnibot::TF_TEAM_RED) |
 		(1 << Omnibot::TF_TEAM_YELLOW) |
@@ -1346,7 +1346,7 @@ void CFuncFFScript::SetBotGoalInfo(int _type, int _team)
 		m_BotTeamFlags = iAllTeams & ~(1 << Omnibot::TF_TEAM_GREEN);
 		break;
 	}
-	Omnibot::Notify_GoalInfo(this, m_BotGoalType, m_BotTeamFlags);
+	Omnibot::Notify_GoalInfo(this, m_BotGoalType, m_BotTeamFlags); */
 }
 #endif
 // ##################################################################################

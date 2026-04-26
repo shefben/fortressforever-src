@@ -120,13 +120,13 @@ static ConVar physicsshadowupdate_render( "physicsshadowupdate_render", "0" );
 bool IsInCommentaryMode( void );
 bool IsListeningToCommentary( void );
 
-#if !defined( CSTRIKE_DLL )
+#if !defined( CSTRIKE_DLL ) && !defined( FF_DLL )
 ConVar cl_sidespeed( "cl_sidespeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_upspeed( "cl_upspeed", "320", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_forwardspeed( "cl_forwardspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
 ConVar cl_backspeed( "cl_backspeed", "450", FCVAR_REPLICATED | FCVAR_CHEAT );
 #endif // CSTRIKE_DLL
-#if defined( FF_DLL )
+#if defined( FF_DLL ) // FF_DLL
 // YoYo178: match values from in_main.cpp to avoid the
 // "parent and child convars with different values" error
 ConVar cl_sidespeed( "cl_sidespeed", "1000", FCVAR_REPLICATED | FCVAR_CHEAT );

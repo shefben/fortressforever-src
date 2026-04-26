@@ -5,9 +5,10 @@
 //-----------------------------------------------------------------------------
 
 $Macro SRCDIR		"..\.."
-$Macro GAMENAME "FortressForever2013"
-$Include "$SRCDIR\materialsystem\stdshaders\game_shader_dx9_base.vpc"
+$Macro OUTBINNAME "game_shader_generic_example"
+$Macro GAMENAME "fortressforever"
+$Include "$SRCDIR\materialsystem\stdshaders\game_shader_generic_example_base.vpc"
 
-$Project "Shaders (FF)"
+$Project "Game Shaders (FF)"
 {
 }

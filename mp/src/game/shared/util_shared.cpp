@@ -1468,7 +1468,7 @@ CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID )
 // HPE_END
 //=============================================================================
 
-#endif
+
 
 
 const char* ReadAndAllocStringValue( KeyValues *pSub, const char *pName, const char *pFilename )

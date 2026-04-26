@@ -75,12 +75,10 @@ CNavMesh::CNavMesh( void )
 	LoadPlaceDatabase();
 
 	ListenForGameEvent( "round_start" );
-#ifdef FF_DLL
-	ListenForGameEvent( "round_start_pre_entity" );
-#endif
+//	ListenForGameEvent( "round_start_pre_entity" );
 	ListenForGameEvent( "break_prop" );
 	ListenForGameEvent( "break_breakable" );
-#ifdef FF_DLL
+#ifndef FF_DLL
 	ListenForGameEvent( "teamplay_round_start" );
 #endif
 		
