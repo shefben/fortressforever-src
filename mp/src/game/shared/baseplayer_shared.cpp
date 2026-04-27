@@ -514,8 +514,8 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 	float velrun;
 	float velwalk;
 	int	fLadder;
-
-	/*if ( m_flStepSoundTime > 0 )
+#ifndef FF
+	if ( m_flStepSoundTime > 0 )
 	{
 		m_flStepSoundTime -= 1000.0f * gpGlobals->frametime;
 		if ( m_flStepSoundTime < 0 )
@@ -525,12 +525,11 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 	}
 
 	if ( m_flStepSoundTime > 0 )
-		return;*/
-
-	// --> Mirv: Replaced to fix footsteps
+		return;
+#else	// --> Mirv: Replaced to fix footsteps
 	if (m_flStepSoundTime > gpGlobals->curtime)
 		return;
-	// <-- Mirv
+#endif	// <-- Mirv
 
 	if ( GetFlags() & (FL_FROZEN|FL_ATCONTROLS))
 		return;
@@ -804,15 +803,27 @@ void CBasePlayer::SetStepSoundTime( stepsoundtimes_t iStepSoundTime, bool bWalki
 	{
 	case STEPSOUNDTIME_NORMAL:
 	case STEPSOUNDTIME_WATER_FOOT:
-		m_flStepSoundTime = bWalking ? /*400 : 300;*/ gpGlobals->curtime + 0.400f : gpGlobals->curtime + 0.300f;	// |-- Mirv: Added gpGlobals->curtime
+	#ifndef FF
+		m_flStepSoundTime = bWalking ? 400 : 300;
+	#else
+		m_flStepSoundTime = bWalking ? gpGlobals->curtime + 0.400f : gpGlobals->curtime + 0.300f;	// |-- Mirv: Added gpGlobals->curtime
+	#endif
 		break;
 
 	case STEPSOUNDTIME_ON_LADDER:
-		m_flStepSoundTime = /*350;*/ gpGlobals->curtime + 0.350f;	// |-- Mirv: Added gpGlobals->curtime
+	#ifndef FF
+		m_flStepSoundTime = 350;
+	#else
+		m_flStepSoundTime = gpGlobals->curtime + 0.350f;	// |-- Mirv: Added gpGlobals->curtime
+	#endif
 		break;
 
 	case STEPSOUNDTIME_WATER_KNEE:
-		m_flStepSoundTime = /*600;*/ gpGlobals->curtime + 0.600f;	// |-- Mirv: Added gpGlobals->curtime
+	#ifndef FF
+		m_flStepSoundTime = 600;
+	#else
+		m_flStepSoundTime = gpGlobals->curtime + 0.600f;	// |-- Mirv: Added gpGlobals->curtime
+	#endif
 		break;
 
 	default:
@@ -823,9 +834,13 @@ void CBasePlayer::SetStepSoundTime( stepsoundtimes_t iStepSoundTime, bool bWalki
 	// UNDONE: need defined numbers for run, walk, crouch, crouch run velocities!!!!	
 	if ( ( GetFlags() & FL_DUCKING) || ( GetMoveType() == MOVETYPE_LADDER ) )
 	{
+	#ifndef FF
+		m_flStepSoundTime += 100;
+	#else
 		m_flStepSoundTime += 0.001f * 100; // slower step time if ducking
 	} else {
 		m_flStepSoundTime += 0.001f;
+	#endif
 	}
 }
 

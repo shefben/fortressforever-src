@@ -168,8 +168,11 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 	// Pull out of the wall a bit
 	if ( pTrace->fraction != 1.0 )
 	{
-		//SetAbsOrigin( pTrace->endpos + (pTrace->plane.normal * 0.6) );
+	#ifndef FF
+		SetAbsOrigin( pTrace->endpos + (pTrace->plane.normal * 0.6) );
+	#else
 		SetLocalOrigin( pTrace->endpos + (pTrace->plane.normal * 32.0f) );	// |-- Mirv: 32 units used in TFC
+	#endif
 	}
 
 	Vector vecAbsOrigin = GetAbsOrigin();
@@ -215,17 +218,17 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 	CSoundEnt::InsertSound ( SOUND_COMBAT, GetAbsOrigin(), BASEGRENADE_EXPLOSION_VOLUME, 3.0 );
 #endif
 
-	// Use the thrower's position as the reported position
-	//Vector vecReported = m_hThrower ? m_hThrower->GetAbsOrigin() : vec3_origin;
-
+#ifndef FF	// Use the thrower's position as the reported position
+	Vector vecReported = m_hThrower ? m_hThrower->GetAbsOrigin() : vec3_origin;
+	
+	CTakeDamageInfo info( this, m_hThrower, GetBlastForce(), GetAbsOrigin(), m_flDamage, bitsDamageType, 0, &vecReported );
+#else
 	// We need to report where the explosion took place
 	Vector vecReported = pTrace->endpos; //m_hThrower ? m_hThrower->GetAbsOrigin() : vec3_origin;
-	
-	//CTakeDamageInfo info( this, m_hThrower, GetBlastForce(), GetAbsOrigin(), m_flDamage, bitsDamageType, 0, &vecReported );
 	// --> Mirv: #0000675: Killing people with certain weapons says the person killed themself
 	CTakeDamageInfo info( this, /*m_hThrower*/ GetOwnerEntity(), GetBlastForce(), GetAbsOrigin(), m_flDamage, bitsDamageType, m_iKillType, &vecReported );
 	// <-- Mirv
-
+#endif
 	RadiusDamage( info, GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
 	UTIL_DecalTrace( pTrace, "Scorch" );
@@ -643,9 +646,10 @@ CBaseGrenade::CBaseGrenade(void)
 	m_DmgRadius			= 100;
 	m_flDetonateTime	= 0;
 	m_bHasWarnedAI		= false;
+#ifdef FF
 	m_iKillType			= 0;
 	m_iDamageType		= DMG_BLAST;
-
+#endif
 	SetSimulatedEveryTick( true );
 };
 

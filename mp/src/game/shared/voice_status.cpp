@@ -30,7 +30,7 @@
 #include "cdll_int.h"
 #include <vgui/IPanel.h>
 
-#ifdef( FF )
+#ifdef FF
 #include "c_ff_player.h"
 #include "ff_gamerules.h"
 #endif
@@ -237,7 +237,7 @@ void CVoiceStatus::DrawHeadLabels()
 		// Don't show an icon for dead or spectating players (ie: invisible entities).
 		if( pPlayer->IsPlayerDead() )
 			continue;
-#ifdef( FF )
+#ifdef FF
 		C_FFPlayer* pLocalPlayer = dynamic_cast<C_FFPlayer*>(C_BasePlayer::GetLocalPlayer());
 		if (!pLocalPlayer)
 			continue;
@@ -582,7 +582,7 @@ void CVoiceStatus::SetPlayerBlockedState(int iPlayer, bool blocked)
 	{
 		Msg("CVoiceStatus::SetPlayerBlockedState: setting player %d ban to %d\n", iPlayer, !m_BanMgr.GetPlayerBan(pi.guid));
 	}
-#ifndef( FF ) // Mirv: What the hell, a toggle??
+#ifndef FF // Mirv: What the hell, a toggle??
 	m_BanMgr.SetPlayerBan(pi.guid, !m_BanMgr.GetPlayerBan(pi.guid));
 #else
 	m_BanMgr.SetPlayerBan(pi.guid, blocked);

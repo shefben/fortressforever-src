@@ -258,8 +258,7 @@ typedef enum
 	
 	ACT_VM_ATTACH_SILENCER,
 	ACT_VM_DETACH_SILENCER,
-#if defined( FF )
-	// --> Mirv: Anims
+#if defined( FF ) // --> Mirv: Anims
 	//===========================
 	// FortressForever Specific Activities
 	//===========================
@@ -330,8 +329,7 @@ typedef enum
 	ACT_VM_FINISHRELOAD_WITH4,
 	ACT_VM_FINISHRELOAD_WITH5,
 	ACT_VM_FINISHRELOAD_WITH6,
-	// <-- Mirv: Anims
-#endif
+#endif // <-- Mirv: Anims
 	// TF2 Scout Pack
 	ACT_VM_DRAW_SPECIAL,
 	ACT_VM_HOLSTER_SPECIAL,

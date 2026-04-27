@@ -203,7 +203,13 @@ Vector SharedRandomVector( const char *sharedname, float minVal, float maxVal, i
 
 	int seed = SeedFileLineHash( CBaseEntity::GetPredictionRandomSeed(), sharedname, additionalSeed );
 	RandomSeed( seed );
-	return RandomVector( minVal, maxVal );
+	// HACK:  Can't call RandomVector/Angle because it uses rand() not vstlib Random*() functions!
+	// Get a random vector.
+	Vector vRandom;
+	vRandom.x = RandomFloat( minVal, maxVal );
+	vRandom.y = RandomFloat( minVal, maxVal );
+	vRandom.z = RandomFloat( minVal, maxVal );
+	return vRandom;
 }
 
 QAngle SharedRandomAngle( const char *sharedname, float minVal, float maxVal, int additionalSeed /*=0*/ )
@@ -212,7 +218,14 @@ QAngle SharedRandomAngle( const char *sharedname, float minVal, float maxVal, in
 
 	int seed = SeedFileLineHash( CBaseEntity::GetPredictionRandomSeed(), sharedname, additionalSeed );
 	RandomSeed( seed );
-	return RandomAngle(minVal, maxVal);
+
+	// HACK:  Can't call RandomVector/Angle because it uses rand() not vstlib Random*() functions!
+	// Get a random vector.
+	Vector vRandom;
+	vRandom.x = RandomFloat( minVal, maxVal );
+	vRandom.y = RandomFloat( minVal, maxVal );
+	vRandom.z = RandomFloat( minVal, maxVal );
+	return QAngle( vRandom.x, vRandom.y, vRandom.z );
 }
 
 
@@ -239,13 +252,13 @@ bool PassServerEntityFilter( const IHandleEntity *pTouch, const IHandleEntity *p
 		return false;
 	
 	// don't clip against owner
-	if (!pEntPass->CanClipOwnerEntity())
+	if ( !pEntPass->CanClipOwnerEntity() )
 	{
-		if (pEntPass->GetOwnerEntity() == pEntTouch)
-			return false;
+		if ( pEntPass->GetOwnerEntity() == pEntTouch )
+			return false;	
 	}
 
-	if (!pEntPass->CanClipPlayer() && pEntTouch->IsPlayer())
+	if ( !pEntPass->CanClipPlayer() && pEntTouch->IsPlayer() )
 		return false;
 
 
@@ -305,7 +318,7 @@ CTraceFilterSimple::CTraceFilterSimple( const IHandleEntity *passedict, int coll
 //-----------------------------------------------------------------------------
 bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int contentsMask )
 {
-
+#ifdef FF
 	CBaseEntity* pHandle = EntityFromEntityHandle(pHandleEntity);
 
 	const CBaseEntity* pPassEnt = NULL;
@@ -598,23 +611,26 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 			}
 		}
 	}
-
+#endif
 	if ( !StandardFilterRules( pHandleEntity, contentsMask ) )
 		return false;
 
 	if ( m_pPassEnt )
 	{
 		if ( !PassServerEntityFilter( pHandleEntity, m_pPassEnt ) )
+		{
 			return false;
+		}
 	}
 
-	// Don't test if the game code tells us we should ignore this collision...
-	//CBaseEntity *pEntity = EntityFromEntityHandle( pHandleEntity );
+#ifndef FF	// Don't test if the game code tells us we should ignore this collision...
+	CBaseEntity *pEntity = EntityFromEntityHandle( pHandleEntity );
+#endif
 	if ( !pHandle )
 		return false;
 	if ( !pHandle->ShouldCollide( m_collisionGroup, contentsMask ) )
 		return false;
-	if (pHandle && !g_pGameRules->ShouldCollide( m_collisionGroup, pHandle->GetCollisionGroup() ) )
+	if ( pHandle && !g_pGameRules->ShouldCollide( m_collisionGroup, pHandle->GetCollisionGroup() ) )
 		return false;
 	if ( m_pExtraShouldHitCheckFunction &&
 		(! ( m_pExtraShouldHitCheckFunction( pHandleEntity, contentsMask ) ) ) )
@@ -970,8 +986,8 @@ void UTIL_TraceEntity( CBaseEntity *pEntity, const Vector &vecAbsStart, const Ve
 	// Adding this assertion here so game code catches it, but really the assertion belongs in the engine
 	// because one day, rotated collideables will work!
 	Assert( pCollision->GetCollisionAngles() == vec3_angle );
-
-	if (pEntity->Classify() == CLASS_INFOSCRIPT)
+#ifdef FF
+	if ( pEntity->Classify() == CLASS_INFOSCRIPT )
 	{
 		//// Hey, this is some cool shit and shows just how often the shit is tested
 		//#ifdef GAME_DLL
@@ -996,7 +1012,7 @@ void UTIL_TraceEntity( CBaseEntity *pEntity, const Vector &vecAbsStart, const Ve
 		//		}
 		//#endif
 	}
-
+#endif
 	CTraceFilterEntity traceFilter( pEntity, pCollision->GetCollisionGroup() );
 
 #ifdef PORTAL
@@ -1271,7 +1287,7 @@ void UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amou
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void UTIL_BloodSpray(const Vector& pos, const Vector& dir, int color, int amount, int flags)
+void UTIL_BloodSpray(const Vector &pos, const Vector &dir, int color, int amount, int flags)
 {
 	if (color == DONT_BLEED)
 		return;
@@ -1471,7 +1487,7 @@ CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID )
 
 
 
-const char* ReadAndAllocStringValue( KeyValues *pSub, const char *pName, const char *pFilename )
+char* ReadAndAllocStringValue( KeyValues *pSub, const char *pName, const char *pFilename )
 {
 	const char *pValue = pSub->GetString( pName, NULL );
 	if ( !pValue )

@@ -225,7 +225,8 @@ enum CastVote
 // <-- FF
 
 #define HIDEHUD_BITCOUNT			14
-#elifndef FF
+#endif
+#ifndef FF
 #if defined( TF_DLL ) || defined ( TF_CLIENT_DLL )
 #define HIDEHUD_BUILDING_STATUS		        ( 1<<12 )	// Hide Engineer building status
 #define HIDEHUD_CLOAK_AND_FEIGN             ( 1<<13 )	// Hide item effect meter (cloak, etc)
@@ -447,7 +448,7 @@ enum PLAYER_ANIM
 #define PLAYER_LAND_ON_FLOATING_OBJECT	173 // Can fall another 173 in/sec without getting hurt
 #define PLAYER_MIN_BOUNCE_SPEED		173
 #define PLAYER_FALL_PUNCH_THRESHOLD 303.0f // won't punch player's screen/make scrape noise unless player falling at least this fast - at least a 76" fall (sqrt( 2 * g * 76))
-#elifdef FF_DLL
+#elif defined FF_DLL
 // --> Mirv: Changed fall speed limits
 #define PLAYER_FATAL_FALL_SPEED		1024	// This is a kind of arbitary figure
 #define PLAYER_MAX_SAFE_FALL_SPEED	640		// Just a bit more than the 2fort balc drop
@@ -697,11 +698,8 @@ enum
 	EFL_DIRTY_ABSANGVELOCITY =	(1<<13),
 	EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS	= (1<<14),
 	EFL_DIRTY_SPATIAL_PARTITION = (1<<15),
-#ifndef FF
 	EFL_FORCE_ALLOW_MOVEPARENT	= (1<<16),
-#else
-	EFL_NO_WEAPON_PICKUP		= (1 << 16),	// Characters can't pick up weapons
-#endif
+
 	EFL_IN_SKYBOX =				(1<<17),	// This is set if the entity detects that it's in the skybox.
 											// This forces it to pass the "in PVS" for transmission.
 	EFL_USE_PARTITION_WHEN_NOT_SOLID = (1<<18),	// Entities with this flag set show up in the partition even when not solid

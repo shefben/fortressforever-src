@@ -161,7 +161,6 @@ void CFFWeaponBase::ForceRemove()
 	RemoveEffects(EF_NODRAW);
 	VPhysicsDestroyObject();
 	SetGroundEntity(NULL);
-	AddEFlags(EFL_NO_WEAPON_PICKUP);
 	SetThink(NULL);
 	SetTouch(NULL);
 	SetOwnerEntity(NULL);
@@ -389,7 +388,6 @@ void CFFWeaponBase::Drop( const Vector& vecVelocity )
 	RemoveEffects( EF_NODRAW );
 	FallInit();
 	SetGroundEntity( NULL );
-	AddEFlags( EFL_NO_WEAPON_PICKUP );
 	SetThink( &CFFWeaponBase::DropThink );
 	SetTouch( NULL );
 

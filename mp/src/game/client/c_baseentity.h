@@ -235,9 +235,7 @@ public:
 	DECLARE_DATADESC();
 	DECLARE_CLIENTCLASS();
 	DECLARE_PREDICTABLE();
-#ifdef FF
-	void PrintDeleteInfo();
-#endif
+
 									C_BaseEntity();
 	virtual							~C_BaseEntity();
 #ifdef FF

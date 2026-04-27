@@ -47,7 +47,7 @@ static ConVar *g_pClosecaption = NULL;
 int LookupStringFromCloseCaptionToken( char const *token );
 const wchar_t *GetStringForIndex( int index );
 #endif
-static bool g_bPermitDirectSoundPrecache = false;
+bool g_bPermitDirectSoundPrecache = false;
 
 #if !defined( CLIENT_DLL )
 
@@ -262,21 +262,24 @@ public:
 		StartLog();
 		Q_snprintf( mapname, sizeof( mapname ), "maps/%s", STRING( gpGlobals->mapname ) );
 #else
-		Q_strncpy( mapname, engine->GetLevelName(), sizeof( mapname ) );
+		Q_snprintf( mapname, sizeof( mapname ), "maps/%s", V_GetFileName( engine->GetLevelName() ) );
 #endif
 
 		Q_FixSlashes( mapname );
 		Q_strlower( mapname );
 
+		char maptmp[256];
+		const char *pszCleanMapName = GetCleanMapName( mapname, maptmp );
+
 		// Load in any map specific overrides
 		char scriptfile[ 512 ];
 #if defined( TF_CLIENT_DLL ) || defined( TF_DLL )
-		if( V_stristr( mapname, "mvm" ) )
+		if( V_stristr( pszCleanMapName, "mvm" ) )
 		{
 			V_strncpy( scriptfile, "scripts/mvm_level_sounds.txt", sizeof( scriptfile ) );
 			if ( filesystem->FileExists( "scripts/mvm_level_sounds.txt", "GAME" ) )
 			{
-				soundemitterbase->AddSoundOverrides( "scripts/mvm_level_sounds.txt" );
+				soundemitterbase->AddSoundOverrides( "scripts/mvm_level_sounds.txt", true );
 			}
 			if ( filesystem->FileExists( "scripts/mvm_level_sound_tweaks.txt", "GAME" ) )
 			{
@@ -294,7 +297,7 @@ public:
 		}
 		else
 		{
-			Q_StripExtension( mapname, scriptfile, sizeof( scriptfile ) );
+			Q_StripExtension( pszCleanMapName, scriptfile, sizeof( scriptfile ) );
 			Q_strncat( scriptfile, "_level_sounds.txt", sizeof( scriptfile ), COPY_ALL_CHARACTERS );
 			if ( filesystem->FileExists( scriptfile, "GAME" ) )
 			{
@@ -302,7 +305,7 @@ public:
 			}
 		}
 #else
-		Q_StripExtension( mapname, scriptfile, sizeof( scriptfile ) );
+		Q_StripExtension( pszCleanMapName, scriptfile, sizeof( scriptfile ) );
 		Q_strncat( scriptfile, "_level_sounds.txt", sizeof( scriptfile ), COPY_ALL_CHARACTERS );
 
 		if ( filesystem->FileExists( scriptfile, "GAME" ) )
@@ -480,12 +483,12 @@ public:
 			params.volume = ep.m_flVolume;
 		}
 
-		// needed for ac rev sound to play at the same time as ac loop shot sound - Jon
+#ifdef FF // needed for ac rev sound to play at the same time as ac loop shot sound - Jon
 		if (ep.m_nFlags & SND_CHANGE_CHAN)
 		{
 			params.channel = ep.m_nChannel;
 		}
-
+#endif
 #if !defined( CLIENT_DLL )
 		bool bSwallowed = CEnvMicrophone::OnSoundPlayed( 
 			entindex, 
@@ -541,7 +544,7 @@ public:
 
 
 		// Don't caption modulations to the sound
-		if ( !( ep.m_nFlags & ( SND_CHANGE_PITCH | SND_CHANGE_VOL | SND_CHANGE_CHAN ) ) )
+		if ( !( ep.m_nFlags & ( SND_CHANGE_PITCH | SND_CHANGE_VOL ) ) )
 		{
 			EmitCloseCaption( filter, entindex, params, ep );
 		}
@@ -881,7 +884,7 @@ public:
 				soundname, wavename, entindex );
 		}
 	}
-
+#ifdef FF
 	// Jon: so we can stop sounds in a specific channel that's different from what the script defines
 	void StopSoundInChannelByHandle(int entindex, const char* soundname, HSOUNDSCRIPTHANDLE& handle, const int channel)
 	{
@@ -929,8 +932,7 @@ public:
 
 		StopSoundInChannelByHandle(entindex, soundname, (HSOUNDSCRIPTHANDLE&)soundindex, channel);
 	}
-
-
+#endif
 	void StopSound( int entindex, const char *soundname )
 	{
 		HSOUNDSCRIPTHANDLE handle = (HSOUNDSCRIPTHANDLE)soundemitterbase->GetSoundIndex( soundname );
@@ -1041,9 +1043,9 @@ void S_SoundEmitterSystemFlush( void )
 }
 
 #if defined( CLIENT_DLL )
-CON_COMMAND_F( cl_soundemitter_flush, "Flushes the sounds.txt system (client only)", /*FCVAR_CHEAT*/ FCVAR_CLIENTDLL ) // not enough args so added FCVAR_CLIENTDLL
+CON_COMMAND_F( cl_soundemitter_flush, "Flushes the sounds.txt system (client only)", FCVAR_CHEAT )
 #else
-CON_COMMAND_F( sv_soundemitter_flush, "Flushes the sounds.txt system (server only)", FCVAR_CHEAT )
+CON_COMMAND_F( sv_soundemitter_flush, "Flushes the sounds.txt system (server only)", FCVAR_DEVELOPMENTONLY )
 #endif
 {
 	S_SoundEmitterSystemFlush( );
@@ -1055,7 +1057,7 @@ CON_COMMAND_F( sv_soundemitter_flush, "Flushes the sounds.txt system (server onl
 
 #if !defined( _XBOX )
 
-CON_COMMAND_F( sv_soundemitter_filecheck, "Report missing wave files for sounds and game_sounds files.", /*FCVAR_DEVELOPMENTONLY*/ FCVAR_CHEAT )
+CON_COMMAND_F( sv_soundemitter_filecheck, "Report missing wave files for sounds and game_sounds files.", FCVAR_DEVELOPMENTONLY )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() )
 		return;
@@ -1064,7 +1066,7 @@ CON_COMMAND_F( sv_soundemitter_filecheck, "Report missing wave files for sounds 
 	DevMsg( "---------------------------\nTotal missing files %i\n", missing );
 }
 
-CON_COMMAND_F( sv_findsoundname, "Find sound names which reference the specified wave files.", /*FCVAR_DEVELOPMENTONLY*/ FCVAR_CHEAT )
+CON_COMMAND_F( sv_findsoundname, "Find sound names which reference the specified wave files.", FCVAR_DEVELOPMENTONLY )
 {
 	if ( !UTIL_IsCommandIssuedByServerAdmin() )
 		return;
@@ -1177,14 +1179,14 @@ static ConCommand Command_Playgamesound( "playgamesound", Playgamesound_f, "Play
 // Purpose:  Non-static override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
 // Input  : *soundname - 
 //-----------------------------------------------------------------------------
-void CBaseEntity::EmitSoundShared( const char *soundname, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
+void CBaseEntity::EmitSound( const char *soundname, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
 {
 	//VPROF( "CBaseEntity::EmitSound" );
-	VPROF_BUDGET("CBaseEntity::EmitSound", _T("CBaseEntity::EmitSound"));
+	VPROF_BUDGET( "CBaseEntity::EmitSound", _T( "CBaseEntity::EmitSound" ) );
 
 	CPASAttenuationFilter filter( this, soundname );
 
-#ifdef GAME_DLL
+#ifdef FF_DLL
 	// FF: AfterShock: Don't send to self. This fixes clientside prediction on sounds and means we can just do 1 shared EmitSound(bla)
 	if (gpGlobals->maxClients > 1)
 	{
@@ -1203,25 +1205,24 @@ void CBaseEntity::EmitSoundShared( const char *soundname, float soundtime /*= 0.
 	EmitSound( filter, entindex(), params );
 }
 
-//-----------------------------------------------------------------------------
-// Purpose:  Non-static override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
-// Input  : *soundname - 
-//-----------------------------------------------------------------------------
-void CBaseEntity::EmitSound( const char *soundname, float soundtime /*= 0.0f*/, float *duration /*=NULL*/ )
+#if !defined ( CLIENT_DLL )
+void CBaseEntity::ScriptEmitSound( const char *soundname )
 {
-	//VPROF( "CBaseEntity::EmitSound" );
-	VPROF_BUDGET( "CBaseEntity::EmitSound", _T( "CBaseEntity::EmitSound" ) );
-
-	CPASAttenuationFilter filter( this, soundname );
-
-	EmitSound_t params;
-	params.m_pSoundName = soundname;
-	params.m_flSoundTime = soundtime;
-	params.m_pflSoundDuration = duration;
-	params.m_bWarnOnDirectWaveReference = true;
-
-	EmitSound( filter, entindex(), params );
+	EmitSound( soundname );
 }
+
+void CBaseEntity::ScriptStopSound( const char *soundname )
+{
+	StopSound( soundname );
+}
+
+float CBaseEntity::ScriptSoundDuration( const char *soundname, const char *actormodel )
+{
+	float duration = CBaseEntity::GetSoundDuration( soundname, actormodel );
+	return duration;
+}
+#endif // !CLIENT
+
 
 //-----------------------------------------------------------------------------
 // Purpose:  Non-static override for doing the general case of CPASAttenuationFilter( this ), and EmitSound( filter, entindex(), etc. );
@@ -1390,8 +1391,7 @@ void CBaseEntity::StopSound( int iEntIndex, int iChannel, const char *pSample )
 {
 	g_SoundEmitterSystem.StopSound( iEntIndex, iChannel, pSample );
 }
-
-
+#ifdef FF
 // Jon: so we can stop sounds in a specific channel that's different from what the script defines
 void CBaseEntity::StopSoundInChannel(const char *soundname, HSOUNDSCRIPTHANDLE& handle, const int channel)
 {
@@ -1412,7 +1412,7 @@ void CBaseEntity::StopSoundInChannel(int iEntIndex, const char *soundname, const
 {
 	g_SoundEmitterSystem.StopSoundInChannel(iEntIndex, soundname, channel);
 }
-
+#endif
 soundlevel_t CBaseEntity::LookupSoundLevel( const char *soundname )
 {
 	return soundemitterbase->LookupSoundLevel( soundname );

@@ -113,7 +113,6 @@ public:
 #ifdef FF_DLL
 	int				GetAmmoTypeLua( void );
 #endif
-
 	// Given a damage type (composed of the #defines above), fill out a string with the appropriate text.
 	// For designer debug output.
 	static void		DebugGetDamageTypeString(unsigned int DamageType, char *outbuf, int outbuflength );

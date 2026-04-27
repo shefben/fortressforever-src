@@ -20,7 +20,7 @@ $Configuration
 		$AdditionalIncludeDirectories		"$BASE;$THIRDPARTY\discord-rpc\include,..\shared\ff\buildables\base,..\shared\ff\buildables,..\shared\ff\grenades,..\shared\ff\projectiles,..\shared\ff\weapons,..\shared\ff,.\ff\fx,.\ff\vgui\fortressoptions,.\ff\vgui,.\ff\hud\ui,.\ff\hud,.\ff"
 		$PreprocessorDefinitions			"$BASE;FF;FF_CLIENT_DLL;SDK2013CE"
 		
-		$AdditionalOptions					"$BASE /std:c++17"
+		//$AdditionalOptions					"$BASE /std:c++17"
 	}
 }
 

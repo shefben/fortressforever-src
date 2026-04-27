@@ -283,7 +283,7 @@ void CSpriteTrail::OnDataChanged( DataUpdateType_t updateType )
 //-----------------------------------------------------------------------------
 void CSpriteTrail::ClientThink()
 {
-	if (!IsEnabledByClient())
+	if ( !IsEnabledByClient() )
 		return;
 
 	// Update the trail + bounding box

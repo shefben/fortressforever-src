@@ -688,13 +688,13 @@ ConVar	ffdev_disableentitydecals("ffdev_disableentitydecals", "1", FCVAR_CHEAT |
 
 void CBaseEntity::DecalTrace( trace_t *pTrace, char const *decalName )
 {
-
+#ifdef FF
 	if (ffdev_disableentitydecals.GetBool())
 	{
 		if (Classify() != CLASS_NONE && Classify() < NUM_AI_CLASSES)
 			return;
 	}
-
+#endif
 	int indexD = decalsystem->GetDecalIndexForName( decalName );
 	if ( indexD < 0 )
 		return;
@@ -799,13 +799,11 @@ int CBaseEntity::RegisterThinkContext( const char *szContext )
 //-----------------------------------------------------------------------------
 BASEPTR	CBaseEntity::ThinkSet( BASEPTR func, float thinkTime, const char *szContext )
 {
-#if !defined( CLIENT_DLL )
-#ifdef _DEBUG
+#if !defined( CLIENT_DLL ) && defined( _DEBUG )
 #ifdef GNUC
 	COMPILE_TIME_ASSERT( sizeof(func) == 8 );
 #else
 	COMPILE_TIME_ASSERT( sizeof(func) == 4 );
-#endif
 #endif
 #endif
 
@@ -2206,14 +2204,16 @@ void CBaseEntity::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 #ifndef FF
 			SpawnBlood( vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
 			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
-#else		// 
+		}
+#else
 			// Fix blood showing for teammates when FF is off.
 			if (IsPlayer() && g_pGameRules->FCanTakeDamage(ToFFPlayer(this), info.GetAttacker()))
 			{
-				SpawnBlood(vecOrigin, vecDir, blood, info.GetDamage());// a little surface blood.
-				TraceBleed(info.GetDamage(), vecDir, ptr, info.GetDamageType());
+			SpawnBlood(vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
+			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
 			}
-#endif	}
+		}
+#endif
 	}
 }
 
@@ -2636,34 +2636,3 @@ bool CBaseEntity::IsToolRecording() const
 #endif
 }
 #endif
-
-#ifdef FF_CLIENT_DLL
-ConVar dump_deletes_cl("dump_deletes_cl", "0");
-ConVar dump_deletes_flush("dump_deletes_flush", "0");
-#endif
-
-
-void CBaseEntity::PrintDeleteInfo()
-{
-	static FileHandle_t m_hClassNameFile = NULL;
-
-#ifdef FF_CLIENT_DLL
-	if (dump_deletes_cl.GetBool())
-	{
-		if (!m_hClassNameFile)
-		{
-			m_hClassNameFile = filesystem->Open("classdump_client.txt", "wt", "MOD");
-		}
-		if (m_hClassNameFile)
-		{
-			const char* classname = GetClassname();
-			char buffer[1024] = {};
-			V_snprintf(buffer, 1024, "%.2f deleted %s, index %d\n",
-				gpGlobals->curtime, classname ? classname : "unknown", entindex());
-			filesystem->Write(buffer, V_strlen(buffer), m_hClassNameFile);
-			if (dump_deletes_flush.GetBool())
-				filesystem->Flush(m_hClassNameFile);
-		}
-	}
-#endif
-}

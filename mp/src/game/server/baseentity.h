@@ -452,9 +452,7 @@ public:
 	DECLARE_DATADESC();
 	// script description
 	DECLARE_ENT_SCRIPTDESC();
-	#ifdef FF_DLL
-	void PrintDeleteInfo();
-	#endif
+	
 	// memory handling
     void *operator new( size_t stAllocateBlock );
     void *operator new( size_t stAllocateBlock, int nBlockUse, const char *pFileName, int nLine );
