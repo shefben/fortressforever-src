@@ -50,6 +50,8 @@ ConVar	sv_specnoclip	( "sv_specnoclip", "1", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVA
 
 #if defined( CSTRIKE_DLL ) || defined( HL1MP_DLL )
 ConVar	sv_maxspeed		( "sv_maxspeed", "320", FCVAR_NOTIFY | FCVAR_REPLICATED);
+#elif !defined( FF_DLL )
+ConVar	sv_maxspeed		( "sv_maxspeed", "320", FCVAR_NOTIFY | FCVAR_REPLICATED);	// |-- Mirv: [600 is] a more sane max speed
 #else
 ConVar	sv_maxspeed		( "sv_maxspeed", "600", FCVAR_NOTIFY | FCVAR_REPLICATED);	// |-- Mirv: [600 is] a more sane max speed
 #endif // CSTRIKE_DLL
@@ -59,6 +61,8 @@ ConVar	sv_maxspeed		( "sv_maxspeed", "600", FCVAR_NOTIFY | FCVAR_REPLICATED);	//
 #else
 
 #if defined( CSTRIKE_DLL ) || defined( HL1MP_DLL )
+	ConVar	sv_accelerate	( "sv_accelerate", "10", FCVAR_NOTIFY | FCVAR_REPLICATED);
+#elif !defined( FF_DLL )
 	ConVar	sv_accelerate	( "sv_accelerate", "10", FCVAR_NOTIFY | FCVAR_REPLICATED);
 #else
 	ConVar	sv_accelerate	( "sv_accelerate", "14", FCVAR_NOTIFY | FCVAR_REPLICATED/* | FCVAR_DEVELOPMENTONLY*/);
@@ -88,7 +92,9 @@ ConVar	sv_rollangle	( "sv_rollangle", "0", FCVAR_NOTIFY | FCVAR_REPLICATED | FCV
 	#endif
 #endif // CSTRIKE_DLL
 
-#if defined( DOD_DLL ) || defined( CSTRIKE_DLL ) || defined( HL1MP_DLL ) || !defined( HL2MP_DLL ) || !defined( TF_DLL )
+#if defined( DOD_DLL ) || defined( CSTRIKE_DLL ) || defined( HL1MP_DLL )
+ConVar	sv_friction		( "sv_friction","4", FCVAR_NOTIFY | FCVAR_REPLICATED, "World friction." );
+#elif defined( HL2MP_DLL )
 ConVar	sv_friction		( "sv_friction","4", FCVAR_NOTIFY | FCVAR_REPLICATED, "World friction." );
 #else
 ConVar	sv_friction		( "sv_friction","5", FCVAR_NOTIFY | FCVAR_REPLICATED, "World friction." );
@@ -100,8 +106,7 @@ ConVar	sv_maxvelocity	( "sv_maxvelocity","3500", FCVAR_REPLICATED, "Maximum spee
 ConVar	sv_stepsize		( "sv_stepsize","18", FCVAR_NOTIFY | FCVAR_REPLICATED );
 ConVar	sv_backspeed	( "sv_backspeed", "0.6", FCVAR_ARCHIVE | FCVAR_REPLICATED, "How much to slow down backwards motion" );
 ConVar  sv_waterdist	( "sv_waterdist","12", FCVAR_REPLICATED, "Vertical view fixup when eyes are near water plane." );
-#else
-	#ifndef FF
+#elif defined( HL2MP_DLL )
 ConVar	sv_bounce		( "sv_bounce","0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Bounce multiplier for when physically simulated objects collide with other objects." );
 ConVar	sv_maxvelocity	( "sv_maxvelocity","3500", FCVAR_REPLICATED, "Maximum speed any ballistically moving object is allowed to attain per axis." );
 ConVar	sv_stepsize		( "sv_stepsize","18", FCVAR_NOTIFY | FCVAR_REPLICATED );
@@ -112,8 +117,7 @@ ConVar	sv_bounce		( "sv_bounce","0", FCVAR_NOTIFY | FCVAR_REPLICATED | FCVAR_DEV
 ConVar	sv_maxvelocity	( "sv_maxvelocity","3500", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Maximum speed any ballistically moving object is allowed to attain per axis." );
 ConVar	sv_stepsize		( "sv_stepsize","18", FCVAR_NOTIFY | FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY);
 ConVar	sv_backspeed	( "sv_backspeed", "0.6", FCVAR_ARCHIVE | FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "How much to slow down backwards motion" );
-ConVar  sv_waterdist	( "sv_waterdist","12", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY #endif, "Vertical view fixup when eyes are near water plane." );
-	#endif
+ConVar  sv_waterdist	( "sv_waterdist","12", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Vertical view fixup when eyes are near water plane." );
 #endif // CSTRIKE_DLL
 
 ConVar	sv_skyname		( "sv_skyname", "sky_urb01", FCVAR_ARCHIVE | FCVAR_REPLICATED, "Current name of the skybox texture" );

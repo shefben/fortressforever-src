@@ -3665,7 +3665,8 @@ void C_BaseAnimating::ProcessMuzzleFlashEvent()
 				//dl->color.exponent = colorDLight.exponent;// 5/*ffdev_muzzleflash_light_color_e.GetFloat()*/; // essentially the brightness...also determines the gradient, basically
 				dl->color = colorDLight;
 			}
-#endif	}
+#endif
+		}
 	}
 }
 

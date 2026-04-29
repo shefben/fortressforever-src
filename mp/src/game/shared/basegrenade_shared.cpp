@@ -70,9 +70,9 @@ BEGIN_DATADESC( CBaseGrenade )
 	DEFINE_THINKFUNC( TumbleThink ),
 
 END_DATADESC()
-
+	#ifdef FF
 void SendProxy_CropFlagsToPlayerFlagBitsLength( const SendProp *pProp, const void *pStruct, const void *pVarData, DVariant *pOut, int iElement, int objectID);
-
+	#endif
 #endif
 
 IMPLEMENT_NETWORKCLASS_ALIASED( BaseGrenade, DT_BaseGrenade )
@@ -84,11 +84,10 @@ BEGIN_NETWORK_TABLE( CBaseGrenade, DT_BaseGrenade )
 	SendPropInt( SENDINFO( m_bIsLive ), 1, SPROP_UNSIGNED ),
 //	SendPropTime( SENDINFO( m_flDetonateTime ) ),
 	SendPropEHandle( SENDINFO( m_hThrower ) ),
-
-	//SendPropVector( SENDINFO( m_vecVelocity ), 0, SPROP_NOSCALE ), 
+	#ifndef FF
+	SendPropVector( SENDINFO( m_vecVelocity ), 0, SPROP_NOSCALE ), 
+	#else
 	// --> Mirv: Gren optimisation
-	//SendPropVector( SENDINFO( m_vecVelocity ), 0, SPROP_NOSCALE ),
-
 	SendPropExclude("DT_BaseEntity", "m_angRotation"),
 
 	SendPropFloat(SENDINFO_VECTORELEM(m_vecVelocity, 0), 13, SPROP_CHANGES_OFTEN | SPROP_ROUNDDOWN, -1024.0f, 1024.0f),
@@ -100,20 +99,24 @@ BEGIN_NETWORK_TABLE( CBaseGrenade, DT_BaseGrenade )
 	SendPropFloat(SENDINFO_VECTORELEM(m_angRotation, 0), 9, SPROP_CHANGES_OFTEN | SPROP_ROUNDDOWN, 0.0f, 360.0f, SendProxy_AngleToFloat),
 	SendPropFloat(SENDINFO_VECTORELEM(m_angRotation, 1), 9, SPROP_CHANGES_OFTEN | SPROP_ROUNDDOWN, 0.0f, 360.0f, SendProxy_AngleToFloat),
 	SendPropFloat(SENDINFO_VECTORELEM(m_angRotation, 2), 9, SPROP_CHANGES_OFTEN | SPROP_ROUNDDOWN, 0.0f, 360.0f, SendProxy_AngleToFloat),
-	// <-- Mirv
-
+	#endif	// <-- Mirv
+	#ifndef FF
 	// HACK: Use same flag bits as player for now
+	SendPropInt			( SENDINFO(m_fFlags), 0, SPROP_UNSIGNED ),
+	#else
 	SendPropInt			( SENDINFO(m_fFlags), PLAYER_FLAG_BITS, SPROP_UNSIGNED, SendProxy_CropFlagsToPlayerFlagBitsLength ),
+	#endif
 #else
 	RecvPropFloat( RECVINFO( m_flDamage ) ),
 	RecvPropFloat( RECVINFO( m_DmgRadius ) ),
 	RecvPropInt( RECVINFO( m_bIsLive ) ),
 //	RecvPropTime( RECVINFO( m_flDetonateTime ) ),
 	RecvPropEHandle( RECVINFO( m_hThrower ) ),
-
+#endif
+#ifdef FF_CLIENT_DLL
 	// Need velocity from grenades to make animation system work correctly when running
-	//RecvPropVector( RECVINFO(m_vecVelocity), 0, RecvProxy_LocalVelocity ),
-#ifdef FF
+	RecvPropVector( RECVINFO(m_vecVelocity), 0, RecvProxy_LocalVelocity ),
+
 	// --> Mirv: Gren optimisation
 	//RecvPropVector( RECVINFO(m_vecVelocity), 0, RecvProxy_LocalVelocity ),
 	RecvPropFloat(RECVINFO(m_vecVelocity[0]), 0, RecvProxy_LocalVelocityX),
@@ -125,7 +128,7 @@ BEGIN_NETWORK_TABLE( CBaseGrenade, DT_BaseGrenade )
 	RecvPropFloat(RECVINFO_NAME(m_angNetworkAngles[2], m_angRotation[2]), 0),
 
 #endif // <-- Mirv
-
+#ifndef GAME_DLL
 	RecvPropInt( RECVINFO( m_fFlags ) ),
 #endif
 END_NETWORK_TABLE()
@@ -193,7 +196,11 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 		te->Explosion( filter, -1.0, // don't apply cl_interp delay
 			&vecAbsOrigin,
 			!( contents & MASK_WATER ) ? g_sModelIndexFireball : g_sModelIndexWExplosion,
-			/*m_DmgRadius * .03*/ m_flDamage / 128.0f, // scale
+		#ifndef FF
+			m_DmgRadius * .03, 
+		#else
+			m_flDamage / 128.0f, // scale
+		#endif
 			25,
 			TE_EXPLFLAG_NONE,
 			m_DmgRadius,
@@ -362,11 +369,13 @@ void CBaseGrenade::Detonate( void )
 		// If this is the case, we do the downward trace again from the actual origin of the grenade. (sjb) 3/8/2007  (for ep2_outland_09)
 		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + Vector( 0, 0, -32), MASK_SHOT_HULL, this, COLLISION_GROUP_NONE, &tr );
 	}
-
+#ifndef FF
+	Explode( &tr, DMG_BLAST );
+#else
 	Explode( &tr, m_iDamageType );
-
+#endif
 	// No shake if in a no gren area
-#ifdef GAME_DLL
+#ifdef FF_DLL
 	if ( GetShakeAmplitude() && FFScriptRunPredicates(this, "onexplode", true ) )
 	{
 		UTIL_ScreenShake( GetAbsOrigin(), GetShakeAmplitude(), 150.0, 1.0, GetShakeRadius(), SHAKE_START );
@@ -402,14 +411,18 @@ void CBaseGrenade::ExplodeTouch( CBaseEntity *pOther )
 	Vector velDir = GetAbsVelocity();
 	VectorNormalize( velDir );
 	vecSpot = GetAbsOrigin() - velDir * 32;
-	// direct rocket hits were essentially inverting movement effects because the trace was going straight through players
-	//UTIL_TraceLine( vecSpot, vecSpot + velDir * 64, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
+#ifndef FF // direct rocket hits were essentially inverting movement effects because the trace was going straight through players
+	UTIL_TraceLine( vecSpot, vecSpot + velDir * 64, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
+
+	Explode( &tr, DMG_BLAST );
+#else
 	UTIL_TraceLine( vecSpot, vecSpot + velDir * 64, MASK_SHOT_HULL, this, COLLISION_GROUP_NONE, &tr );
 
 	if (FF_IsAirshot(pOther))
 		m_iDamageType |= DMG_AIRSHOT;
 
 	Explode( &tr, m_iDamageType );
+#endif
 }
 
 

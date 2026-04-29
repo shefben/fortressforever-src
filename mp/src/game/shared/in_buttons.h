@@ -37,7 +37,8 @@
 #define IN_GRENADE1		(1 << 23)	// grenade 1
 #define IN_GRENADE2		(1 << 24)	// grenade 2
 #define	IN_ATTACK3		(1 << 25)
+#ifdef FF
 #define IN_TOGGLEGRENADE1		 (1 << 26)	// grenade 1 (toggle)
 #define IN_TOGGLEGRENADE2		 (1 << 27)	// grenade 2 (toggle)
-
+#endif
 #endif // IN_BUTTONS_H

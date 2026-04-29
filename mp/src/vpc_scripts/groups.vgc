@@ -24,6 +24,7 @@ $Group "game"
 	"server"
 	"tier1"
 	"vgui_controls"
+	"lua"
 }
 
 $Group "shaders"
@@ -59,6 +60,7 @@ $Group "everything"
 	"vtfdiff"
 	"vvis_dll"
 	"vvis_launcher"
+	"lua"
 
 	"game_shader_generic_example"
 
@@ -73,4 +75,7 @@ $Group "dedicated"
 	"server"
 	"tier1"
 }
-
+$Group "lualibs"
+{
+	"lua"
+}

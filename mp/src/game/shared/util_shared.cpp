@@ -59,7 +59,7 @@ bool NPC_CheckBrushExclude( CBaseEntity *pEntity, CBaseEntity *pBrush );
 
 ConVar r_visualizetraces( "r_visualizetraces", "0", FCVAR_CHEAT );
 ConVar developer("developer", "0", 0, "Set developer message level" ); // developer mode
-
+#ifdef FF
 //Adding ConVars to toggle grenades/pipes colliding with the enemy
 //ConVar ffdev_grenade_collidewithenemy("ffdev_grenade_collidewithenemy", "1", FCVAR_FF_FFDEV_REPLICATED, "If set to 0, grenades pass through enemies" );
 #define GRENADE_COLLIDEWITHENEMY true
@@ -67,8 +67,7 @@ ConVar developer("developer", "0", 0, "Set developer message level" ); // develo
 #define SOFTCLIP_ALWAYSCLIPPERCENT 1.25f
 //ConVar ffdev_softclip_asdisguisedteam("ffdev_softclip_asdisguisedteam", "0", FCVAR_FF_FFDEV_REPLICATED, "If set to 1, spies soft clip as though they were on their disguised team");
 #define SOFTCLIP_ASDISGUISEDTEAM false
-
-
+#endif
 float UTIL_VecToYaw( const Vector &vec )
 {
 	if (vec.y == 0 && vec.x == 0)
@@ -250,8 +249,11 @@ bool PassServerEntityFilter( const IHandleEntity *pTouch, const IHandleEntity *p
 	// don't clip against own missiles
 	if ( pEntTouch->GetOwnerEntity() == pEntPass )
 		return false;
-	
+	#ifndef FF
 	// don't clip against owner
+	if ( pEntPass->GetOwnerEntity() == pEntTouch )
+		return false;	
+	#else
 	if ( !pEntPass->CanClipOwnerEntity() )
 	{
 		if ( pEntPass->GetOwnerEntity() == pEntTouch )
@@ -260,7 +262,7 @@ bool PassServerEntityFilter( const IHandleEntity *pTouch, const IHandleEntity *p
 
 	if ( !pEntPass->CanClipPlayer() && pEntTouch->IsPlayer() )
 		return false;
-
+	#endif
 
 	return true;
 }
@@ -318,17 +320,28 @@ CTraceFilterSimple::CTraceFilterSimple( const IHandleEntity *passedict, int coll
 //-----------------------------------------------------------------------------
 bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int contentsMask )
 {
-#ifdef FF
-	CBaseEntity* pHandle = EntityFromEntityHandle(pHandleEntity);
+	if ( !StandardFilterRules( pHandleEntity, contentsMask ) )
+		return false;
 
+	if ( m_pPassEnt )
+	{
+		if ( !PassServerEntityFilter( pHandleEntity, m_pPassEnt ) )
+		{
+			return false;
+		}
+	}
+
+	// Don't test if the game code tells us we should ignore this collision...
+	CBaseEntity *pEntity = EntityFromEntityHandle( pHandleEntity );
+#ifdef FF
 	const CBaseEntity* pPassEnt = NULL;
 	if (m_pPassEnt)
 		pPassEnt = EntityFromEntityHandle(m_pPassEnt);
 
 	// --> hlstriker: No team collisions
-	if (pPassEnt && pHandle)
+	if (pPassEnt && pEntity)
 	{
-		if (pHandle->IsPlayer())
+		if (pEntity->IsPlayer())
 		{
 			////Team orient this collision group.  Includes things like rockets, and blue pipes -Green Mushy
 			////Confusing: these projectiles use the interactive collision group, not the projectile collision group
@@ -359,12 +372,12 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 			if (m_collisionGroup == COLLISION_GROUP_PROJECTILE)
 			{
 				//Make sure u dont collide with the owner
-				if (ToFFPlayer(pHandle) == ToFFPlayer(pPassEnt->GetOwnerEntity()))
+				if (ToFFPlayer(pEntity) == ToFFPlayer(pPassEnt->GetOwnerEntity()))
 				{
 					return false;
 				}
 				//Now check teams and dont collide if the team numbers are the same
-				else if (ToFFPlayer(pHandle)->GetTeamNumber() == ToFFPlayer(pPassEnt->GetOwnerEntity())->GetTeamNumber())
+				else if (ToFFPlayer(pEntity)->GetTeamNumber() == ToFFPlayer(pPassEnt->GetOwnerEntity())->GetTeamNumber())
 				{
 					return false;
 				}
@@ -382,12 +395,12 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 			// need to also check for IsPlayer for things that don't send a collision group (like moveable brushes/doors)
 			if (m_collisionGroup == COLLISION_GROUP_PLAYER_MOVEMENT || (pPassEnt->IsPlayer() && contentsMask == MASK_PLAYERSOLID && m_collisionGroup == COLLISION_GROUP_PLAYER))
 			{
-				if (pPassEnt == pHandle)
+				if (pPassEnt == pEntity)
 					return false;
 
 				// This allows players to pass through any team object (another player or entity), includes allies
 				int iPassTeam = pPassEnt->GetTeamNumber();
-				int iHandleTeam = pHandle->GetTeamNumber();
+				int iHandleTeam = pEntity->GetTeamNumber();
 
 				// get disguised team if we should
 				if (SOFTCLIP_ASDISGUISEDTEAM)
@@ -400,16 +413,16 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 							iPassTeam = pPassPlayer->GetDisguisedTeam();
 					}
 
-					if (pHandle->IsPlayer())
+					if (pEntity->IsPlayer())
 					{
-						CFFPlayer* pHandlePlayer = ToFFPlayer(pHandle);
+						CFFPlayer* pHandlePlayer = ToFFPlayer(pEntity);
 
 						if (pHandlePlayer && pHandlePlayer->IsDisguised())
 							iHandleTeam = pHandlePlayer->GetDisguisedTeam();
 					}
 				}
 
-				if (pHandle->IsPlayer() && FFGameRules()->IsTeam1AlliedToTeam2(iPassTeam, iHandleTeam) == GR_TEAMMATE)
+				if (pEntity->IsPlayer() && FFGameRules()->IsTeam1AlliedToTeam2(iPassTeam, iHandleTeam) == GR_TEAMMATE)
 				{
 					// If either of the entities are moving fast enough, then just ignore teammates entirely
 					if (pPassEnt->IsPlayer())
@@ -422,7 +435,7 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 								return false;
 						}
 					}
-					if (pHandle->IsPlayer())
+					if (pEntity->IsPlayer())
 					{
 						CFFPlayer* pPlayer = ToFFPlayer(const_cast<CBaseEntity*>(pPassEnt));
 						if (pPlayer)
@@ -435,7 +448,7 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 
 					// If player lands on top of a team entity make sure they hit
 					Vector vecOrigin = pPassEnt->GetAbsOrigin();
-					Vector vecTeamOrigin = pHandle->GetAbsOrigin();
+					Vector vecTeamOrigin = pEntity->GetAbsOrigin();
 
 					Vector vecMin;
 					if (pPassEnt->IsPlayer())
@@ -447,13 +460,13 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 						vecMin = pPassEnt->WorldAlignMins();
 
 					Vector vecTeamMax;
-					if (pHandle->IsPlayer())
+					if (pEntity->IsPlayer())
 					{
-						CFFPlayer* pPlayer = static_cast<CFFPlayer*>(pHandle);
+						CFFPlayer* pPlayer = static_cast<CFFPlayer*>(pEntity);
 						vecTeamMax = pPlayer->GetPlayerMaxs();
 					}
 					else
-						vecTeamMax = pHandle->WorldAlignMaxs();
+						vecTeamMax = pEntity->WorldAlignMaxs();
 
 					float fMinZ = vecMin[2];
 					VectorAdd(vecMin, vecOrigin, vecMin);
@@ -476,14 +489,14 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 	}
 	// <--
 
-	if (pHandle)
+	if (pEntity)
 	{
-		if (pHandle->Classify() == CLASS_TRIGGER_CLIP)
+		if (pEntity->Classify() == CLASS_TRIGGER_CLIP)
 		{
 #ifdef _DEBUG
 			Assert(dynamic_cast<CFFTriggerClip*>(pHandle) != 0);
 #endif
-			CFFTriggerClip* pTriggerClip = static_cast<CFFTriggerClip*>(pHandle);
+			CFFTriggerClip* pTriggerClip = static_cast<CFFTriggerClip*>(pEntity);
 			if (pTriggerClip && pTriggerClip->GetClipMask())
 			{
 				if (pPassEnt)
@@ -612,25 +625,11 @@ bool CTraceFilterSimple::ShouldHitEntity( IHandleEntity *pHandleEntity, int cont
 		}
 	}
 #endif
-	if ( !StandardFilterRules( pHandleEntity, contentsMask ) )
+	if ( !pEntity )
 		return false;
-
-	if ( m_pPassEnt )
-	{
-		if ( !PassServerEntityFilter( pHandleEntity, m_pPassEnt ) )
-		{
-			return false;
-		}
-	}
-
-#ifndef FF	// Don't test if the game code tells us we should ignore this collision...
-	CBaseEntity *pEntity = EntityFromEntityHandle( pHandleEntity );
-#endif
-	if ( !pHandle )
+	if ( !pEntity->ShouldCollide( m_collisionGroup, contentsMask ) )
 		return false;
-	if ( !pHandle->ShouldCollide( m_collisionGroup, contentsMask ) )
-		return false;
-	if ( pHandle && !g_pGameRules->ShouldCollide( m_collisionGroup, pHandle->GetCollisionGroup() ) )
+	if ( pEntity && !g_pGameRules->ShouldCollide( m_collisionGroup, pEntity->GetCollisionGroup() ) )
 		return false;
 	if ( m_pExtraShouldHitCheckFunction &&
 		(! ( m_pExtraShouldHitCheckFunction( pHandleEntity, contentsMask ) ) ) )
@@ -1283,7 +1282,7 @@ void UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amou
 
 	DispatchEffect( "bloodimpact", data );
 }
-
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1302,7 +1301,7 @@ void UTIL_BloodSpray(const Vector &pos, const Vector &dir, int color, int amount
 
 	DispatchEffect("bloodspray", data);
 }
-
+#endif
 bool UTIL_IsSpaceEmpty( CBaseEntity *pMainEnt, const Vector &vMin, const Vector &vMax )
 {
 	Vector vHalfDims = ( vMax - vMin ) * 0.5f;
@@ -1456,7 +1455,170 @@ CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID )
 	}
 	return NULL;
 }
+#ifndef FF
+// Helper for use with console commands and the like.
+// Returns NULL if not found or if the provided arg would match multiple players.
+// Currently accepts, in descending priority:
+//  - Formatted SteamID ([U:1:1234])
+//  - SteamID64 (76561123412341234)
+//  - Legacy SteamID (STEAM_0:1:1234)
+//  - UserID preceded by a pound (#4)
+//  - Partial name match (if unique)
+//  - UserID not preceded by a pound*
+//
+// *Does not count as ambiguous with higher priority items
+CBasePlayer* UTIL_PlayerByCommandArg( const char *arg )
+{
+	size_t nLength = V_strlen( arg );
+	if ( nLength < 1 )
+		{ return NULL; }
 
+	// Is the argument numeric?
+	bool bAllButFirstNumbers = true;
+	for ( size_t idx = 1; bAllButFirstNumbers && idx < nLength; idx++ )
+	{
+		bAllButFirstNumbers = V_isdigit( arg[idx] );
+	}
+	bool bAllNumbers = V_isdigit( arg[0] ) && bAllButFirstNumbers;
+
+	// Keep searching when we find a match to track ambiguous results
+	CBasePlayer *pFound = NULL;
+
+	// Assign pFound unless we already found a different player, in which case return NULL due to ambiguous
+	// WTB Lambdas
+#define UTIL_PLAYERBYCMDARG_CHECKMATCH( pEvalMatch ) \
+	do                                               \
+	{                                                \
+		CBasePlayer *_pMacroMatch = (pEvalMatch);    \
+		if ( _pMacroMatch )                          \
+		{                                            \
+			/* Ambiguity check */                    \
+			if ( pFound && pFound != _pMacroMatch )  \
+				{ return NULL; }                     \
+			pFound = _pMacroMatch;                   \
+		}                                            \
+	} while ( false );
+
+	// Formatted SteamID or SteamID64
+	if ( bAllNumbers || ( arg[0] == '[' && arg[nLength-1] == ']' ) )
+	{
+		CSteamID steamID;
+		bool bMatch = steamID.SetFromStringStrict( arg, GetUniverse() );
+		UTIL_PLAYERBYCMDARG_CHECKMATCH( bMatch ? UTIL_PlayerBySteamID( steamID ) : NULL );
+	}
+
+	// Legacy SteamID?
+	const char szPrefix[] = "STEAM_";
+	if ( nLength >= V_ARRAYSIZE( szPrefix ) && V_strncmp( szPrefix, arg, V_ARRAYSIZE( szPrefix ) - 1 ) == 0 )
+	{
+		CSteamID steamID;
+		bool bMatch = SteamIDFromSteam2String( arg, GetUniverse(), &steamID );
+		UTIL_PLAYERBYCMDARG_CHECKMATCH( bMatch ? UTIL_PlayerBySteamID( steamID ) : NULL );
+	}
+
+	// UserID preceded by a pound (#4)
+	if ( nLength > 1 && arg[0] == '#' && bAllButFirstNumbers )
+	{
+		UTIL_PLAYERBYCMDARG_CHECKMATCH( UTIL_PlayerByUserId( V_atoi( arg + 1 ) ) );
+	}
+
+	// Partial name match (if unique)
+	UTIL_PLAYERBYCMDARG_CHECKMATCH( UTIL_PlayerByPartialName( arg ) );
+
+	// UserID not preceded by a pound
+	// *Does not count as ambiguous with higher priority items
+	if ( bAllNumbers && !pFound )
+	{
+		UTIL_PLAYERBYCMDARG_CHECKMATCH( UTIL_PlayerByUserId( V_atoi( arg ) ) );
+	}
+
+	return pFound;
+
+#undef UTIL_PLAYERBYCMDARG_CHECKMATCH
+}
+#endif
+CBasePlayer* UTIL_PlayerByName( const char *name )
+{
+	if ( !name || !name[0] )
+		return NULL;
+
+	for (int i = 1; i<=gpGlobals->maxClients; i++ )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+
+		if ( !pPlayer )
+			continue;
+
+#ifndef CLIENT_DLL
+		if ( !pPlayer->IsConnected() )
+			continue;
+#endif
+
+		if ( Q_stricmp( pPlayer->GetPlayerName(), name ) == 0 )
+		{
+			return pPlayer;
+		}
+	}
+
+	return NULL;
+}
+
+// Finds a player who has this non-ambiguous substring
+CBasePlayer* UTIL_PlayerByPartialName( const char *name )
+{
+	if ( !name || !name[0] )
+		return NULL;
+
+	CBasePlayer *pFound = NULL;
+	for (int i = 1; i<=gpGlobals->maxClients; i++ )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+
+		if ( !pPlayer )
+			continue;
+
+#ifndef CLIENT_DLL
+		if ( !pPlayer->IsConnected() )
+			continue;
+#endif
+
+		if ( Q_stristr( pPlayer->GetPlayerName(), name ) )
+		{
+			if ( pFound )
+			{
+				// Ambiguous
+				return NULL;
+			}
+			pFound = pPlayer;
+		}
+	}
+
+	return pFound;
+}
+#ifndef FF
+CBasePlayer* UTIL_PlayerByUserId( int userID )
+{
+	for (int i = 1; i<=gpGlobals->maxClients; i++ )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex( i );
+
+		if ( !pPlayer )
+			continue;
+
+#ifndef CLIENT_DLL
+		if ( !pPlayer->IsConnected() )
+			continue;
+#endif
+
+		if ( pPlayer->GetUserID()  == userID )
+		{
+			return pPlayer;
+		}
+	}
+
+	return NULL;
+}
+#else
 //=============================================================================
 // HPE_BEGIN:
 // [menglish] Added UTIL function for events in client win_panel which transmit the player as a user ID
@@ -1483,7 +1645,7 @@ CBasePlayer *UTIL_PlayerBySteamID( const CSteamID &steamID )
 //=============================================================================
 // HPE_END
 //=============================================================================
-
+#endif
 
 
 

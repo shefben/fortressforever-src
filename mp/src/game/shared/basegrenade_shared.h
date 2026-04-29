@@ -31,12 +31,24 @@
 class CTakeDamageInfo;
 
 #if !defined( CLIENT_DLL )
-class CBaseGrenade : public CBaseAnimating //, public CDefaultPlayerPickupVPhysics
+	#ifndef FF
+class CBaseGrenade : public CBaseProjectile, public CDefaultPlayerPickupVPhysics
+	#else
+	class CBaseGrenade : public CBaseAnimating //, public CDefaultPlayerPickupVPhysics
+	#endif
 #else
-class CBaseGrenade : public CBaseAnimating
+	#ifndef FF
+class CBaseGrenade : public CBaseProjectile
+	#else
+	class CBaseGrenade : public CBaseAnimating
+	#endif
 #endif
 {
+	#ifndef FF
+	DECLARE_CLASS( CBaseGrenade, CBaseProjectile );
+	#else
 	DECLARE_CLASS( CBaseGrenade, CBaseAnimating );
+	#endif
 public:
 
 	CBaseGrenade(void);

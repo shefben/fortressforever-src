@@ -586,6 +586,7 @@ void CVoiceStatus::SetPlayerBlockedState(int iPlayer, bool blocked)
 	m_BanMgr.SetPlayerBan(pi.guid, !m_BanMgr.GetPlayerBan(pi.guid));
 #else
 	m_BanMgr.SetPlayerBan(pi.guid, blocked);
+#endif
 	UpdateServerState(false);
 }
 

@@ -19,15 +19,15 @@
 #include "debugoverlay_shared.h"
 #include "coordsize.h"
 #include "vphysics/performance.h"
+#ifdef FF
 #include "filesystem.h"
 #include "networkvar.h"
-
+#endif
 #ifdef CLIENT_DLL
 	#include "c_te_effect_dispatch.h"
-	#ifdef FF_CLIENT_DLL
-	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
+#ifdef FF	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
 	#include "c_ff_player.h"
-	#endif
+#endif
 #else
 	#include "te_effect_dispatch.h"
 	#include "soundent.h"
@@ -35,10 +35,10 @@
 	#include "player_pickup.h"
 	#include "waterbullet.h"
 	#include "func_break.h"
-	#ifdef FF_DLL
-	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
+
+#ifdef FF	// not ideal but I need this to be able to do ToFFPlayer for the team blood stuff
 	#include "ff_player.h"
-	#endif
+#endif
 #ifdef HL2MP
 	#include "te_hl2mp_shotgun_shot.h"
 #endif
@@ -321,8 +321,7 @@ void CBaseEntity::ParseMapData( CEntityMapData *mapData )
 		} 
 		while ( mapData->GetNextKey(keyName, value) );
 	}
-
-#ifdef GAME_DLL
+#ifdef FF_DLL
 	// setup the event action for the output
 	// this is necessary for routing the ouputs to lua
 	for (datamap_t* dmap = GetDataDescMap(); dmap != NULL; dmap = dmap->baseMap)
@@ -342,7 +341,6 @@ void CBaseEntity::ParseMapData( CEntityMapData *mapData )
 		}
 	}
 #endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -684,8 +682,9 @@ void CBaseEntity::SetPredictionRandomSeed( const CUserCmd *cmd )
 //------------------------------------------------------------------------------
 // Purpose : Base implimentation for entity handling decals
 //------------------------------------------------------------------------------
+#ifdef FF
 ConVar	ffdev_disableentitydecals("ffdev_disableentitydecals", "1", FCVAR_CHEAT | FCVAR_REPLICATED);
-
+#endif
 void CBaseEntity::DecalTrace( trace_t *pTrace, char const *decalName )
 {
 #ifdef FF
@@ -800,11 +799,7 @@ int CBaseEntity::RegisterThinkContext( const char *szContext )
 BASEPTR	CBaseEntity::ThinkSet( BASEPTR func, float thinkTime, const char *szContext )
 {
 #if !defined( CLIENT_DLL ) && defined( _DEBUG )
-#ifdef GNUC
-	COMPILE_TIME_ASSERT( sizeof(func) == 8 );
-#else
-	COMPILE_TIME_ASSERT( sizeof(func) == 4 );
-#endif
+	COMPILE_TIME_ASSERT( sizeof(func) == ENTITYFUNCPTR_SIZE );
 #endif
 
 	// Old system?
@@ -1703,7 +1698,8 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 #ifndef FF
 	// Skip multiple entities when tracing
 	CBulletsTraceFilter traceFilter( COLLISION_GROUP_NONE );
-#else //Testing if this is what makes sentryguns not damage players with projectile clipping -Green Mushy
+#else
+	//Testing if this is what makes sentryguns not damage players with projectile clipping -Green Mushy
 	CTraceFilterSkipTwoEntities traceFilter(this, info.m_pAdditionalIgnoreEnt, COLLISION_GROUP_NONE /*COLLISION_GROUP_PROJECTILE*/);	// |-- Mirv: Count bullets as projectiles so they don't hit weapon bags
 #endif
 	traceFilter.SetPassEntity( this ); // Standard pass entity for THIS so that it can be easily removed from the list after passing through a portal
@@ -1871,12 +1867,13 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 #endif //#ifdef GAME_DLL
 			bHitWater = true;
 		}
-#ifndef FF
+
 		// Now hit all triggers along the ray that respond to shots...
 		// Clip the ray to the first collided solid returned from traceline
+#ifndef FF
 		CTakeDamageInfo triggerInfo( pAttacker, pAttacker, info.m_flDamage, nDamageType );
 #else
-		CTakeDamageInfo triggerInfo( this, pAttacker, /*info.m_flDamage*/flDmg, nDamageType ); // |-- Mirv: Split damage into shots
+		CTakeDamageInfo triggerInfo(this, pAttacker, /*info.m_flDamage*/flDmg, nDamageType); // |-- Mirv: Split damage into shots
 #endif
 		CalculateBulletDamageForce( &triggerInfo, info.m_iAmmoType, vecDir, tr.endpos );
 		triggerInfo.ScaleDamageForce( info.m_flDamageForceScale );
@@ -1915,7 +1912,8 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			float flActualDamage = info.m_flDamage;
 #else
 			float flActualDamage = /*info.m_flDamage*/ flDmg;	// |-- Mirv: Split damage into shots
-#endif		// If we hit a player, and we have player damage specified, use that instead
+#endif
+			// If we hit a player, and we have player damage specified, use that instead
 			// Adrian: Make sure to use the currect value if we hit a vehicle the player is currently driving.
 			if ( iPlayerDamage )
 			{
@@ -1952,12 +1950,14 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 				CalculateBulletDamageForce( &dmgInfo, info.m_iAmmoType, vecDir, tr.endpos );
 				dmgInfo.ScaleDamageForce( info.m_flDamageForceScale );
 				dmgInfo.SetAmmoType( info.m_iAmmoType );
-#ifdef FF		// --> Mirv: Quick hack, fix this tomorrow
-				if (tr.m_pEnt->IsPlayer())
+#ifdef FF
+				// --> Mirv: Quick hack, fix this tomorrow
+				if ( tr.m_pEnt->IsPlayer() )
 				{
-					dmgInfo.ScaleDamageForce(0.01f);
+					dmgInfo.ScaleDamageForce( 0.01f );
 				}
-#endif			// <-- Mirv
+				// <-- Mirv
+#endif
 				tr.m_pEnt->DispatchTraceAttack( dmgInfo, vecDir, &tr );
 			
 				if ( ToBaseCombatCharacter( tr.m_pEnt ) )
@@ -2201,19 +2201,19 @@ void CBaseEntity::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		
 		if ( blood != DONT_BLEED )
 		{
-#ifndef FF
+			#ifndef FF
 			SpawnBlood( vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
 			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
-		}
-#else
+			#else
+			// 
 			// Fix blood showing for teammates when FF is off.
-			if (IsPlayer() && g_pGameRules->FCanTakeDamage(ToFFPlayer(this), info.GetAttacker()))
+			if ( IsPlayer() && g_pGameRules->FCanTakeDamage( ToFFPlayer( this ), info.GetAttacker() ) )
 			{
-			SpawnBlood(vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
-			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
+				SpawnBlood( vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
+				TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
 			}
+			#endif
 		}
-#endif
 	}
 }
 

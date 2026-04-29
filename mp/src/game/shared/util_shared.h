@@ -350,7 +350,9 @@ bool		UTIL_ShouldShowBlood( int bloodColor );
 void		UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount );
 
 void		UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amount );
+#ifdef FF
 void		UTIL_BloodSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags);
+#endif
 void		UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor );
 void		UTIL_DecalTrace( trace_t *pTrace, char const *decalName );
 bool		UTIL_IsSpaceEmpty( CBaseEntity *pMainEnt, const Vector &vMin, const Vector &vMax );
@@ -393,10 +395,11 @@ char *UTIL_GetFilteredChatText( int iPlayerIndex, char *pszText, int nTextBuffer
 // [menglish] Added UTIL function for events in client win_panel which transmit the player as a user ID
 //=============================================================================
 CBasePlayer *UTIL_PlayerByUserId( int userID );
-#endif
+
 //=============================================================================
 // HPE_END
 //=============================================================================
+#endif
 // decodes a buffer using a 64bit ICE key (inplace)
 void		UTIL_DecodeICE( unsigned char * buffer, int size, const unsigned char *key);
 

@@ -381,12 +381,12 @@ BEGIN_PREDICTION_DATA( C_BasePlayer )
 	DEFINE_PRED_FIELD( m_iHealth, FIELD_INTEGER, FTYPEDESC_INSENDTABLE | FTYPEDESC_ONLY_ERROR_IF_ABOVE_ZERO_TO_ZERO_OR_BELOW_ETC ),
 #else
 	DEFINE_PRED_FIELD( m_iHealth, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
-#endif
 	// Added by Mulch for testing
 	DEFINE_PRED_FIELD( m_iMaxHealth, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_iArmor, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_iMaxArmor, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	// Added by Mulch for testing
+#endif
 	DEFINE_PRED_FIELD( m_iBonusProgress, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_iBonusChallenge, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_fOnTarget, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
@@ -631,14 +631,14 @@ void C_BasePlayer::SetObserverTarget( EHANDLE hObserverTarget )
 		{
 			ResetToneMapping(1.0);
 		}
-
+#ifdef FF
 		//AfterShock: update spectator name when you change target
 		IViewPortPanel* spectator = gViewPortInterface->FindPanelByName(PANEL_SPECGUI);
-		if (spectator && spectator->IsVisible())
+		if ( spectator && spectator->IsVisible() )
 		{
 			spectator->Update();
 		}
-
+#endif
 		// NVNT notify haptics of changed player
 		if ( haptics )
 			haptics->OnPlayerChanged();

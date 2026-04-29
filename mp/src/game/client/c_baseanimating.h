@@ -498,9 +498,9 @@ public:
 	// Texture group to use
 	int								m_nSkin;
 #ifdef FF	// Override Material (FF)
-	IMaterial*						m_pOverrideMaterial;
-	virtual void					FindOverrideMaterial(char const* pMaterialName, const char* pTextureGroupName, bool complain = true, const char* pComplainPrefix = NULL);
-	virtual void					ReleaseOverrideMaterial(char const* pMaterialName = 0);
+	IMaterial						*m_pOverrideMaterial;
+	virtual void					FindOverrideMaterial( char const *pMaterialName, const char *pTextureGroupName, bool complain = true, const char *pComplainPrefix = NULL );
+	virtual void					ReleaseOverrideMaterial( char const *pMaterialName = 0 );
 	void							StartMaterialOverride();
 	void							StopMaterialOverride();
 #endif

@@ -358,7 +358,11 @@ void CalculateMeleeDamageForce( CTakeDamageInfo *info, const Vector &vecMeleeDir
 	info->SetDamagePosition( vecForceOrigin );
 
 	// Calculate an impulse large enough to push a 75kg man 4 in/sec per point of damage
+	#ifndef FF
+	float flForceScale = info->GetBaseDamage() * ImpulseScale( 75, 4 );
+	#else
 	float flForceScale = info->GetBaseDamage() * ImpulseScale( 75, .2 ); // 4 -> .2
+	#endif
 	Vector vecForce = vecMeleeDir;
 	VectorNormalize( vecForce );
 	vecForce *= flForceScale;

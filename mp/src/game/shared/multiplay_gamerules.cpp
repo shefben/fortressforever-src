@@ -328,9 +328,9 @@ CMultiplayRules::CMultiplayRules()
 			engine->ServerCommand( szCommand );
 		}
 	}
-
+#ifdef FF
 	m_flIntermissionEndTime = 0.f;
-
+#endif
 	nextlevel.SetValue( "" );
 	LoadMapCycleFile();
 
@@ -373,7 +373,7 @@ bool CMultiplayRules::Init()
 	// override some values for multiplay.
 
 		// suitcharger
-#ifndef TF_DLL && !defined( FF_DLL )
+#ifndef TF_DLL
 //=============================================================================
 // HPE_BEGIN:
 // [menglish] CS doesn't have the suitcharger either
@@ -746,7 +746,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			if ( pKiller->Classify() == CLASS_PLAYER )
 				return (CBasePlayer*)pKiller;
 
-			// BEG: Added by Mulchman
+#ifdef FF	// BEG: Added by Mulchman
 			// Buildable Objects need to be specifically tested for
 			// because pScorer in DeathNotice is NULL when someone
 			// is killed by a Buildable Object (and this in incorrect -
@@ -761,7 +761,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 
 			if (pKiller->Classify() == CLASS_DISPENSER)
 				return (CBasePlayer*)(((CFFDispenser*)pKiller)->m_hOwner.Get());
-			// END: Added by Mulchman
+#endif		// END: Added by Mulchman
 
 			// Killing entity might be specifying a scorer player
 			IScorer *pScorerInterface = dynamic_cast<IScorer*>( pKiller );
@@ -804,31 +804,48 @@ ConVarRef suitcharger( "sk_suitcharger" );
 		// Find the killer & the scorer
 		CBaseEntity *pInflictor = info.GetInflictor();
 		CBaseEntity *pKiller = info.GetAttacker();
-
+#ifdef FF
 		// Jiggles: Maybe not the best spot to put this, but...
 		// If the gun killed someone while in malicious sabotage mode
 		// we want to give credit to the Spy who did it
-		CFFBuildableObject* pSabotagedBuildable = CFFBuildableObject::AttackerInflictorBuildable(pKiller, pInflictor);
-		if (pSabotagedBuildable)
+		CFFBuildableObject *pSabotagedBuildable = CFFBuildableObject::AttackerInflictorBuildable( pKiller, pInflictor );
+		if ( pSabotagedBuildable )
 		{
-			if (pSabotagedBuildable->IsMaliciouslySabotaged())
+			if ( pSabotagedBuildable->IsMaliciouslySabotaged() )
 				pKiller = pSabotagedBuildable->m_hSaboteur;
 		}
-
+#endif
 		CBasePlayer *pScorer = GetDeathScorer( pKiller, pInflictor, pVictim );
 		
 		pVictim->IncrementDeathCount( 1 );
 
+		// dvsents2: uncomment when removing all FireTargets
+		// variant_t value;
+		// g_EventQueue.AddEvent( "game_playerdie", "Use", value, 0, pVictim, pVictim );
+#ifdef FF
 		// Bug #0000529: Total death column doesn't work
-		if (pVictim->GetTeam())
-			pVictim->GetTeam()->AddDeaths(1);
+		if ( pVictim->GetTeam() )
+			pVictim->GetTeam()->AddDeaths( 1 );
+#endif
 		FireTargets( "game_playerdie", pVictim, pVictim, USE_TOGGLE, 0 );
-
-		if (pScorer && pVictim != pScorer)
+#ifndef FF
+		// Did the player kill himself?
+		if ( pVictim == pScorer )  
+		{			
+			if ( UseSuicidePenalty() )
+			{
+				// Players lose a frag for killing themselves
+				pVictim->IncrementFragCount( -1 );
+			}			
+		}
+		else if ( pScorer )
+#else
+		if ( pScorer && pVictim != pScorer )
+#endif
 		{
 			// if a player dies in a deathmatch game and the killer is a client, award the killer some points
 			pScorer->IncrementFragCount( IPointsForKill( pScorer, pVictim ) );
-
+#ifdef FF
 			// AfterShock - scoring system : Just award 100 points for frag (for now)
 			if (PlayerRelationship(pScorer, pVictim) == GR_TEAMMATE)
 			{
@@ -836,16 +853,26 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			}
 			else
 				pScorer->AddFortPoints(100, "#FF_FORTPOINTS_FRAG");
-			
+#endif
 			// Allow the scorer to immediately paint a decal
 			pScorer->AllowImmediateDecalPainting();
 
+			// dvsents2: uncomment when removing all FireTargets
+			//variant_t value;
+			//g_EventQueue.AddEvent( "game_playerkill", "Use", value, 0, pScorer, pScorer );
 			FireTargets( "game_playerkill", pScorer, pScorer, USE_TOGGLE, 0 );
 		}
-
+#ifndef FF
+		else
+		{  
+			if ( UseSuicidePenalty() )
+			{
+				// Players lose a frag for letting the world kill them			
+				pVictim->IncrementFragCount( -1 );
+#else
 		// if there was a kill assister, give them some fort point as long as they're not a teammate from prior team dmg
-		CFFPlayer* pFFPlayer = ToFFPlayer(pVictim);
-		if (pFFPlayer)
+		CFFPlayer *pFFPlayer = ToFFPlayer( pVictim );
+		if ( pFFPlayer )
 		{
 			// if we have a top assister give em some fort points
 			RecentAttackerInfo* pTopAssister = pFFPlayer->GetTopKillAssister(pScorer);
@@ -853,7 +880,8 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			{
 				pTopAssister->hPlayer->AddFortPoints(25, "#FF_FORTPOINTS_ASSIST");
 				pTopAssister->hPlayer->IncrementAssistsCount(1);
-			}
+#endif
+			}					
 		}
 	}
 
@@ -866,9 +894,10 @@ ConVarRef suitcharger( "sk_suitcharger" );
 		// Work out what killed the player, and send a message to all clients about it
 		const char *killer_weapon_name = "world";		// by default, the player is killed by the world
 		int killer_ID = 0;
+#ifdef FF
 		int iKilledSGLevel = 0;
 		int iKillerSGLevel = 0;
-
+#endif
 		// Find the killer & the scorer
 		CBaseEntity *pInflictor = info.GetInflictor();
 		CBaseEntity *pKiller = info.GetAttacker();
@@ -964,8 +993,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			{
 				killer_weapon_name = STRING( pInflictor->m_iClassname );
 			}
-
-			// --> Mirv: Special case for projectiles
+#ifdef FF	// --> Mirv: Special case for projectiles
 			CFFProjectileBase* pProjectile = dynamic_cast<CFFProjectileBase*> (pInflictor);
 
 			if (pProjectile && pProjectile->m_iSourceClassname != NULL_STRING)
@@ -1021,35 +1049,27 @@ ConVarRef suitcharger( "sk_suitcharger" );
 
 			//UTIL_LogPrintf(" killer_ID: %i\n",killer_ID);
 			//UTIL_LogPrintf(" killer_weapon_name: %s\n",killer_weapon_name);
-
+#endif
 			// strip the NPC_* or weapon_* from the inflictor's classname
-			if (Q_strncmp( killer_weapon_name, "weapon_", 7 ) == 0 )
+			if ( strncmp( killer_weapon_name, "weapon_", 7 ) == 0 )
 			{
-				//UTIL_LogPrintf("  begins with weapon_, removing\n");
 				killer_weapon_name += 7;
 			}
-			else if (Q_strncmp( killer_weapon_name, "NPC_", 4 ) == 0 )
+			else if ( strncmp( killer_weapon_name, "NPC_", 4 ) == 0 )
 			{
-				//UTIL_LogPrintf("  begins with NPC_, removing\n");
 				killer_weapon_name += 4;
 			}
-			else if (Q_strncmp( killer_weapon_name, "func_", 5 ) == 0 )
+			else if ( strncmp( killer_weapon_name, "func_", 5 ) == 0 )
 			{
-				//UTIL_LogPrintf("  begins with func_, removing\n");
 				killer_weapon_name += 5;
 			}
-			// BEG: Added by Mulchman for ff_ entities
-			else if (Q_strnicmp(killer_weapon_name, "ff_", 3) == 0)
+#ifdef FF	// BEG: Added by Mulchman for ff_ entities
+			else if ( strncmp(killer_weapon_name, "ff_", 3) == 0)
 			{
-				//UTIL_LogPrintf( "  begins with ff_, removing\n" );
 				killer_weapon_name += 3;
 			}
-			// END: Added by Mulchman for FF_ entities
+#endif		// END: Added by Mulchman for FF_ entities
 		}
-
-		//UTIL_LogPrintf(" userid (victim): %i\n",pVictim->GetUserID());
-		//UTIL_LogPrintf(" attacker: %i\n",killer_ID);
-		//UTIL_LogPrintf(" weapon: %s\n",killer_weapon_name);
 
 		IGameEvent * event = gameeventmanager->CreateEvent( "player_death" );
 		if ( event )
@@ -1100,7 +1120,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			
 			if ( bAllowedLUA )
 			{
-				gameeventmanager->FireEvent(event);
+				gameeventmanager->FireEvent( event );
 			}
 		}
 
@@ -1279,16 +1299,22 @@ ConVarRef suitcharger( "sk_suitcharger" );
 	//=========================================================
 	int CMultiplayRules::DeadPlayerWeapons( CBasePlayer *pPlayer )
 	{
-		// Modified by L0ki: we dont drop weapons in FF
+#ifndef FF // Modified by L0ki: we dont drop weapons in FF
+		return GR_PLR_DROP_GUN_ACTIVE;
+#else
 		return GR_PLR_DROP_GUN_NO;
+#endif
 	}
 
 	//=========================================================
 	//=========================================================
 	int CMultiplayRules::DeadPlayerAmmo( CBasePlayer *pPlayer )
 	{
-		// Modified by L0ki: we drop all ammo types in FF
+#ifndef FF // Modified by L0ki: we drop all ammo types in FF
+		return GR_PLR_DROP_AMMO_ACTIVE;
+#else
 		return GR_PLR_DROP_AMMO_ALL;
+#endif
 	}
 
 	CBaseEntity *CMultiplayRules::GetPlayerSpawnSpot( CBasePlayer *pPlayer )
@@ -1340,9 +1366,12 @@ ConVarRef suitcharger( "sk_suitcharger" );
 	//=========================================================
 	bool CMultiplayRules::FAllowNPCs( void )
 	{
-		//return true; // E3 hack
-		//return ( allowNPCs.GetInt() != 0 );
+		#ifndef FF
+		return true; // E3 hack
+		return ( allowNPCs.GetInt() != 0 );
+		#else
 		return false; // Jiggles: No need for NPCs in FF :)
+		#endif
 	}
 
 	//=========================================================
@@ -1373,8 +1402,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 				continue;
 
 			pPlayer->ShowViewPortPanel( PANEL_SCOREBOARD );
-
-			// --> Mirv: Lock into place too
+#ifdef FF	// --> Mirv: Lock into place too
 			CFFPlayer *pFFPlayer = ToFFPlayer(pPlayer);
 			pFFPlayer->LockPlayerInPlace();
 			pFFPlayer->AddFlag(FL_FROZEN);
@@ -1404,6 +1432,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			//////////////////////////////////////////////////////////////////////////
 			pEvent->SetInt("winner", pWinningTeam ? pWinningTeam->GetTeamNumber() : 0);
 			gameeventmanager->FireEvent(pEvent);
+#endif
 		}
 	}
 
@@ -1478,11 +1507,29 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			return;
 		}
 
-		char szRecommendedName[ MAX_PATH ];
-		V_sprintf_safe( szRecommendedName, "cfg/%s", pszVar );
+		// Check cfg/foo first.  Resolve dot-slashes only on the concatonated path, since "../foo" is valid if it
+		// matches "cfg/../foo".
+		//
+		// XXX Everything is awful bonus, V_RemoveDotSlashes("a/../b") returns false and the invalid "/b" parse, and the
+		//     comment there says "for backwards compat".  So we do "/cfg/%s" and then trim the first character on
+		//     success because why not.
+		char szRecommendedNameWithSlash[ MAX_PATH ] = { 0 };
+		V_sprintf_safe( szRecommendedNameWithSlash, "/cfg/%s", pszVar );
+		char *pszRecommendedName = szRecommendedNameWithSlash + 1;
+		if ( !V_RemoveDotSlashes( szRecommendedNameWithSlash ) ||
+		     szRecommendedNameWithSlash[0] != CORRECT_PATH_SEPARATOR || !*pszRecommendedName )
+		{
+			if ( bForceSpew || V_stricmp( szLastResult, "__novar") )
+			{
+				Msg( "mapcyclefile convar is not a valid path.\n" );
+				V_strcpy_safe( szLastResult, "__novar" );
+			}
+			*pszResult = '\0';
+			return;
+		}
 
 		// First, look for a mapcycle file in the cfg directory, which is preferred
-		V_strncpy( pszResult, szRecommendedName, nSizeResult );
+		V_strncpy( pszResult, pszRecommendedName, nSizeResult );
 		if ( filesystem->FileExists( pszResult, "GAME" ) )
 		{
 			if ( bForceSpew || V_stricmp( szLastResult, pszResult) )
@@ -1493,27 +1540,43 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			return;
 		}
 
-		// Nope?  Try the root.
-		V_strncpy( pszResult, pszVar, nSizeResult );
+		// Nope?  Try the root.  Resolve dot-slashes in the path in isolation since "../foo" is now not allowed from
+		// there.  Same note as above about V_RemoveDotSlashes being actually broken.
+		char szCleanPathWithSlash[ MAX_PATH ] = { 0 };
+		V_sprintf_safe( szCleanPathWithSlash, "/%s", pszVar );
+		char *pszCleanPath = szCleanPathWithSlash + 1;
+		if ( !V_RemoveDotSlashes( szCleanPathWithSlash ) || szCleanPathWithSlash[0] != CORRECT_PATH_SEPARATOR || !pszCleanPath )
+		{
+			if ( bForceSpew || V_stricmp( szLastResult, "__novar") )
+			{
+				Msg( "mapcyclefile convar is not a valid path.\n" );
+				V_strcpy_safe( szLastResult, "__novar" );
+			}
+			*pszResult = '\0';
+			return;
+		}
+
+
+		V_strncpy( pszResult, pszCleanPath, nSizeResult );
 		if ( filesystem->FileExists( pszResult, "GAME" ) )
 		{
 			if ( bForceSpew || V_stricmp( szLastResult, pszResult) )
 			{
-				Msg( "Using map cycle file '%s'.  ('%s' was not found.)\n", pszResult, szRecommendedName );
+				Msg( "Using map cycle file '%s'.  ('%s' was not found.)\n", pszResult, pszRecommendedName );
 				V_strcpy_safe( szLastResult, pszResult );
 			}
 			return;
 		}
 
 		// Nope?  Use the default.
-		if ( !V_stricmp( pszVar, "mapcycle.txt" ) )
+		if ( !V_stricmp( pszCleanPath, "mapcycle.txt" ) )
 		{
 			V_strncpy( pszResult, "cfg/mapcycle_default.txt", nSizeResult );
 			if ( filesystem->FileExists( pszResult, "GAME" ) )
 			{
 				if ( bForceSpew || V_stricmp( szLastResult, pszResult) )
 				{
-					Msg( "Using map cycle file '%s'.  ('%s' was not found.)\n", pszResult, szRecommendedName );
+					Msg( "Using map cycle file '%s'.  ('%s' was not found.)\n", pszResult, pszRecommendedName );
 					V_strcpy_safe( szLastResult, pszResult );
 				}
 				return;
@@ -1524,7 +1587,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 		*pszResult = '\0';
 		if ( bForceSpew || V_stricmp( szLastResult, "__notfound") )
 		{
-			Msg( "Map cycle file '%s' was not found.\n", szRecommendedName );
+			Msg( "Map cycle file '%s' was not found.\n", pszRecommendedName );
 			V_strcpy_safe( szLastResult, "__notfound" );
 		}
 	}
@@ -1660,36 +1723,14 @@ ConVarRef suitcharger( "sk_suitcharger" );
 			// Search for all pop files that are prefixed with the current map name
 			CUtlString sFileList;
 
-			char szBaseName[_MAX_PATH];
-			V_snprintf( szBaseName, sizeof( szBaseName ), "scripts/population/%s*.pop", STRING(gpGlobals->mapname) );
+			CUtlVector< CUtlString > defaultPopFiles;
+			CPopulationManager::FindDefaultPopulationFileShortNames( defaultPopFiles );
 
-			FileFindHandle_t popHandle;
-			const char *pPopFileName = filesystem->FindFirst( szBaseName, &popHandle );
-
-			while ( pPopFileName && pPopFileName[ 0 ] != '\0' )
+			FOR_EACH_VEC( defaultPopFiles, idx )
 			{
-				// Skip it if it's a directory or is the folder info
-				if ( filesystem->FindIsDirectory( popHandle ) )
-				{
-					pPopFileName = filesystem->FindNext( popHandle );
-					continue;
-				}
-
-				const char *pchPopPostfix = StringAfterPrefix( pPopFileName, STRING(gpGlobals->mapname) );
-				if ( pchPopPostfix )
-				{
-					char szShortName[_MAX_PATH];
-					V_strncpy( szShortName, ( ( pchPopPostfix[ 0 ] == '_' ) ? ( pchPopPostfix + 1 ) : "normal" ), sizeof( szShortName ) ); // skip the '_'
-					V_StripExtension( szShortName, szShortName, sizeof( szShortName ) );
-
-					sFileList += szShortName;
-					sFileList += '\n';
-				}
-
-				pPopFileName = filesystem->FindNext( popHandle );
+				sFileList += defaultPopFiles[ idx ];
+				sFileList += "\n";
 			}
-
-			filesystem->FindClose( popHandle );
 
 			if ( sFileList.Length() > 0 )
 			{
@@ -1876,7 +1917,7 @@ ConVarRef suitcharger( "sk_suitcharger" );
 
 			CBaseMultiplayerPlayer *pMultiPlayerPlayer = dynamic_cast< CBaseMultiplayerPlayer * >( pPlayer );
 
-			if ( pMultiPlayerPlayer )
+			if ( pMultiPlayerPlayer && pMultiPlayerPlayer->ShouldRunRateLimitedCommand( pcmd ) )
 			{
 				int iMenu = atoi( args[1] );
 				int iItem = atoi( args[2] );
@@ -1914,20 +1955,32 @@ ConVarRef suitcharger( "sk_suitcharger" );
 		{
 			if ( FStrEq( pszCommand, "AchievementEarned" ) )
 			{
-				if ( pPlayer->ShouldAnnounceAchievement() )
+				if ( !pPlayer->ShouldAnnounceAchievement() )
+					return;
+
+				int nAchievementID = pKeyValues->GetInt( "achievementID" );
+
+#ifdef TF_DLL
+				// Josh:
+				// Bots are using this as a back-channel to communicate on our servers
+				// with invalid achievement indexes.
+				// I did want to use achievementmgr but that isn't available on the server --
+				// nor are the achievement's actually DECLARED (they rely on a bunch of client code)
+				// so we have a list of achievements in achievements_tf_list.inc.
+				// Let's validate the achievement is actually valid before continuing...
+				if ( g_ValidAchiementIdxs.find( nAchievementID ) == g_ValidAchiementIdxs.end() )
+					return;
+#endif
+
+				IGameEvent * event = gameeventmanager->CreateEvent( "achievement_earned" );
+				if ( event )
 				{
-					int nAchievementID = pKeyValues->GetInt( "achievementID" );
-
-					IGameEvent * event = gameeventmanager->CreateEvent( "achievement_earned" );
-					if ( event )
-					{
-						event->SetInt( "player", pPlayer->entindex() );
-						event->SetInt( "achievement", nAchievementID );
-						gameeventmanager->FireEvent( event );
-					}
-
-					pPlayer->OnAchievementEarned( nAchievementID );
+					event->SetInt( "player", pPlayer->entindex() );
+					event->SetInt( "achievement", nAchievementID );
+					gameeventmanager->FireEvent( event );
 				}
+
+				pPlayer->OnAchievementEarned( nAchievementID );
 			}
 		}
 	}

@@ -20,6 +20,11 @@ public:
 	// Team data access 
 	virtual const char		*GetTeamName( int index ) = 0;
 	virtual int				GetTeamScore( int index ) = 0;
+#ifdef FF
+	virtual int				GetTeamFortPoints( int index ) = 0;
+	virtual float			GetTeamScoreTime(int index ) = 0;
+	virtual int				GetTeamDeaths( int index ) = 0;
+#endif
 	virtual const Color&	GetTeamColor( int index ) = 0;
 
 	// Player data access
@@ -36,6 +41,16 @@ public:
 	virtual int		GetFrags( int index ) = 0;
 	virtual int		GetTeam( int index ) = 0;
 	virtual int		GetHealth( int index ) = 0;
+#ifdef FF
+	virtual int		GetArmor( int index ) = 0;
+	virtual int		GetAssists( int index ) = 0;
+	// --> Mirv: Extra's needed for menus
+	virtual int		GetClass( int index ) = 0;
+	virtual int		GetChannel( int index ) = 0;
+	virtual int		GetTeamClassLimits( int index, int classindex ) = 0;
+	virtual int		GetTeamLimits( int index ) = 0;
+	// <-- Mirv: Extra's needed for menus
+#endif
 };
 
 extern IGameResources *GameResources( void ); // singelton accessor

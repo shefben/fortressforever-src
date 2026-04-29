@@ -221,7 +221,7 @@ CBaseEntity *CGameRules::GetPlayerSpawnSpot( CBasePlayer *pPlayer )
 
 	return pSpawnSpot;
 }
-
+#ifdef FF
 // this is not a cheat
 ConVar sv_spawnoffsetattempts("sv_spawnoffsetattempts", "5", 0, "4 rotations PER this value.  It keeps trying offset positions while less than this value.  Oh and also, attempt 0 just checks the original spawn location so there are no rotations.", true, 0, true, 9);
 
@@ -320,8 +320,7 @@ Vector CGameRules::GetPlayerSpawnSpotOffset(const CBasePlayer* pPlayer, const Ve
 	// Just spawn already, DAMN!
 	return Vector(0, 0, 0);
 }
-
-
+#endif
 // checks if the spot is clear of players
 bool CGameRules::IsSpawnPointValid( CBaseEntity *pSpot, CBasePlayer *pPlayer  )
 {
@@ -377,8 +376,7 @@ bool CGameRules::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWe
 //=========================================================
 void CGameRules::RefreshSkillData ( bool forceUpdate )
 {
-	// We don't care about this stuff, do we? -- Mulch
-	/*
+#ifndef FF // We don't care about this stuff, do we? -- Mulch
 #ifndef CLIENT_DLL
 	if ( !forceUpdate )
 	{
@@ -413,7 +411,7 @@ void CGameRules::RefreshSkillData ( bool forceUpdate )
 
 #endif // HL2_DLL
 #endif // CLIENT_DLL
-*/
+#endif
 }
 
 

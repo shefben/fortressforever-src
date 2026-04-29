@@ -10,6 +10,7 @@
 #include "c_team.h"
 #else
 #include "c_ff_team.h"
+#endif
 #include "gamestringpool.h"
 #ifdef FF
 #include "ff_shareddefs.h"
@@ -112,7 +113,7 @@ C_PlayerResource::C_PlayerResource()
 	m_Colors[TEAM_COMBINE] = COLOR_BLUE;
 	m_Colors[TEAM_REBELS] = COLOR_RED;
 	m_Colors[TEAM_UNASSIGNED] = COLOR_YELLOW;
-#elifdef FF
+#elif defined FF
 	m_Colors[TEAM_SPECTATOR] = TEAM_COLOR_SPECTATOR;
 	m_Colors[TEAM_BLUE]		 = TEAM_COLOR_BLUE;
 	m_Colors[TEAM_RED]		 = TEAM_COLOR_RED;
@@ -241,7 +242,7 @@ int C_PlayerResource::GetTeamScore(int index_ )
 
 	return team->Get_Score();
 }
-
+#ifdef FF
 int C_PlayerResource::GetTeamFortPoints(int index)
 {
 	C_Team* team = GetGlobalTeam(index);
@@ -293,7 +294,7 @@ int C_PlayerResource::GetTeamLimits(int index)
 	return team->Get_Teams();
 }
 // <-- Mirv: So menus can show correct limits
-
+#endif
 int C_PlayerResource::GetFrags(int index )
 {
 	//return 666;
@@ -398,7 +399,7 @@ int	C_PlayerResource::GetPlayerScore( int iIndex )
 
 	return m_iScore[iIndex];
 }
-
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -409,7 +410,7 @@ int	C_PlayerResource::GetFortPoints( int iIndex )
 
 	return m_iFortPoints[iIndex];
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -431,7 +432,7 @@ int	C_PlayerResource::GetHealth( int iIndex )
 
 	return m_iHealth[iIndex];
 }
-
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -452,7 +453,7 @@ int	C_PlayerResource::GetClass( int iIndex )
 	return m_iClass[iIndex];
 }
 // <-- Mirv: Get the player's class
-
+#endif
 const Color &C_PlayerResource::GetTeamColor(int index_ )
 {
 	if ( index_ < 0 || index_ >= MAX_TEAMS )

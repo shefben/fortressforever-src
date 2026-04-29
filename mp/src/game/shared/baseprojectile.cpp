@@ -213,8 +213,24 @@ void CBaseProjectile::ResetCollideWithTeammates()
 {
 	// Don't collide with players on the owner's team for the first bit of our life
 	m_bCanCollideWithTeammates = false;
-	
-	SetContextThink( &CBaseProjectile::CollideWithTeammatesThink, gpGlobals->curtime + GetCollideWithTeammatesDelay(), "CollideWithTeammates" );
+#ifndef FF
+	// Josh: This now uses a new g_flServerCurTime which is not affected by rollback, etc
+	// as Thinks like this should be in server time space, not client rollback time space.
+	// This fixes a bug where clients with higher ping would get shorter teammate collisions,
+	// as it was thinking for less time, and low ping local players would end up getting longer collisions,
+	// and due to the way rollback is implemented in Source (can do roll-forward), weapons like the
+	// Crucader's Crossbow with a 0 delay, would end up having some, due to the client-local curtime,
+	// being above the server's curtime.
+	// It is worth noting that rollback does not affect position/velocity of the spawned projectile (only hitscan).
+	// There is also a special case for the 0 delay, because we don't need to think in that instance anyway!
+	// ( but it was tested with that too :> )
+	if ( GetCollideWithTeammatesDelay() == 0.0f )
+		m_bCanCollideWithTeammates = true;
+	else
+		SetContextThink( &CBaseProjectile::CollideWithTeammatesThink, g_flServerCurTime + GetCollideWithTeammatesDelay(), "CollideWithTeammates" );
+#else
+	SetContextThink( &CBaseProjectile::CollideWithTeammatesThink, gpGlobals->curtime + GetCollideWithTeammatesDelay(), "CollideWithTeammates" );		
+#endif
 }
 
 #endif // GAME_DLL

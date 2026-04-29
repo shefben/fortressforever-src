@@ -18,9 +18,11 @@
 
 #define CTEXTURESMAX		512			// max number of textures loaded
 #define CBTEXTURENAMEMAX	13			// only load first n chars of name
-
-//#define GAMEMOVEMENT_DUCK_TIME				1000.0f		// ms
+#ifndef FF
+#define GAMEMOVEMENT_DUCK_TIME				1000.0f		// ms
+#else
 #define GAMEMOVEMENT_DUCK_TIME					400.0f		// |-- Mirv: Inline with TFC value now
+#endif
 #define GAMEMOVEMENT_JUMP_TIME				510.0f		// ms approx - based on the 21 unit height jump
 #define GAMEMOVEMENT_JUMP_HEIGHT			21.0f		// units
 #define GAMEMOVEMENT_TIME_TO_UNDUCK			( TIME_TO_UNDUCK * 1000.0f )		// ms
@@ -97,7 +99,7 @@ protected:
 	void			WaterJump( void );
 
 	// Handles both ground friction and water friction
-	virtual void			Friction( void );
+	void			Friction( void );
 
 	virtual void	AirAccelerate( Vector& wishdir, float wishspeed, float accel );
 

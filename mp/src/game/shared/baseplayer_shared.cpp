@@ -659,7 +659,7 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 	{
 		fvol *= 0.65;
 	}
-#if defined( FF )
+#ifdef FF
 	// --> Mirv: Redone sound stuff
 
 	// If we are walking or ducking, silence
@@ -1478,7 +1478,7 @@ void CBasePlayer::SmoothViewOnStairs( Vector& eyeOrigin )
 	CBaseEntity *pGroundEntity = GetGroundEntity();
 	float flCurrentPlayerZ = GetLocalOrigin().z;
 	float flCurrentPlayerViewOffsetZ = GetViewOffset().z;
-#if defined( FF )
+#ifdef FF
 	// --> Mirv:
 	// We're now only smoothing stairs if we've recently stepped up or down
 	// far enough (currently >= 8.0 units). This way the stair smoothing isn't

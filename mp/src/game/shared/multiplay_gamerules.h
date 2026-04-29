@@ -255,7 +255,9 @@ protected:
 
 public:
 	virtual void ChangeLevel( void );
-
+#ifndef FF
+protected:
+#endif
 	// moving to public so we can use changelevel/gotointermission in lua
 	//===============================
 	virtual void GoToIntermission( void );
@@ -264,8 +266,9 @@ public:
 
 	float m_flIntermissionEndTime;
 	//===============================
-
+#ifndef FF
 protected:
+#endif
 	static int m_nMapCycleTimeStamp;
 	static int m_nMapCycleindex;
 	static CUtlVector<char*> m_MapList;

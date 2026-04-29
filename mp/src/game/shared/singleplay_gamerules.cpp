@@ -493,8 +493,11 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	bool CSingleplayRules::FAllowNPCs( void )
 	{
-		//return true;
+		#ifndef FF
+		return true;
+		#else
 		return false; // Jiggles: No need for NPCs in FF :)
+		#endif
 	}
 
 #endif

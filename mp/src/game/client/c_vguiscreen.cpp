@@ -815,8 +815,12 @@ bool CVGuiScreenPanel::Init( KeyValues* pKeyValues, VGuiScreenInitData_t* pInitD
 	const char *pResFile = pKeyValues->GetString( "resfile" );
 	if (pResFile[0] != 0)
 	{
+#ifdef FF
 		KeyValues *pCachedKeyValues = CacheKeyValuesForFile( pResFile );
 		LoadControlSettings( pResFile, NULL, pCachedKeyValues );
+#else
+		LoadControlSettings( pResFile, NULL, NULL );
+#endif
 	}
 
 	// Dimensions in pixels

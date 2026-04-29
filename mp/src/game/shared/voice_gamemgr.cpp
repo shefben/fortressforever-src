@@ -238,7 +238,7 @@ void CVoiceGameMgr::UpdateMasks()
 #ifndef FF	// --> Mirv: [For FF] Need different cast
 				CBaseEntity *pEnt = UTIL_PlayerByIndex(iOtherClient+1);
 #else
-				CFFPlayer *pEnt = (CFFPlayer*)UTIL_PlayerByIndex(iOtherClient + 1);
+				CFFPlayer *pEnt = (CFFPlayer*)UTIL_PlayerByIndex(iOtherClient+1);
 #endif			// <-- Mirv: [For FF] Need different cast
 #ifndef FF
 				if(pEnt && pEnt->IsPlayer() && 

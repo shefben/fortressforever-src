@@ -283,9 +283,6 @@ void CSpriteTrail::OnDataChanged( DataUpdateType_t updateType )
 //-----------------------------------------------------------------------------
 void CSpriteTrail::ClientThink()
 {
-	if ( !IsEnabledByClient() )
-		return;
-
 	// Update the trail + bounding box
 	UpdateTrail();
 	UpdateBoundingBox();
@@ -345,29 +342,29 @@ void CSpriteTrail::ComputeScreenPosition( Vector *pScreenPos )
 	*pScreenPos = GetRenderOrigin();
 #endif
 }
-
+#ifdef FF
 //-----------------------------------------------------------------------------
 // Returns true if the client has this trail enabled
 //-----------------------------------------------------------------------------
-bool CSpriteTrail::IsEnabledByClient(void)
+bool CSpriteTrail::IsEnabledByClient( void )
 {
-	CBaseEntity* pParent = GetMoveParent();
+	CBaseEntity *pParent = GetMoveParent();
 
-	if (grenadetrails.GetBool() == false &&
-		pParent && pParent->Classify() >= CLASS_GREN && pParent->Classify() <= CLASS_GREN_LASER)
+	if ( grenadetrails.GetBool() == false &&
+		pParent && pParent->Classify() >= CLASS_GREN && pParent->Classify() <= CLASS_GREN_LASER )
 		return false;
 
-	if (pipetrails.GetBool() == false &&
-		pParent && pParent->Classify() >= CLASS_PIPEBOMB && pParent->Classify() <= CLASS_GLGRENADE)
+	if ( pipetrails.GetBool() == false &&
+		pParent && pParent->Classify() >= CLASS_PIPEBOMB && pParent->Classify() <= CLASS_GLGRENADE )
 		return false;
 
-	if (flagtrails.GetBool() == false &&
-		pParent && pParent->Classify() == CLASS_INFOSCRIPT)
+	if ( flagtrails.GetBool() == false &&
+		pParent && pParent->Classify() == CLASS_INFOSCRIPT )
 		return false;
 
 	return true;
 }
-
+#endif
 
 //-----------------------------------------------------------------------------
 // Compute position	+ bounding box
@@ -388,14 +385,14 @@ void CSpriteTrail::UpdateBoundingBox( void )
 	for ( int i = 0; i < m_nStepCount; ++i )
 	{
 		TrailPoint_t *pPoint = GetTrailPoint(i);
-
+#ifdef FF
 		// The render origin can move in between updates, so skip points
 		// that are now too far away
 		if (pPoint->m_vecScreenPos.DistToSqr(vecRenderOrigin) > cl_spritetrail_maxlength.GetFloat() * cl_spritetrail_maxlength.GetFloat())
 		{
 			continue;
 		}
-
+#endif
 		float flActualWidth = (flMaxWidth + pPoint->m_flWidthVariance) * 0.5f;
 		Vector size( flActualWidth, flActualWidth, flActualWidth );
 		VectorSubtract( pPoint->m_vecScreenPos, size, mins );
@@ -422,7 +419,7 @@ void CSpriteTrail::UpdateTrail( void )
 	Vector	screenPos;
 	ComputeScreenPosition( &screenPos );
 	TrailPoint_t *pLast = m_nStepCount ? GetTrailPoint( m_nStepCount-1 ) : NULL;
-
+#ifdef FF
 	// If the sprite trail is too long, just start over
 	if (pLast && pLast->m_vecScreenPos.DistToSqr(screenPos) > cl_spritetrail_maxlength.GetFloat() * cl_spritetrail_maxlength.GetFloat())
 	{
@@ -430,7 +427,7 @@ void CSpriteTrail::UpdateTrail( void )
 		m_nStepCount = 0;
 		pLast = NULL;
 	}
-
+#endif
 	if ( ( pLast == NULL ) || ( pLast->m_vecScreenPos.DistToSqr( screenPos ) > 4.0f ) )
 	{
 		// If we're over our limit, steal the last point and put it up front
@@ -474,35 +471,40 @@ int CSpriteTrail::DrawModel( int flags )
 		return 1;
 
 	//See if we should draw
-	if ( !IsVisible() || ( m_bReadyToDraw == false || !IsEnabledByClient() ) )
+	if ( !IsVisible() || ( m_bReadyToDraw == false ) )
 		return 0;
 
 	CEngineSprite *pSprite = Draw_SetSpriteTexture( GetModel(), m_flFrame, GetRenderMode() );
 	if ( pSprite == NULL )
 		return 0;
 
+	// Specify all the segments.
+	CMatRenderContextPtr pRenderContext( g_pMaterialSystem );
+	CBeamSegDraw segDraw;
+	segDraw.Start( pRenderContext, m_nStepCount + 1, pSprite->GetMaterial( GetRenderMode() ) );
+	
 	// Setup the first point, always emanating from the attachment point
 	TrailPoint_t *pLast = GetTrailPoint( m_nStepCount-1 );
 	TrailPoint_t currentPoint;
-	//currentPoint.m_flDieTime = gpGlobals->curtime + m_flLifeTime;
+	#ifdef FF
 	ComputeScreenPosition( &currentPoint.m_vecScreenPos );
 
 	// if the current point is too far away from the last point, then don't draw anything
-	if (pLast->m_vecScreenPos.DistToSqr(currentPoint.m_vecScreenPos) > cl_spritetrail_maxlength.GetFloat() * cl_spritetrail_maxlength.GetFloat())
+	if ( pLast->m_vecScreenPos.DistToSqr(currentPoint.m_vecScreenPos) > cl_spritetrail_maxlength.GetFloat() * cl_spritetrail_maxlength.GetFloat() )
 	{
 		return 0;
 	}
-
+	#endif
 	currentPoint.m_flDieTime = gpGlobals->curtime + m_flLifeTime;
-
+	ComputeScreenPosition( &currentPoint.m_vecScreenPos );
 	currentPoint.m_flTexCoord = pLast->m_flTexCoord + currentPoint.m_vecScreenPos.DistTo(pLast->m_vecScreenPos) * m_flTextureRes;
 	currentPoint.m_flWidthVariance = 0.0f;
-
+#ifdef FF
 	// Specify all the segments.
 	CMatRenderContextPtr pRenderContext(g_pMaterialSystem);
 	CBeamSegDraw segDraw;
 	segDraw.Start(pRenderContext, m_nStepCount + 1, pSprite->GetMaterial(GetRenderMode()));
-
+#endif
 #if SCREEN_SPACE_TRAILS
 	VMatrix	viewMatrix;
 	materials->GetMatrix( MATERIAL_VIEW, &viewMatrix );

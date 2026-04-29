@@ -17,6 +17,7 @@
 #include "hud_basechat.h"
 #else
 #include "ff_hud_chat.h"
+#endif
 #include "weapon_selection.h"
 #include <vgui/IVGui.h>
 #include <vgui/Cursor.h>
@@ -683,44 +684,38 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 		return 1;
 	
 	// Should we start typing a message?
-	if (pszCurrentBinding)
+	if ( pszCurrentBinding &&
+		( Q_strcmp( pszCurrentBinding, "messagemode" ) == 0 ||
+			Q_strcmp( pszCurrentBinding, "say" ) == 0 ) )
 	{
-		//////////////////////////////////////////////////////////////////////////
-		// Say
-		bool bMessageMode = !Q_strncmp( pszCurrentBinding, "messagemode", 11 );
-		bool bSay = !Q_strcmp( pszCurrentBinding, "say" );
-		if ( bMessageMode || bSay )
+		if ( down )
 		{
-			if ( down )
-			{
-				if (bMessageMode)
-					StartMessageMode( MM_MESSAGEMODE );
-				else
-					StartMessageMode( MM_SAY );
-			}
-			return 0;
+			StartMessageMode( MM_SAY );
+		}
+		return 0;
+	}
+	else if (pszCurrentBinding &&
+		( Q_strcmp( pszCurrentBinding, "messagemode2" ) == 0 ||
+			Q_strcmp( pszCurrentBinding, "say_team" ) == 0 ) )
+	{
+		if ( down )
+		{
+			StartMessageMode( MM_SAY_TEAM );
+		}
+		return 0;
+	}
+	else if (pszCurrentBinding &&
+		(Q_strcmp( pszCurrentBinding, "messagemode3" ) == 0 ||
+			Q_strcmp( pszCurrentBinding, "say_party" ) == 0 ) )
+	{
+		if ( down && BCanSendPartyChatMessages() )
+		{
+			StartMessageMode( MM_SAY_PARTY );
+		}
+		return 0;
+	}
 
-			// Support starting the message partially filled in
-			if ( bMessageMode && m_pChatElement )
-			{
-				const char* pStartStr = pszCurrentBinding + 11;
-				while ( pStartStr && *pStartStr && *pStartStr == ' ' )
-					++pStartStr;
-				m_pChatElement->StartInputMessage( pStartStr );
-			}
-			return 0;
-		}
-		//////////////////////////////////////////////////////////////////////////
-		// TeamSay
-		bool bSayTeam = !Q_strcmp( pszCurrentBinding, "say_team" );
-		if ( bSayTeam )
-		{
-			if ( down )
-			{
-				StartMessageMode( MM_SAY_TEAM );
-			}
-			return 0;
-		}
+	#ifdef FF
 		//////////////////////////////////////////////////////////////////////////
 		// %i hack
 		bool bParsedOutMacro = false;
@@ -728,13 +723,13 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 		bool bSayTeamBind = !Q_strncmp(pszCurrentBinding, "say_team ", 9);
 		if (bSayBind || bSayTeamBind)
 		{
-			C_FFPlayer* pPlayer = ToFFPlayer(C_BasePlayer::GetLocalPlayer());
+			C_FFPlayer *pPlayer = ToFFPlayer( C_BasePlayer::GetLocalPlayer() );
 			if (pPlayer)
 			{
 				std::string strcmd = pszCurrentBinding;
-				while (true)
+				while ( true )
 				{
-					size_t tok = strcmd.find("%i");
+					size_t tok = strcmd.find( "%i" );
 					if (tok == strcmd.npos)
 						break;
 
@@ -755,7 +750,7 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 				}
 			}
 		}
-	}
+	#endif
 	
 	// If we're voting...
 #ifdef VOTING_ENABLED
@@ -772,23 +767,23 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
 
 	// if ingame spectator mode, let spectator input intercept key event here
-	if( pPlayer &&
-		( pPlayer->GetObserverMode() > OBS_MODE_DEATHCAM ) &&
-		!HandleSpectatorKeyInput( down, keynum, pszCurrentBinding ) )
+	if (pPlayer &&
+		(pPlayer->GetObserverMode() > OBS_MODE_DEATHCAM) &&
+		!HandleSpectatorKeyInput(down, keynum, pszCurrentBinding))
 	{
 		return 0;
 	}
 
 	// Let game-specific hud elements get a crack at the key input
-	if ( !HudElementKeyInput( down, keynum, pszCurrentBinding ) )
+	if (!HudElementKeyInput(down, keynum, pszCurrentBinding))
 	{
 		return 0;
 	}
 
-	C_BaseCombatWeapon *pWeapon = GetActiveWeapon();
-	if ( pWeapon )
+	C_BaseCombatWeapon* pWeapon = GetActiveWeapon();
+	if (pWeapon)
 	{
-		return pWeapon->KeyInput( down, keynum, pszCurrentBinding );
+		return pWeapon->KeyInput(down, keynum, pszCurrentBinding);
 	}
 
 	return 1;

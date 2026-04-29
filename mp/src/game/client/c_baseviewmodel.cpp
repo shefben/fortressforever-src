@@ -140,9 +140,10 @@ void C_BaseViewModel::UncorrectViewModelAttachment( Vector &vOrigin )
 void C_BaseViewModel::FireEvent( const Vector& origin, const QAngle& angles, int event, const char *options )
 {
 	// Mirv: Don't do any viewmodel stuff in third person
+#ifdef SDK2013CE
 	if ( input->CAM_IsThirdPerson() )
 		return;
-
+#endif
 	// We override sound requests so that we can play them locally on the owning player
 	if ( ( event == AE_CL_PLAYSOUND ) || ( event == CL_EVENT_SOUND ) )
 	{

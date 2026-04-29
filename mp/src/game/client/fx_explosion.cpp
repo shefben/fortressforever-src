@@ -18,7 +18,9 @@
 #include "fx_quad.h"
 #include "fx_line.h"
 #include "fx_water.h"
-
+#ifdef FF
+#include "utlqueue.h"
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -196,7 +198,7 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, float s
 #endif
 
 	PlaySound();
-
+#ifdef FF
 	// --> Mirv: Now supporting better explosion scaling
 	// HACK HACK: Rather than replace all the times when scale is much bigger
 	// we're just going to reduce to a "normal" size if they're trying an old-style scale
@@ -219,7 +221,7 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, float s
 		if (g_flFractional < 0.01f)
 			g_flFractional = 0.01f;
 	}
-
+#endif
 	if ( scale != 0 )
 	{
 		// UNDONE: Make core size parametric to scale or remove scale?
@@ -230,9 +232,10 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, float s
 	if (!(UTIL_PointContents(m_vecOrigin) & CONTENTS_WATER))
 		CreateDynamicLight();
 	CreateMisc();
-
+#ifdef FF
 	// Now add this explosion to our tracker
 	m_QueueExplosions.Insert(gpGlobals->curtime + 0.8f);
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -304,8 +307,9 @@ void C_BaseExplosionEffect::CreateCore( void )
 		// Smoke - basic internal filler
 		// Rises above afterwards
 		//
+#ifdef FF
 		number = (int)ceil(4 * g_flFractional);
-
+#endif
 		for (i = 0; i < number; i++)
 		{
 			pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), m_Material_Smoke, m_vecOrigin );
@@ -313,31 +317,42 @@ void C_BaseExplosionEffect::CreateCore( void )
 			if ( pParticle != NULL )
 			{
 				pParticle->m_flLifetime = 0.0f;
+#ifndef FF		// --> Mirv: Use TF2 length smoke but scale it so that it hovers up slowly
+	#ifdef INVASION_CLIENT_DLL
+				pParticle->m_flDieTime	= random->RandomFloat( 0.5f, 1.0f );
+	#endif
+	#ifdef _XBOX
+				pParticle->m_flDieTime	= 1.0f;
+	#else
+				pParticle->m_flDieTime	= random->RandomFloat( 2.0f, 3.0f );
+	#endif
+#else // FF
+				pParticle->m_flDieTime	= random->RandomFloat( 0.5f, 1.0f ) * ( m_flScale * m_flScale * m_flScale );
+#endif			// <-- Mirv
 
-				// --> Mirv: Use TF2 length smoke but scale it so that it hovers up slowly
-//#ifdef INVASION_CLIENT_DLL
-				pParticle->m_flDieTime = random->RandomFloat(0.5f, 1.0f) * (m_flScale * m_flScale * m_flScale);
-//#else
-				//pParticle->m_flDieTime	= random->RandomFloat( 2.0f, 3.0f );
-//#endif
-				// <-- Mirv
+				pParticle->m_vecVelocity.Random( -spread, spread );
+				pParticle->m_vecVelocity += ( m_vecDirection * random->RandomFloat( 1.0f, 6.0f ) );
+				
+				VectorNormalize( pParticle->m_vecVelocity );
 
-				pParticle->m_vecVelocity.Random(-spread, spread);
-				pParticle->m_vecVelocity += (m_vecDirection * random->RandomFloat(1.0f, 6.0f));
-
-				VectorNormalize(pParticle->m_vecVelocity);
-
-				float	fForce = random->RandomFloat(1, 750) * force;
+				float	fForce = random->RandomFloat( 1, 750 ) * force;
 
 				//Scale the force down as we fall away from our main direction
-				ScaleForceByDeviation(pParticle->m_vecVelocity, m_vecDirection, spread, &fForce);
+				ScaleForceByDeviation( pParticle->m_vecVelocity, m_vecDirection, spread, &fForce );
 
 				pParticle->m_vecVelocity *= fForce;
+				
+				#if __EXPLOSION_DEBUG
+				if ( debugoverlay )
+				{
+					debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
+				}
+				#endif
 
-				// --> Mirv: Reduce velocity for scale
+#ifdef FF		// --> Mirv: Reduce velocity for scale
 				if (m_flScale < 1.0f)
 					pParticle->m_vecVelocity *= m_flScale;
-				// <-- Mirv
+#endif			// <-- Mirv
 
 #if __EXPLOSION_DEBUG
 				debugoverlay->AddLineOverlay(m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3);
@@ -348,10 +363,10 @@ void C_BaseExplosionEffect::CreateCore( void )
 				pParticle->m_uchColor[1] = (worldLight[1] * nColor);
 				pParticle->m_uchColor[2] = (worldLight[2] * nColor);
 
-				// --> Mirv: Scale the size of the rising smoke too
+#ifdef FF		// --> Mirv: Scale the size of the rising smoke too
 				pParticle->m_uchStartSize = clamp(72 * m_flScale, 20, 126);
 				pParticle->m_uchEndSize = pParticle->m_uchStartSize * 2;
-				// <-- Mirv
+#endif			// <-- Mirv
 
 				pParticle->m_uchStartAlpha = 255;
 				pParticle->m_uchEndAlpha = 0;

@@ -1099,9 +1099,9 @@ void CBaseEntity::PhysicsImpact( CBaseEntity *other, trace_t &trace )
 #ifdef FF_CLIENT_DLL	// BEG: Added by Mulch 11/07/2005
 	if (trace.m_pEnt)
 	{
-		if ((trace.m_pEnt->Classify() == CLASS_DISPENSER) ||
-			(trace.m_pEnt->Classify() == CLASS_SENTRYGUN) ||
-			(trace.m_pEnt->Classify() == CLASS_DETPACK))
+		if ( ( trace.m_pEnt->Classify() == CLASS_DISPENSER ) ||
+			( trace.m_pEnt->Classify() == CLASS_SENTRYGUN ) ||
+			( trace.m_pEnt->Classify() == CLASS_DETPACK ) )
 		{
 			// If there's no owner bail out
 			if (!(((CFFBuildableObject*)trace.m_pEnt)->CheckForOwner()))
@@ -1599,12 +1599,13 @@ void CBaseEntity::PhysicsCheckWaterTransition( void )
 
 			if ( !IsEFlagSet( EFL_NO_WATER_VELOCITY_CHANGE ) )
 			{
+			#ifndef FF
 				// BEG: Removed by Mulch - it was deflecting
 				// stuff entering water
-				/*Vector vecAbsVelocity = GetAbsVelocity();
+				Vector vecAbsVelocity = GetAbsVelocity();
 				vecAbsVelocity[2] *= 0.5;
-				SetAbsVelocity( vecAbsVelocity );*/
-				// END: Mulch
+				SetAbsVelocity( vecAbsVelocity );
+			#endif // END: Mulch
 			}
 		}
 	}
@@ -1698,13 +1699,16 @@ void CBaseEntity::PhysicsToss( void )
 	{	
 		// entity is trapped in another solid
 		// UNDONE: does this entity needs to be removed?
-		// Jiggles: Added this conditional to "fix" the "pipes don't always explode when they hit a player" bug
-		if (Classify() != CLASS_GLGRENADE)
+#ifdef FF // Jiggles: Added this conditional to "fix" the "pipes don't always explode when they hit a player" bug
+		if ( Classify() != CLASS_GLGRENADE )
 		{
+#endif
 			SetAbsVelocity(vec3_origin);
 			SetLocalAngularVelocity(vec3_angle);
 			return;
+#ifdef FF
 		}
+#endif
 	}
 	
 #if !defined( CLIENT_DLL )

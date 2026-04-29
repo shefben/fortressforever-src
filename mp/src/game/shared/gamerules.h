@@ -174,13 +174,13 @@ public:
 	virtual const unsigned char *GetEncryptionKey() { return NULL; }
 
 	// --> Mirv: Clientside rules
-
+#ifdef FF
 	// These aren't pure virtual functions so that they don't 
 	// break all the other derived gamerule classes
 	virtual int		PlayerRelationship( CBaseEntity *pPlayer, CBaseEntity *pTarget) { AssertMsg(0, "This should not be called!"); return 0; }
 	virtual bool	FCanTakeDamage( CBaseEntity *pVictim, CBaseEntity *pAttacker) { AssertMsg(0, "This should not be called!"); return TRUE; }
 	// <-- Mirv
-
+#endif
 	virtual bool InRoundRestart( void ) { return false; }
 
 	//Allow thirdperson camera.
@@ -211,7 +211,7 @@ public:
 
 	virtual void ModifySentChat( char *pBuf, int iBufSize ) { return; }
 
-	virtual bool ShouldWarnOfAbandonOnQuit() { return false; }
+	virtual bool ShouldConfirmOnDisconnect() { return false; }
 	
 #else
 
