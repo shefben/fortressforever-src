@@ -27,12 +27,13 @@ public:
 	void SetMode(int iMode);
 	void SetChaseCamParams( float flOffset, float flDistance, float flTheta, float flPhi  );
 	void SpecNextPlayer( bool bInverse );
-	void SpecNamedPlayer( const char *szPlayerName );
+	// See UTIL_PlayerByCommandArg for what all might go in here.
+	void SpecPlayerByPredicate( const char *szPlayerSearch );
 	void ToggleChaseAsFirstPerson();
 	bool IsPVSLocked();
 	void SetAutoDirector( bool bActive );
 #ifdef FF
-	bool IsValidObserverTarget(int nEntity);
+	bool IsValidObserverTarget( int nEntity );
 #endif
 	int  GetMode();	// returns current camera mode
 	C_BaseEntity *GetPrimaryTarget();  // return primary target

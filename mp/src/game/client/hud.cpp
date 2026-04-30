@@ -26,13 +26,13 @@
 #include <vgui_controls/AnimationController.h>
 #include <vgui/ISurface.h>
 #include "hud_lcd.h"
-
+#ifdef FF
 #include "materialsystem/imaterialsystemhardwareconfig.h"
 // --> FF
 #include "c_ff_player.h"
 #include "ff_utils.h"
 // <-- FF
-
+#endif
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -161,12 +161,11 @@ void FreeHudTextureList( CUtlDict< CHudTexture *, int >& list )
 	}
 	list.RemoveAll();
 }
-
-// --> Mirv:
+#ifdef FF // --> Mirv:
 //-----------------------------------------------------------------------------
 // Purpose: Added this helper function in too
 //-----------------------------------------------------------------------------
-CHudTexture* FindHudTextureInDict(CUtlDict< CHudTexture *, int >& list, const char *psz)
+CHudTexture *FindHudTextureInDict(CUtlDict< CHudTexture *, int >& list, const char *psz )
 {
 	int idx = list.Find( psz );
 	if ( idx == list.InvalidIndex() )
@@ -174,7 +173,7 @@ CHudTexture* FindHudTextureInDict(CUtlDict< CHudTexture *, int >& list, const ch
 
 	return list[idx];
 }
-// <-- Mirv
+#endif	// <-- Mirv
 
 // Globally-used fonts
 vgui::HFont g_hFontTrebuchet24 = vgui::INVALID_FONT;
@@ -408,9 +407,9 @@ CHud::CHud()
 
 	m_flScreenShotTime = -1;
 }
-
-ConVar cl_reduced_quality_dx8("cl_reduced_quality_dx8", "1", FCVAR_ARCHIVE);
-
+#ifdef FF
+//ConVar cl_reduced_quality_dx8("cl_reduced_quality_dx8", "1", FCVAR_ARCHIVE);
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: This is called every time the DLL is loaded
 //-----------------------------------------------------------------------------
@@ -485,10 +484,9 @@ void CHud::Init( void )
 	// check to see if we have sprites for this res; if not, step down
 	LoadHudTextures( textureList, "scripts/hud_textures", NULL );
 	LoadHudTextures( textureList, "scripts/mod_textures", NULL );
-
-	// load FF HUD textures
-	LoadHudTextures( textureList, "scripts/ff_hud_textures", NULL );	// |-- Mirv: Renamed
-
+#ifdef FF // load FF HUD textures
+	LoadHudTextures( textureList, "scripts/ff_hud_textures", NULL ); // |-- Mirv: Renamed
+#endif
 	int c = textureList.Count();
 	for ( int index = 0; index < c; index++ )
 	{
@@ -839,10 +837,9 @@ void CHud::RefreshHudTextures()
 	// check to see if we have sprites for this res; if not, step down
 	LoadHudTextures( textureList, "scripts/hud_textures", NULL );
 	LoadHudTextures( textureList, "scripts/mod_textures", NULL );
-
-	// load FF HUD textures
-	LoadHudTextures( textureList, "scripts/ff_hud_textures", NULL );	// |-- Mirv: Renamed
-
+#ifdef FF	// load FF HUD textures
+	LoadHudTextures( textureList, "scripts/ff_hud_textures", NULL ); // |-- Mirv: Renamed
+#endif
 	// fix up all the texture icons first
 	int c = textureList.Count();
 	for ( int index = 0; index < c; index++ )
@@ -916,20 +913,20 @@ void CHud::VidInit( void )
 	{
 		m_HudList[i]->VidInit();
 	}
-
+#ifdef FF
 	// If they are running dx8 and are using reduced quality, then set the material stuff here
 /* AfterShock: commented this because it's causing crashes on create server <dx9, guess this stuff needs to be set in configs rather than ingame
-	if (cl_reduced_quality_dx8.GetBool() && g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 90)
+	if ( cl_reduced_quality_dx8.GetBool() && g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 90 )
 	{
-		engine->ClientCmd("mat_bumpmap 0");
-		engine->ClientCmd("mat_fastnobump 1");
-		engine->ClientCmd("mat_specular 0");
+		engine->ClientCmd( "mat_bumpmap 0" );
+		engine->ClientCmd( "mat_fastnobump 1" );
+		engine->ClientCmd( "mat_specular 0" );
 	}
 */
 // Clear any explosion reductions
 	extern void ClearExplosions();
 	ClearExplosions();
-
+#endif
 	ResetHUD();
 }
 
@@ -1009,13 +1006,13 @@ bool CHud::IsHidden( int iHudFlags )
 	// Everything hidden?
 	if ( iHideHud & HIDEHUD_ALL )
 		return true;
-
+#ifdef FF
 	// --> FF
 	if ( ( iHudFlags & HIDEHUD_SPECTATING ) && ( pPlayer->IsObserver() ) )
 		return true;
 
-	C_BasePlayer* pLocalPlayer = pPlayer;
-	C_FFPlayer* pFFPlayer = ToFFPlayer( pPlayer );
+	C_BasePlayer *pLocalPlayer = pPlayer;
+	C_FFPlayer *pFFPlayer = ToFFPlayer( pPlayer );
 
 	if ( ( iHudFlags & HIDEHUD_UNASSIGNED ) && ( ( !FF_HasPlayerPickedClass( pFFPlayer ) && !FF_IsPlayerSpec( pFFPlayer ) ) || pPlayer->GetTeamNumber() <= TEAM_UNASSIGNED ) )
 		return true;
@@ -1029,10 +1026,13 @@ bool CHud::IsHidden( int iHudFlags )
 
 	// if we're an observer, we shouldn't count as dead unless our target is
 	bool canBeDead = !pLocalPlayer->IsObserver() || pPlayer != pLocalPlayer;
-	// <-- FF
+#endif	// <-- FF
 
-	// Local player dead?
+#ifndef FF	// Local player dead?
+	if ( ( iHudFlags & HIDEHUD_PLAYERDEAD ) && ( pPlayer->GetHealth() <= 0 && !pPlayer->IsAlive() ) )
+#else
 	if ( ( iHudFlags & HIDEHUD_PLAYERDEAD ) && ( pPlayer->GetHealth() <= 0 &&/* !pPlayer->IsAlive()*/ canBeDead ) )
+#endif
 		return true;
 
 	// Need the HEV suit ( HL2 )

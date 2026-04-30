@@ -1372,19 +1372,21 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 	//
 	// Dlight
 	//
-
-	// dlight scale
+#ifdef FF // dlight scale
 	float flDLightScale = cl_ffdlight_explosion.GetFloat();
-
-	dlight_t* dl = NULL;
-	if (flDLightScale > 0.0f)
-		dl = effects->CL_AllocDlight(0);
+	if ( flDLightScale > 0.0f )
+#endif
+	dlight_t *dl = effects->CL_AllocDlight( 0 );
 
 	if (dl)
 	{
 		dl->origin = offset;
 		dl->color.r = dl->color.g = dl->color.b = 64;
+#ifndef FF
+		dl->radius = random->RandomFloat(128, 256);
+#else
 		dl->radius = random->RandomFloat(112, 144) * flDLightScale;
+#endif
 		dl->die = gpGlobals->curtime + 0.1;
 	}
 

@@ -38,6 +38,7 @@
 
 ConVar crosshair( "crosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
 ConVar cl_observercrosshair( "cl_observercrosshair", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+#ifdef FF
 ConVar cl_acchargebar( "cl_acchargebar", "0", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
 ConVar cl_pyro_fuelbar( "cl_pyro_fuelbar", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
 
@@ -49,7 +50,7 @@ ConVar cl_concaim_showtrueaim( "cl_concaim_showtrueaim", "0", FCVAR_CLIENTDLL | 
 #define FFDEV_CONCAIM cl_concaim.GetInt()
 #define FFDEV_CONCAIM_FADETIME cl_concaim_fadetime.GetFloat()
 #define FFDEV_CONCAIM_SHOWTRUEAIM cl_concaim_showtrueaim.GetBool()
-
+#endif
 using namespace vgui;
 
 int ScreenTransform( const Vector& point, Vector& screen );
@@ -71,8 +72,11 @@ CHudCrosshair::CHudCrosshair( const char *pElementName ) :
 	m_clrCrosshair = Color( 0, 0, 0, 0 );
 
 	m_vecCrossHairOffsetAngle.Init();
-
+#ifndef FF
+	SetHiddenBits( HIDEHUD_PLAYERDEAD | HIDEHUD_CROSSHAIR );
+#else
 	SetHiddenBits( /*HIDEHUD_PLAYERDEAD | */HIDEHUD_CROSSHAIR );
+#endif
 }
 
 CHudCrosshair::~CHudCrosshair()
@@ -85,18 +89,16 @@ void CHudCrosshair::ApplySchemeSettings( IScheme *scheme )
 
 	m_pDefaultCrosshair = gHUD.GetIcon("crosshair_default");
 	SetPaintBackgroundEnabled( false );
+#ifdef FF // --> Mirv
+	vgui::HScheme CrossHairScheme = vgui::scheme()->LoadSchemeFromFile( "resource/CrosshairScheme.res", "CrosshairScheme" );
 
-	// --> Mirv
-	vgui::HScheme CrossHairScheme = vgui::scheme()->LoadSchemeFromFile("resource/CrosshairScheme.res", "CrosshairScheme");
-
-	for (int i = 0; i < CROSSHAIR_SIZES; i++)
+	for ( int i = 0; i < CROSSHAIR_SIZES; i++ )
 	{
-		m_hPrimaryCrosshairs[i] = vgui::scheme()->GetIScheme(CrossHairScheme)->GetFont(VarArgs("PrimaryCrosshairs%d", (i + 1)));
-		m_hSecondaryCrosshairs[i] = vgui::scheme()->GetIScheme(CrossHairScheme)->GetFont(VarArgs("SecondaryCrosshairs%d", (i + 1)));
+		m_hPrimaryCrosshairs[i] = vgui::scheme()->GetIScheme(CrossHairScheme)->GetFont( VarArgs( "PrimaryCrosshairs%d", (i + 1) ) );
+		m_hSecondaryCrosshairs[i] = vgui::scheme()->GetIScheme(CrossHairScheme)->GetFont( VarArgs( "SecondaryCrosshairs%d", (i + 1) ) );
 	}
-	// <-- Mirv
-
-	SetSize( ScreenWidth(), ScreenHeight() );
+#endif	// <-- Mirv
+    SetSize( ScreenWidth(), ScreenHeight() );
 
 	SetForceStereoRenderToFrameBuffer( true );
 }
@@ -160,8 +162,9 @@ bool CHudCrosshair::ShouldDraw( void )
 
 	return ( bNeedsDraw && CHudElement::ShouldDraw() );
 }
-
+#ifdef FF
 extern void GetCrosshair( FFWeaponID iWeapon, char& innerChar, Color& innerCol, int& innerSize, char& outerChar, Color& outerCol, int& outerSize ); // |-- Mirv
+#endif
 #ifdef TF_CLIENT_DLL
 extern ConVar cl_crosshair_red;
 extern ConVar cl_crosshair_green;
@@ -266,16 +269,57 @@ void CHudCrosshair::Paint( void )
 
 	if ( !IsCurrentViewAccessAllowed() )
 		return;
-
+#ifndef FF
+	C_BasePlayer* pPlayer = C_BasePlayer::GetLocalPlayer();
+	if ( !pPlayer )
+#else
 	C_FFPlayer* pActivePlayer = C_FFPlayer::GetLocalFFPlayerOrObserverTarget();
-
 	if ( !pActivePlayer )
+#endif
 		return;
-
+#ifdef FF
 	m_curViewAngles = CurrentViewAngles();
 	m_curViewOrigin = CurrentViewOrigin();
+#endif
 
 	float x, y;
+#ifndef FF
+	bool bBehindCamera;
+	GetDrawPosition ( &x, &y, &bBehindCamera, m_vecCrossHairOffsetAngle );
+
+	if( bBehindCamera )
+		return;
+
+	float flWeaponScale = 1.f;
+	int iTextureW = m_pCrosshair->Width();
+	int iTextureH = m_pCrosshair->Height();
+	C_BaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
+	if ( pWeapon )
+	{
+		pWeapon->GetWeaponCrosshairScale( flWeaponScale );
+	}
+
+	float flPlayerScale = 1.0f;
+#ifdef TF_CLIENT_DLL
+	Color clr( cl_crosshair_red.GetInt(), cl_crosshair_green.GetInt(), cl_crosshair_blue.GetInt(), 255 );
+	flPlayerScale = cl_crosshair_scale.GetFloat() / 32.0f;  // the player can change the scale in the options/multiplayer tab
+#else
+	Color clr = m_clrCrosshair;
+#endif
+	float flWidth = flWeaponScale * flPlayerScale * (float)iTextureW;
+	float flHeight = flWeaponScale * flPlayerScale * (float)iTextureH;
+	int iWidth = (int)( flWidth + 0.5f );
+	int iHeight = (int)( flHeight + 0.5f );
+	int iX = (int)( x + 0.5f );
+	int iY = (int)( y + 0.5f );
+
+	m_pCrosshair->DrawSelfCropped (
+		iX-(iWidth/2), iY-(iHeight/2),
+		0, 0,
+		iTextureW, iTextureH,
+		iWidth, iHeight,
+		clr );
+#else
 	x = ScreenWidth() / 2;
 	y = ScreenHeight() / 2;
 
@@ -284,7 +328,7 @@ void CHudCrosshair::Paint( void )
 	// MattB - m_vecCrossHairOffsetAngle is the autoaim angle.
 	// if we're not using autoaim, just draw in the middle of the 
 	// screen
-	if (m_vecCrossHairOffsetAngle != vec3_angle)
+	if ( m_vecCrossHairOffsetAngle != vec3_angle )
 	{
 		Assert(0);	// |-- Mirv
 		QAngle angles;
@@ -364,10 +408,10 @@ void CHudCrosshair::Paint( void )
 	//		y - 0.5f * m_pCrosshair->Height(),
 	//		m_clrCrosshair );
 
-	C_FFWeaponBase* pWeapon = pActivePlayer->GetActiveFFWeapon();
+	C_FFWeaponBase *pWeapon = pActivePlayer->GetActiveFFWeapon();
 
 	// No crosshair for no weapon
-	if (!pWeapon)
+	if ( !pWeapon )
 		return;
 
 	FFWeaponID weaponID = pWeapon->GetWeaponID();
@@ -386,7 +430,7 @@ void CHudCrosshair::Paint( void )
 	//
 
 	HFont currentFont;
-	GetCrosshair(weaponID, innerChar, innerCol, innerSize, outerChar, outerCol, outerSize);
+	GetCrosshair( weaponID, innerChar, innerCol, innerSize, outerChar, outerCol, outerSize );
 
 	// concaim 1 = flash xhair when shooting
 	if ((FFDEV_CONCAIM == 1) && ((pActivePlayer->m_flConcTime > gpGlobals->curtime) || (pActivePlayer->m_flConcTime < 0)))
@@ -437,7 +481,7 @@ void CHudCrosshair::Paint( void )
 	// <-- Mirv
 
 	// Draw pyro fuel
-	if (cl_pyro_fuelbar.GetBool() && pActivePlayer->GetClassSlot() == CLASS_PYRO && pActivePlayer->m_bCanUseJetpack)
+	if ( cl_pyro_fuelbar.GetBool() && pActivePlayer->GetClassSlot() == CLASS_PYRO && pActivePlayer->m_bCanUseJetpack )
 	{
 		float fuelPercent = pActivePlayer->m_iJetpackFuel / 200.0f;
 
@@ -465,7 +509,7 @@ void CHudCrosshair::Paint( void )
 	}
 
 	// Mulch: Draw charge bar!
-	if ((weaponID == FF_WEAPON_ASSAULTCANNON) && (cl_acchargebar.GetBool()))
+	if ( ( weaponID == FF_WEAPON_ASSAULTCANNON ) && ( cl_acchargebar.GetBool() ) )
 	{
 		CFFWeaponAssaultCannon *pAC = (CFFWeaponAssaultCannon *) pWeapon;
 
@@ -486,7 +530,7 @@ void CHudCrosshair::Paint( void )
 		surface()->DrawSetColor(outerCol.r(), outerCol.g(), outerCol.b(), 200);
 		surface()->DrawOutlinedRect(iLeft, iTop, iRight, iBottom);
 	}
-	else if (weaponID == FF_WEAPON_SNIPERRIFLE)
+	else if ( weaponID == FF_WEAPON_SNIPERRIFLE )
 	{
 		CFFWeaponSniperRifle *pSniperRifle = (CFFWeaponSniperRifle *)pWeapon;
 
@@ -510,14 +554,14 @@ void CHudCrosshair::Paint( void )
 		surface()->DrawSetColor(outerCol.r(), outerCol.g(), outerCol.b(), 200);
 		surface()->DrawOutlinedRect(iLeft, iTop, iRight, iBottom);
 	}
-	else if (weaponID == FF_WEAPON_JUMPGUN)
+	else if ( weaponID == FF_WEAPON_JUMPGUN )
 	{
 		CFFWeaponJumpgun *pJump = (CFFWeaponJumpgun *) pWeapon;
 
 		float flCharge = pJump->GetClampedCharge() / JUMPGUN_CHARGEUPTIME;
 		flCharge = clamp(flCharge, 0.01f, 1.0f);
 
-		if (flCharge <= 0.0f)
+		if ( flCharge <= 0.0f )
 			return;
 
 		x = ScreenWidth() / 2;
@@ -528,9 +572,9 @@ void CHudCrosshair::Paint( void )
 		int iRight = iLeft + (charOffsetX * 2);
 		int iBottom = iTop + 10;
 
-		if (flCharge == 1.0f)
+		if ( flCharge == 1.0f )
 		{
-			surface()->DrawSetColor(128, 255, 64, 150);
+			surface()->DrawSetColor( 128, 255, 64, 150 );
 		}
 		else
 		{
@@ -541,6 +585,7 @@ void CHudCrosshair::Paint( void )
 		surface()->DrawSetColor(outerCol.r(), outerCol.g(), outerCol.b(), 200);
 		surface()->DrawOutlinedRect(iLeft, iTop, iRight, iBottom);
 	}
+#endif
 }
 
 //-----------------------------------------------------------------------------

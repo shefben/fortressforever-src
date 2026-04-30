@@ -51,11 +51,9 @@
 #include "replay/ienginereplay.h"
 #endif
 
-// Bug #0000385: point_camera & func_monitor in-titties
-// Allways USE_MONITORS
-//#if defined( HL2_CLIENT_DLL ) || defined( CSTRIKE_DLL )
+#if defined( HL2_CLIENT_DLL ) || defined( CSTRIKE_DLL ) || defined( TF_CLIENT_DLL ) || defined( FF_CLIENT_DLL )
 #define USE_MONITORS
-//#endif
+#endif
 
 #ifdef PORTAL
 #include "c_prop_portal.h" //portal surface rendering functions
@@ -112,7 +110,7 @@ static ConVar v_centerspeed( "v_centerspeed","500" );
 // and motions look the most natural.
 ConVar v_viewmodel_fov( "viewmodel_fov", "54", FCVAR_ARCHIVE, "Sets the field-of-view for the viewmodel.", true, 0.1, true, 179.9, true, 54, true, 70, NULL );
 #else
-ConVar v_viewmodel_fov("viewmodel_fov", "74", FCVAR_ARCHIVE, "Sets the field-of-view for the viewmodel.", true, 0.1, true, 179.9);
+ConVar v_viewmodel_fov( "viewmodel_fov", "74", FCVAR_ARCHIVE, "Sets the field-of-view for the viewmodel.", true, 0.1, true, 179.9 );
 #endif
 ConVar mat_viewportscale( "mat_viewportscale", "1.0", FCVAR_ARCHIVE, "Scale down the main viewport (to reduce GPU impact on CPU profiling)", true, (1.0f / 640.0f), true, 1.0f );
 ConVar mat_viewportupscale( "mat_viewportupscale", "1", FCVAR_ARCHIVE, "Scale the viewport back up" );
@@ -736,14 +734,12 @@ void CViewRender::SetUpViews()
 #else
 	view.fovViewmodel = g_pClientMode->GetViewModelFOV() - flFOVOffset;
 #endif
-#ifdef FF
-	// --> Mirv: Make sure this doesn't go negative
-	if (m_View.fovViewmodel < 10.0f)
+#ifdef FF // --> Mirv: Make sure this doesn't go negative
+	if ( m_View.fovViewmodel < 10.0f )
 	{
 		m_View.fovViewmodel = 10.0f;
 	}
-	// <-- Mirv
-#endif
+#endif	// <-- Mirv
 	if ( UseVR() )
 	{
 		// Let the headtracking read the status of the HMD, etc.

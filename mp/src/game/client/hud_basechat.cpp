@@ -7,7 +7,11 @@
 
 #include "cbase.h"
 #include "hud_basechat.h"
-
+#ifdef FF
+#include "valve_minmax_off.h"
+#include <string>
+#include "valve_minmax_on.h"
+#endif
 #include <vgui/IScheme.h>
 #include <vgui/IVGui.h>
 #include "iclientmode.h"
@@ -1232,9 +1236,8 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 	m_pChatInput->RequestFocus();
 	m_pChatInput->SetPaintBorderEnabled( true );
 	m_pChatInput->SetMouseInputEnabled( true );
-#ifdef FF
-	// Mirv: Remove the scoreboard if it is showing
-	gViewPortInterface->ShowPanel(PANEL_SCOREBOARD, false);
+#ifdef FF	// Mirv: Remove the scoreboard if it is showing
+	gViewPortInterface->ShowPanel( PANEL_SCOREBOARD, false );
 #endif
 	//Place the mouse cursor near the text so people notice it.
 	int x, y, w, h;
@@ -1373,13 +1376,21 @@ Color CBaseHudChat::GetTextColorForClient( TextColor colorNum, int clientIndex )
 			}
 			else
 			{
+			#ifndef FF
+				c = GetDefaultTextColor();
+			#else
 				c = GetDefaultChatColor();
+			#endif
 			}
 		}
 		break;
 
 	default:
+	#ifndef FF
+		c = GetDefaultTextColor();
+	#else
 		c = GetDefaultChatColor();
+	#endif
 	}
 
 	return Color( c[0], c[1], c[2], 255 );
@@ -1435,7 +1446,11 @@ void CBaseHudChatLine::InsertAndColorizeText( wchar_t *buf, int clientIndex )
 	wchar_t *txt = m_text;
 	int lineLen = wcslen( m_text );
 	Color colCustom;
+#ifndef FF
+	if ( m_text[0] == COLOR_PLAYERNAME || m_text[0] == COLOR_LOCATION || m_text[0] == COLOR_NORMAL || m_text[0] == COLOR_ACHIEVEMENT || m_text[0] == COLOR_CUSTOM || m_text[0] == COLOR_HEXCODE || m_text[0] == COLOR_HEXCODE_ALPHA )
+#else
 	if ( m_text[0] <= COLOR_MAX && m_text[0] != COLOR_USEOLDCOLORS )
+#endif
 	{
 		while ( txt && *txt )
 		{
@@ -1509,35 +1524,35 @@ void CBaseHudChatLine::InsertAndColorizeText( wchar_t *buf, int clientIndex )
 				{
 					Color col;
 
-					ConVarRef cl_chat_colorize("cl_chat_colorize");
+					ConVarRef cl_chat_colorize( "cl_chat_colorize" );
 					
 					if ( cl_chat_colorize.IsValid() && !cl_chat_colorize.GetBool() )
 						col = GetDefaultChatColor();
 
-					if (col == Color())
+					if ( col == Color() )
 					{
 						switch ( txt[0] )
 						{
 						case '0': // orange
 							col = Color( 226, 118, 10, 255 ); break;
 						case '1': // blue
-							col = Color(60, 60, 255, 255); break;
+							col = Color( 60, 60, 255, 255 ); break;
 						case '2': // red
-							col = Color(255, 60, 60, 255); break;
+							col = Color( 255, 60, 60, 255 ); break;
 						case '3': // yellow
-							col = Color(248, 248, 0, 255); break;
+							col = Color( 248, 248, 0, 255 ); break;
 						case '4': // green
-							col = Color(40, 245, 40, 255); break;
+							col = Color( 40, 245, 40, 255 ); break;
 						case '5': // white
-							col = Color(255, 255, 255, 255); break;
+							col = Color( 255, 255, 255, 255 ); break;
 						case '6': // black
-							col = Color(20, 20, 20, 255); break;
+							col = Color( 20, 20, 20, 255 ); break;
 						case '7': // grey
-							col = Color(188, 188, 188, 255); break;
+							col = Color( 188, 188, 188, 255 ); break;
 						case '8': // magenta
-							col = Color(139, 45, 139, 255); break;
+							col = Color( 139, 45, 139, 255 ); break;
 						case '9': // cyan
-							col = Color(0, 255, 255, 255); break;
+							col = Color( 0, 255, 255, 255 ); break;
 
 						default:
 							col = GetDefaultChatColor();
@@ -1674,9 +1689,9 @@ void CBaseHudChatLine::Colorize( int alpha )
 
 		}
 	}
-	
+#ifdef FF
 	Msg("\n");
-
+#endif
 	InvalidateLayout( true );
 }
 
@@ -1723,8 +1738,8 @@ This is a very long string that I am going to attempt to paste into the cs hud c
 		{
 			GameRules()->ModifySentChat( ansi, ARRAYSIZE(ansi) );
 		}
-
-		char* txt = ansi;
+#ifdef FF
+		char *txt = ansi;
 		while ( *txt != '\0' )
 		{
 			if (*txt == '"')
@@ -1732,30 +1747,40 @@ This is a very long string that I am going to attempt to paste into the cs hud c
 
 			txt++;
 		}
-
+#endif
 		char szbuf[144];	// more than 128
+#ifndef FF
+		const char* pszCmd = NULL;
+		switch( m_nMessageMode )
+		{
+			case MM_SAY: pszCmd = "say"; break;
+			case MM_SAY_TEAM: pszCmd = "say_team"; break;
+			case MM_SAY_PARTY: pszCmd = "say_party"; break;
+		}
+		Q_snprintf( szbuf, sizeof(szbuf), "%s \"%s\"", pszCmd, ansi );
+#else
 		Q_snprintf( szbuf, sizeof(szbuf), "%s \"%s\"", m_nMessageMode == MM_SAY ? "say" : "say_team", ansi );
 
-		C_FFPlayer* pPlayer = ToFFPlayer( C_BasePlayer::GetLocalPlayer() );
-		if (pPlayer)
+		C_FFPlayer *pPlayer = ToFFPlayer( C_BasePlayer::GetLocalPlayer() );
+		if ( pPlayer )
 		{
 			std::string strcmd = szbuf;
 			while (true)
 			{
-				size_t tok = strcmd.find("%i");
+				size_t tok = strcmd.find( "%i" );
 				if (tok == strcmd.npos)
 					break;
 
 				strcmd.erase(tok, 2); // erase the token
-				if (pPlayer && pPlayer->m_hCrosshairInfo.m_szNameLastSeen[0])
+				if ( pPlayer && pPlayer->m_hCrosshairInfo.m_szNameLastSeen[0] )
 				{
-					strcmd.insert(tok, pPlayer->m_hCrosshairInfo.m_szNameLastSeen);
+					strcmd.insert( tok, pPlayer->m_hCrosshairInfo.m_szNameLastSeen );
 				}
 
-				V_sprintf_safe(szbuf, "%s", strcmd.c_str());
+				V_sprintf_safe( szbuf, "%s", strcmd.c_str() );
 			}
 		}
-		Q_snprintf( szbuf, sizeof(szbuf), "%s \"%s\"", pszCmd, ansi );
+#endif
 
 		engine->ClientCmd_Unrestricted(szbuf);
 	}
@@ -1950,16 +1975,16 @@ void CBaseHudChat::ChatPrintf( int iPlayerIndex, int iFilter, const char *fmt, .
 
 			if ( nameInString )
 			{
-				// Go ahead and play the correct "chat beep" sound.
+#ifdef FF		// Go ahead and play the correct "chat beep" sound.
 				// These strings will be the same length if the "(TEAM)" prefix is missing
 				std::string szMsg = pmsg;
 
 				CLocalPlayerFilter filter;
 				if ( szMsg.find( "\x1(TEAM)" ) == 0 )
-					C_BaseEntity::EmitSound(filter, -1, "HudChat.TeamMessage");
+					C_BaseEntity::EmitSound( filter, -1, "HudChat.TeamMessage" );
 				else
-					C_BaseEntity::EmitSound(filter, -1, "HudChat.Message");
-
+					C_BaseEntity::EmitSound( filter, -1, "HudChat.Message" );
+#endif
 				iNameStart = (nameInString - wbuf);
 				iNameLength = wcslen( wideName );
 			}
@@ -1993,7 +2018,7 @@ void CBaseHudChat::FireGameEvent( IGameEvent *event )
 	}
 #endif
 }
-
+#ifdef FF
 void CBaseHudChat::StartInputMessage( const char *_msg )
 {
 	if ( m_pChatInput )
@@ -2008,3 +2033,4 @@ void CBaseHudChat::StartInputMessage( const char *_msg )
 		}
 	}
 }
+#endif

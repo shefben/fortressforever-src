@@ -24,8 +24,9 @@
 
 ConVar hud_drawhistory_time( "hud_drawhistory_time", HISTORY_DRAW_TIME, FCVAR_ARCHIVE );
 ConVar hud_fastswitch( "hud_fastswitch", "1", FCVAR_ARCHIVE, "0 = none | 1 = keyboard & mouse | 2 = keyboard only (old HL/TFC style)" );
+#ifdef FF
 ConVar hud_weaponselect( "hud_weaponselect", "1", FCVAR_ARCHIVE, "Briefly shows the weapon select menu whenever switching weapons when hud_fastswitch is enabled" );
-
+#endif
 //-----------------------------------------------------------------------------
 // Purpose: Weapon Selection commands
 //-----------------------------------------------------------------------------
@@ -123,7 +124,7 @@ void CBaseHudWeaponSelection::UpdateSelectionTime( void )
 	m_flSelectionTime = gpGlobals->curtime;
 }
 #ifdef FF
-void CBaseHudWeaponSelection::QuicklyFadeOut(void)
+void CBaseHudWeaponSelection::QuicklyFadeOut( void )
 {
 	ShowSelection();
 	m_flSelectionTime = gpGlobals->curtime - 4.0f;
@@ -183,24 +184,26 @@ void CBaseHudWeaponSelection::ProcessInput()
 	// Check to see if the player is in VGUI mode...
 	if ( pPlayer->IsInVGuiInputMode() && !pPlayer->IsInViewModelVGuiInputMode() )
 	{
-		// If so, close weapon selection when they press fire
-		//if ( gHUD.m_iKeyBits & IN_ATTACK )
-		//{
-		//	if ( HUDTYPE_PLUS != hud_fastswitch.GetInt() )
-		//	{
-		//		// Swallow the button
-		//		gHUD.m_iKeyBits &= ~IN_ATTACK;
-		//		input->ClearInputButton( IN_ATTACK );
-		//	}
+#ifndef FF // If so, close weapon selection when they press fire
+		if ( gHUD.m_iKeyBits & IN_ATTACK )
+		{
+			if ( HUDTYPE_PLUS != nFastswitchMode )
+			{
+				// Swallow the button
+				gHUD.m_iKeyBits &= ~IN_ATTACK;
+				input->ClearInputButton( IN_ATTACK );
+			}
 
-		//	engine->ClientCmd( "cancelselect\n" );
-		//}
-
+			engine->ClientCmd( "cancelselect\n" );
+		}
+#else
 		// Swallow the button
 		gHUD.m_iKeyBits &= ~IN_ATTACK;
 		input->ClearInputButton( IN_ATTACK );
 
 		engine->ClientCmd( "cancelselect\n" );
+
+#endif
 		return;
 	}
 
@@ -488,25 +491,28 @@ void CBaseHudWeaponSelection::UserCmd_NextWeapon(void)
 	if ( !BaseClass::ShouldDraw() )
 		return;
 
-	// --> Mirv: Not while dead
-	C_BasePlayer* player = C_BasePlayer::GetLocalPlayer();
+	int nFastswitchMode = hud_fastswitch.GetInt();
+	if ( ::input->IsSteamControllerActive() )
+	{
+		nFastswitchMode = HUDTYPE_FASTSWITCH;
+	}
+#ifdef FF // --> Mirv: Not while dead
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 
 	if ( !player || !player->IsAlive() || player->GetTeamNumber() < TEAM_BLUE )
 		return;
-	// <-- Mirv: Not while dead
+#endif	// <-- Mirv: Not while dead
 
 	CycleToNextWeapon();
-	
-// --> Mirv: hud_fastswitch 1 will automatically change on prev/next
-	if ( hud_fastswitch.GetInt() == 1 )
+	if( nFastswitchMode > 0 )
 	{
 		SelectWeapon();
-
+#ifdef FF
 		if ( hud_weaponselect.GetBool() )
 			QuicklyFadeOut();
+#endif
 	}
-	else
-// <-- Mirv
+
 	UpdateSelectionTime();
 }
 
@@ -519,16 +525,24 @@ void CBaseHudWeaponSelection::UserCmd_PrevWeapon(void)
 	if ( !BaseClass::ShouldDraw() )
 		return;
 
-	CycleToPrevWeapon();
+	int nFastswitchMode = hud_fastswitch.GetInt();
+	if ( ::input->IsSteamControllerActive() )
+	{
+		nFastswitchMode = HUDTYPE_FASTSWITCH;
+	}
 
-	// --> Mirv: Not while dead
-	C_BasePlayer* player = C_BasePlayer::GetLocalPlayer();
+	CycleToPrevWeapon();
+#ifdef FF // --> Mirv: Not while dead
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 
 	if ( !player || !player->IsAlive() || player->GetTeamNumber() < TEAM_BLUE )
 		return;
-	// <-- Mirv: Not while dead
-
-// --> Mirv: hud_fastswitch 1 will automatically change on prev/next
+#endif	// <-- Mirv: Not while dead
+	if ( nFastswitchMode > 0 )
+	{
+		SelectWeapon();
+	}
+#ifdef FF // --> Mirv: hud_fastswitch 1 will automatically change on prev/next
 	if ( hud_fastswitch.GetInt() == 1 )
 	{
 		SelectWeapon();
@@ -536,8 +550,7 @@ void CBaseHudWeaponSelection::UserCmd_PrevWeapon(void)
 		if ( hud_weaponselect.GetBool() )
 			QuicklyFadeOut();
 	}
-	else
-// <-- Mirv
+#endif	// <-- Mirv
 	UpdateSelectionTime();
 }
 
@@ -567,18 +580,20 @@ void CBaseHudWeaponSelection::SwitchToLastWeapon( void )
 {
 	// Get the player's last weapon
 	C_BasePlayer* player = C_BasePlayer::GetLocalPlayer();
-	//if ( !player )
-	//	return;
-
+#ifndef FF
+	if ( !player )
+		return;
+#else
 	// --> Mirv: Don't select while dead
 	if ( !player || !player->IsAlive() || player->GetTeamNumber() < TEAM_BLUE )
 		return;
 	// <-- Mirv: Don't select while dead
-
+#endif
 	input->MakeWeaponSelection( player->GetLastWeapon() );
-
+#ifdef FF
 	//  Jiggles: The player used the Last Inventory key!  Good for them!
 	g_FFHintTimers.DeleteTimer( "LI" );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -603,13 +618,13 @@ void CBaseHudWeaponSelection::SelectWeapon( void )
 		return;
 	}
 
-	// --> Mirv: Not while dead
-	C_BasePlayer* player = C_BasePlayer::GetLocalPlayer();
-
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+#ifdef FF // --> Mirv: Not while dead
 	if ( !player || !player->IsAlive() || player->GetTeamNumber() < TEAM_BLUE )
+#else
+	if ( !player )
 		return;
-	// <-- Mirv: Not while dead
-
+#endif	// <-- Mirv: Not while dead
 	// Don't allow selections of weapons that can't be selected (out of ammo, etc)
 	if ( !GetSelectedWeapon()->CanBeSelected() )
 	{
@@ -706,8 +721,11 @@ C_BaseCombatWeapon *CBaseHudWeaponSelection::GetNextActivePos( int iSlot, int iS
 		C_BaseCombatWeapon *pWeapon = player->GetWeapon( i );
 		if ( !pWeapon )
 			continue;
-
+#ifndef FF
+		if ( CanBeSelectedInHUD( pWeapon ) && pWeapon->GetSlot() == iSlot )
+#else
 		if ( pWeapon->CanBeSelected()/*CanBeSelectedInHUD( pWeapon )*/ && pWeapon->GetSlot() == iSlot )
+#endif
 		{
 			// If this weapon is lower in the slot than the current lowest, and above our desired position, it's our new winner
 			if ( pWeapon->GetPosition() <= iLowestPosition && pWeapon->GetPosition() >= iSlotPos )

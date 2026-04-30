@@ -18,10 +18,15 @@
 // Purpose: Base class for all the hud elements that are just a numeric display
 //			with some options for text and icons
 //-----------------------------------------------------------------------------
+#ifndef FF
+class CHudNumericDisplay : public vgui::Panel
+{
+	DECLARE_CLASS_SIMPLE( CHudNumericDisplay, vgui::Panel );
+#else
 class CHudNumericDisplay : public vgui::FFPanel
 {
 	DECLARE_CLASS_SIMPLE( CHudNumericDisplay, vgui::FFPanel );
-
+#endif
 public:
 	CHudNumericDisplay(vgui::Panel *parent, const char *name);
 
@@ -32,14 +37,13 @@ public:
 	void SetLabelText(const wchar_t *text);
 	void SetIndent(bool state);
 	void SetIsTime(bool state);
-
-	// So animation controller animations actually adjust the
+#ifdef FF // So animation controller animations actually adjust the
 	// numbers' colors and not the entire panel that encapsulates the numbers
-	virtual void SetFgColor(Color color)
+	virtual void SetFgColor( Color color )
 	{
 		m_NumberColor = color;
 	}
-
+#endif
 	bool ShouldDisplayValue( void ) { return m_bDisplayValue; }
 	bool ShouldDisplaySecondaryValue( void ) { return m_bDisplaySecondaryValue; }
 
@@ -63,12 +67,17 @@ protected:
 	bool m_bIsTime;
 
 	CPanelAnimationVar( float, m_flBlur, "Blur", "0" );
-	//CPanelAnimationVar( Color, m_TextColor, "TextColor", "FgColor" );
+#ifndef FF
+	CPanelAnimationVar( Color, m_TextColor, "TextColor", "FgColor" );
+#else
 	CPanelAnimationVar( Color, m_NumberColor, "NumberColor", "FgColor" );
+#endif
 	CPanelAnimationVar( Color, m_Ammo2Color, "Ammo2Color", "FgColor" );
-
-	//CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers" );
+#ifndef FF
+	CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers" );
+#else
 	CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers2" );
+#endif
 	CPanelAnimationVar( vgui::HFont, m_hNumberGlowFont, "NumberGlowFont", "HudNumbersGlow" );
 	CPanelAnimationVar( vgui::HFont, m_hSmallNumberFont, "SmallNumberFont", "HudNumbersSmall" );
 	CPanelAnimationVar( vgui::HFont, m_hTextFont, "TextFont", "Default" );
@@ -79,14 +88,13 @@ protected:
 	CPanelAnimationVarAliasType( float, digit_ypos, "digit_ypos", "2", "proportional_float" );
 	CPanelAnimationVarAliasType( float, digit2_xpos, "digit2_xpos", "98", "proportional_float" );
 	CPanelAnimationVarAliasType( float, digit2_ypos, "digit2_ypos", "16", "proportional_float" );
-
-	// --> Mirv: Added for icons
+#ifdef FF // --> Mirv: Added for icons
 protected:
 	CPanelAnimationVarAliasType( float, icon_xpos, "icon_xpos", "0", "proportional_float" );
 	CPanelAnimationVarAliasType( float, icon_ypos, "icon_ypos", "0", "proportional_float" );
 	CPanelAnimationVarAliasType( float, icon_width, "icon_width", "1", "proportional_float" );
 	CPanelAnimationVarAliasType( float, icon_height, "icon_height", "1", "proportional_float" );
-	// <-- Mirv: Added for icons
+#endif	// <-- Mirv: Added for icons
 };
 
 

@@ -29,7 +29,7 @@ static CHudTexture *FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, 
 	return list[ idx ];
 }
 #ifdef FF
-CHudTexture* FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, const char *psz );	// |-- Mirv: Now defined in hud.cpp
+CHudTexture *FindHudTextureInDict( CUtlDict< CHudTexture *, int >& list, const char *psz );	// |-- Mirv: Now defined in hud.cpp
 #endif
 //-----------------------------------------------------------------------------
 // Purpose: 

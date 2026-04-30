@@ -151,21 +151,21 @@ void CHudNumericDisplay::PaintNumbers(HFont font, int xpos, int ypos, int value)
 #ifdef FF
 void CHudNumericDisplay::PaintNumbersRightAligned(HFont font, int xpos, int ypos, int value, int maxchars)
 {
-	int charWidth = surface()->GetCharacterWidth(font, '0');
+	int charWidth = surface()->GetCharacterWidth( font, '0' );
 	int iTempxpos = xpos + charWidth * maxchars; // allow for X characters of score
 
 	wchar_t unicode[6];
 	V_snwprintf(unicode, ARRAYSIZE(unicode), L"%d", value);
 
-	surface()->DrawSetTextFont(font);
+	surface()->DrawSetTextFont( font );
 
-	for (wchar_t* wch = unicode; *wch != 0; wch++)
-		iTempxpos -= surface()->GetCharacterWidth(font, *wch);
+	for ( wchar_t *wch = unicode; *wch != 0; wch++ )
+		iTempxpos -= surface()->GetCharacterWidth( font, *wch );
 
 	surface()->DrawSetTextPos(iTempxpos, ypos);
 
-	for (wchar_t* wch = unicode; *wch != 0; wch++)
-		surface()->DrawUnicodeChar(*wch);
+	for (wchar_t *wch = unicode; *wch != 0; wch++ )
+		surface()->DrawUnicodeChar( *wch );
 }
 #endif
 

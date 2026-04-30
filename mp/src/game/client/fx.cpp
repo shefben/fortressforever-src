@@ -258,21 +258,21 @@ void FX_MuzzleEffect(
 	}
 
 #ifdef FF
-	if (muzzleflash_light.GetBool())
+	if ( muzzleflash_light.GetBool() )
 	{
 		// dlight scale
 		float flDLightScale = cl_ffdlight_muzzle.GetFloat();
 
-		dlight_t* dl = NULL;
-		if (flDLightScale > 0.0f)
+		dlight_t *dl = NULL;
+		if ( flDLightScale > 0.0f )
 			// Make a dlight (that's a "D" for dynamic so everything lights up, YAAAAYYYYY!)
 			//dl = effects->CL_AllocDlight( LIGHT_INDEX_MUZZLEFLASH + index );
-			dl = effects->CL_AllocDlight(0); // 0 allows multiple dynamic lights at the same time
+			dl = effects->CL_AllocDlight( 0 ); // 0 allows multiple dynamic lights at the same time
 
 		if (dl) // I'm scared, daddy...of NULL pointers.
 		{
 			dl->origin = origin;
-			dl->radius = random->RandomFloat(56, 72) * flDLightScale; // sorta small radius for muzzle flash
+			dl->radius = random->RandomFloat( 56, 72 ) * flDLightScale; // sorta small radius for muzzle flash
 			dl->die = gpGlobals->curtime + 0.05; // die = current time + life
 			dl->decay = dl->radius / 0.05; // radius / life = good fade
 			dl->color.r = 255;

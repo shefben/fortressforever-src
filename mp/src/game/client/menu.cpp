@@ -136,9 +136,9 @@ bool CHudMenu::ShouldDraw( void )
 	if ( !draw )
 		return false;
 #ifdef FF
-	if (m_flExpireTime > 0 && m_flExpireTime <= gpGlobals->realtime)
+	if ( m_flExpireTime > 0 && m_flExpireTime <= gpGlobals->realtime )
 	{
-		engine->ClientCmd("menuselect 0\n");
+		engine->ClientCmd( "menuselect 0\n" );
 		m_bMenuDisplayed = false;
 		return false;
 	}

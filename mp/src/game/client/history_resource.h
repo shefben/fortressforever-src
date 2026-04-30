@@ -94,8 +94,8 @@ private:
 #ifdef FF
 	CHudTexture* m_pHudAmmoTypes[MAX_AMMO_TYPES];	// |-- Mirv: Generic ammo icons
 	// --> Mirv: Added for icons
-	CPanelAnimationVarAliasType(float, m_iIconHeight, "icon_height", "20", "proportional_float");
-	CPanelAnimationVarAliasType(float, m_iIconWidth, "icon_width", "20", "proportional_float");
+	CPanelAnimationVarAliasType( float, m_iIconHeight, "icon_height", "20", "proportional_float" );
+	CPanelAnimationVarAliasType( float, m_iIconWidth, "icon_width", "20", "proportional_float" );
 #endif // <-- Mirv: Added for icons
 };
 

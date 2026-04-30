@@ -266,7 +266,7 @@ public:
 	// IGameEventListener interface:
 	virtual void FireGameEvent( IGameEvent *event);
 #ifdef FF
-	void StartInputMessage(const char* _msg); // drevil
+	void StartInputMessage( const char *_msg ); // drevil
 #endif
 	CHudChatHistory			*GetChatHistory();
 
@@ -308,7 +308,7 @@ protected:
 	CBaseHudChatInputLine	*m_pChatInput;
 	CBaseHudChatLine		*m_ChatLine;
 #ifdef FF
-	CBaseHudChatLine* m_ChatLines[CHAT_INTERFACE_LINES];
+	CBaseHudChatLine *m_ChatLines[CHAT_INTERFACE_LINES];
 #endif
 	int					m_iFontHeight;
 
@@ -409,7 +409,7 @@ public:
 
 	vgui::Panel		*GetInputPanel( void );
 #ifdef FF
-	CBaseHudChatEntry* GetChatEntryInput() { return m_pInput; }
+	CBaseHudChatEntry *GetChatEntryInput() { return m_pInput; }
 #endif
 	virtual vgui::VPANEL GetCurrentKeyFocus() { return m_pInput->GetVPanel(); } 
 

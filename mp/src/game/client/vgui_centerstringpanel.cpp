@@ -157,7 +157,7 @@ extern ConVar hud_messages;
 void CCenterStringLabel::Print( char *text )
 {
 #ifdef FF
-	if (!cl_drawhud.GetBool() || !hud_messages.GetBool())
+	if ( !cl_drawhud.GetBool() || !hud_messages.GetBool() )
 		return;
 #endif // FF
 	SetText( text );
@@ -171,7 +171,7 @@ void CCenterStringLabel::Print( char *text )
 void CCenterStringLabel::Print( wchar_t *text )
 {
 #ifdef FF
-	if (!cl_drawhud.GetBool() || !hud_messages.GetBool())
+	if ( !cl_drawhud.GetBool() || !hud_messages.GetBool() )
 		return;
 #endif //FF
 	SetText( text );

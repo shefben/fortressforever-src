@@ -1015,7 +1015,7 @@ void CInput::ComputeForwardMove( CUserCmd *cmd )
 		cmd->forwardmove -= cl_backspeed.GetFloat() * KeyState (&in_back);
 	}	
 }
-/ifdef FF
+#ifdef FF
 extern bool Client_IsIntermission();
 extern void ForceScoreboard();
 #endif

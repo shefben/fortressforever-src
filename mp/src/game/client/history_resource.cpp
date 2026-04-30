@@ -68,6 +68,11 @@ void CHudHistoryResource::Init( void )
 
 	Reset();
 }
+#ifdef FF
+// Need these for the texture caching
+void FreeHudTextureList( CUtlDict<CHudTexture*, int>& list );
+CHudTexture *FindHudTextureInDict( CUtlDict<CHudTexture*, int>& list, const char *psz );
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -77,33 +82,31 @@ void CHudHistoryResource::Reset( void )
 	m_PickupHistory.RemoveAll();
 	m_iCurrentHistorySlot = 0;
 	m_bDoNotDraw = true;
-#ifdef FF
-	// --> Mirv: Get icon for each generic ammo type
+#ifdef FF // --> Mirv: Get icon for each generic ammo type
 
 	// Open up our dedicated ammo hud file
 	CUtlDict<CHudTexture*, int> tempList;
 	LoadHudTextures(tempList, "scripts/ff_hud_genericammo", NULL);
 
-	for (int i = 0; i < MAX_AMMO_TYPES; i++)
+	for ( int i = 0; i < MAX_AMMO_TYPES; i++ )
 	{
-		Ammo_t* pAmmo = GetAmmoDef()->GetAmmoOfIndex(i);
+		Ammo_t* pAmmo = GetAmmoDef()->GetAmmoOfIndex( i );
 
-		if (pAmmo && pAmmo->pName)
+		if ( pAmmo && pAmmo->pName )
 		{
-			CHudTexture* p = FindHudTextureInDict(tempList, pAmmo->pName);
+			CHudTexture *p = FindHudTextureInDict( tempList, pAmmo->pName );
 			if (p)
 			{
 				m_pHudAmmoTypes[i] = gHUD.AddUnsearchableHudIconToList(*p);
 			}
 			else
 			{
-				Warning("Could not find entry for %s ammo in ff_hud_genericammo\n", pAmmo->pName);
+				Warning( "Could not find entry for %s ammo in ff_hud_genericammo\n", pAmmo->pName );
 			}
 		}
 	}
-	FreeHudTextureList(tempList);
-	// <-- Mirv: Get icon for each generic ammo type
-#endif
+	FreeHudTextureList( tempList );
+#endif	// <-- Mirv: Get icon for each generic ammo type
 }
 
 //-----------------------------------------------------------------------------
@@ -177,7 +180,7 @@ void CHudHistoryResource::AddToHistory( int iType, int iId, int iCount )
 #ifndef FF
 	AddIconToHistory( iType, iId, NULL, iCount, NULL );
 #else // Get the item's icon
-	CHudTexture* icon = gHUD.GetIcon(FF_GetAmmoName(iId));
+	CHudTexture *icon = gHUD.GetIcon( FF_GetAmmoName( iId ) );
 
 	AddIconToHistory( iType, iId, NULL, iCount, icon );
 #endif
@@ -217,9 +220,8 @@ void CHudHistoryResource::AddIconToHistory( int iType, int iId, C_BaseCombatWeap
 	{
 		g_pClientMode->GetViewportAnimationController()->StartAnimationSequence( "HintMessageLower" ); 
 	}
-
 #ifdef FF // --> Mirv: Also limit to 8 icons
-	if (m_iCurrentHistorySlot == 8)
+	if ( m_iCurrentHistorySlot == 8 )
 	{
 		m_iCurrentHistorySlot = 0;
 	}
@@ -381,13 +383,35 @@ void CHudHistoryResource::Paint( void )
 			{
 			case HISTSLOT_AMMO:
 				{
-				if (!m_PickupHistory[i].icon)
-					itemIcon = gWR.GetAmmoIconFromWeapon(m_PickupHistory[i].iId);
-				else
-					itemIcon = m_PickupHistory[i].icon;
-				iAmount = m_PickupHistory[i].iCount;
-			}
-			break;
+					// Get the weapon we belong to
+#ifndef HL2MP
+					const FileWeaponInfo_t *pWpnInfo = gWR.GetWeaponFromAmmo( m_PickupHistory[i].iId );
+					if ( pWpnInfo && ( pWpnInfo->iMaxClip1 >= 0 || pWpnInfo->iMaxClip2 >= 0 ) )
+					{
+						// The weapon will be the main icon, and the ammo the smaller
+						itemIcon = pWpnInfo->iconSmall;
+						itemAmmoIcon = gWR.GetAmmoIconFromWeapon( m_PickupHistory[i].iId );
+					}
+					else
+#endif // HL2MP
+					{
+						itemIcon = gWR.GetAmmoIconFromWeapon( m_PickupHistory[i].iId );
+						itemAmmoIcon = NULL;
+					}
+
+#ifdef CSTRIKE_DLL
+					// show grenades as the weapon icon
+					if ( pWpnInfo && pWpnInfo->iFlags & ITEM_FLAG_EXHAUSTIBLE )	
+					{
+						itemIcon = pWpnInfo->iconActive;
+						itemAmmoIcon = NULL;
+						bHalfHeight = false;
+					}
+#endif
+
+					iAmount = m_PickupHistory[i].iCount;
+				}
+				break;
 			case HISTSLOT_AMMODENIED:
 				{
 					itemIcon = gWR.GetAmmoIconFromWeapon( m_PickupHistory[i].iId );
@@ -431,7 +455,8 @@ void CHudHistoryResource::Paint( void )
 				break;
 			}
 
-			// --> Mirv: Draw proper icons
+			if ( !itemIcon )
+				continue;
 
 			if ( clr[3] )
 			{
@@ -439,34 +464,23 @@ void CHudHistoryResource::Paint( void )
 				m_bNeedsDraw = true;
 			}
 
-			// We don't have a weapon for this item, so just show a generic one
-			if (!itemIcon && m_PickupHistory[i].iId >= 0)
-				itemIcon = m_pHudAmmoTypes[m_PickupHistory[i].iId];
-
-			// these will get changed later if there is an icon
-			int iconTall = surface()->GetFontTall(m_hNumberFont);
-			int iconWide = 0;
-
 			int ypos = tall - (m_flHistoryGap * (i + 1));
+			int xpos = wide - itemIcon->Width() - m_flIconInset;
 
-			if ( itemIcon )
+#ifndef HL2MP
+			// Adjust for a half-height icon
+			if ( bHalfHeight )
 			{
-				if (itemIcon->bRenderUsingFont)
-				{
-					iconTall = itemIcon->Height();
-					iconWide = itemIcon->Width();
-				}
-				else
-				{
-					float ratio = (float)itemIcon->Width() / (float)itemIcon->Height();
-					iconWide = iconTall * ratio;
-				}
-
-				int xpos = wide - iconWide - m_flIconInset;
-
-				itemIcon->DrawSelf(xpos, ypos, iconWide, iconTall, clr);
+				ypos += itemIcon->Height() / 2;
 			}
-			// <-- Mirv: Draw proper icons
+#endif // HL2MP
+
+			itemIcon->DrawSelf( xpos, ypos, clr );
+
+			if ( itemAmmoIcon )
+			{
+				itemAmmoIcon->DrawSelf( xpos - ( itemAmmoIcon->Width() * 1.25f ), ypos, clr );
+			}
 
 			if ( iAmount )
 			{
@@ -474,7 +488,7 @@ void CHudHistoryResource::Paint( void )
 				_snwprintf( text, sizeof( text ) / sizeof(wchar_t), L"%i", m_PickupHistory[i].iCount );
 
 				// offset the number to sit properly next to the icon
-				ypos -= ( surface()->GetFontTall( m_hNumberFont ) - iconTall ) / 2;
+				ypos -= ( surface()->GetFontTall( m_hNumberFont ) - itemIcon->Height() ) / 2;
 
 				vgui::surface()->DrawSetTextFont( m_hNumberFont );
 				vgui::surface()->DrawSetTextColor( clr );
@@ -484,7 +498,7 @@ void CHudHistoryResource::Paint( void )
 			else if ( bUseAmmoFullMsg )
 			{
 				// offset the number to sit properly next to the icon
-				ypos -= ( surface()->GetFontTall( m_hTextFont ) - iconTall ) / 2;
+				ypos -= ( surface()->GetFontTall( m_hTextFont ) - itemIcon->Height() ) / 2;
 
 				vgui::surface()->DrawSetTextFont( m_hTextFont );
 				vgui::surface()->DrawSetTextColor( clr );

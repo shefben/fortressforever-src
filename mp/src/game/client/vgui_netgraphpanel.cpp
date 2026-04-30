@@ -228,9 +228,13 @@ CNetGraphPanel::CNetGraphPanel( VPANEL parent )
 	SetPaintBackgroundEnabled( false );
 
 	InitColors();
-
+#ifndef FF
+	cl_updaterate = static_cast< const ConVar_ServerBounded* >( cvar->FindVar( "cl_updaterate" ) );
+	cl_cmdrate = static_cast< const ConVar_ServerBounded* >( cvar->FindVar( "cl_cmdrate" ) );
+#else
 	cl_updaterate = cvar->FindVar( "cl_updaterate" );
 	cl_cmdrate = cvar->FindVar( "cl_cmdrate" );
+#endif
 	assert( cl_updaterate && cl_cmdrate );
 
 	memset( sendcolor, 0, 3 );

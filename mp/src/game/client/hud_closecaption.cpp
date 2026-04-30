@@ -2378,7 +2378,7 @@ bool CHudCloseCaption::AddAsyncWork( const char *tokenstream, bool bIsStream, fl
 		tokenname[ 0 ] = 0;
 		const char *p = tokenstream;
 	#ifdef SDK2013CE
-		p = nexttoken( tokenname, p, ' ', sizeof(tokenname) );
+		p = nexttoken( tokenname, p, ' ', sizeof( tokenname ) );
 	#else
 		p = nexttoken( tokenname, p, ' ' );
 	#endif
@@ -2425,7 +2425,7 @@ void CHudCloseCaption::ProcessSentenceCaptionStream( const char *tokenstream )
 	const char *p = tokenstream;
 
 #ifdef SDK2013CE
-	p = nexttoken( tokenname, p, ' ', sizeof(tokenname) );
+	p = nexttoken( tokenname, p, ' ', sizeof( tokenname ) );
 #else
 	p = nexttoken( tokenname, p, ' ' );
 #endif

@@ -635,7 +635,7 @@ void CPrediction::SetupMove( C_BasePlayer *player, CUserCmd *ucmd, IMoveHelper *
 	move->m_flOldForwardMove = player->m_Local.m_flOldForwardMove;
 	move->m_flClientMaxSpeed = player->m_flMaxspeed;
 #ifdef FF
-	CFFPlayer* pPlayer = ToFFPlayer(player);
+	CFFPlayer *pPlayer = ToFFPlayer( player );
 
 	// Update client max speed if there are speed modifiers active
 	if (pPlayer)
