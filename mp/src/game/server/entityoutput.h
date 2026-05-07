@@ -69,6 +69,10 @@ public:
 
 	int NumberOfElements( void );
 
+	// Read-only access to the registered actions; iterate via ev->m_pNext.
+	// Used by FF bot's level-init door analysis (ff_door_link.cpp).
+	CEventAction *FirstAction( void ) const { return m_ActionList; }
+
 	float GetMaxDelay( void );
 
 	fieldtype_t ValueFieldType() { return m_Value.FieldType(); }
