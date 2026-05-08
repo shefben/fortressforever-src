@@ -1,0 +1,84 @@
+//-----------------------------------------------------------------------------
+//	NEXTBOT.VPC
+//
+//	NextBot framework — imported from Source SDK 2013 (NextBot/ tree).
+//	Foundation for the FF native bot AI (CFFBot inherits from NextBotPlayer<CFFPlayer>).
+//-----------------------------------------------------------------------------
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;NEXT_BOT"
+		$AdditionalIncludeDirectories	"$BASE;.\nextbot"
+	}
+}
+
+$Project
+{
+	$Folder	"Source Files"
+	{
+		$Folder	"NextBot"
+		{
+			$File	"nextbot\NextBot.cpp"
+			$File	"nextbot\NextBot.h"
+			// NextBotAttentionInterface — L4D-only, .cpp out of sync with .h in the leak. Excluded.
+			$File	"nextbot\NextBotBehavior.h"
+			$File	"nextbot\NextBotBodyInterface.cpp"
+			$File	"nextbot\NextBotBodyInterface.h"
+			$File	"nextbot\NextBotComponentInterface.cpp"
+			$File	"nextbot\NextBotComponentInterface.h"
+			$File	"nextbot\NextBotContextualQueryInterface.h"
+			$File	"nextbot\NextBotDebug.h"
+			$File	"nextbot\NextBotEventResponderInterface.h"
+			$File	"nextbot\NextBotGroundLocomotion.cpp"
+			$File	"nextbot\NextBotGroundLocomotion.h"
+			$File	"nextbot\NextBotHearingInterface.h"
+			$File	"nextbot\NextBotIntentionInterface.cpp"
+			$File	"nextbot\NextBotIntentionInterface.h"
+			$File	"nextbot\NextBotInterface.cpp"
+			$File	"nextbot\NextBotInterface.h"
+			$File	"nextbot\NextBotKnownEntity.h"
+			$File	"nextbot\NextBotLocomotionInterface.cpp"
+			$File	"nextbot\NextBotLocomotionInterface.h"
+			$File	"nextbot\NextBotManager.cpp"
+			$File	"nextbot\NextBotManager.h"
+			$File	"nextbot\NextBotUtil.h"
+			$File	"nextbot\NextBotVisionInterface.cpp"
+			$File	"nextbot\NextBotVisionInterface.h"
+		}
+
+		$Folder	"NextBot\Behavior"
+		{
+			$File	"nextbot\Behavior\BehaviorBackUp.h"
+			$File	"nextbot\Behavior\BehaviorMoveTo.h"
+		}
+
+		$Folder	"NextBot\NavMeshEntities"
+		{
+			$File	"nextbot\NavMeshEntities\func_nav_prerequisite.cpp"
+			$File	"nextbot\NavMeshEntities\func_nav_prerequisite.h"
+		}
+
+		$Folder	"NextBot\Path"
+		{
+			$File	"nextbot\Path\NextBotChasePath.cpp"
+			$File	"nextbot\Path\NextBotChasePath.h"
+			$File	"nextbot\Path\NextBotPath.cpp"
+			$File	"nextbot\Path\NextBotPath.h"
+			$File	"nextbot\Path\NextBotPathFollow.cpp"
+			$File	"nextbot\Path\NextBotPathFollow.h"
+			$File	"nextbot\Path\NextBotRetreatPath.h"
+		}
+
+		$Folder	"NextBot\Player"
+		{
+			$File	"nextbot\Player\NextBotPlayer.cpp"
+			$File	"nextbot\Player\NextBotPlayer.h"
+			$File	"nextbot\Player\NextBotPlayerBody.cpp"
+			$File	"nextbot\Player\NextBotPlayerBody.h"
+			$File	"nextbot\Player\NextBotPlayerLocomotion.cpp"
+			$File	"nextbot\Player\NextBotPlayerLocomotion.h"
+		}
+	}
+}
