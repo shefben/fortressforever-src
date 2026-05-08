@@ -12,6 +12,15 @@
 #include "ff_bot_ctf.h"
 #include "ff_bot_class.h"
 #include "ff_bot_medic.h"
+#include "ff_bot_get_ammo.h"
+#include "ff_bot_get_health.h"
+#include "ff_bot_retreat_to_cover.h"
+#include "ff_bot_destroy_enemy_sentry.h"
+#include "ff_bot_spy_attack.h"
+#include "ff_bot_spy_infiltrate.h"
+#include "ff_bot_medic_follow.h"
+#include "ff_bot_sniper_lurk.h"
+#include "ff_bot_demoman_sticky_trap.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_weapon.h"
 #include "ff_bot_intel.h"
@@ -99,14 +108,25 @@ static float ProjectileSpeedForWeapon( FFWeaponID id )
 
 
 //-----------------------------------------------------------------------------
-// CFFBotCtfObjective owns the path on every map — it picks flag/cap goals on
-// CTF maps and falls through to wander-style random nav-area picking when no
-// CTF goal is applicable. This means we don't need a separate code path for
-// non-CTF maps.
+// Class-aware default behavior. CtfObjective is the offense/defense default
+// (flag carry / defend / wander). Sniper bots lurk in vantage spots, spies
+// infiltrate and ambush, medics follow a teammate. Engineer/demoman/scout
+// /soldier/HWGuy/pyro/civilian all use CtfObjective and rely on the per-tick
+// FFBotClass::Update driver for class-specific tactics on top.
 //-----------------------------------------------------------------------------
 Action< CFFBot > *CFFBotMainAction::InitialContainedAction( CFFBot *me )
 {
-	return new CFFBotCtfObjective;
+	switch ( me ? me->GetClassSlot() : 0 )
+	{
+	case CLASS_SNIPER:
+		return new CFFBotSniperLurk;
+	case CLASS_SPY:
+		return new CFFBotSpyInfiltrate;
+	case CLASS_MEDIC:
+		return new CFFBotMedicFollow;
+	default:
+		return new CFFBotCtfObjective;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -904,15 +924,62 @@ ActionResult< CFFBot > CFFBotMainAction::Update( CFFBot *me, float interval )
 	// Sub-action dispatch: when a threat is in close range and visible,
 	// suspend movement (Attack stops the chase path so we hold position).
 	IVision *vision = me->GetVisionInterface();
-	if ( vision )
+	const CKnownEntity *threat = vision ? vision->GetPrimaryKnownThreat( false ) : NULL;
+	const bool hasVisibleThreat =
+		( threat && threat->GetEntity() && !threat->IsObsolete() && threat->IsVisibleRecently() );
+
+	if ( hasVisibleThreat )
 	{
-		const CKnownEntity *threat = vision->GetPrimaryKnownThreat( false );
-		if ( threat && threat->GetEntity() && !threat->IsObsolete() && threat->IsVisibleRecently() )
+		const float distSq = ( threat->GetEntity()->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
+		if ( distSq > FFBOT_ATTACK_HOLD_RANGE * FFBOT_ATTACK_HOLD_RANGE )
 		{
-			const float distSq = ( threat->GetEntity()->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
-			if ( distSq > FFBOT_ATTACK_HOLD_RANGE * FFBOT_ATTACK_HOLD_RANGE )
+			// Spies use a knife-aware attack that prefers backstabs from the
+			// rear arc; everyone else uses the generic chase.
+			if ( me->GetClassSlot() == CLASS_SPY )
 			{
-				return SuspendFor( new CFFBotAttack, "Engaging primary threat" );
+				CFFPlayer *victim = ToFFPlayer( threat->GetEntity() );
+				return SuspendFor( new CFFBotSpyAttack( victim ), "Spy engaging — backstab approach" );
+			}
+			return SuspendFor( new CFFBotAttack, "Engaging primary threat" );
+		}
+	}
+
+	// Resupply peel-off (no visible threat): GetAmmo when low ammo, GetHealth
+	// when sub-50% HP. IsPossible() walks gEntList + nav areas; throttle to
+	// every 1.5s so we don't burn cycles every tick.
+	if ( !hasVisibleThreat )
+	{
+		if ( !me->m_resupplyCheckTimer.HasStarted() || me->m_resupplyCheckTimer.IsElapsed() )
+		{
+			me->m_resupplyCheckTimer.Start( 1.5f );
+
+			if ( me->IsAmmoLow() && CFFBotGetAmmo::IsPossible( me ) )
+				return SuspendFor( new CFFBotGetAmmo, "Low ammo — fetching ammo" );
+
+			const int hp = me->GetHealth();
+			const int hpMax = me->GetMaxHealth();
+			if ( hpMax > 0 && hp * 2 < hpMax && CFFBotGetHealth::IsPossible( me ) )
+				return SuspendFor( new CFFBotGetHealth, "Low HP — fetching health" );
+
+			// Demoman opportunistic sticky trap — when no immediate threat,
+			// not low HP/ammo, and we're standing in a defensive area, lay
+			// stickies on the inbound chokepoint.
+			if ( me->GetClassSlot() == CLASS_DEMOMAN &&
+			     CFFBotDemomanStickyTrap::IsPossible( me ) )
+			{
+				CFFNavArea *here = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
+				if ( here )
+				{
+					const unsigned int attrs = here->GetAttributesFF();
+					const int myTeam = me->GetTeamNumber();
+					const unsigned int ownFlagAttr = CFFNavArea::FlagAttributeForTeam( myTeam );
+					const unsigned int ownCapAttr  = CFFNavArea::CapAttributeForTeam( myTeam );
+					if ( ( attrs & ownFlagAttr ) || ( attrs & ownCapAttr ) )
+					{
+						return SuspendFor( new CFFBotDemomanStickyTrap,
+							"Demoman laying sticky trap at defensive choke" );
+					}
+				}
 			}
 		}
 	}

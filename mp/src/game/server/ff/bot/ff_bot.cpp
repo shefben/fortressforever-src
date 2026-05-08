@@ -11,14 +11,18 @@
 #include "ff_bot_body.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_intel.h"
+#include "ff_bot_weapon.h"
 #include "ff_nav_area.h"
 #include "ff_nav_mesh.h"
 #include "ff_player.h"
 #include "ff_team.h"
 #include "ff_utils.h"
 #include "ff_gamerules.h"
+#include "ff_weapon_base.h"
+#include "ammodef.h"
 #include "nav_mesh.h"
 #include "nav_area.h"
+#include "NextBotKnownEntity.h"
 
 #include <algorithm>
 
@@ -83,6 +87,7 @@ CFFBot::CFFBot()
 	m_sniperFireState = SNIPER_FIRE_IDLE;
 	m_sniperFireStartTime = 0.0f;
 	m_routeSeed = (unsigned int)RandomInt( 1, 65535 );
+	m_routeFlavor = (unsigned char)RandomInt( 0, ROUTE_FLAVOR_COUNT - 1 );
 	m_lastRouteChokeID = 0;
 	m_spawnExitDir.Init();
 	m_spawnExitStartPos.Init();
@@ -132,6 +137,7 @@ void CFFBot::Spawn( void )
 	m_calloutTimer.Invalidate();
 	m_weaponSwitchTimer.Invalidate();
 	m_retreatTimer.Invalidate();
+	m_resupplyCheckTimer.Invalidate();
 	m_grenadePrimeStart = 0.0f;
 	m_grenadeCooldownTimer.Invalidate();
 	m_sniperFireState = SNIPER_FIRE_IDLE;
@@ -341,6 +347,152 @@ void CFFBot::Spawn( void )
 			diagName, GetTeamNumber(), GetClassSlot(), diagAreaId, diagAreaAttrs );
 	}
 }
+
+//-----------------------------------------------------------------------------
+// Combat range table — per-class engagement ranges. Indexed by class slot
+// (CLASS_SCOUT..CLASS_CIVILIAN). `desired` is "stop chasing, hold and shoot";
+// `maxAttack` is "still effective from here". Roughly mirrors TFBot per-weapon
+// values, mapped to FF class loadouts.
+//-----------------------------------------------------------------------------
+struct FFBotCombatRange
+{
+	float desired;
+	float maxAttack;
+};
+
+static const FFBotCombatRange kCombatRanges[ 11 ] = {
+	/* 0  unassigned */ { 600.0f,  600.0f },
+	/* 1  Scout    */   { 250.0f,  600.0f },		// nailgun / supershotgun
+	/* 2  Sniper   */   { 2000.0f, 3000.0f },		// sniper rifle
+	/* 3  Soldier  */   { 750.0f,  1500.0f },		// RPG (splash)
+	/* 4  Demoman  */   { 600.0f,  1100.0f },		// grenade launcher (arc)
+	/* 5  Medic    */   { 350.0f,  750.0f },		// super nailgun
+	/* 6  HWGuy    */   { 600.0f,  1200.0f },		// assault cannon
+	/* 7  Pyro     */   { 200.0f,  1000.0f },		// flamer / IC
+	/* 8  Spy      */   { 500.0f,  1000.0f },		// tranq
+	/* 9  Engineer */   { 500.0f,  1000.0f },		// railgun
+	/* 10 Civilian */   { 60.0f,   80.0f },			// umbrella melee
+};
+
+
+//-----------------------------------------------------------------------------
+float CFFBot::GetDesiredAttackRange( void ) const
+{
+	const int slot = GetClassSlot();
+	if ( slot < 0 || slot > CLASS_CIVILIAN )
+		return 600.0f;
+	return kCombatRanges[ slot ].desired;
+}
+
+
+//-----------------------------------------------------------------------------
+float CFFBot::GetMaxAttackRange( void ) const
+{
+	const int slot = GetClassSlot();
+	if ( slot < 0 || slot > CLASS_CIVILIAN )
+		return 1200.0f;
+	return kCombatRanges[ slot ].maxAttack;
+}
+
+
+//-----------------------------------------------------------------------------
+float CFFBot::GetDesiredPathLookAheadRange( void ) const
+{
+	// Default 300u — enough to clear most corners without overshooting the
+	// turn. HWGuy is slow but still uses 300; we don't currently need
+	// per-class variation here.
+	return 300.0f;
+}
+
+
+//-----------------------------------------------------------------------------
+bool CFFBot::EquipBestWeaponForThreat( const CKnownEntity *threat )
+{
+	float threatRange = -1.0f;
+	if ( threat && threat->GetEntity() )
+	{
+		threatRange = ( threat->GetLastKnownPosition() - GetAbsOrigin() ).Length();
+	}
+	return FFBotWeapon::TrySwitchToPreferred( const_cast< CFFBot * >( this ), threatRange );
+}
+
+
+//-----------------------------------------------------------------------------
+bool CFFBot::IsLineOfFireClear( const Vector &where ) const
+{
+	return IsLineOfFireClear( const_cast< CFFBot * >( this )->EyePosition(), where );
+}
+
+bool CFFBot::IsLineOfFireClear( CBaseEntity *who ) const
+{
+	if ( !who )
+		return false;
+	return IsLineOfFireClear( const_cast< CFFBot * >( this )->EyePosition(), who->WorldSpaceCenter() );
+}
+
+bool CFFBot::IsLineOfFireClear( const Vector &from, const Vector &to ) const
+{
+	trace_t tr;
+	CTraceFilterSimple filter( this, COLLISION_GROUP_NONE );
+	UTIL_TraceLine( from, to, MASK_SHOT, &filter, &tr );
+	return tr.fraction >= 1.0f && !tr.startsolid;
+}
+
+
+//-----------------------------------------------------------------------------
+float CFFBot::TransientlyConsistentRandomValue( float period, int seedValue ) const
+{
+	if ( period <= 0.0f )
+		period = 10.0f;
+	const int bucket = (int)( gpGlobals->curtime / period );
+	const unsigned int h0 = ( m_routeSeed ^ (unsigned int)( seedValue * 2654435769U ) ) + (unsigned int)bucket * 22695477U;
+	const unsigned int h1 = h0 ^ ( h0 >> 13 );
+	return ( h1 % 1001 ) * 0.001f;
+}
+
+
+//-----------------------------------------------------------------------------
+bool CFFBot::IsAmmoLow( void ) const
+{
+	CFFWeaponBase *active = const_cast< CFFBot * >( this )->GetActiveFFWeapon();
+	if ( active )
+	{
+		const int ammoType = active->GetPrimaryAmmoType();
+		if ( ammoType >= 0 )
+		{
+			const int reserve = const_cast< CFFBot * >( this )->GetAmmoCount( ammoType );
+			const int clip = active->Clip1();
+			if ( reserve < 20 && clip <= 0 )
+				return true;
+		}
+	}
+	if ( GetClassSlot() == CLASS_ENGINEER )
+	{
+		const int cellsAmmoType = GetAmmoDef()->Index( AMMO_CELLS );
+		if ( cellsAmmoType >= 0 && const_cast< CFFBot * >( this )->GetAmmoCount( cellsAmmoType ) < 50 )
+			return true;
+	}
+	return false;
+}
+
+
+//-----------------------------------------------------------------------------
+bool CFFBot::IsAmmoFull( void ) const
+{
+	// Walk all primary ammo types we have a max for; if any has room to
+	// grow, we're not full.
+	CFFBot *self = const_cast< CFFBot * >( this );
+	for ( int i = 0; i < MAX_AMMO_TYPES; ++i )
+	{
+		const int maxCount = m_iMaxAmmo[ i ];
+		if ( maxCount <= 0 )
+			continue;	// class doesn't carry this type
+		if ( self->GetAmmoCount( i ) < maxCount )
+			return false;
+	}
+	return true;
+}
+
 
 //-----------------------------------------------------------------------------
 // Static factory used by ClientPutInServerOverride during fake-client creation.

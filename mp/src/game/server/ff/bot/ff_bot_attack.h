@@ -1,11 +1,12 @@
 //========= Fortress Forever Bot =============================================//
 //
-// CFFBotAttack — Phase 4 combat action.
+// CFFBotAttack — chase-the-threat sub-action.
 //
-// Aims at the bot's primary known threat and fires the held weapon. Also
-// strafes toward the threat if out of range; otherwise stops to fire.
-// Returns DONE when no primary threat remains so the suspended parent
-// behavior (Wander, eventually CTF/etc.) can resume.
+// Mirrors TFBot's CTFBotAttack. Aim and fire are handled per-tick at
+// CFFBotMainAction; this action only drives positioning. Uses ChasePath
+// (LEAD_SUBJECT) when the target is visible (predicts target movement) and
+// PathFollower to last-known position when LOS is lost. Equips the best
+// weapon for the current threat each tick.
 //
 //===========================================================================//
 
@@ -17,21 +18,31 @@
 
 #include "NextBotBehavior.h"
 #include "Path/NextBotPathFollow.h"
+#include "Path/NextBotChasePath.h"
 #include "ff_bot.h"
 
 class CFFBotAttack : public Action< CFFBot >
 {
 public:
 	CFFBotAttack( void );
+	virtual ~CFFBotAttack() { }
 
-	virtual ActionResult< CFFBot >	OnStart( CFFBot *me, Action< CFFBot > *priorAction ) OVERRIDE;
-	virtual ActionResult< CFFBot >	Update( CFFBot *me, float interval ) OVERRIDE;
+	virtual ActionResult< CFFBot > OnStart( CFFBot *me, Action< CFFBot > *priorAction ) OVERRIDE;
+	virtual ActionResult< CFFBot > Update( CFFBot *me, float interval ) OVERRIDE;
+
+	virtual EventDesiredResult< CFFBot > OnStuck( CFFBot *me ) OVERRIDE;
+	virtual EventDesiredResult< CFFBot > OnMoveToSuccess( CFFBot *me, const Path *path ) OVERRIDE;
+	virtual EventDesiredResult< CFFBot > OnMoveToFailure( CFFBot *me, const Path *path, MoveToFailureType reason ) OVERRIDE;
+
+	virtual QueryResultType ShouldRetreat( const INextBot *me ) const OVERRIDE;
+	virtual QueryResultType ShouldHurry( const INextBot *me ) const OVERRIDE;
 
 	virtual const char *GetName( void ) const OVERRIDE { return "Attack"; }
 
 private:
-	PathFollower m_chasePath;
-	CountdownTimer m_repathTimer;
+	PathFollower m_path;			// path to last-known position when LOS lost
+	ChasePath m_chasePath;			// lead-the-subject path while visible
+	CountdownTimer m_repathTimer;	// throttle re-paths to LKP
 	CountdownTimer m_loseSightTimer;	// give up if threat unseen this long
 };
 

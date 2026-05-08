@@ -50,8 +50,38 @@ namespace FFBotHelpers
 
 	// True iff any enemy player is within `radius` of our own flag. Used
 	// for reactive defense — bots only switch to "defend home" when this
-	// returns true.
-	bool IsOwnFlagThreatened( int myTeam, float radius = 1000.0f );
+	// returns true. Default radius is the flag-room only, NOT the whole
+	// half-of-map: 1200u was too aggressive and pulled every offensive
+	// bot home as soon as one enemy crossed midfield.
+	bool IsOwnFlagThreatened( int myTeam, float radius = 600.0f );
+
+	// True iff any enemy is approaching our flag — within `radius` AND
+	// either has line of sight to it or is moving toward it. Stricter
+	// than IsOwnFlagThreatened; used to gate "stop offense, run home" so
+	// only a real incoming push trips it, not an enemy passing through
+	// our half. Returns the closest such enemy in *out (optional).
+	bool IsEnemyApproachingOwnFlag( int myTeam, float radius,
+	                                CFFPlayer **out = NULL );
+
+	// Find an enemy player currently carrying our flag. Returns NULL if
+	// no enemy is carrying it (flag at home, dropped, or carried by us
+	// somehow). Used to switch from "defend the empty pedestal" to
+	// "intercept the carrier" when the flag is stolen.
+	CFFPlayer *FindEnemyCarryingOurFlag( int myTeam );
+
+	// Count alive friendly engineers / snipers / hwguys on a team —
+	// used by the CTF objective to enforce single-defender quotas.
+	int CountAliveOnTeam( int myTeam, int classSlot );
+
+	// Find the alive engineer on `myTeam` who is closest to `pos`. Used
+	// to pick the "home" engineer (others go offense) without needing
+	// a true squad-assignment system. NULL if no engineer alive.
+	CFFPlayer *FindClosestAliveEngineer( int myTeam, const Vector &pos );
+
+	// True iff any friendly sentry gun (built or building) exists within
+	// `radius` of `pos`. Used to keep additional engineers from piling
+	// onto an existing nest.
+	bool IsFriendlySentryNear( int myTeam, const Vector &pos, float radius );
 
 	// Find a teammate (not the asking bot) currently carrying any enemy
 	// flag. Used to make escort bots follow the flag-runner instead of

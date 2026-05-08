@@ -59,6 +59,7 @@ public:
 	CountdownTimer	m_calloutTimer;			// any class: SaveMe / EngyMe spam control
 	CountdownTimer	m_weaponSwitchTimer;	// throttle weapon-switch attempts
 	CountdownTimer	m_retreatTimer;			// re-eval low-HP retreat throttle
+	CountdownTimer	m_resupplyCheckTimer;	// throttle GetAmmo/GetHealth IsPossible scans
 
 	// Grenade priming state. m_grenadePrimeStart > 0 means we've started a
 	// secondary-grenade prime and should throw at curtime - start >= COOK.
@@ -94,6 +95,22 @@ public:
 	// same goal. Set once at construction; doesn't reset on respawn.
 	unsigned int	m_routeSeed;
 
+	// Coarse per-bot route preference. Set once at construction; combines
+	// with m_routeSeed to push different bots through structurally
+	// different routes (e.g. underwater sewers vs. main bridge on 2fort).
+	//   0 = DRY     — penalize water areas
+	//   1 = WATER   — discount water areas (so this bot takes the sewer
+	//                  even when the bridge is shorter)
+	//   2 = NEUTRAL — no water bias
+	enum RouteFlavor
+	{
+		ROUTE_FLAVOR_DRY     = 0,
+		ROUTE_FLAVOR_WATER   = 1,
+		ROUTE_FLAVOR_NEUTRAL = 2,
+		ROUTE_FLAVOR_COUNT   = 3,
+	};
+	unsigned char	m_routeFlavor;
+
 	// Last route-key-area visited — bot remembers which choke they took
 	// last time and biases away from it next time so the team spreads
 	// across multiple lanes over time.
@@ -117,6 +134,39 @@ public:
 	virtual PlayerBody       *GetBodyInterface( void )       const OVERRIDE { return m_body; }
 	virtual IVision          *GetVisionInterface( void )     const OVERRIDE { return m_vision; }
 	virtual IIntention       *GetIntentionInterface( void )  const OVERRIDE { return m_intention; }
+
+	// Combat helpers — class-aware engagement ranges. Mirrors TFBot's
+	// GetDesiredAttackRange / GetMaxAttackRange. Used by Attack action to
+	// decide when to stop chasing and when to consider a threat "in range".
+	float			GetDesiredAttackRange( void ) const;
+	float			GetMaxAttackRange( void ) const;
+
+	// Path-follower lookahead. Larger bots / heavier classes need a longer
+	// lookahead to avoid corner-cutting through walls.
+	float			GetDesiredPathLookAheadRange( void ) const;
+
+	// Equip the best weapon we have for the given threat. Wraps
+	// FFBotWeapon::TrySwitchToPreferred with the threat's range.
+	bool			EquipBestWeaponForThreat( const CKnownEntity *threat );
+
+	// True if a hitscan from our eye reaches `where` without being blocked
+	// by world geometry. Filters out friendlies and the bot itself.
+	bool			IsLineOfFireClear( const Vector &where ) const;
+	bool			IsLineOfFireClear( CBaseEntity *who ) const;
+	bool			IsLineOfFireClear( const Vector &from, const Vector &to ) const;
+
+	// Pseudo-random value [0,1] that stays consistent within a `period`-second
+	// window but changes unpredictably each window. Used by behaviors that
+	// want to occasionally pick a different action without thrashing —
+	// e.g., circle-strafe direction. Mirrors CTFBot::TransientlyConsistentRandomValue.
+	float			TransientlyConsistentRandomValue( float period = 10.0f, int seedValue = 0 ) const;
+
+	// Ammo state — used by GetAmmo behavior and by path-cost heuristics.
+	// IsAmmoLow: active weapon has empty clip with <20 reserve, OR engineer
+	// with <50 cells (gates SG repair/upgrade).
+	// IsAmmoFull: no ammo type has room to grow.
+	bool			IsAmmoLow( void ) const;
+	bool			IsAmmoFull( void ) const;
 
 private:
 	PlayerLocomotion *m_locomotor;

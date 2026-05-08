@@ -22,6 +22,7 @@
 #include "ammodef.h"
 #include "shareddefs.h"
 #include "entitylist.h"
+#include "engine/IEngineTrace.h"
 #include "tier1/utlvector.h"
 
 enum FFBotRouteType
@@ -53,8 +54,43 @@ public:
 			m_caltrops.AddToTail( e->GetAbsOrigin() );
 		}
 
+		// Cache persistent grenade-aftermath danger zones so the path
+		// follower routes around them. Without this, bots run straight
+		// through pyro fire / scout gas / hwguy slowfield / enemy sticky
+		// traps and take damage they could have avoided. Each entity
+		// becomes a hazard point; per-edge cost adds a steep penalty
+		// for areas within the hazard radius.
+		//
+		// Only enemy ff_projectile_pl (sticky bombs) count — our team's
+		// stickies don't hurt us. Other danger grenades affect everyone
+		// in radius regardless of owner so no team filter applies.
+		const int myTeam = me->GetTeamNumber();
+		m_dangers.RemoveAll();
+		static const char * const kDangerClasses[] = {
+			"ff_grenade_napalmlet",   // pyro fire patch (after detonation)
+			"ff_grenade_gas",         // scout gas cloud
+			"ff_grenade_slowfield",   // hwguy slow zone
+		};
+		for ( int c = 0; c < ARRAYSIZE( kDangerClasses ); ++c )
+		{
+			CBaseEntity *de = NULL;
+			while ( ( de = gEntList.FindEntityByClassname( de, kDangerClasses[ c ] ) ) != NULL )
+			{
+				m_dangers.AddToTail( de->GetAbsOrigin() );
+			}
+		}
+		// Enemy sticky bombs.
+		CBaseEntity *sb = NULL;
+		while ( ( sb = gEntList.FindEntityByClassname( sb, "ff_projectile_pl" ) ) != NULL )
+		{
+			if ( sb->GetTeamNumber() == myTeam )
+				continue;	// our own stickies — no friendly damage in normal play
+			m_dangers.AddToTail( sb->GetAbsOrigin() );
+		}
+
 		// Cache class identity + ammo state so per-edge query stays fast.
 		m_classSlot = me->GetClassSlot();
+		m_routeFlavor = me->m_routeFlavor;
 		m_isLowAmmo  = false;
 		m_isLowHealth = false;
 		const int hp = me->GetHealth();
@@ -140,6 +176,20 @@ public:
 			}
 		}
 
+		// Grenade-aftermath avoidance: any nav-area within ~150u of a
+		// fire patch / gas cloud / slowfield / enemy sticky gets the
+		// same kind of steep multiplier so the path routes around. The
+		// 150u radius covers the napalmlet's flame radius (~80u) with
+		// margin, the gas cloud, and stickies' splash range.
+		for ( int i = 0; i < m_dangers.Count(); ++i )
+		{
+			const float dSq = ( m_dangers[ i ] - areaCenter ).LengthSqr();
+			if ( dSq < ( 150.0f * 150.0f ) )
+			{
+				return ( fromArea ? ( fromArea->GetCenter() - areaCenter ).Length() : 0.0f ) * 6.0f + 200.0f;
+			}
+		}
+
 		// ---- Attribute-based modifiers -----------------------------------
 		const unsigned int attrs = area->GetAttributesFF();
 		float costMul = 1.0f;
@@ -182,11 +232,40 @@ public:
 			costMul *= 1.5f;
 		}
 
+		// Per-bot route flavor — drives some bots through the underwater
+		// /alternate route while others take the main path. Without this,
+		// every bot picks the shortest route (the main bridge on 2fort)
+		// because the per-area noise below isn't large enough to flip
+		// long-vs-short. Sampling water content per area is a physics
+		// query but cheap (no contact, just point in space). Caltrop
+		// caching above shows the same gEntList-once-per-path pattern.
+		const int areaContents = enginetrace->GetPointContents( areaCenter );
+		const bool isWaterArea = ( areaContents & ( CONTENTS_WATER | CONTENTS_SLIME ) ) != 0;
+		if ( isWaterArea )
+		{
+			switch ( m_routeFlavor )
+			{
+			case CFFBot::ROUTE_FLAVOR_DRY:
+				costMul *= 1.6f;	// avoid water — take the dry route
+				break;
+			case CFFBot::ROUTE_FLAVOR_WATER:
+				costMul *= 0.7f;	// prefer water — sewer / underwater approach
+				break;
+			default:
+				break;
+			}
+		}
+
 		// Route entropy: per-bot deterministic noise so different bots
-		// pick different shortest paths through the same map.
+		// pick different shortest paths through the same map. ±20% — large
+		// enough that medium-length detours can win against the shortest
+		// route, so multi-bot teams actually spread across the map's
+		// alternate corridors instead of all funneling through the same
+		// choke. Smaller values (we used to run ±5%) only scrambled the
+		// order of equally-short paths and produced no visible spread.
 		const unsigned int h0 = m_me->m_routeSeed * 2654435769U;
 		const unsigned int h1 = ( h0 + area->GetID() * 22695477U ) ^ ( h0 >> 13 );
-		const float noise = ( ( (int)( h1 % 1001 ) ) - 500 ) * 0.0001f;	// ±5%
+		const float noise = ( ( (int)( h1 % 1001 ) ) - 500 ) * 0.0004f;	// ±20%
 		costMul *= ( 1.0f + noise );
 
 		// Distance traveled.
@@ -229,11 +308,16 @@ private:
 
 	// Bot state cached for per-edge cost lookup.
 	int  m_classSlot;
+	unsigned char m_routeFlavor;
 	bool m_isLowAmmo;
 	bool m_isLowHealth;
 
 	// Caltrop positions cached at construction for per-edge avoidance.
 	CUtlVector< Vector > m_caltrops;
+
+	// Persistent grenade-aftermath danger zones (fire patches, gas, slow
+	// fields, enemy stickies). Same per-path snapshot as caltrops.
+	CUtlVector< Vector > m_dangers;
 };
 
 

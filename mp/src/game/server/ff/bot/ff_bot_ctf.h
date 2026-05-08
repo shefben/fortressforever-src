@@ -47,6 +47,7 @@ private:
 		STATE_RETURN_OWN_FLAG,
 		STATE_DEFEND_OWN_FLAG,	// engineers / defensive roles: hold near our flag
 		STATE_DEFEND_AT_CAP,	// snipers, hwguys: post up at our cap point
+		STATE_INTERCEPT_CARRIER,// our flag is stolen — chase the enemy carrier
 		STATE_ESCORT_CARRIER,	// teammate is carrying enemy flag — escort them
 		STATE_RETREAT,			// low HP — fall back to our spawn area
 		STATE_PUSH_OBJECTIVE,	// AvD/no-flag maps: head to nearest cap point
@@ -72,6 +73,7 @@ private:
 	CountdownTimer m_evaluateTimer;	// how often to re-check game state
 	CountdownTimer m_repathTimer;	// how often to recompute the path
 	CountdownTimer m_wanderPickTimer;
+	CountdownTimer m_dangerCheckTimer;	// throttle for grenade-danger scan
 
 	Vector m_lastStuckPos;
 	float  m_avoidStuckRadius;

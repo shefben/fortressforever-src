@@ -32,6 +32,43 @@
 #define FFBOT_CTF_WANDER_RADIUS	2000.0f
 
 
+// True if `pos` is within 200u of any persistent grenade-aftermath danger
+// entity (pyro fire, scout gas, hwguy slowfield, enemy stickies). When this
+// fires, the contained action should invalidate its path so the next tick's
+// repath uses the new danger snapshot in CFFBotPathCost and routes around.
+//
+// Without this, the bot keeps walking the (stale) pre-fire path for up to
+// ~1.5s after fire appears in front of them — long enough to take real
+// damage. The check is cheap: ~5-10 entity origins per query.
+static bool IsStandingInGrenadeDanger( int myTeam, const Vector &pos )
+{
+	static const char * const kDangerClasses[] = {
+		"ff_grenade_napalmlet",
+		"ff_grenade_gas",
+		"ff_grenade_slowfield",
+	};
+	const float radSq = 200.0f * 200.0f;
+	for ( int c = 0; c < ARRAYSIZE( kDangerClasses ); ++c )
+	{
+		CBaseEntity *e = NULL;
+		while ( ( e = gEntList.FindEntityByClassname( e, kDangerClasses[ c ] ) ) != NULL )
+		{
+			if ( ( e->GetAbsOrigin() - pos ).LengthSqr() < radSq )
+				return true;
+		}
+	}
+	CBaseEntity *sb = NULL;
+	while ( ( sb = gEntList.FindEntityByClassname( sb, "ff_projectile_pl" ) ) != NULL )
+	{
+		if ( sb->GetTeamNumber() == myTeam )
+			continue;
+		if ( ( sb->GetAbsOrigin() - pos ).LengthSqr() < radSq )
+			return true;
+	}
+	return false;
+}
+
+
 //-----------------------------------------------------------------------------
 // True if the flag is currently grabbable: not removed, not currently carried
 // by any player.
@@ -312,6 +349,20 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		return STATE_RETURN_OWN_FLAG;
 	}
 
+	// 2.5) Our flag is stolen — chase the enemy carrier. Higher priority than
+	// escorting our own flag-carrier: the stolen flag is on a clock and the
+	// carrier dies when we kill them, so killing them is what matters.
+	// Defensive classes (engineer/sniper) keep their post — the carrier will
+	// come back through their lane on the way to cap. Offensive classes
+	// converge on the carrier to gun them down.
+	CFFPlayer *enemyCarrier = FFBotHelpers::FindEnemyCarryingOurFlag( myTeam );
+	if ( enemyCarrier && !isDefensiveClass )
+	{
+		outTargetEnt->Set( enemyCarrier );
+		*outGoalPos = enemyCarrier->GetAbsOrigin();
+		return STATE_INTERCEPT_CARRIER;
+	}
+
 	// 3) Escort a teammate carrying the enemy flag — non-defensive offensive
 	// classes converge on the carrier so they don't get assassinated alone.
 	// (This is what made bots feel aimless before: enemy flag was carried, so
@@ -327,9 +378,11 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		}
 	}
 
-	// 4) Reactive defense: if any enemy is near our flag, switch to defend
-	// regardless of class.
-	const bool flagThreatened = ownFlag && FFBotHelpers::IsOwnFlagThreatened( myTeam, 1200.0f );
+	// 4) Reactive defense. Tighter than before: enemy must be IN the flag
+	// area (600u, ~the flag room) AND either have LOS or be moving toward
+	// the flag. "Enemy crossing midfield" no longer pulls everyone home.
+	const bool flagApproaching = ownFlag &&
+		FFBotHelpers::IsEnemyApproachingOwnFlag( myTeam, 600.0f, NULL );
 
 	// 5) Defensive class anchoring.
 	if ( isEngineerRole )
@@ -337,22 +390,42 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		CFFSentryGun *sg = me->GetSentryGun();
 		const bool hasDispenser = ( me->GetDispenser() != NULL );
 
-		// 5a) Engineer with no SG yet: go to a FF_NAV_SENTRY_SPOT area
-		// (mapper-hand-tagged via nav_edit). Without hand-tagged spots,
-		// fall through to the flag itself as the build location.
+		// Single-defender quota: only the engineer closest to our flag
+		// claims the flag-room sentry slot. Other engineers (without an
+		// SG of their own and where a friendly SG already covers home)
+		// push forward to build a *forward* sentry on the way to the
+		// enemy's flag — TFBot-style "battle engineer".
+		const bool isHomeEngineer = ( ownFlag != NULL ) &&
+			( FFBotHelpers::FindClosestAliveEngineer( myTeam,
+				ownFlag->GetAbsOrigin() ) == me );
+
+		// 5a) Engineer with no SG yet: home-engineer goes to FF_NAV_SENTRY_SPOT
+		// nearest the flag. Other engineers go to the next-nearest unclaimed
+		// FF_NAV_SENTRY_SPOT, falling through to offense if none.
 		if ( !sg )
 		{
+			const Vector flagPos = ownFlag ? ownFlag->GetAbsOrigin() : myPos;
+
 			CFFNavArea *spot = NULL;
-			float bestDistSq = FLT_MAX;
+			float bestScore = -FLT_MAX;
 			for ( int i = 0; i < TheNavAreas.Count(); ++i )
 			{
 				CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
 				if ( !area->HasAttributeFF( FF_NAV_SENTRY_SPOT ) )
 					continue;
-				const float dSq = ( area->GetCenter() - myPos ).LengthSqr();
-				if ( dSq < bestDistSq )
+				const Vector spotPos = area->GetCenter();
+
+				// Skip spots already covered by a friendly SG.
+				if ( FFBotHelpers::IsFriendlySentryNear( myTeam, spotPos, 400.0f ) )
+					continue;
+
+				// Score: home engineer prefers spots near the flag; non-home
+				// engineers prefer spots far from the flag (forward push).
+				const float distToFlag = ( spotPos - flagPos ).Length();
+				const float score = isHomeEngineer ? -distToFlag : distToFlag;
+				if ( score > bestScore )
 				{
-					bestDistSq = dSq;
+					bestScore = score;
 					spot = area;
 				}
 			}
@@ -362,12 +435,18 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 				*outGoalPos = spot->GetCenter();
 				return STATE_DEFEND_OWN_FLAG;
 			}
-			if ( ownFlag )
+
+			// No untaken sentry spot found.
+			if ( isHomeEngineer && ownFlag )
 			{
+				// Home engineer: build at the flag itself.
 				outTargetEnt->Set( ownFlag );
 				*outGoalPos = ownFlag->GetAbsOrigin();
 				return STATE_DEFEND_OWN_FLAG;
 			}
+			// Non-home engineer with nowhere good to build: fall through
+			// to offense — they'll attempt the build wherever they end
+			// up (the class driver has its own friendlyNear guard).
 		}
 		else
 		{
@@ -377,17 +456,12 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 			const bool sgSapped  = sg->IsSabotaged();
 			const bool sgUpgrading = sg->GetLevel() < 3;
 			const bool sgNeedsHelp = sgWounded || sgSapped;
-
-			// Per the user spec: if SG is taking damage / sapped AND
-			// we're close enough to actually help, return to repair.
-			// If we're far away, leave it — running across the map to
-			// touch a sapped SG just wastes our time.
 			const bool closeEnoughToHelp = ( sgDist < 800.0f );
 
 			if ( ( sgNeedsHelp && closeEnoughToHelp ) ||
 				 sgUpgrading ||
 				 !hasDispenser ||
-				 flagThreatened )
+				 flagApproaching )
 			{
 				// Stay near the SG to repair / upgrade / build dispenser /
 				// defend the home base.
@@ -404,29 +478,11 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	}
 	else if ( isSniperRole )
 	{
-		// Snipers prefer a FF_NAV_SNIPER_SPOT-tagged area (mapper hand-tag
-		// via nav_edit). Without hand-tagged spots, fall through to cap
-		// point — snipers post up there to pick off attackers.
-		CFFNavArea *spot = NULL;
-		float bestDistSq = FLT_MAX;
-		for ( int i = 0; i < TheNavAreas.Count(); ++i )
-		{
-			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
-			if ( !area->HasAttributeFF( FF_NAV_SNIPER_SPOT ) )
-				continue;
-			const float dSq = ( area->GetCenter() - myPos ).LengthSqr();
-			if ( dSq < bestDistSq )
-			{
-				bestDistSq = dSq;
-				spot = area;
-			}
-		}
-		if ( spot )
-		{
-			outTargetEnt->Term();
-			*outGoalPos = spot->GetCenter();
-			return STATE_DEFEND_AT_CAP;
-		}
+		// Snipers normally route through CFFBotSniperLurk (set as the root
+		// action for sniper class in CFFBotMainAction::InitialContainedAction).
+		// CtfObjective only runs for sniper if Lurk is suspended for some
+		// reason — keep a sane fallback to cap area so the bot doesn't
+		// stand still.
 		CFFInfoScript *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
 		if ( cap )
 		{
@@ -443,7 +499,47 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	}
 	else if ( isHWGuyRole )
 	{
-		// HWGuys hold the choke at our flag area.
+		// HWGuy holds a choke between our flag and the nearest enemy spawn
+		// exit, NOT the flag itself. Picks the spawn-room threshold area
+		// for any enemy team that's closest to our flag — that's the
+		// doorway the enemy comes through to reach our flag, which is
+		// where the AC's spinup matters most.
+		CFFNavMesh *mesh = TheFFNavMesh();
+		Vector chokePos;
+		bool gotChoke = false;
+		if ( mesh && ownFlag )
+		{
+			const Vector flagPos = ownFlag->GetAbsOrigin();
+			float bestDistSq = FLT_MAX;
+			for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
+			{
+				if ( t == myTeam )
+					continue;
+				CUtlVector< CFFNavArea * > thresholds;
+				mesh->CollectSpawnRoomThresholdAreas( t, &thresholds );
+				for ( int i = 0; i < thresholds.Count(); ++i )
+				{
+					const Vector p = thresholds[ i ]->GetCenter();
+					const float dSq = ( p - flagPos ).LengthSqr();
+					if ( dSq < bestDistSq )
+					{
+						bestDistSq = dSq;
+						chokePos = p;
+						gotChoke = true;
+					}
+				}
+			}
+		}
+		if ( gotChoke )
+		{
+			// Stand 2/3 of the way from flag to choke — close enough to
+			// flag that we can rotate, still spun up at the doorway.
+			const Vector flagPos = ownFlag->GetAbsOrigin();
+			outTargetEnt->Term();
+			*outGoalPos = flagPos + ( chokePos - flagPos ) * 0.66f;
+			return STATE_DEFEND_OWN_FLAG;
+		}
+		// No choke computable — fall back to flag.
 		if ( ownFlag )
 		{
 			outTargetEnt->Set( ownFlag );
@@ -451,12 +547,38 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 			return STATE_DEFEND_OWN_FLAG;
 		}
 	}
-	else if ( flagThreatened && ownFlag )
+	else if ( flagApproaching && ownFlag )
 	{
-		// Non-defensive class but our flag is under attack — pull back.
-		outTargetEnt->Set( ownFlag );
-		*outGoalPos = ownFlag->GetAbsOrigin();
-		return STATE_DEFEND_OWN_FLAG;
+		// Non-defensive class and an enemy is actually pushing the flag.
+		// Quota: only the closest non-defensive bot to the flag responds.
+		// Others stay on offense.
+		const float myDistToFlagSq = ( me->GetAbsOrigin() - ownFlag->GetAbsOrigin() ).LengthSqr();
+		bool iAmClosest = true;
+		for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+		{
+			CFFPlayer *pp = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+			if ( !pp || pp == me || !pp->IsAlive() )
+				continue;
+			if ( pp->GetTeamNumber() != myTeam )
+				continue;
+			const int slot = pp->GetClassSlot();
+			if ( slot == CLASS_ENGINEER || slot == CLASS_SNIPER || slot == CLASS_HWGUY )
+				continue;	// already defensive or has its own logic
+			if ( slot == CLASS_CIVILIAN )
+				continue;
+			const float dSq = ( pp->GetAbsOrigin() - ownFlag->GetAbsOrigin() ).LengthSqr();
+			if ( dSq < myDistToFlagSq )
+			{
+				iAmClosest = false;
+				break;
+			}
+		}
+		if ( iAmClosest )
+		{
+			outTargetEnt->Set( ownFlag );
+			*outGoalPos = ownFlag->GetAbsOrigin();
+			return STATE_DEFEND_OWN_FLAG;
+		}
 	}
 
 	// 6) Offensive classes try to grab the closest enemy flag (default).
@@ -491,6 +613,26 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	{
 		outTargetEnt->Term();
 		return STATE_WANDER;
+	}
+
+	// Wander failed (rare — usually means bot is in a corner pocket with
+	// nothing within wander radius that's traversable). Final fallback so
+	// the bot doesn't freeze in spawn: aim at our team's spawn-room
+	// threshold area, which is always populated if we have spawn rooms.
+	{
+		CFFNavMesh *mesh = TheFFNavMesh();
+		if ( mesh )
+		{
+			CUtlVector< CFFNavArea * > thresholds;
+			mesh->CollectSpawnRoomThresholdAreas( myTeam, &thresholds );
+			if ( thresholds.Count() > 0 )
+			{
+				CFFNavArea *pick = thresholds[ RandomInt( 0, thresholds.Count() - 1 ) ];
+				outTargetEnt->Term();
+				*outGoalPos = pick->GetCenter();
+				return STATE_WANDER;
+			}
+		}
 	}
 
 	return STATE_NONE;
@@ -582,6 +724,21 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 	// window.
 	if ( me->m_pathInhibitTimer.HasStarted() && !me->m_pathInhibitTimer.IsElapsed() )
 		return Continue();
+
+	// Standing in a fresh fire / gas / slow / sticky zone? Force an
+	// immediate repath. The current path was computed before this danger
+	// existed and walks straight through it — without this nudge the bot
+	// stays on the bad waypoint until the regular m_repathTimer fires
+	// (~1.5s) and burns the whole time. Throttled so the scan only runs
+	// every ~0.25s — just often enough to react quickly without churning.
+	if ( !m_dangerCheckTimer.HasStarted() || m_dangerCheckTimer.IsElapsed() )
+	{
+		m_dangerCheckTimer.Start( 0.25f );
+		if ( IsStandingInGrenadeDanger( me->GetTeamNumber(), me->GetAbsOrigin() ) )
+		{
+			m_repathTimer.Invalidate();
+		}
+	}
 
 	// Recompute path occasionally and when the goal-target moves (e.g., the
 	// flag carrier we're chasing is moving).
