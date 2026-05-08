@@ -1,7 +1,6 @@
 //========= Fortress Forever Bot =============================================//
 //
-// CFFBot — Phase 3. Bot has a minimal IIntention with a Wander root action so
-// nav-walking can be exercised end-to-end. Real behavior tree comes in Phase 5.
+// CFFBot — TFBot-based fake-client adapter for FF.
 //
 //===========================================================================//
 
@@ -12,7 +11,6 @@
 #include "ff_bot_body.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_intel.h"
-#include "ff_bot_mapintel.h"
 #include "ff_nav_area.h"
 #include "ff_nav_mesh.h"
 #include "ff_player.h"
@@ -87,6 +85,7 @@ CFFBot::CFFBot()
 	m_routeSeed = (unsigned int)RandomInt( 1, 65535 );
 	m_lastRouteChokeID = 0;
 	m_spawnExitDir.Init();
+	m_spawnExitStartPos.Init();
 	m_spawnExitForceTimer.Invalidate();
 }
 
@@ -146,322 +145,175 @@ void CFFBot::Spawn( void )
 	m_recentStuckExpireTime = 0.0f;
 	m_lookAroundUntil = 0.0f;
 
-	// Spawn-exit aim override.
+	// Spawn-aim override.
 	//
-	// Root cause we're fighting: CGameRules::GetPlayerSpawnSpot
-	// (gamerules.cpp:218) calls SnapEyeAngles( pSpawnSpot->GetLocalAngles() )
-	// during BaseClass::Spawn(). That sets the bot's view to whatever angle
-	// the mapper gave the info_ff_teamspawn entity, which is often an
-	// arbitrary direction (sometimes facing the back wall). Human players
-	// turn around as soon as they spawn; bots can't, so PlayerLocomotion
-	// ::Approach reads view-vs-goal and presses IN_BACK, walking the bot
+	// Root cause: CGameRules::GetPlayerSpawnSpot calls SnapEyeAngles with
+	// the spawn entity's facing during BaseClass::Spawn(). Mappers don't
+	// always angle spawns toward the playable region, so PlayerLocomotion
+	// ::Approach can read view-vs-goal and press IN_BACK, walking the bot
 	// into whatever is behind their facing.
 	//
-	// Fix sequence (each tier falls through if the previous returns no
-	// usable direction): pick a target point, snap eye angles to face it,
-	// seed the body so Upkeep doesn't slew back to a stale m_lookAtPos.
+	// Approach (TFBot-style):
+	//   1. Use the bot's nav area's enemy-invasion vector — neighbors with
+	//      LOWER enemy-team incursion distance are the doorways out of
+	//      our spawn toward the fight. Picks the closest one.
+	//   2. If invasion vector is empty (interior area with no gradient,
+	//      e.g., area entirely surrounded by spawn-room neighbors), fall
+	//      back to the closest spawn-room threshold area for our team.
+	//   3. Last resort: closest enemy flag/cap area as a directional hint.
 	//
-	//   1. Adjacent non-spawn nav area (we're inside spawn, doorway is
-	//      one nav-edge away).
-	//   2. Two-hop search (multi-area spawn rooms).
-	//   3. Nearest SPAWN_EXIT-tagged area for our team (precise threshold
-	//      list built by the tagger).
-	//   4. Nearest non-spawn nav area within 1500u (covers the case where
-	//      the tagger didn't tag our spawn area at all — we still face
-	//      *some* non-spawn region).
-	//   5. Direction toward our enemy team's nearest cap/flag area
-	//      (objective direction; usually points outward from spawn).
-	//
-	// If even tier 5 fails (no nav, no objectives), the bot keeps the
-	// spawn entity's angles. That's the same outcome a human player gets;
-	// we just can't do better without a map cue.
+	// All three depend only on level-init nav state, not intra-room
+	// position, so two bots in the same spawn room get the same direction.
 	m_spawnExitDir.Init();
 	m_spawnExitForceTimer.Invalidate();
 
 	const Vector myPos = GetAbsOrigin();
+	m_spawnExitStartPos = myPos;
+
+	CBaseEntity *spawnSpot = GetLastSpawnPoint();
 	Vector targetPos = vec3_origin;
 	const char *tier = "none";
-	int navTier = 0;	// 0 = no nav, otherwise tier number (1..5) used
+	bool gotTarget = false;
+	CNavArea *botArea = NULL;
+	CFFNavMesh *ffMesh = TheFFNavMesh();
 
 	if ( TheNavMesh && TheNavMesh->IsLoaded() )
 	{
-		CNavArea *startArea = TheNavMesh->GetNearestNavArea(
+		botArea = TheNavMesh->GetNearestNavArea(
 			myPos, false, 1024.0f, false, true, TEAM_ANY );
-		CFFNavArea *here = static_cast< CFFNavArea * >( startArea );
-		const bool hereIsSpawn = ( here && here->HasFFTag( FF_NAV_SPAWN_ANY ) );
 
-		// Tier 1+2: adjacent / two-hop non-spawn area.
-		if ( hereIsSpawn )
+		// Tier 1: invasion vector from our nav area.
+		if ( !gotTarget && botArea )
 		{
-			CFFNavArea *exit = NULL;
-			for ( int d = 0; d < NUM_DIRECTIONS && !exit; ++d )
-			{
-				const NavConnectVector *adj = here->GetAdjacentAreas( (NavDirType)d );
-				if ( !adj )
-					continue;
-				for ( int i = 0; i < adj->Count(); ++i )
-				{
-					CFFNavArea *cand = static_cast< CFFNavArea * >( ( *adj )[ i ].area );
-					if ( cand && !cand->HasFFTag( FF_NAV_SPAWN_ANY ) )
-					{
-						exit = cand;
-						break;
-					}
-				}
-			}
-			if ( exit )
-			{
-				targetPos = exit->GetCenter();
-				tier = "T1 adjacent non-spawn";
-				navTier = 1;
-			}
-			else
-			{
-				for ( int d = 0; d < NUM_DIRECTIONS && !exit; ++d )
-				{
-					const NavConnectVector *adj = here->GetAdjacentAreas( (NavDirType)d );
-					if ( !adj )
-						continue;
-					for ( int i = 0; i < adj->Count() && !exit; ++i )
-					{
-						CFFNavArea *step1 = static_cast< CFFNavArea * >( ( *adj )[ i ].area );
-						if ( !step1 )
-							continue;
-						for ( int d2 = 0; d2 < NUM_DIRECTIONS && !exit; ++d2 )
-						{
-							const NavConnectVector *adj2 = step1->GetAdjacentAreas( (NavDirType)d2 );
-							if ( !adj2 )
-								continue;
-							for ( int j = 0; j < adj2->Count(); ++j )
-							{
-								CFFNavArea *cand = static_cast< CFFNavArea * >( ( *adj2 )[ j ].area );
-								if ( cand && !cand->HasFFTag( FF_NAV_SPAWN_ANY ) )
-								{
-									exit = cand;
-									break;
-								}
-							}
-						}
-					}
-				}
-				if ( exit )
-				{
-					targetPos = exit->GetCenter();
-					tier = "T2 two-hop non-spawn";
-					navTier = 2;
-				}
-			}
-		}
-
-		// Tier 3: nearest SPAWN_EXIT-tagged area for our team (the explicit
-		// threshold list the tagger built). Useful when our nav area got
-		// tagged spawn but neighbor walking didn't find an exit (e.g.,
-		// disconnected sub-areas of the same spawn room).
-		if ( navTier == 0 )
-		{
-			CFFNavMesh *mesh = TheFFNavMesh();
-			const CUtlVector< CFFNavArea * > *exits =
-				mesh ? mesh->GetSpawnExitAreas( GetTeamNumber() ) : NULL;
-			if ( exits && exits->Count() > 0 )
+			CFFNavArea *here = static_cast< CFFNavArea * >( botArea );
+			const CUtlVector< CFFNavArea * > &invasion =
+				here->GetEnemyInvasionAreaVector( GetTeamNumber() );
+			if ( invasion.Count() > 0 )
 			{
 				CFFNavArea *best = NULL;
 				float bestDistSq = FLT_MAX;
-				for ( int i = 0; i < exits->Count(); ++i )
+				for ( int i = 0; i < invasion.Count(); ++i )
 				{
-					const float dSq = ( ( *exits )[ i ]->GetCenter() - myPos ).LengthSqr();
+					CFFNavArea *cand = invasion[ i ];
+					if ( !cand )
+						continue;
+					Vector delta = cand->GetCenter() - myPos;
+					delta.z = 0.0f;
+					const float dSq = delta.LengthSqr();
+					if ( dSq < 1.0f )
+						continue;
 					if ( dSq < bestDistSq )
 					{
 						bestDistSq = dSq;
-						best = ( *exits )[ i ];
+						best = cand;
 					}
 				}
 				if ( best )
 				{
 					targetPos = best->GetCenter();
-					tier = "T3 nearest SPAWN_EXIT";
-					navTier = 3;
+					tier = "invasion";
+					gotTarget = true;
 				}
 			}
 		}
 
-		// Tier 4: BFS through the nav graph from our start area. The first
-		// non-spawn-tagged area we reach via nav edges is the actual
-		// REACHABLE exit, regardless of whether the tagger worked.
-		//
-		// Why this beats Euclidean "nearest non-spawn":
-		//   - On 2fort's lower spawn, the side-wall doorway connects (via
-		//     nav edges) to a corridor heading UP — but the Euclidean
-		//     nearest non-spawn area might be a courtyard chunk on the
-		//     other side of a wall. Aiming Euclidean walks the bot into
-		//     the wall.
-		//   - BFS through the nav graph follows the ACTUAL connectivity:
-		//     the first non-spawn area found is the area on the other
-		//     side of a real doorway / corridor / ramp.
-		//
-		// We track the area we reached the non-spawn area FROM ("parent"
-		// in BFS terms). Aiming at the parent's center pulls the bot
-		// through the doorway threshold rather than toward the far side
-		// of the next room.
-		if ( navTier == 0 && startArea )
+		// Tier 2: closest spawn-room threshold area for our team. Mirrors
+		// CTFNavMesh::CollectSpawnRoomThresholdAreas — the largest non-spawn
+		// neighbor of each spawn-room exit, i.e., the playable region we
+		// step into when leaving spawn.
+		if ( !gotTarget && ffMesh )
 		{
-			CUtlVector< CFFNavArea * > openList;
-			CUtlVector< CFFNavArea * > parentOf;	// 1:1 with openList
-			CUtlVector< CFFNavArea * > visited;
-
-			openList.AddToTail( static_cast< CFFNavArea * >( startArea ) );
-			parentOf.AddToTail( NULL );
-			visited.AddToTail( static_cast< CFFNavArea * >( startArea ) );
-
-			CFFNavArea *firstNonSpawn = NULL;
-			CFFNavArea *thresholdParent = NULL;
-
-			// Cap BFS depth so we don't explore the whole map for no
-			// gain. 32 areas is plenty to reach the first doorway from
-			// any spawn room.
-			int explored = 0;
-			while ( explored < openList.Count() && explored < 32 && !firstNonSpawn )
-			{
-				CFFNavArea *cur = openList[ explored ];
-				CFFNavArea *parent = parentOf[ explored ];
-				++explored;
-
-				if ( !cur->HasFFTag( FF_NAV_SPAWN_ANY ) && parent != NULL )
-				{
-					firstNonSpawn = cur;
-					thresholdParent = parent;
-					break;
-				}
-
-				for ( int dir = 0; dir < NUM_DIRECTIONS; ++dir )
-				{
-					const NavConnectVector *adj = cur->GetAdjacentAreas( (NavDirType)dir );
-					if ( !adj )
-						continue;
-					for ( int i = 0; i < adj->Count(); ++i )
-					{
-						CFFNavArea *neighbor = static_cast< CFFNavArea * >( ( *adj )[ i ].area );
-						if ( !neighbor )
-							continue;
-						if ( visited.Find( neighbor ) != visited.InvalidIndex() )
-							continue;
-						visited.AddToTail( neighbor );
-						openList.AddToTail( neighbor );
-						parentOf.AddToTail( cur );
-					}
-				}
-			}
-
-			if ( firstNonSpawn )
-			{
-				// Aim through the threshold (the spawn-side area we
-				// reached from). If we reached the non-spawn area
-				// directly from start (parent == start), aim straight
-				// at the non-spawn area's center.
-				if ( thresholdParent && thresholdParent != startArea )
-					targetPos = thresholdParent->GetCenter();
-				else
-					targetPos = firstNonSpawn->GetCenter();
-				tier = "T4 BFS first non-spawn";
-				navTier = 4;
-			}
-		}
-	}
-
-	// Tier 5: enemy objective direction. Points roughly toward enemy
-	// territory regardless of whether nav tagging worked.
-	if ( navTier == 0 )
-	{
-		CFFNavMesh *mesh = TheFFNavMesh();
-		if ( mesh )
-		{
-			Vector best = vec3_origin;
+			CUtlVector< CFFNavArea * > thresholds;
+			ffMesh->CollectSpawnRoomThresholdAreas( GetTeamNumber(), &thresholds );
+			CFFNavArea *best = NULL;
 			float bestDistSq = FLT_MAX;
-			for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
+			for ( int i = 0; i < thresholds.Count(); ++i )
 			{
-				if ( t == GetTeamNumber() )
-					continue;
-				const CUtlVector< CFFNavArea * > *enemyFlags = mesh->GetFlagAreas( t );
-				if ( enemyFlags )
+				const float dSq = ( thresholds[ i ]->GetCenter() - myPos ).LengthSqr();
+				if ( dSq < bestDistSq )
 				{
-					for ( int i = 0; i < enemyFlags->Count(); ++i )
-					{
-						const float dSq = ( ( *enemyFlags )[ i ]->GetCenter() - myPos ).LengthSqr();
-						if ( dSq < bestDistSq )
-						{
-							bestDistSq = dSq;
-							best = ( *enemyFlags )[ i ]->GetCenter();
-						}
-					}
-				}
-				const CUtlVector< CFFNavArea * > *enemyCaps = mesh->GetCapAreas( t );
-				if ( enemyCaps )
-				{
-					for ( int i = 0; i < enemyCaps->Count(); ++i )
-					{
-						const float dSq = ( ( *enemyCaps )[ i ]->GetCenter() - myPos ).LengthSqr();
-						if ( dSq < bestDistSq )
-						{
-							bestDistSq = dSq;
-							best = ( *enemyCaps )[ i ]->GetCenter();
-						}
-					}
+					bestDistSq = dSq;
+					best = thresholds[ i ];
 				}
 			}
-			if ( bestDistSq < FLT_MAX )
+			if ( best )
 			{
-				targetPos = best;
-				tier = "T5 enemy objective";
-				navTier = 5;
+				targetPos = best->GetCenter();
+				tier = "threshold";
+				gotTarget = true;
 			}
 		}
 	}
 
-	// Targeted diagnostics so we can correlate "bot stuck" reports with
-	// what nav tagging / search picked. Logged once per spawn (initial
-	// and respawn). Includes:
-	//   - bot identity (name, team, class)
-	//   - bot spawn position
-	//   - nearest nav area ID + tag bits
-	//   - per-team SPAWN_EXIT count (T3 input — empty = over-tagging
-	//     consumed all the threshold areas)
-	//   - tier selected, target world pos
-	const int diagTeam = GetTeamNumber();
-	const int diagClass = GetClassSlot();
-	const char *diagName = GetPlayerName() ? GetPlayerName() : "?";
-	int diagAreaId = -1;
-	int diagAreaTags = 0;
+	// Tier 3: closest enemy flag / cap area as a directional hint.
+	if ( !gotTarget && ffMesh )
 	{
-		CNavArea *cur = TheNavMesh ? TheNavMesh->GetNearestNavArea(
-			myPos, false, 1024.0f, false, true, TEAM_ANY ) : NULL;
-		if ( cur )
+		Vector best = vec3_origin;
+		float bestDistSq = FLT_MAX;
+		for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
 		{
-			diagAreaId = cur->GetID();
-			diagAreaTags = static_cast< CFFNavArea * >( cur )->GetFFTags();
+			if ( t == GetTeamNumber() )
+				continue;
+			const CUtlVector< CFFNavArea * > *flags = ffMesh->GetFlagAreas( t );
+			if ( flags )
+			{
+				for ( int i = 0; i < flags->Count(); ++i )
+				{
+					const float dSq = ( ( *flags )[ i ]->GetCenter() - myPos ).LengthSqr();
+					if ( dSq < bestDistSq )
+					{
+						bestDistSq = dSq;
+						best = ( *flags )[ i ]->GetCenter();
+					}
+				}
+			}
+			const CUtlVector< CFFNavArea * > *caps = ffMesh->GetCapAreas( t );
+			if ( caps )
+			{
+				for ( int i = 0; i < caps->Count(); ++i )
+				{
+					const float dSq = ( ( *caps )[ i ]->GetCenter() - myPos ).LengthSqr();
+					if ( dSq < bestDistSq )
+					{
+						bestDistSq = dSq;
+						best = ( *caps )[ i ]->GetCenter();
+					}
+				}
+			}
+		}
+		if ( bestDistSq < FLT_MAX )
+		{
+			targetPos = best;
+			tier = "objective";
+			gotTarget = true;
 		}
 	}
-	int diagExitCount = 0;
-	if ( CFFNavMesh *mesh = TheFFNavMesh() )
+
+	// Diagnostics — bot name/team/class/pos/spawn entity/nav area, plus
+	// which tier picked the direction. Helps correlate "bot stuck"
+	// reports with whether the tagger fired correctly.
+	const char *diagName = GetPlayerName() ? GetPlayerName() : "?";
+	const char *diagSpawnClass = spawnSpot ? spawnSpot->GetClassname() : "none";
+	const char *diagSpawnName = spawnSpot ? STRING( spawnSpot->GetEntityName() ) : "";
+	if ( !diagSpawnName || !diagSpawnName[ 0 ] )
+		diagSpawnName = "-";
+	int diagAreaId = -1;
+	unsigned int diagAreaAttrs = 0;
+	if ( botArea )
 	{
-		const CUtlVector< CFFNavArea * > *exits = mesh->GetSpawnExitAreas( diagTeam );
-		if ( exits )
-			diagExitCount = exits->Count();
+		diagAreaId = botArea->GetID();
+		diagAreaAttrs = static_cast< CFFNavArea * >( botArea )->GetAttributesFF();
 	}
 
-	if ( navTier > 0 )
+	if ( gotTarget )
 	{
 		Vector dir = targetPos - myPos;
 		dir.z = 0.0f;
 		if ( dir.NormalizeInPlace() > 0.1f )
 		{
-			// No yaw jitter — the user identified that ±15° rotation can
-			// aim a bot into a wall when the doorway is narrow. Spread
-			// bots out via path-cost penalties, player avoidance, and
-			// HandleWallAvoidance whisker tracing instead.
 			m_spawnExitDir = dir;
 			m_spawnExitForceTimer.Start( 1.5f );
 
-			// Snap eye angles so PlayerLocomotion::Approach reads the
-			// correct view this tick and presses IN_FORWARD.
 			QAngle desiredAngles;
 			VectorAngles( dir, desiredAngles );
 			SnapEyeAngles( desiredAngles );
@@ -474,30 +326,19 @@ void CFFBot::Spawn( void )
 			}
 
 			Msg( "[CFFBot] spawn-aim '%s' team=%d class=%d pos=(%.0f,%.0f,%.0f) "
-				"navArea=%d tags=0x%08x exits[team]=%d tier=%s dir=(%.2f,%.2f) yaw=%.0f\n",
-				diagName, diagTeam, diagClass,
+				"spawn=%s:%s navArea=%d attrs=0x%08x tier=%s yaw=%.0f\n",
+				diagName, GetTeamNumber(), GetClassSlot(),
 				myPos.x, myPos.y, myPos.z,
-				diagAreaId, diagAreaTags, diagExitCount,
-				tier, dir.x, dir.y, desiredAngles.y );
-		}
-		else
-		{
-			Msg( "[CFFBot] spawn-aim '%s' team=%d class=%d navArea=%d tags=0x%08x "
-				"exits[team]=%d tier=%s — direction collapsed (target == bot pos).\n",
-				diagName, diagTeam, diagClass, diagAreaId, diagAreaTags,
-				diagExitCount, tier );
+				diagSpawnClass, diagSpawnName, diagAreaId, diagAreaAttrs,
+				tier, desiredAngles.y );
 		}
 	}
 	else
 	{
-		// No tier matched — emit a clear warning. With BFS T4 added,
-		// this should be rare (only happens with no nav loaded at all).
-		Msg( "[CFFBot] spawn-aim '%s' team=%d class=%d pos=(%.0f,%.0f,%.0f) "
-			"navArea=%d tags=0x%08x exits[team]=%d — NO TIER MATCHED, "
-			"bot keeps spawn entity's angles.\n",
-			diagName, diagTeam, diagClass,
-			myPos.x, myPos.y, myPos.z,
-			diagAreaId, diagAreaTags, diagExitCount );
+		Msg( "[CFFBot] spawn-aim '%s' team=%d class=%d navArea=%d attrs=0x%08x — "
+			"no tier matched (no nav, no threshold, no objective). "
+			"Bot keeps spawn entity's angles.\n",
+			diagName, GetTeamNumber(), GetClassSlot(), diagAreaId, diagAreaAttrs );
 	}
 }
 
@@ -785,8 +626,6 @@ void FFBotManager_Tick( void )
 {
 	// Intel layer runs every frame: alert decay, flag-stolen detection.
 	FFBotIntel::Tick();
-	// Map-intel layer: refresh enemy-sentry registry, mancannon nav tags.
-	FFBotMapIntel::Tick();
 
 	static CountdownTimer s_balanceTimer;
 	if ( !s_balanceTimer.HasStarted() )

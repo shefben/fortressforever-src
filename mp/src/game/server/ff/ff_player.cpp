@@ -633,6 +633,7 @@ CFFPlayer::CFFPlayer()
 	m_flLastClassSwitch = 0.0f;
 
 	m_SpawnPointOverride = 0;
+	m_hLastSpawnPoint = NULL;
 
 	m_recentAttackers.Purge();
 	//m_iStatsID = -1;
@@ -972,6 +973,7 @@ CBaseEntity *g_pLastSpawnRandomizer = NULL;
 void CFFPlayer::SetLastSpawn( CBaseEntity *pEntity )
 {
 	g_pLastSpawn = pEntity;
+	m_hLastSpawnPoint = pEntity;
 
 	if( !pEntity )
 		g_pLastSpawnRandomizer = NULL;
@@ -1095,7 +1097,10 @@ ReturnSpot:
 	//////////////////////////////////////////////////////////////////////////
 	// Shortcut for spawning bots where we want them.
 	if(m_SpawnPointOverride)
+	{
+		m_hLastSpawnPoint = m_SpawnPointOverride;
 		return m_SpawnPointOverride;
+	}
 	//////////////////////////////////////////////////////////////////////////
 
 // --> Jon: new spawn method
@@ -1273,6 +1278,7 @@ ReturnSpot:
 	if( !pSpot  )
 	{
 		Warning( "PutClientInServer: no info_player_start on level\n");
+		m_hLastSpawnPoint = NULL;
 		return CBaseEntity::Instance( INDEXENT( 0 ) );
 	}
 	else
@@ -1283,6 +1289,7 @@ ReturnSpot:
 	}
 
 	g_pLastSpawn = pSpot;
+	m_hLastSpawnPoint = pSpot;
 	return pSpot;
 	//*/
 }

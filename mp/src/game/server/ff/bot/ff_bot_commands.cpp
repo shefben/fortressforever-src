@@ -1,6 +1,6 @@
 //========= Fortress Forever Bot =============================================//
 //
-// FFBot console commands — validation, visualization, save/load, diagnose.
+// FFBot console commands — validation, visualization, diagnose.
 //
 //===========================================================================//
 
@@ -8,8 +8,6 @@
 #include "ff_bot.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_intel.h"
-#include "ff_bot_mapintel.h"
-#include "ff_bot_persistence.h"
 #include "ff_nav_area.h"
 #include "ff_nav_mesh.h"
 #include "ff_info_script.h"
@@ -27,60 +25,6 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-
-//-----------------------------------------------------------------------------
-// ff_nav_save — write the current FF semantic tags to <map>.ffnav so future
-// loads can skip inference.
-//-----------------------------------------------------------------------------
-CON_COMMAND_F( ff_nav_save, "Save FF nav semantic tags to <map>.ffnav.", FCVAR_CHEAT )
-{
-	CFFNavMesh *mesh = TheFFNavMesh();
-	if ( !mesh || !mesh->IsLoaded() )
-	{
-		Msg( "Nav mesh not loaded.\n" );
-		return;
-	}
-	if ( FFBotPersistence::Save( mesh ) )
-		Msg( "Saved.\n" );
-	else
-		Msg( "Save failed.\n" );
-}
-
-
-//-----------------------------------------------------------------------------
-// ff_nav_analyze — clear runtime tags + re-run inference + save. Useful
-// after editing a map's spawns/flags without restarting the server.
-//-----------------------------------------------------------------------------
-CON_COMMAND_F( ff_nav_analyze, "Re-run FF map-intel inference and save .ffnav.", FCVAR_CHEAT )
-{
-	CFFNavMesh *mesh = TheFFNavMesh();
-	if ( !mesh || !mesh->IsLoaded() )
-	{
-		Msg( "Nav mesh not loaded.\n" );
-		return;
-	}
-
-	// Clear inferred tags (preserve entity-derived ones).
-	const int preservedMask =
-		FF_NAV_SPAWN_ANY | FF_NAV_FLAG_ANY | FF_NAV_CAP_ANY |
-		FF_NAV_RESUPPLY | FF_NAV_AMMO | FF_NAV_ARMOR | FF_NAV_HEALTH | FF_NAV_GRENADES |
-		FF_NAV_VIP_GOAL | FF_NAV_NO_BUILD;
-	for ( int i = 0; i < TheNavAreas.Count(); ++i )
-	{
-		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
-		if ( !area )
-			continue;
-		const int keep = area->GetFFTags() & preservedMask;
-		area->ClearFFTags();
-		area->AddFFTag( keep );
-		area->SetClassMask( 0 );
-	}
-
-	FFBotMapIntel::RunLevelInit( mesh );
-	FFBotPersistence::Save( mesh );
-	Msg( "FF nav re-analyzed.\n" );
-}
 
 
 //-----------------------------------------------------------------------------
@@ -133,8 +77,7 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 		}
 	}
 
-	// Connectivity: every spawn should be able to reach every flag of
-	// other teams.
+	// Connectivity: every spawn should reach every other team's flag.
 	struct GeoCost : public IPathCost {
 		virtual float operator()( CNavArea *area, CNavArea *fromArea, const CNavLadder *ladder, const CFuncElevator *, float length ) const OVERRIDE {
 			if ( !fromArea ) return 0.0f;
@@ -171,37 +114,54 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 		}
 	}
 
-	// Tag-counts summary.
-	int tagCounts[ 32 ] = { 0 };
+	// Attribute-counts summary — only the bits we still set.
+	struct { int bit; const char *name; } known[] = {
+		{ FF_NAV_BLOCKED,            "BLOCKED" },
+		{ FF_NAV_SPAWN_ROOM_BLUE,    "SPAWN_ROOM_BLUE" },
+		{ FF_NAV_SPAWN_ROOM_RED,     "SPAWN_ROOM_RED" },
+		{ FF_NAV_SPAWN_ROOM_YELLOW,  "SPAWN_ROOM_YELLOW" },
+		{ FF_NAV_SPAWN_ROOM_GREEN,   "SPAWN_ROOM_GREEN" },
+		{ FF_NAV_SPAWN_ROOM_EXIT,    "SPAWN_ROOM_EXIT" },
+		{ FF_NAV_HAS_AMMO,           "HAS_AMMO" },
+		{ FF_NAV_HAS_HEALTH,         "HAS_HEALTH" },
+		{ FF_NAV_HAS_ARMOR,          "HAS_ARMOR" },
+		{ FF_NAV_HAS_GRENADES,       "HAS_GRENADES" },
+		{ FF_NAV_FLAG_BLUE,          "FLAG_BLUE" },
+		{ FF_NAV_FLAG_RED,           "FLAG_RED" },
+		{ FF_NAV_FLAG_YELLOW,        "FLAG_YELLOW" },
+		{ FF_NAV_FLAG_GREEN,         "FLAG_GREEN" },
+		{ FF_NAV_CAP_BLUE,           "CAP_BLUE" },
+		{ FF_NAV_CAP_RED,            "CAP_RED" },
+		{ FF_NAV_CAP_YELLOW,         "CAP_YELLOW" },
+		{ FF_NAV_CAP_GREEN,          "CAP_GREEN" },
+		{ FF_NAV_SNIPER_SPOT,        "SNIPER_SPOT" },
+		{ FF_NAV_SENTRY_SPOT,        "SENTRY_SPOT" },
+		{ FF_NAV_HUNTED_ESCAPE,      "HUNTED_ESCAPE" },
+		{ FF_NAV_NO_SPAWNING,        "NO_SPAWNING" },
+		{ FF_NAV_UNBLOCKABLE,        "UNBLOCKABLE" },
+	};
+	const int kKnown = (int)( sizeof( known ) / sizeof( known[ 0 ] ) );
+	int counts[ 32 ] = { 0 };
 	for ( int i = 0; i < TheNavAreas.Count(); ++i )
 	{
 		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
 		if ( !area ) continue;
-		const int t = area->GetFFTags();
-		for ( int b = 0; b < 32; ++b )
-			if ( t & ( 1 << b ) ) ++tagCounts[ b ];
+		const unsigned int t = area->GetAttributesFF();
+		for ( int k = 0; k < kKnown; ++k )
+		{
+			if ( t & known[ k ].bit ) ++counts[ k ];
+		}
 	}
 
 	Msg( "\n[ff_nav_validate] Coverage:\n" );
 	Msg( "    teamspawn entities:   %d (missing nav: %d)\n", spawns, spawnMissing );
 	Msg( "    info_ff_script goals: %d (missing nav: %d)\n", infoScripts, infoMissing );
 	Msg( "    connectivity failures: %d\n", connectivityFails );
-	Msg( "[ff_nav_validate] Tag counts:\n" );
-	int knownBits[] = { 0,1,2,3, 4,5,6,7, 8,9,10,11, 12,13,14,15,16, 17, 18,19,20,21, 22,23,24, 25,26,27 };
-	const char *bitNames[] = {
-		"SPAWN_BLUE","SPAWN_RED","SPAWN_YELLOW","SPAWN_GREEN",
-		"FLAG_BLUE","FLAG_RED","FLAG_YELLOW","FLAG_GREEN",
-		"CAP_BLUE","CAP_RED","CAP_YELLOW","CAP_GREEN",
-		"RESUPPLY","AMMO","ARMOR","HEALTH","GRENADES",
-		"VIP_GOAL",
-		"NO_BUILD","SENTRY_HINT","SNIPER_HINT","DETPACKABLE_DOOR",
-		"WATER","BACKDOOR","MANCANNON",
-		"CHOKE","NEAR_DOOR","INTERCEPT_LANE",
-	};
-	for ( int i = 0; i < (int)( sizeof( knownBits ) / sizeof( int ) ); ++i )
+	Msg( "[ff_nav_validate] Attribute counts:\n" );
+	for ( int k = 0; k < kKnown; ++k )
 	{
-		if ( tagCounts[ knownBits[ i ] ] > 0 )
-			Msg( "    %-22s %d\n", bitNames[ i ], tagCounts[ knownBits[ i ] ] );
+		if ( counts[ k ] > 0 )
+			Msg( "    %-22s %d\n", known[ k ].name, counts[ k ] );
 	}
 
 	Msg( "[ff_nav_validate] %s (%d issue%s)\n",
@@ -211,11 +171,10 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 
 
 //-----------------------------------------------------------------------------
-// ff_nav_visualize <type> — draw debug overlays for a tag class.
-// type: spawn, flag, cap, resupply, sniper, sentry, water, backdoor,
-//       choke, near_door, danger, all
+// ff_nav_visualize <type> — draw debug overlays for an attribute class.
+// type: spawn, exit, flag, cap, resupply, sniper, sentry, combat, all
 //-----------------------------------------------------------------------------
-CON_COMMAND_F( ff_nav_visualize, "Visualize FF nav tags. Args: spawn|flag|cap|resupply|sniper|sentry|water|backdoor|choke|near_door|danger|all", FCVAR_CHEAT )
+CON_COMMAND_F( ff_nav_visualize, "Visualize FF nav attributes. Args: spawn|exit|flag|cap|resupply|sniper|sentry|combat|all", FCVAR_CHEAT )
 {
 	if ( args.ArgC() < 2 )
 	{
@@ -224,22 +183,19 @@ CON_COMMAND_F( ff_nav_visualize, "Visualize FF nav tags. Args: spawn|flag|cap|re
 	}
 	const char *type = args.Arg( 1 );
 
-	int tagFilter = 0;
-	int color[3] = { 255, 255, 255 };
-	bool dangerMode = false;
+	int filter = 0;
+	int color[ 3 ] = { 255, 255, 255 };
+	bool combatMode = false;
 
-	if ( FStrEq( type, "spawn" ) )      { tagFilter = FF_NAV_SPAWN_ANY;       color[0]=128; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "flag" ) )  { tagFilter = FF_NAV_FLAG_ANY;        color[0]=255; color[1]=255; color[2]=64;  }
-	else if ( FStrEq( type, "cap" ) )   { tagFilter = FF_NAV_CAP_ANY;         color[0]=255; color[1]=128; color[2]=64;  }
-	else if ( FStrEq( type, "resupply" ) ) { tagFilter = FF_NAV_RESUPPLY;     color[0]=64;  color[1]=255; color[2]=128; }
-	else if ( FStrEq( type, "sniper" ) ){ tagFilter = FF_NAV_SNIPER_HINT;     color[0]=255; color[1]=64;  color[2]=255; }
-	else if ( FStrEq( type, "sentry" ) ){ tagFilter = FF_NAV_SENTRY_HINT;     color[0]=255; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "water" ) ) { tagFilter = FF_NAV_WATER;           color[0]=64;  color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "backdoor" ) ){ tagFilter = FF_NAV_BACKDOOR;      color[0]=180; color[1]=64;  color[2]=180; }
-	else if ( FStrEq( type, "choke" ) ) { tagFilter = FF_NAV_CHOKE;           color[0]=255; color[1]=128; color[2]=0;   }
-	else if ( FStrEq( type, "near_door" ) ){ tagFilter = FF_NAV_NEAR_DOOR;    color[0]=128; color[1]=64;  color[2]=64;  }
-	else if ( FStrEq( type, "danger" ) ) { dangerMode = true; }
-	else if ( FStrEq( type, "all" ) )   { tagFilter = -1; }
+	if ( FStrEq( type, "spawn" ) )         { filter = FF_NAV_SPAWN_ROOM_ANY; color[0]=128; color[1]=128; color[2]=255; }
+	else if ( FStrEq( type, "exit" ) )     { filter = FF_NAV_SPAWN_ROOM_EXIT; color[0]=128; color[1]=255; color[2]=128; }
+	else if ( FStrEq( type, "flag" ) )     { filter = FF_NAV_FLAG_ANY;       color[0]=255; color[1]=255; color[2]=64;  }
+	else if ( FStrEq( type, "cap" ) )      { filter = FF_NAV_CAP_ANY;        color[0]=255; color[1]=128; color[2]=64;  }
+	else if ( FStrEq( type, "resupply" ) ) { filter = FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH | FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES; color[0]=64; color[1]=255; color[2]=128; }
+	else if ( FStrEq( type, "sniper" ) )   { filter = FF_NAV_SNIPER_SPOT;    color[0]=255; color[1]=64;  color[2]=255; }
+	else if ( FStrEq( type, "sentry" ) )   { filter = FF_NAV_SENTRY_SPOT;    color[0]=255; color[1]=128; color[2]=255; }
+	else if ( FStrEq( type, "combat" ) )   { combatMode = true; }
+	else if ( FStrEq( type, "all" ) )      { filter = -1; }
 	else { Msg( "Unknown type '%s'\n", type ); return; }
 
 	int drawn = 0;
@@ -249,30 +205,26 @@ CON_COMMAND_F( ff_nav_visualize, "Visualize FF nav tags. Args: spawn|flag|cap|re
 		if ( !area )
 			continue;
 
-		float intensity = 0.0f;
-		if ( dangerMode )
+		if ( combatMode )
 		{
-			const float d = area->GetDangerScore();
-			if ( d <= 0.5f ) continue;
-			intensity = MIN( 1.0f, d / 10.0f );
-			color[0] = (int)( 255 * intensity );
-			color[1] = 0;
-			color[2] = 0;
+			const float intensity = area->GetCombatIntensity();
+			if ( intensity <= 0.05f ) continue;
+			color[ 0 ] = (int)( 255 * intensity );
+			color[ 1 ] = 0;
+			color[ 2 ] = 0;
 		}
-		else if ( tagFilter == -1 )
+		else if ( filter == -1 )
 		{
-			if ( area->GetFFTags() == 0 ) continue;
-			intensity = 1.0f;
+			if ( area->GetAttributesFF() == 0 ) continue;
 		}
 		else
 		{
-			if ( !area->HasFFTag( tagFilter ) ) continue;
-			intensity = 1.0f;
+			if ( !area->HasAttributeFF( filter ) ) continue;
 		}
 
 		const Vector center = area->GetCenter();
 		NDebugOverlay::Box( center, Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-			color[0], color[1], color[2], 64, 30.0f );
+			color[ 0 ], color[ 1 ], color[ 2 ], 64, 30.0f );
 		++drawn;
 	}
 	Msg( "[ff_nav_visualize] Drew %d areas for '%s'.\n", drawn, type );

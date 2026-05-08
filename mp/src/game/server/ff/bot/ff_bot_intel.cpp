@@ -240,7 +240,7 @@ static void TickHeatmap( void )
 				CNavArea *area = TheNavMesh->GetNearestNavArea(
 					snap->lastAlivePos, false, 256.0f, false, true, TEAM_ANY );
 				if ( area )
-					static_cast< CFFNavArea * >( area )->IncrementDanger( 1.0f );
+					static_cast< CFFNavArea * >( area )->OnCombat();
 			}
 		}
 		snap->wasAlive = isAlive;

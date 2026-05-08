@@ -8,7 +8,6 @@
 #include "ff_bot_ctf.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_intel.h"
-#include "ff_bot_mapintel.h"
 #include "ff_bot_path_cost.h"
 #include "ff_nav_area.h"
 #include "ff_nav_mesh.h"
@@ -90,7 +89,7 @@ static CNavArea *FindNearestHuntedEscapeArea( const Vector &fromPos )
 	for ( int i = 0; i < TheNavAreas.Count(); ++i )
 	{
 		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
-		if ( !area->HasFFTag( FF_NAV_HUNTED_ESCAPE ) )
+		if ( !area->HasAttributeFF( FF_NAV_HUNTED_ESCAPE ) )
 			continue;
 		const float dSq = ( area->GetCenter() - fromPos ).LengthSqr();
 		if ( dSq < bestDistSq )
@@ -338,19 +337,29 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		CFFSentryGun *sg = me->GetSentryGun();
 		const bool hasDispenser = ( me->GetDispenser() != NULL );
 
-		// 5a) Engineer with no SG yet: go to a SENTRY_HINT area that
-		// doesn't already have a friendly SG within 300u. Without this
-		// gate, every engy on the team paths to the same hint and we end
-		// up with 5 SGs in one corner.
+		// 5a) Engineer with no SG yet: go to a FF_NAV_SENTRY_SPOT area
+		// (mapper-hand-tagged via nav_edit). Without hand-tagged spots,
+		// fall through to the flag itself as the build location.
 		if ( !sg )
 		{
-			CFFNavArea *hint = FFBotMapIntel::FindUnoccupiedSentryHint( myTeam, myPos );
-			if ( !hint )
-				hint = FFBotMapIntel::FindNearestSentryHint( myPos );	// fallback if all hints occupied
-			if ( hint )
+			CFFNavArea *spot = NULL;
+			float bestDistSq = FLT_MAX;
+			for ( int i = 0; i < TheNavAreas.Count(); ++i )
+			{
+				CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+				if ( !area->HasAttributeFF( FF_NAV_SENTRY_SPOT ) )
+					continue;
+				const float dSq = ( area->GetCenter() - myPos ).LengthSqr();
+				if ( dSq < bestDistSq )
+				{
+					bestDistSq = dSq;
+					spot = area;
+				}
+			}
+			if ( spot )
 			{
 				outTargetEnt->Term();
-				*outGoalPos = hint->GetCenter();
+				*outGoalPos = spot->GetCenter();
 				return STATE_DEFEND_OWN_FLAG;
 			}
 			if ( ownFlag )
@@ -395,18 +404,27 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	}
 	else if ( isSniperRole )
 	{
-		// Snipers prefer a SNIPER_HINT-tagged area. Use the unoccupied
-		// variant first so 3 snipers don't all path to the same vantage
-		// point and stack on top of each other (player-vs-player
-		// collision then wedges them and HandleStuckState's lateral
-		// escape loops uselessly).
-		CFFNavArea *hint = FFBotMapIntel::FindUnoccupiedSniperHint( myTeam, myPos );
-		if ( !hint )
-			hint = FFBotMapIntel::FindNearestSniperHint( myPos );	// all hints occupied
-		if ( hint )
+		// Snipers prefer a FF_NAV_SNIPER_SPOT-tagged area (mapper hand-tag
+		// via nav_edit). Without hand-tagged spots, fall through to cap
+		// point — snipers post up there to pick off attackers.
+		CFFNavArea *spot = NULL;
+		float bestDistSq = FLT_MAX;
+		for ( int i = 0; i < TheNavAreas.Count(); ++i )
+		{
+			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+			if ( !area->HasAttributeFF( FF_NAV_SNIPER_SPOT ) )
+				continue;
+			const float dSq = ( area->GetCenter() - myPos ).LengthSqr();
+			if ( dSq < bestDistSq )
+			{
+				bestDistSq = dSq;
+				spot = area;
+			}
+		}
+		if ( spot )
 		{
 			outTargetEnt->Term();
-			*outGoalPos = hint->GetCenter();
+			*outGoalPos = spot->GetCenter();
 			return STATE_DEFEND_AT_CAP;
 		}
 		CFFInfoScript *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );

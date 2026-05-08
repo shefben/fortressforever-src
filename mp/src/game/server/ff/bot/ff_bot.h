@@ -43,13 +43,12 @@ public:
 	// false in tf_bot.cpp:2381).
 	virtual bool			IsDormantWhenDead( void ) const OVERRIDE { return false; }
 
-	// Set in Spawn() to remember the desired exit direction (toward nearest
-	// non-spawn nav area). Drives a per-tick SnapEyeAngles for ~1.5s after
-	// spawn so PlayerLocomotion::Approach (which reads EyeVectors and dots
-	// against goal direction to pick IN_FORWARD vs IN_BACK) keeps reading
-	// view-aligned-with-path even while the body is slewing toward whatever
-	// m_lookAtPos was set by other systems.
+	// Set in Spawn() to remember the desired exit direction and origin.
+	// The main action keeps the body aimed there briefly so
+	// PlayerLocomotion::Approach reads view-aligned-with-path instead of the
+	// mapper-authored spawn angles.
 	Vector			m_spawnExitDir;
+	Vector			m_spawnExitStartPos;
 	CountdownTimer	m_spawnExitForceTimer;
 
 	// Class-specialty per-life state (consumed by ff_bot_class.cpp).

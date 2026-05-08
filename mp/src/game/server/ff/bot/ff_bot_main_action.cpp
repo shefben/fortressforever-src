@@ -198,18 +198,14 @@ static bool TryExitSpawnOverride( CFFBot *me, IBody *body )
 		return false;
 
 	// Terminate early once we've travelled a meaningful distance from
-	// where we spawned — we're clearly out of the spawn room and the
-	// path follower can take over. Track via velocity proxy: if our
-	// forward speed has been > 80 ups for a while, we're moving freely.
-	// (We don't track our own spawn position to compare — we just trust
-	// the timer + the path follower below to claim control.)
-	Vector vel = me->GetAbsVelocity();
-	vel.z = 0.0f;
-	if ( vel.LengthSqr() > ( 200.0f * 200.0f ) )
+	// where we spawned — we're clearly out of the initial spawn pocket and
+	// the path follower can take over. Do not terminate on velocity alone:
+	// a bot can accelerate into the wrong wall before the body has held the
+	// doorway aim long enough to correct the inherited spawn angles.
+	Vector delta = me->GetAbsOrigin() - me->m_spawnExitStartPos;
+	delta.z = 0.0f;
+	if ( delta.LengthSqr() > ( 320.0f * 320.0f ) )
 	{
-		// Moving fast — we're definitely making progress. Drop override
-		// and let the path follower drive normally; AimHeadTowards we
-		// were doing was just to override stale m_lookAtPos.
 		me->m_spawnExitForceTimer.Invalidate();
 		return false;
 	}
@@ -298,7 +294,7 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 			// signal than "enemies come from over there in general".
 			const Vector myPos = me->GetAbsOrigin();
 			CFFNavArea *hotArea = NULL;
-			float hotScore = 2.0f;	// minimum threshold to count as hot
+			float hotScore = 0.1f;	// minimum threshold to count as hot
 			for ( int i = 0; i < TheNavAreas.Count(); ++i )
 			{
 				CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
@@ -307,17 +303,17 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 				const float distSq = ( area->GetCenter() - myPos ).LengthSqr();
 				if ( distSq > ( 1500.0f * 1500.0f ) )
 					continue;
-				const float danger = area->GetDangerScore();
-				if ( danger > hotScore )
+				const float intensity = area->GetCombatIntensity();
+				if ( intensity > hotScore )
 				{
-					hotScore = danger;
+					hotScore = intensity;
 					hotArea = area;
 				}
 			}
 			if ( hotArea )
 			{
 				body->AimHeadTowards( hotArea->GetCenter() + Vector( 0, 0, 32 ),
-					IBody::BORING, 0.5f, NULL, "Watching hot zone" );
+					IBody::BORING, 0.5f, NULL, "Watching combat zone" );
 				return;
 			}
 
@@ -997,21 +993,6 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 	if ( horizSpeedSq > ( 50.0f * 50.0f ) || !loco->IsAttemptingToMove() )
 	{
 		me->m_lastUnstuckTime = gpGlobals->curtime;
-	}
-
-	// Route memory: if we just crossed a choke area, remember it. Sampled
-	// only when actually moving (horizontal speed) so a stuck bot bouncing
-	// vertically near a choke doesn't pin themselves on it.
-	if ( horizSpeedSq > ( 100.0f * 100.0f ) && TheNavMesh && TheNavMesh->IsLoaded() )
-	{
-		CNavArea *here = TheNavMesh->GetNearestNavArea( me->GetAbsOrigin(),
-			false, 64.0f, false, true, TEAM_ANY );
-		if ( here )
-		{
-			CFFNavArea *ffa = static_cast< CFFNavArea * >( here );
-			if ( ffa->HasFFTag( FF_NAV_CHOKE ) )
-				me->m_lastRouteChokeID = ffa->GetID();
-		}
 	}
 
 	// ---- Bunny-hop ---------------------------------------------------

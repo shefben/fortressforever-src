@@ -172,6 +172,7 @@ public:
 	virtual void PreThink();
 	virtual void PostThink();
 	virtual CBaseEntity *EntSelectSpawnPoint();
+	CBaseEntity *GetLastSpawnPoint( void ) const { return m_hLastSpawnPoint.Get(); }
 			void PreForceSpawn( void );
 	virtual void Spawn();
 	virtual void InitialSpawn();
@@ -1022,6 +1023,7 @@ public:
 	float		m_flSpeedModifierChangeTime;
 
 	CBaseEntity	*m_SpawnPointOverride;
+	EHANDLE		m_hLastSpawnPoint;
 public:
 	// Run "effects" and "speed effects" through here first
 	// before giving the player the actual effect.
