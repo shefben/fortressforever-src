@@ -105,6 +105,27 @@ enum FFNavPointType
 	FFNAVPT_LINK_FROM,		// start of a connection this mesh is missing
 	FFNAVPT_LINK_TO,		// ...and where it comes out
 
+	// --- Page 4: traversal furniture & maintenance --------------------------
+	//
+	// Ladders and doors were already detected and tagged, and both were
+	// invisible and unauthorable: no marker type, no entry in
+	// ff_nav_visualize. "The ladder in 2fort has no nav points on it" and "the
+	// ladder was never tagged" looked identical, and where the detection did
+	// miss one there was no way to say so.
+	FFNAVPT_LADDER,			// ladder endpoint — climb here
+	FFNAVPT_GRENADES,		// grenade resupply, as distinct from ammo
+	FFNAVPT_DOOR_TEAM,		// team; a door that only opens for one team
+	FFNAVPT_DOOR_ONEWAY,	// team; a respawn gate: out only, owners only
+
+	// Not a nav point at all: an ANTI-point.
+	//
+	// Everything the tagger, the auto-tagger and the analyzer derive is
+	// recomputed from scratch at every map load, which means deleting one of
+	// their tags is not something that can persist — it is back the next time
+	// the map loads. This marker records the deletion instead, and is applied
+	// after every derivation pass, so what it clears stays clear.
+	FFNAVPT_ERASE,
+
 	FFNAVPT_COUNT
 };
 
@@ -113,7 +134,7 @@ enum FFNavPointType
 // with room to spare, and page 1 is deliberately the same nine keys the tool
 // had before pages existed, so existing muscle memory still works.
 #define FFNAVPT_SLOTS_PER_PAGE	9
-#define FFNAVPT_PAGE_COUNT		3
+#define FFNAVPT_PAGE_COUNT		4
 
 
 //-----------------------------------------------------------------------------
@@ -154,6 +175,16 @@ namespace FFNavBuilder
 	// room feeds those computations exactly like an entity-derived one.
 	void ApplyToMesh( CFFNavMesh *mesh );
 
+	// Apply the 'erase' markers. Called LAST, after the auto-tagger and the
+	// analyzer, because the whole point is to remove what those derived — an
+	// erasure applied before them is overwritten by them within the same map
+	// load, which looks exactly like the delete not working.
+	//
+	// Separate from ApplyToMesh rather than a case inside it for that reason
+	// alone: it is not a different kind of marker, it is a different point in
+	// the pipeline.
+	int ApplyErasures( CFFNavMesh *mesh );
+
 	// Per-frame. Draws the authoring overlay while the mode is on; does
 	// nothing at all when it's off. Called from FFBotManager_Tick.
 	void Tick( void );
@@ -168,8 +199,19 @@ namespace FFNavBuilder
 	// mesh and writes the sidecar. Returns false and prints why on failure.
 	bool Place( CBasePlayer *player, int type, int team );
 
-	// Remove every marker within radius of pos. Returns how many went away.
-	int  DeleteNear( const Vector &pos, float radius );
+	// Remove the SINGLE nearest marker within radius of pos. Returns 1 if one
+	// went away, 0 if there was nothing in range.
+	//
+	// Nearest rather than all-within-radius because deletion is usually a
+	// correction: you placed one marker slightly wrong and want that one gone.
+	// In a doorway with a door marker, a defend marker and two spawn corners
+	// inside 96 units of each other, "delete everything near me" takes four
+	// markers when you meant one, and three of them were fine.
+	int  DeleteNearest( const Vector &pos, float radius );
+
+	// Remove EVERY marker within radius. The old behaviour, still wanted for
+	// clearing an area out wholesale.
+	int  DeleteAllNear( const Vector &pos, float radius );
 
 	void Save( void );
 	void Clear( void );

@@ -471,6 +471,14 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 		{ FF_NAV2_BREACHABLE,        "BREACHABLE (derived)" },
 		{ FF_NAV2_TELEPORT,          "TELEPORT (derived)" },
 		{ FF_NAV2_PUSH,              "PUSH (derived)" },
+		{ FF_NAV2_LADDER,            "LADDER (auto+manual)" },
+		{ FF_NAV2_DOOR_ONEWAY,       "DOOR_ONEWAY (respawn gate)" },
+		{ FF_NAV2_DOOR_BLUE,         "DOOR_BLUE" },
+		{ FF_NAV2_DOOR_RED,          "DOOR_RED" },
+		{ FF_NAV2_DOOR_YELLOW,       "DOOR_YELLOW" },
+		{ FF_NAV2_DOOR_GREEN,        "DOOR_GREEN" },
+		{ FF_NAV2_GRENADE_RESUPPLY,  "GRENADE_RESUPPLY" },
+		{ FF_NAV2_ERASED,            "ERASED (author override)" },
 	};
 
 	const int kKnown = (int)( sizeof( known ) / sizeof( known[ 0 ] ) );
@@ -561,6 +569,12 @@ struct NavVizType
 // match the wrong attribute, which is why they were never merged.
 static const NavVizType s_navVizTypes[] =
 {
+	// ---- Author overrides, first ------------------------------------------
+	// An erased area has had everything else stripped off it, so nothing below
+	// can match anyway; putting it first states the reason rather than leaving
+	// it to show up as a blank.
+	{ "erased",      0,                      FF_NAV2_ERASED,           48,  48,  80, "author wiped this area; nothing re-tags it" },
+
 	// ---- Objectives: what the map is about --------------------------------
 	{ "flag",        FF_NAV_FLAG_ANY,        0,                       255, 255,  64, "flag rest position (per team)" },
 	{ "cap",         FF_NAV_CAP_ANY,         0,                       255, 128,  64, "capture point (per team)" },
@@ -599,6 +613,16 @@ static const NavVizType s_navVizTypes[] =
 	{ "cutpoint",    0,                      FF_NAV2_CUTPOINT,        255,  32,  32, "removing this would split the nav graph" },
 	{ "overlook",    0,                      FF_NAV2_OVERLOOK,        255, 160, 255, "sees a lot of the ground people walk on" },
 	{ "traffic",     0,                      FF_NAV2_HIGH_TRAFFIC,    255, 224,  96, "on a large share of spawn-to-objective routes" },
+	// ---- Traversal furniture ----------------------------------------------
+	// Above the plain "doorway" and "resupply" rows, because each of these is
+	// a strictly stronger statement than the general one and the general one
+	// would otherwise swallow it: every gate is also a doorway, and every
+	// grenade crate is also a resupply.
+	{ "gate",        0,                      FF_NAV2_DOOR_ONEWAY,     160, 200, 255, "respawn gate: one team out, nobody in" },
+	{ "teamdoor",    0,                      FF_NAV2_DOOR_TEAM_ANY,   224, 224, 255, "door that only opens for one team" },
+	{ "grenades",    0,                      FF_NAV2_GRENADE_RESUPPLY, 64, 224,  96, "grenade resupply" },
+	{ "ladder",      0,                      FF_NAV2_LADDER,          255, 176,  32, "ladder endpoint - climb here" },
+
 	{ "resupply",    FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH |
 	                 FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES, 0,        64, 255, 128, "ammo / health / armor available" },
 	{ "doorway",     FF_NAV_DOORWAY,         0,                       255, 255, 255, "an openable blocker overlaps this" },
@@ -608,7 +632,7 @@ static const NavVizType s_navVizTypes[] =
 	{ "autosentry",  FF_NAV_AUTO_SENTRY_SPOT, 0,                      200, 200,  64, "heuristic sentry choke" },
 	{ "choke",       FF_NAV_CHOKE,           0,                       255, 200,  64, "narrow corridor / doorway" },
 	{ "highground",  FF_NAV_HIGH_GROUND,     0,                       128, 255, 255, "elevated relative to neighbours" },
-	{ "ladder",      FF_NAV_NEAR_LADDER,     0,                       255, 255, 128, "adjacent to a ladder" },
+	{ "nearladder",  FF_NAV_NEAR_LADDER,     0,                       255, 255, 128, "adjacent to a ladder" },
 
 	// ---- Terrain: last, because almost everything can also be one of these -
 	{ "underwater",  FF_NAV_UNDERWATER,      0,                        32,  64, 200, "must swim" },

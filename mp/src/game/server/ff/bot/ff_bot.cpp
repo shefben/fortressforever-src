@@ -578,6 +578,23 @@ bool CFFBot::IsAmmoLow( void ) const
 		if ( cellsAmmoType >= 0 && const_cast< CFFBot * >( this )->GetAmmoCount( cellsAmmoType ) < 50 )
 			return true;
 	}
+
+	// Out of grenades counts as low on ammo.
+	//
+	// The class behaviours already bail out of every grenade throw with
+	// "GetSecondaryGrenades() <= 0" and then do nothing about it, so a bot
+	// that spent its grenades stayed spent for the rest of the life — it never
+	// asked for resupply, because the only thing that triggered a resupply
+	// trip was the primary weapon running dry.
+	//
+	// Both counts, and only when BOTH are empty: a demoman with pipes and no
+	// concs is not out of ammo in any sense worth walking across the map for.
+	{
+		CFFBot *self = const_cast< CFFBot * >( this );
+		if ( self->GetPrimaryGrenades() <= 0 && self->GetSecondaryGrenades() <= 0 )
+			return true;
+	}
+
 	return false;
 }
 

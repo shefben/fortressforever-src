@@ -127,6 +127,22 @@ void CFFNavMesh::ClearTaggedAreaCaches( void )
 }
 
 //-----------------------------------------------------------------------------
+void CFFNavMesh::RemoveAreaFromTaggedCaches( CFFNavArea *area )
+{
+	if ( !area )
+		return;
+
+	for ( int i = 0; i < FF_NAV_TEAM_COUNT; ++i )
+	{
+		m_spawnRoomAreas[ i ].FindAndRemove( area );
+		m_spawnRoomExitAreas[ i ].FindAndRemove( area );
+		m_flagAreas[ i ].FindAndRemove( area );
+		m_capAreas[ i ].FindAndRemove( area );
+	}
+	m_resupplyAreas.FindAndRemove( area );
+}
+
+//-----------------------------------------------------------------------------
 // Single-team incursion-distance flood-fill. Mirrors CTFNavMesh's same-name
 // overload — Dijkstra-style BFS through the nav graph from this team's
 // spawn-room areas. Each visited area gets distance = travel distance from

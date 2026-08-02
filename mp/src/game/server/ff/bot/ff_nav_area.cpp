@@ -137,6 +137,18 @@ int CFFNavArea::CapAttributeForTeam( int team )
 	return 0;
 }
 
+int CFFNavArea::DoorAttributeForTeam( int team )
+{
+	switch ( team )
+	{
+	case TEAM_BLUE:		return FF_NAV2_DOOR_BLUE;
+	case TEAM_RED:		return FF_NAV2_DOOR_RED;
+	case TEAM_YELLOW:	return FF_NAV2_DOOR_YELLOW;
+	case TEAM_GREEN:	return FF_NAV2_DOOR_GREEN;
+	}
+	return 0;
+}
+
 //-----------------------------------------------------------------------------
 float CFFNavArea::GetIncursionDistance( int team ) const
 {

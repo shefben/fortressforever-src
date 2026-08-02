@@ -311,7 +311,13 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 				++resupplyTagged;
 				break;
 			case Omnibot::kBackPack_Grenades:
+				// Both words. FF_NAV_HAS_GRENADES has existed since the first
+				// tagger and nothing read it — the ammo behaviour only ever
+				// looked for FF_NAV_HAS_AMMO — and it had no entry in
+				// ff_nav_visualize either, so a grenade crate was invisible in
+				// every diagnostic as well as to every bot.
 				area->SetAttributeFF( FF_NAV_HAS_GRENADES );
+				area->SetAttributeFF2( FF_NAV2_GRENADE_RESUPPLY );
 				mesh->AddResupplyArea( area );
 				++resupplyTagged;
 				break;
@@ -372,6 +378,16 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 	// ground, aim directions, breakable walls that open shortcuts, and the
 	// teleport connections no amount of walkable-space sampling can find.
 	CFFBotAnalyzer::AnalyzeAll( mesh );
+
+	// ---- Author overrides: erasures -------------------------------------
+	//
+	// Dead last, and it has to be. Every pass above recomputes its tags from
+	// entities and geometry, so an author's decision to remove one of them can
+	// only be expressed as something applied AFTER they run. Applied any
+	// earlier and the pass that produced the tag simply produces it again,
+	// within the same map load, which is indistinguishable from the delete
+	// having silently failed.
+	FFNavBuilder::ApplyErasures( mesh );
 
 	// ---- Diagnostics ----------------------------------------------------
 	int perTeamSpawnRooms[ FF_NAV_TEAM_COUNT ] = { 0, 0, 0, 0 };

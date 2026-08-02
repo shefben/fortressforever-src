@@ -186,6 +186,23 @@ public:
 				return -1.0f;
 		}
 
+		// A door that will not open for us is a wall, not an expensive door.
+		//
+		// This is the one place where the doorway exemption above is wrong.
+		// FF_NAV_DOORWAY exists so a SHUT door does not delete the route —
+		// the bot walks up to it and opens it. A team-restricted door cannot
+		// be opened by walking up to it, so keeping the route alive sends the
+		// bot to stand in front of it indefinitely, and it will look for all
+		// the world like a pathing bug rather than a permissions one.
+		//
+		// Applied to the enemy's respawn gates above all. The enemy spawn room
+		// itself is already refused, but its gate areas straddle the threshold
+		// and are frequently NOT tagged as spawn room, so without this the
+		// cheapest route to a flag runs straight through the door the enemy
+		// team spawns behind.
+		if ( !area->IsDoorPassableByTeam( myTeam ) )
+			return -1.0f;
+
 		// Recent stuck position: when this bot got severely stuck within
 		// the last 30s, penalize areas within 256u so the next path
 		// computation routes around the same wedge instead of barreling

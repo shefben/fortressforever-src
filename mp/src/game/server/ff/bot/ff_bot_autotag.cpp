@@ -454,31 +454,241 @@ static void TagAutoSentrySpots( const CUtlVector< CFFNavArea * > &allAreas,
 
 
 //-----------------------------------------------------------------------------
-// Ladder-adjacent tag. Walks every ladder in the mesh and tags both endpoints
-// with FF_NAV_NEAR_LADDER so the path-cost can prefer ladder-adjacent areas
-// for vertical traversal hints.
+// Ladder tags. Walks every ladder in the mesh and tags all of its connected
+// areas with FF_NAV_NEAR_LADDER (which the path cost reads) and FF_NAV2_LADDER
+// (which makes it visible and authorable).
+//
+// Both, because they answer different questions and the second one was
+// missing. FF_NAV_NEAR_LADDER had no entry in ff_nav_visualize and no marker
+// type, so "2fort's ladder has nothing on it" could equally have meant the
+// ladder was never generated, was generated but connected to nothing, or was
+// tagged perfectly and simply never drawn. Those want different fixes.
+//
+// Returns the number of ladders that contributed at least one tagged area, so
+// a mesh whose ladders exist but connect to nothing can be reported as such
+// rather than silently counted as working.
 //-----------------------------------------------------------------------------
-static void TagLadderAdjacent( void )
+static int TagLadderAdjacent( int *outConnectedLadders )
 {
+	int tagged = 0;
+	int connected = 0;
+
+	if ( outConnectedLadders )
+		*outConnectedLadders = 0;
+
 	if ( !TheNavMesh )
-		return;
+		return 0;
+
 	const NavLadderVector &ladders = TheNavMesh->GetLadders();
+
 	for ( int i = 0; i < ladders.Count(); ++i )
 	{
 		CNavLadder *ladder = ladders[ i ];
 		if ( !ladder )
 			continue;
-		if ( ladder->m_topForwardArea )
-			static_cast< CFFNavArea * >( ladder->m_topForwardArea )->SetAttributeFF( FF_NAV_NEAR_LADDER );
-		if ( ladder->m_topLeftArea )
-			static_cast< CFFNavArea * >( ladder->m_topLeftArea )->SetAttributeFF( FF_NAV_NEAR_LADDER );
-		if ( ladder->m_topRightArea )
-			static_cast< CFFNavArea * >( ladder->m_topRightArea )->SetAttributeFF( FF_NAV_NEAR_LADDER );
-		if ( ladder->m_topBehindArea )
-			static_cast< CFFNavArea * >( ladder->m_topBehindArea )->SetAttributeFF( FF_NAV_NEAR_LADDER );
-		if ( ladder->m_bottomArea )
-			static_cast< CFFNavArea * >( ladder->m_bottomArea )->SetAttributeFF( FF_NAV_NEAR_LADDER );
+
+		CNavArea * const ends[] = {
+			ladder->m_topForwardArea, ladder->m_topLeftArea,
+			ladder->m_topRightArea, ladder->m_topBehindArea,
+			ladder->m_bottomArea,
+		};
+
+		bool any = false;
+
+		for ( int e = 0; e < (int)ARRAYSIZE( ends ); ++e )
+		{
+			if ( !ends[ e ] )
+				continue;
+
+			CFFNavArea *area = static_cast< CFFNavArea * >( ends[ e ] );
+			if ( !area->HasAttributeFF2( FF_NAV2_LADDER ) )
+				++tagged;
+
+			area->SetAttributeFF( FF_NAV_NEAR_LADDER );
+			area->SetAttributeFF2( FF_NAV2_LADDER );
+			any = true;
+		}
+
+		if ( any )
+			++connected;
 	}
+
+	if ( ladders.Count() > 0 && connected < ladders.Count() )
+	{
+		Warning( "[CFFBotAutoTagger] %d of %d ladder(s) connect to no nav area. "
+			"Bots cannot use those — regenerate with ff_nav_generate_full, or "
+			"place 'ladder' markers at both ends by hand.\n",
+			ladders.Count() - connected, ladders.Count() );
+	}
+
+	if ( outConnectedLadders )
+		*outConnectedLadders = connected;
+
+	return tagged;
+}
+
+
+//-----------------------------------------------------------------------------
+// Team doors and respawn gates.
+//
+// FF_NAV_DOORWAY already said "an openable brush overlaps this area", which is
+// enough to stop the path cost treating a shut door as an impassable wall. It
+// is not enough for the two doors that behave differently from every other:
+//
+//   * A respawn gate opens for one team, from one side. Costing it as merely
+//     expensive sends bots to stand in a doorway that will never open for
+//     them, forever, because the path exists and the path is wrong.
+//
+//   * A team-restricted door in the middle of a map is the same problem
+//     without the spawn room.
+//
+// Neither can be read off the entity directly: FF drives door permissions from
+// Lua, and the brush is a plain func_door. What CAN be read is the shape of
+// the situation - a door whose areas straddle exactly one team's spawn room
+// and the world outside it is a respawn gate, whatever the script calls it.
+// Naming is used as a secondary signal only, because it is a convention rather
+// than data.
+//-----------------------------------------------------------------------------
+#define FFBOT_AUTOTAG_DOOR_MARGIN	32.0f
+
+static int TeamFromEntityName( const char *name )
+{
+	if ( !name || !name[ 0 ] )
+		return TEAM_UNASSIGNED;
+
+	// Longest prefixes first, so "yellow" is not matched as "y" and "green"
+	// not as "g". Same ordering rule as the spawn-entity fallback in
+	// CFFBotTagger, and for the same reason.
+	if ( Q_stristr( name, "yellow" ) || Q_stristr( name, "yel" ) ) return TEAM_YELLOW;
+	if ( Q_stristr( name, "green" )  || Q_stristr( name, "grn" ) ) return TEAM_GREEN;
+	if ( Q_stristr( name, "blue" )   || Q_stristr( name, "blu" ) ) return TEAM_BLUE;
+	if ( Q_stristr( name, "red" ) )                                return TEAM_RED;
+	return TEAM_UNASSIGNED;
+}
+
+
+static int TagTeamDoors( int *outGates )
+{
+	int tagged = 0;
+	int gates = 0;
+
+	if ( outGates )
+		*outGates = 0;
+
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
+		return 0;
+
+	static const char * const kDoorClasses[] = {
+		"func_door", "func_door_rotating", "prop_door_rotating",
+		"func_movelinear", "func_wall_toggle",
+	};
+
+	for ( int c = 0; c < (int)ARRAYSIZE( kDoorClasses ); ++c )
+	{
+		CBaseEntity *door = NULL;
+		while ( ( door = gEntList.FindEntityByClassname( door, kDoorClasses[ c ] ) ) != NULL )
+		{
+			// A vertically-travelling door is a lift wearing a door's
+			// classname, and TagLifts has already claimed it. Tagging it as a
+			// gate as well would make bots refuse to ride other teams' lifts.
+			if ( FFBotLift::IsLiftEntity( door ) )
+				continue;
+
+			Vector mins, maxs;
+			door->CollisionProp()->WorldSpaceAABB( &mins, &maxs );
+			mins -= Vector( FFBOT_AUTOTAG_DOOR_MARGIN, FFBOT_AUTOTAG_DOOR_MARGIN,
+			                FFBOT_AUTOTAG_DOOR_MARGIN );
+			maxs += Vector( FFBOT_AUTOTAG_DOOR_MARGIN, FFBOT_AUTOTAG_DOOR_MARGIN,
+			                FFBOT_AUTOTAG_DOOR_MARGIN );
+
+			CUtlVector< CFFNavArea * > touching;
+			int spawnTeamsSeen = 0;
+			int spawnTeam = TEAM_UNASSIGNED;
+			bool sawNonSpawn = false;
+
+			for ( int i = 0; i < TheNavAreas.Count(); ++i )
+			{
+				CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+				if ( !area )
+					continue;
+
+				const Vector p = area->GetCenter();
+				if ( p.x < mins.x || p.x > maxs.x ) continue;
+				if ( p.y < mins.y || p.y > maxs.y ) continue;
+				if ( p.z < mins.z || p.z > maxs.z ) continue;
+
+				touching.AddToTail( area );
+
+				bool inSomeSpawn = false;
+				for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
+				{
+					if ( !area->HasAttributeFF( CFFNavArea::SpawnRoomAttributeForTeam( t ) ) )
+						continue;
+
+					inSomeSpawn = true;
+					if ( spawnTeam != t )
+					{
+						if ( spawnTeam == TEAM_UNASSIGNED )
+							spawnTeam = t;
+						++spawnTeamsSeen;
+					}
+				}
+
+				if ( !inSomeSpawn )
+					sawNonSpawn = true;
+			}
+
+			if ( touching.Count() == 0 )
+				continue;
+
+			// A door between exactly one team's spawn room and the rest of the
+			// map is that team's respawn gate. Two teams' spawn rooms on
+			// either side of one door is not a gate, it is a shared corridor
+			// that happens to be tagged twice, and guessing an owner there
+			// would be worse than declining to.
+			int team = TEAM_UNASSIGNED;
+			bool isGate = false;
+
+			if ( spawnTeamsSeen == 1 && sawNonSpawn )
+			{
+				team = spawnTeam;
+				isGate = true;
+			}
+			else
+			{
+				// No spawn room involved. Fall back to the targetname, which
+				// is a convention rather than data - hence only as a fallback,
+				// and never to override the geometric answer above.
+				team = TeamFromEntityName( STRING( door->GetEntityName() ) );
+			}
+
+			if ( team == TEAM_UNASSIGNED )
+				continue;
+
+			const int doorBit = CFFNavArea::DoorAttributeForTeam( team );
+
+			for ( int i = 0; i < touching.Count(); ++i )
+			{
+				CFFNavArea *area = touching[ i ];
+				if ( area->HasAttributeFF2( doorBit ) )
+					continue;
+
+				area->SetAttributeFF( FF_NAV_DOORWAY );
+				area->SetAttributeFF2( doorBit );
+				if ( isGate )
+					area->SetAttributeFF2( FF_NAV2_DOOR_ONEWAY );
+				++tagged;
+			}
+
+			if ( isGate )
+				++gates;
+		}
+	}
+
+	if ( outGates )
+		*outGates = gates;
+
+	return tagged;
 }
 
 
@@ -688,7 +898,8 @@ void CFFBotAutoTagger::TagAllAreas( CFFNavMesh *mesh )
 		if ( added & FF_NAV_UNDERWATER ) ++underwaterTagged;
 		if ( added & FF_NAV_CHOKE )      ++chokeTagged;
 	}
-	TagLadderAdjacent();
+	int connectedLadders = 0;
+	TagLadderAdjacent( &connectedLadders );
 
 	// Pass 2 — high-ground (needs all areas first).
 	{
@@ -779,9 +990,16 @@ void CFFBotAutoTagger::TagAllAreas( CFFNavMesh *mesh )
 	const int hazardTagged = TagHazardZones();
 	const int liftTagged   = TagLifts();
 
+	// After TagLifts, which claims vertically-travelling func_doors, and after
+	// the spawn-room tags exist — the gate test is "one team's spawn on one
+	// side, the world on the other", and it has nothing to work with until
+	// those are stamped.
+	int doorGates = 0;
+	const int doorTagged = TagTeamDoors( &doorGates );
+
 	Msg( "[CFFBotAutoTagger] Entity-derived: %d area(s) at hazard gear, "
-		"%d in hazard volumes, %d on lifts.\n",
-		gearTagged, hazardTagged, liftTagged );
+		"%d in hazard volumes, %d on lifts, %d on team doors (%d respawn gate(s)).\n",
+		gearTagged, hazardTagged, liftTagged, doorTagged, doorGates );
 
 	if ( gearTagged == 0 && FFBotLuaObjectives::CountOfClass( FFGOALCLASS_HAZARD_GEAR ) > 0 )
 	{
@@ -791,8 +1009,19 @@ void CFFBotAutoTagger::TagAllAreas( CFFNavMesh *mesh )
 
 	Msg( "[CFFBotAutoTagger] Tagged %d water, %d underwater, %d choke, "
 		"%d high-ground, %d auto-sniper-spot, %d auto-sentry-spot, "
-		"%d ladder-adjacent (across %d areas).\n",
+		"%d ladder-adjacent from %d connected ladder(s) (across %d areas).\n",
 		waterTagged, underwaterTagged, chokeTagged,
 		highGroundTagged, autoSniperTagged, autoSentryTagged,
-		ladderTagged, allAreas.Count() );
+		ladderTagged, connectedLadders, allAreas.Count() );
+
+	if ( TheNavMesh && TheNavMesh->GetLadders().Count() == 0 )
+	{
+		// Worth saying every time. Stock Source generates no ladders at all
+		// outside Left 4 Dead, so a mesh built by a build without FF's ladder
+		// pass has none, and there is no other symptom: bots simply never use
+		// a route with a ladder in it and nothing reports why.
+		Msg( "[CFFBotAutoTagger] This mesh contains NO ladders. If the map has "
+			"any, regenerate with ff_nav_generate_full, or mark both ends by "
+			"hand with the 'ladder' marker plus a linkfrom/linkto pair.\n" );
+	}
 }

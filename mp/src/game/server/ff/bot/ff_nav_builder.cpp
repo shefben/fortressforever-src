@@ -45,8 +45,16 @@ ConVar ff_nav_builder_radius( "ff_nav_builder_radius", "0", FCVAR_CHEAT,
 	"Radius applied to newly placed nav markers. 0 = tag only the area under "
 	"the marker; >0 = tag every area whose centre is within this distance." );
 
-ConVar ff_nav_builder_delete_radius( "ff_nav_builder_delete_radius", "96", FCVAR_CHEAT,
-	"How close a marker has to be to you for ff_nav_delete to remove it." );
+ConVar ff_nav_builder_delete_radius( "ff_nav_builder_delete_radius", "192", FCVAR_CHEAT,
+	"How close a marker has to be to you for ff_nav_delete to remove it. "
+	"Measured from the floor below you, not from the camera, so noclip and "
+	"spectator authoring behave the same as standing there." );
+
+ConVar ff_nav_delete_erases_derived( "ff_nav_delete_erases_derived", "1", FCVAR_CHEAT,
+	"What ff_nav_delete does when there is no hand-placed marker in range. "
+	"1 = erase the auto-generated tags on the nav area under you and keep them "
+	"erased across map loads. 0 = do nothing. Set it to 0 if you only ever "
+	"want to remove your own markers." );
 
 ConVar ff_nav_builder_spawn_height( "ff_nav_builder_spawn_height", "256", FCVAR_CHEAT,
 	"Height above the highest spawn-room corner marker that still counts as "
@@ -173,6 +181,22 @@ static const FFNavPointTypeInfo s_typeInfo[] =
 
 	{ FFNAVPT_LINK_TO,      "linkto",     false, false, 255, 200,   0,	// amber
 	  "...and where that connection comes out" },
+
+	// ---- Page 4 -----------------------------------------------------------
+	{ FFNAVPT_LADDER,       "ladder",     false, false, 255, 176,  32,	// amber-orange
+	  "ladder endpoint: climb here" },
+
+	{ FFNAVPT_GRENADES,     "grenades",   false, false,  64, 224,  96,	// mint
+	  "grenade resupply (distinct from ammo)" },
+
+	{ FFNAVPT_DOOR_TEAM,    "doorteam",   true,  false, 224, 224, 255,	// pale blue-white
+	  "door that only opens for one team" },
+
+	{ FFNAVPT_DOOR_ONEWAY,  "dooroneway", true,  false, 160, 200, 255,	// steel blue
+	  "respawn gate: that team leaves through it, nobody enters" },
+
+	{ FFNAVPT_ERASE,        "erase",      false, false,  32,  32,  32,	// near-black
+	  "wipe every derived tag here and keep it wiped" },
 };
 
 
@@ -203,6 +227,11 @@ static const FFNavBuilderPage s_pages[ FFNAVPT_PAGE_COUNT ] =
 	{ "occasional & links", {
 		FFNAVPT_RESUPPLY, FFNAVPT_NO_SPAWNING, FFNAVPT_ESCAPE,
 		FFNAVPT_LINK_FROM, FFNAVPT_LINK_TO, FFNAVPT_INVALID,
+		FFNAVPT_INVALID, FFNAVPT_INVALID, FFNAVPT_INVALID } },
+
+	{ "doors, ladders & erase", {
+		FFNAVPT_LADDER, FFNAVPT_GRENADES, FFNAVPT_DOOR_TEAM,
+		FFNAVPT_DOOR_ONEWAY, FFNAVPT_ERASE, FFNAVPT_INVALID,
 		FFNAVPT_INVALID, FFNAVPT_INVALID, FFNAVPT_INVALID } },
 };
 
@@ -551,6 +580,40 @@ static void ApplyPointToArea( const FFNavPoint &pt, CFFNavArea *area, CFFNavMesh
 		area->SetAttributeFF( FF_NAV_HUNTED_ESCAPE );
 		break;
 
+	case FFNAVPT_LADDER:
+		// Both bits. FF_NAV_NEAR_LADDER is what the existing path-cost and
+		// mobility code reads; FF_NAV2_LADDER is what makes it visible and
+		// tells authored ladders apart from detected ones. A hand-placed
+		// ladder marker exists precisely because the detection missed one, and
+		// the consumers must not be able to tell the difference.
+		area->SetAttributeFF( FF_NAV_NEAR_LADDER );
+		area->SetAttributeFF2( FF_NAV2_LADDER );
+		break;
+
+	case FFNAVPT_GRENADES:
+		area->SetAttributeFF( FF_NAV_HAS_GRENADES );
+		area->SetAttributeFF2( FF_NAV2_GRENADE_RESUPPLY );
+		if ( mesh )
+			mesh->AddResupplyArea( area );
+		break;
+
+	case FFNAVPT_DOOR_TEAM:
+		area->SetAttributeFF( FF_NAV_DOORWAY );
+		area->SetAttributeFF2( CFFNavArea::DoorAttributeForTeam( pt.team ) );
+		break;
+
+	case FFNAVPT_DOOR_ONEWAY:
+		area->SetAttributeFF( FF_NAV_DOORWAY );
+		area->SetAttributeFF2( CFFNavArea::DoorAttributeForTeam( pt.team ) |
+		                       FF_NAV2_DOOR_ONEWAY );
+		break;
+
+	case FFNAVPT_ERASE:
+		// Handled by ApplyErasures, after every derivation pass. Applying it
+		// here would erase tags that the auto-tagger and the analyzer have not
+		// stamped yet, and they would then stamp them.
+		break;
+
 	default:
 		break;
 	}
@@ -785,6 +848,8 @@ void FFNavBuilder::ApplyToMesh( CFFNavMesh *mesh )
 			continue;	// handled as a volume below
 		if ( pt.type == FFNAVPT_LINK_FROM || pt.type == FFNAVPT_LINK_TO )
 			continue;	// handled as a graph edge below
+		if ( pt.type == FFNAVPT_ERASE )
+			continue;	// handled by ApplyErasures, at the end of the pipeline
 
 		CUtlVector< CFFNavArea * > areas;
 		CollectAreasForPoint( pt, areas );
@@ -816,6 +881,86 @@ void FFNavBuilder::ApplyToMesh( CFFNavMesh *mesh )
 	     "%d nav connection(s)%s.\n",
 		stamped, rooms, links,
 		orphaned > 0 ? " (see orphan warnings above)" : "" );
+}
+
+
+//-----------------------------------------------------------------------------
+// Erasures.
+//
+// Deleting an auto-generated tag is harder than deleting a hand-placed one,
+// and the reason is structural rather than fiddly: nothing the tagger, the
+// auto-tagger or the analyzer produces is stored anywhere. All of it is
+// recomputed from live entities and mesh geometry at every map load. So
+// "delete this sniper spot" cannot be done by clearing a bit — the bit is back
+// a moment later, and will be back again on every subsequent load.
+//
+// What can persist is the DECISION. An erase marker is a record that says "an
+// author looked at this spot and said no", stored in the sidecar next to every
+// other authored decision, and re-applied after the derivation passes rather
+// than before them.
+//
+// It clears both attribute words entirely, with one exception. FF_NAV_BLOCKED
+// is not a tag anybody authored; it is set and cleared at runtime by
+// CNavArea::UpdateBlocked from func_brush and door state, and clearing it here
+// would tell the pathfinder a shut door is open until the next time the door
+// moves.
+//-----------------------------------------------------------------------------
+int FFNavBuilder::ApplyErasures( CFFNavMesh *mesh )
+{
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
+		return 0;
+
+	int erased = 0;
+	int markers = 0;
+
+	for ( int i = 0; i < s_points.Count(); ++i )
+	{
+		const FFNavPoint &pt = s_points[ i ];
+		if ( pt.type != FFNAVPT_ERASE )
+			continue;
+
+		++markers;
+
+		CUtlVector< CFFNavArea * > areas;
+		CollectAreasForPoint( pt, areas );
+
+		if ( areas.Count() == 0 )
+		{
+			Warning( "[ff_nav_builder] erase marker at (%.0f %.0f %.0f) has no "
+				"nav area within %.0fu — it does nothing.\n",
+				pt.pos.x, pt.pos.y, pt.pos.z, FFNAVPT_AREA_SEARCH_RANGE );
+			continue;
+		}
+
+		for ( int a = 0; a < areas.Count(); ++a )
+		{
+			CFFNavArea *area = areas[ a ];
+
+			const int keep = (int)( area->GetAttributesFF() & (unsigned int)FF_NAV_BLOCKED );
+
+			area->ClearAllAttributesFF();
+			area->ClearAllAttributesFF2();
+			area->SetAttributeFF( keep );
+
+			// The mesh keeps its own lists of flag / cap / spawn / resupply
+			// areas, built as the tags were stamped. Clearing the bits without
+			// clearing those leaves every consumer that iterates the lists —
+			// which is most of them — still seeing the area.
+			if ( mesh )
+				mesh->RemoveAreaFromTaggedCaches( area );
+
+			area->SetAttributeFF2( FF_NAV2_ERASED );
+			++erased;
+		}
+	}
+
+	if ( markers > 0 )
+	{
+		Msg( "[ff_nav_builder] %d erase marker(s) wiped %d area(s).\n",
+			markers, erased );
+	}
+
+	return erased;
 }
 
 
@@ -1253,6 +1398,7 @@ static void RebuildMeshTags( void )
 		FF_NAV_FLAG_ANY | FF_NAV_CAP_ANY | FF_NAV_SPAWN_ROOM_ANY |
 		FF_NAV_SPAWN_ROOM_EXIT |
 		FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH | FF_NAV_HAS_ARMOR |
+		FF_NAV_HAS_GRENADES | FF_NAV_NEAR_LADDER |
 		FF_NAV_NO_SPAWNING | FF_NAV_HUNTED_ESCAPE;
 
 	for ( int i = 0; i < TheNavAreas.Count(); ++i )
@@ -1271,7 +1417,53 @@ static void RebuildMeshTags( void )
 
 
 //-----------------------------------------------------------------------------
-int FFNavBuilder::DeleteNear( const Vector &pos, float radius )
+int FFNavBuilder::DeleteNearest( const Vector &pos, float radius )
+{
+	const float radiusSq = radius * radius;
+
+	int   best = -1;
+	float bestDistSq = FLT_MAX;
+
+	for ( int i = 0; i < s_points.Count(); ++i )
+	{
+		const float distSq = ( s_points[ i ].pos - pos ).LengthSqr();
+		if ( distSq > radiusSq )
+			continue;
+		if ( distSq < bestDistSq )
+		{
+			bestDistSq = distSq;
+			best = i;
+		}
+	}
+
+	if ( best < 0 )
+		return 0;
+
+	const bool removedALink = ( s_points[ best ].type == FFNAVPT_LINK_FROM ||
+	                            s_points[ best ].type == FFNAVPT_LINK_TO );
+
+	Msg( "[ff_nav_builder] deleted %s at (%.0f %.0f %.0f), %.0fu away\n",
+		NameForType( s_points[ best ].type ),
+		s_points[ best ].pos.x, s_points[ best ].pos.y, s_points[ best ].pos.z,
+		sqrtf( bestDistSq ) );
+
+	s_points.Remove( best );
+
+	Save();
+	RebuildMeshTags();
+
+	if ( removedALink )
+	{
+		Warning( "[ff_nav_builder] the connection that marker made is still live "
+			"in the graph. It goes away on the next map load — removing a nav edge "
+			"from under a bot that is walking it is not safe to do mid-round.\n" );
+	}
+
+	return 1;
+}
+
+
+int FFNavBuilder::DeleteAllNear( const Vector &pos, float radius )
 {
 	const float radiusSq = radius * radius;
 	int removed = 0;
@@ -1931,9 +2123,36 @@ CON_COMMAND_F( ff_nav_builder_page,
 }
 
 
+//-----------------------------------------------------------------------------
+// Where a delete measures from.
+//
+// The same floor trace placement uses, and for the same reason: authoring is
+// almost always done from noclip or from the spectator camera, where the
+// player's origin is somewhere in the air above the thing they are looking at.
+// Measuring from the camera means the marker you are floating directly over is
+// several hundred units away and a sensible radius never reaches it.
+//
+// Delete where you would place. Anything else makes the two commands disagree
+// about what "here" means.
+//-----------------------------------------------------------------------------
+static Vector AuthoringGroundPos( CBasePlayer *player )
+{
+	const Vector origin = player->GetAbsOrigin();
+
+	trace_t tr;
+	UTIL_TraceLine( origin + Vector( 0.0f, 0.0f, 16.0f ),
+		origin - Vector( 0.0f, 0.0f, 4096.0f ),
+		MASK_PLAYERSOLID_BRUSHONLY, player, COLLISION_GROUP_NONE, &tr );
+
+	return ( tr.fraction < 1.0f ) ? tr.endpos : origin;
+}
+
+
 CON_COMMAND_F( ff_nav_delete,
-	"Delete manual nav markers near you. Optional arg: radius (default "
-	"ff_nav_builder_delete_radius).",
+	"Delete the nav point nearest to you. Deletes a hand-placed marker if "
+	"there is one in range; otherwise erases the auto-generated tags on the "
+	"nav area you are standing on, and keeps them erased. "
+	"Optional arg: radius (default ff_nav_builder_delete_radius).",
 	FCVAR_CHEAT )
 {
 	if ( !BuilderModeGuard() )
@@ -1950,9 +2169,103 @@ CON_COMMAND_F( ff_nav_delete,
 		? (float)Q_atof( args.Arg( 1 ) )
 		: ff_nav_builder_delete_radius.GetFloat();
 
-	// Markers sit on the floor; the player's origin is their feet, so a plain
-	// radial test is right without any vertical fudging.
-	const int removed = FFNavBuilder::DeleteNear( player->GetAbsOrigin(), radius );
+	const Vector at = AuthoringGroundPos( player );
+
+	// Hand-placed markers first. They are the thing you most often meant, and
+	// erasing an area that still has a marker on it would leave the marker to
+	// re-stamp what the erasure just cleared on the next rebuild.
+	if ( FFNavBuilder::DeleteNearest( at, radius ) > 0 )
+	{
+		ClientPrint( player, HUD_PRINTCENTER, "- deleted nearest marker" );
+		return;
+	}
+
+	if ( !ff_nav_delete_erases_derived.GetBool() )
+	{
+		char hud[ 96 ];
+		Q_snprintf( hud, sizeof( hud ), "no markers within %.0fu", radius );
+		ClientPrint( player, HUD_PRINTCENTER, hud );
+		Msg( "[ff_nav_delete] nothing within %.0fu of (%.0f %.0f %.0f).\n",
+			radius, at.x, at.y, at.z );
+		return;
+	}
+
+	// Nothing hand-placed here, so the thing the author is pointing at is
+	// something a derivation pass produced. Those cannot be deleted by
+	// clearing a bit — every one of them is recomputed from scratch at the
+	// next map load. Record the decision instead.
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
+	{
+		Msg( "[ff_nav_delete] no nav mesh loaded.\n" );
+		return;
+	}
+
+	CNavArea *base = TheNavMesh->GetNearestNavArea( at, false,
+		FFNAVPT_AREA_SEARCH_RANGE, false, true, TEAM_ANY );
+	if ( !base )
+	{
+		char hud[ 96 ];
+		Q_snprintf( hud, sizeof( hud ), "nothing to delete here" );
+		ClientPrint( player, HUD_PRINTCENTER, hud );
+		Msg( "[ff_nav_delete] no marker and no nav area within %.0fu of "
+			"(%.0f %.0f %.0f).\n", FFNAVPT_AREA_SEARCH_RANGE, at.x, at.y, at.z );
+		return;
+	}
+
+	CFFNavArea *area = static_cast< CFFNavArea * >( base );
+
+	if ( area->HasAttributeFF2( FF_NAV2_ERASED ) )
+	{
+		ClientPrint( player, HUD_PRINTCENTER, "already erased" );
+		Msg( "[ff_nav_delete] area %d is already erased. Delete the erase "
+			"marker itself to bring its tags back.\n", area->GetID() );
+		return;
+	}
+
+	const unsigned int had1 = area->GetAttributesFF();
+	const unsigned int had2 = area->GetAttributesFF2();
+
+	if ( ( had1 & ~(unsigned int)FF_NAV_BLOCKED ) == 0 && had2 == 0 )
+	{
+		ClientPrint( player, HUD_PRINTCENTER, "nothing tagged here" );
+		Msg( "[ff_nav_delete] area %d has no tags to erase.\n", area->GetID() );
+		return;
+	}
+
+	// Placed through the normal path so it is written to the sidecar, drawn by
+	// the overlay and undone by deleting it again, exactly like every other
+	// marker.
+	if ( FFNavBuilder::Place( player, FFNAVPT_ERASE, 0 ) )
+	{
+		Msg( "[ff_nav_delete] erased area %d (was attr1=0x%08x attr2=0x%08x). "
+			"Delete the erase marker to bring them back.\n",
+			area->GetID(), had1, had2 );
+		ClientPrint( player, HUD_PRINTCENTER, "- erased derived tags here" );
+	}
+}
+
+
+CON_COMMAND_F( ff_nav_delete_all,
+	"Delete EVERY hand-placed nav marker within radius of you (default "
+	"ff_nav_builder_delete_radius). Does not erase derived tags — use "
+	"ff_nav_delete for those.",
+	FCVAR_CHEAT )
+{
+	if ( !BuilderModeGuard() )
+		return;
+
+	CBasePlayer *player = UTIL_GetCommandClient();
+	if ( !player )
+	{
+		Msg( "[ff_nav_delete_all] must be issued by a player.\n" );
+		return;
+	}
+
+	const float radius = ( args.ArgC() >= 2 )
+		? (float)Q_atof( args.Arg( 1 ) )
+		: ff_nav_builder_delete_radius.GetFloat();
+
+	const int removed = FFNavBuilder::DeleteAllNear( AuthoringGroundPos( player ), radius );
 
 	char hud[ 96 ];
 	if ( removed > 0 )
@@ -1961,7 +2274,7 @@ CON_COMMAND_F( ff_nav_delete,
 		Q_snprintf( hud, sizeof( hud ), "no markers within %.0fu", radius );
 	ClientPrint( player, HUD_PRINTCENTER, hud );
 
-	Msg( "[ff_nav_delete] removed %d marker(s) within %.0fu.\n", removed, radius );
+	Msg( "[ff_nav_delete_all] removed %d marker(s) within %.0fu.\n", removed, radius );
 }
 
 

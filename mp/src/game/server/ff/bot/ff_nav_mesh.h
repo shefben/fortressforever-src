@@ -94,6 +94,14 @@ public:
 	// references across map loads.
 	void ClearTaggedAreaCaches( void );
 
+	// Drop one area from every one of those lists.
+	//
+	// For FFNavBuilder::ApplyErasures. Clearing an area's attribute bits is
+	// not enough on its own: most consumers iterate these cached lists rather
+	// than scanning TheNavAreas and testing bits, so an erased flag area would
+	// keep being handed out by GetFlagAreas long after the bit was gone.
+	void RemoveAreaFromTaggedCaches( CFFNavArea *area );
+
 	// Per-team incursion-distance flood-fill from spawn rooms outward.
 	// Mirrors CTFNavMesh::ComputeIncursionDistances. Recomputes for all
 	// FF teams. Run AFTER spawn-room tagging.
