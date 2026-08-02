@@ -44,6 +44,16 @@ private:
 	ChasePath m_chasePath;			// lead-the-subject path while visible
 	CountdownTimer m_repathTimer;	// throttle re-paths to LKP
 	CountdownTimer m_loseSightTimer;	// give up if threat unseen this long
+
+	// Cover-peek state. Once we're in firing range with LOS, we cycle:
+	//   peek phase  — exposed, fire for ~1s
+	//   cover phase — hidden behind nav geometry for ~2s, then peek again
+	// Without this the bot just stands wherever they stopped chasing and
+	// eats incoming fire.
+	bool           m_inCoverPhase;
+	Vector         m_coverPos;
+	CountdownTimer m_coverPhaseTimer;
+	PathFollower   m_coverPath;
 };
 
 #endif // FF_BOT_ATTACK_H

@@ -16,6 +16,7 @@
 
 #include "Path/NextBotPathFollow.h"
 #include "ff_bot.h"
+#include "ff_bot_hazard.h"
 #include "ff_nav_area.h"
 #include "ff_player.h"
 #include "ff_weapon_base.h"
@@ -111,6 +112,22 @@ public:
 					m_isLowAmmo = true;
 			}
 		}
+		// Is a hazard volume currently hurting us? FF_NAV2_HAZARD_ZONE has
+		// deliberately never carried a path cost of its own: the tag says a
+		// trigger_hurt is there, not that it is switched on, and plenty of maps
+		// have one covering a pit the nav mesh never touches or one that stays
+		// inert for the whole round. Making it permanently expensive would
+		// distort routing on every map for the sake of the few where it
+		// matters, at the times it doesn't.
+		//
+		// So the cost is conditional on the only evidence that the thing is
+		// live: this bot is being hurt by it right now.
+		m_avoidHazardZones = FFBotHazard::IsSuffering( me );
+
+		// Wading or swimming. Water exits are only interesting to somebody in
+		// the water — from dry land they are just a piece of shoreline.
+		m_inWater = ( me->GetWaterLevel() >= WL_Waist );
+
 		// Engineers also rate as "low ammo" when cells are short — that's
 		// the resource that gates SG upgrades and repairs, so the resupply
 		// discount should pull them through ammo pickups even when their
@@ -131,8 +148,29 @@ public:
 		if ( fromArea == NULL )
 			return 0.0f;
 
+		// FIX 10 — a shut door must not delete the route.
+		//
+		// ILocomotion::IsAreaTraversable is just !area->IsBlocked( team ), and
+		// CNavMesh::UpdateBlockedAreas flips IsBlocked true for any area a
+		// closed door brush occupies. Returning -1 there removed the only way
+		// out of a spawn room every time its gate shut: no path existed at
+		// all, so the bot had nothing to follow and just milled around inside.
+		//
+		// Doorway areas (tagged by CFFNavMesh::MarkDoorwayAreas) are therefore
+		// merely EXPENSIVE while blocked. A route still exists, so the bot
+		// walks up to the door and CFFBotMainAction::HandleDoors opens it. The
+		// penalty is large enough that a genuinely open alternate route always
+		// wins, so bots don't queue at a door when a side corridor is free.
+		//
+		// This mirrors the exemption CFFNavMesh::ComputeIncursionDistances
+		// already makes for FF_NAV_SPAWN_ROOM_EXIT areas.
+		bool blockedDoorway = false;
 		if ( !m_me->GetLocomotionInterface()->IsAreaTraversable( area ) )
-			return -1.0f;
+		{
+			if ( !area->HasAttributeFF( FF_NAV_DOORWAY | FF_NAV_SPAWN_ROOM_EXIT ) )
+				return -1.0f;
+			blockedDoorway = true;
+		}
 
 		// Class restriction mask — if the area is restricted to specific
 		// classes and ours isn't listed, refuse traversal.
@@ -195,6 +233,12 @@ public:
 		float costMul = 1.0f;
 		float costFlat = 0.0f;
 
+		// FIX 10 — currently-shut door. Passable, but only if there is no
+		// better option. Flat rather than multiplicative so the penalty
+		// doesn't scale away on short segments.
+		if ( blockedDoorway )
+			costFlat += 1500.0f;
+
 		// Resupply discount when low on ammo or health.
 		const unsigned int kAnyResupply = FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH |
 		                                  FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES;
@@ -222,6 +266,37 @@ public:
 			break;
 		}
 
+		// FF_NAV2_DANGER — hand-authored with ff_nav_place danger. Pits,
+		// crushers, the grinder everyone on the server knows to walk around.
+		// Expensive rather than impassable, deliberately: an author marking a
+		// hazard is describing a cost, not a wall, and turning it into a wall
+		// is how you end up with no path at all through a corridor whose only
+		// route happens to run past the thing.
+		if ( area->HasAttributeFF2( FF_NAV2_DANGER ) )
+			costMul *= 4.0f;
+
+		// FF_NAV2_HAZARD_ZONE — a trigger_hurt volume, auto-detected. Charged
+		// only while this bot is actually taking environmental damage; see the
+		// note in the constructor for why it is not a permanent cost.
+		//
+		// Steeper than DANGER because it is not an opinion: something in this
+		// volume is measurably taking our health away, and the route out should
+		// leave it at the first opportunity rather than cut a corner through
+		// the far side of the room.
+		if ( m_avoidHazardZones && area->HasAttributeFF2( FF_NAV2_HAZARD_ZONE ) )
+		{
+			costMul *= 8.0f;
+			costFlat += 500.0f;
+		}
+
+		// FF_NAV2_WATER_EXIT — the marked way out of a body of water. The mesh
+		// knows the water connects to the shore; it does not know which stretch
+		// of shore you can actually climb out at, which on FF's sewers and
+		// canals is frequently one specific ladder foot out of forty metres of
+		// wall. To a bot already in the water that is worth a real discount.
+		if ( m_inWater && area->HasAttributeFF2( FF_NAV2_WATER_EXIT ) )
+			costMul *= 0.4f;
+
 		// Sentry-spot avoidance for non-engineers / non-spies. The mapper
 		// hand-tagged areas with FF_NAV_SENTRY_SPOT — those are likely SG
 		// positions. Engineers want to BUILD there; spies want to SAP.
@@ -232,29 +307,76 @@ public:
 			costMul *= 1.5f;
 		}
 
-		// Per-bot route flavor — drives some bots through the underwater
-		// /alternate route while others take the main path. Without this,
-		// every bot picks the shortest route (the main bridge on 2fort)
-		// because the per-area noise below isn't large enough to flip
-		// long-vs-short. Sampling water content per area is a physics
-		// query but cheap (no contact, just point in space). Caltrop
-		// caching above shows the same gEntList-once-per-path pattern.
-		const int areaContents = enginetrace->GetPointContents( areaCenter );
-		const bool isWaterArea = ( areaContents & ( CONTENTS_WATER | CONTENTS_SLIME ) ) != 0;
-		if ( isWaterArea )
+		// Water-aware cost. The auto-tagger (CFFBotAutoTagger) stamps
+		// FF_NAV_WATER (feet wet) and FF_NAV_UNDERWATER (must swim) on
+		// every relevant nav area at level init. We use the tags here
+		// instead of probing engine point contents per edge — that was
+		// fast enough but did a real physics query 30+ times per path
+		// computation, and pre-tagged is strictly better.
+		//
+		// Cost matrix (multiplier, before route-flavor):
+		//   FF_NAV_WATER       — 1.4× (slowed wading)
+		//   FF_NAV_UNDERWATER  — 2.0× (must swim, slowest)
+		//
+		// Class-specific extra:
+		//   HWGuy / Soldier    — heavy classes, +20% on top of water cost
+		//   Scout / Spy        — fast in water, water cost trimmed 25%
+		//
+		// Route-flavor adjustment (existing system, applied last):
+		//   ROUTE_FLAVOR_DRY    — water 1.4× extra (avoids water entirely)
+		//   ROUTE_FLAVOR_WATER  — water ×0.6 (prefers water)
+		//   ROUTE_FLAVOR_NEUTRAL — no change
+		const bool isWater = ( attrs & FF_NAV_WATER ) != 0;
+		const bool isUnderwater = ( attrs & FF_NAV_UNDERWATER ) != 0;
+		if ( isWater || isUnderwater )
 		{
-			switch ( m_routeFlavor )
+			float waterMul = isUnderwater ? 2.0f : 1.4f;
+			switch ( m_classSlot )
 			{
-			case CFFBot::ROUTE_FLAVOR_DRY:
-				costMul *= 1.6f;	// avoid water — take the dry route
+			case CLASS_HWGUY:
+			case CLASS_SOLDIER:
+				waterMul *= 1.2f;
 				break;
-			case CFFBot::ROUTE_FLAVOR_WATER:
-				costMul *= 0.7f;	// prefer water — sewer / underwater approach
+			case CLASS_SCOUT:
+			case CLASS_SPY:
+				waterMul *= 0.75f;
 				break;
 			default:
 				break;
 			}
+			switch ( m_routeFlavor )
+			{
+			case CFFBot::ROUTE_FLAVOR_DRY:
+				waterMul *= 1.4f;
+				break;
+			case CFFBot::ROUTE_FLAVOR_WATER:
+				waterMul *= 0.6f;
+				break;
+			default:
+				break;
+			}
+			costMul *= waterMul;
 		}
+
+		// Choke avoidance for non-defensive classes. Engineers / spies /
+		// snipers want to be near chokes (build / sap / hold sightlines);
+		// running classes route around so they don't bunch up there.
+		if ( ( attrs & FF_NAV_CHOKE ) &&
+			 m_classSlot != CLASS_ENGINEER &&
+			 m_classSlot != CLASS_SPY &&
+			 m_classSlot != CLASS_SNIPER )
+		{
+			costMul *= 1.15f;
+		}
+
+		// Ladder-adjacent discount. Vertical traversal via ladder is more
+		// reliable than free jumps (which need momentum, can be blocked by
+		// teammates, and aren't always in the nav graph). When two paths
+		// have equal length but only one passes a ladder, we'd rather take
+		// the ladder route. Small (5%) discount — enough to break ties
+		// without overriding genuine shortcuts.
+		if ( attrs & FF_NAV_NEAR_LADDER )
+			costMul *= 0.95f;
 
 		// Route entropy: per-bot deterministic noise so different bots
 		// pick different shortest paths through the same map. ±20% — large
@@ -283,8 +405,36 @@ public:
 			dist = ( area->GetCenter() - fromArea->GetCenter() ).Length();
 		}
 
-		// Height-change check.
+		// ---- Height-change check -----------------------------------------
+		//
+		// WATER/LADDER FIX 1 — ladders and elevators must skip this entirely.
+		//
+		// CNavArea::ComputeAdjacentConnectionHeightChange searches the FOUR
+		// COMPASS adjacency lists and returns FLT_MAX when the destination
+		// isn't in any of them (nav_area.cpp). Ladder connections live in a
+		// separate NavLadderConnectVector and elevator links in another, so
+		// for every ladder edge this returned FLT_MAX, which is >=
+		// m_maxJumpHeight, so we returned -1 and A* discarded the edge.
+		//
+		// Net effect: bots could not path up or down ANY ladder on ANY map,
+		// and the vertical half of every sewer/shaft route was invisible to
+		// them. The locomotor's whole ladder state machine (PlayerLocomotion
+		// ::TraverseLadder / ClimbLadder / DescendLadder) was dead code
+		// because no path ever contained a ladder segment.
+		//
+		// The vertical extent of a ladder or elevator is the entire point of
+		// it — it is not a "can I jump this?" question.
+		if ( ladder != NULL || elevator != NULL )
+			return dist * costMul + costFlat;
+
 		float deltaZ = fromArea->ComputeAdjacentConnectionHeightChange( area );
+
+		// Defensive: FLT_MAX means "these areas aren't compass-adjacent", not
+		// "there is an infinitely tall wall". Treat it as no height change
+		// rather than as impassable.
+		if ( deltaZ >= FLT_MAX || deltaZ <= -FLT_MAX )
+			deltaZ = 0.0f;
+
 		if ( deltaZ >= m_stepHeight )
 		{
 			if ( deltaZ >= m_maxJumpHeight )
@@ -293,7 +443,11 @@ public:
 		}
 		else if ( deltaZ < -m_maxDropHeight )
 		{
-			return -1.0f;		// drop too far
+			// WATER/LADDER FIX 2 — a long drop INTO water is survivable, and
+			// on FF maps it's the normal way into a sewer. Only reject the
+			// drop when we'd land on something hard.
+			if ( !( attrs & ( FF_NAV_WATER | FF_NAV_UNDERWATER ) ) )
+				return -1.0f;	// drop too far onto dry ground
 		}
 
 		return dist * costMul + costFlat;
@@ -311,6 +465,8 @@ private:
 	unsigned char m_routeFlavor;
 	bool m_isLowAmmo;
 	bool m_isLowHealth;
+	bool m_avoidHazardZones;	// environmental damage is landing on us right now
+	bool m_inWater;				// wading or swimming, so water exits matter
 
 	// Caltrop positions cached at construction for per-edge avoidance.
 	CUtlVector< Vector > m_caltrops;

@@ -6,6 +6,7 @@
 
 #include "cbase.h"
 #include "ff_bot_wander.h"
+#include "ff_bot_helpers.h"
 #include "ff_bot_path_cost.h"
 #include "nav_mesh.h"
 #include "nav_area.h"
@@ -85,6 +86,19 @@ ActionResult< CFFBot > CFFBotWander::Update( CFFBot *me, float interval )
 		return Continue();
 	}
 
+	// FIX 5 — stuck stage 3 asks us to give up on this goal. Drop it and pick
+	// somewhere else rather than re-planning a route we cannot walk.
+	if ( me->m_abandonGoalRequest )
+	{
+		me->m_abandonGoalRequest = false;
+		m_lastStuckPos = me->GetAbsOrigin();
+		m_avoidStuckRadius = 512.0f;
+		m_hasGoal = false;
+		m_pickGoalTimer.Invalidate();
+		m_repathTimer.Invalidate();
+		m_path.Invalidate();
+	}
+
 	// Pick a new random goal periodically (or if we don't have one yet).
 	if ( !m_hasGoal || m_pickGoalTimer.IsElapsed() )
 	{
@@ -113,15 +127,25 @@ ActionResult< CFFBot > CFFBotWander::Update( CFFBot *me, float interval )
 		}
 	}
 
-	// Recompute path occasionally.
+	// Recompute path occasionally. FIX 7 — hysteresis: leave a working path
+	// alone while we're actually travelling it, so volatile cost terms can't
+	// flip the route between two near-equal lanes every second.
 	if ( m_hasGoal && m_repathTimer.IsElapsed() )
 	{
 		m_repathTimer.Start( RandomFloat( 1.0f, 2.0f ) );
-		CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
-		m_path.Compute( me, m_goalPos, cost );
+		if ( FFBotHelpers::ShouldRecomputePath( me, m_path, m_goalPos ) )
+		{
+			CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
+			m_path.Compute( me, m_goalPos, cost );
+		}
 	}
 
-	m_path.Update( me );
+	// FIX 1 — single movement authority. CanDrivePath publishes the
+	// path goal for the aim driver and refuses while the movement
+	// arbiter owns locomotion, so this can never issue a second,
+	// contradictory Approach() in the same tick.
+	if ( FFBotHelpers::CanDrivePath( me, m_path ) )
+		m_path.Update( me );
 	return Continue();
 }
 

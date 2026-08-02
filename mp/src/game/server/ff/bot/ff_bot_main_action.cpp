@@ -21,6 +21,11 @@
 #include "ff_bot_medic_follow.h"
 #include "ff_bot_sniper_lurk.h"
 #include "ff_bot_demoman_sticky_trap.h"
+#include "ff_bot_demoman_detpack.h"
+#include "ff_bot_hazard.h"
+#include "ff_bot_ride_lift.h"
+#include "ff_bot_gamemode.h"
+#include "ff_nav_builder.h"
 #include "ff_bot_helpers.h"
 #include "ff_bot_weapon.h"
 #include "ff_bot_intel.h"
@@ -28,10 +33,17 @@
 #include "ff_nav_area.h"
 #include "ff_player.h"
 #include "NextBotBodyInterface.h"
+#include "NextBotLocomotionInterface.h"
 #include "ff_weapon_base.h"
+#include "debugoverlay_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+// Defined in ff_bot_ride_lift.cpp. Button pressing and lift riding are the
+// same feature from a server operator's point of view — both are "let the bots
+// operate the map's machinery" — so they share the switch.
+extern ConVar ff_bot_use_lifts;
 
 // Buffer added to the spawn delay before pressing fire — gives the
 // LIFE_DEAD → LIFE_RESPAWNABLE transition (which requires "all buttons
@@ -46,10 +58,15 @@
 #define FFBOT_STUCK_JUMP_THRESHOLD		0.75f
 
 // Sniper rifle: how long to keep IN_ATTACK held before letting it release
-// to fire. FF caps charge at FF_SNIPER_MAXCHARGE (~3s) but full damage
-// arrives well before then; 1.5s gives a strong hit without keeping the
-// bot pinned in place forever.
-#define FFBOT_SNIPER_CHARGE_DURATION	1.5f
+// FF rifle charges by holding IN_ATTACK and fires on release. We let the
+// charge run up to MAX (matches the engine cap) and force a release at
+// that point. The bot fires sooner — at MIN_USEFUL — once the target is
+// actually in the crosshair, since a partial-charge headshot beats a
+// full-charge miss. Pre-charging starts as soon as a threat enters our
+// vision (even before we've finished aiming), so the rifle is hot the
+// moment we acquire.
+#define FFBOT_SNIPER_CHARGE_MAX			5.0f	// engine cap on charge time
+#define FFBOT_SNIPER_CHARGE_MIN_USEFUL	1.0f	// don't release below this
 // Recovery time after firing before next charge cycle starts.
 #define FFBOT_SNIPER_COOLDOWN			0.5f
 
@@ -253,19 +270,99 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 	// CRITICAL priority if an enemy is in our face.
 	const bool inSpawn = TryExitSpawnOverride( me, body );
 
+	// WATER FIX — SWIM AIM IS THREE-DIMENSIONAL.
+	//
+	// FF's CGameMovement::WaterMove builds
+	//     wishvel = forward*forwardMove + right*sideMove + up*upMove
+	// with `forward` taken from mv->m_vecViewAngles. Vertical swim therefore
+	// comes almost entirely from VIEW PITCH — and NextBotPlayer only ever
+	// produces a non-negative m_flUpMove (it's runSpeed when IN_JUMP is held,
+	// zero otherwise), so there is no "swim down" button either.
+	//
+	// Every other aim path in this file flattens .z to zero. Result: a
+	// submerged bot has forward.z == 0 and literally cannot generate downward
+	// wish velocity. It can only ever swim horizontally or rise. That is why
+	// bots could never follow an underwater tunnel down and through.
+	//
+	// So when we're submerged and the route needs real vertical travel, pitch
+	// the view at the goal. Runs ahead of threat aim because at that point
+	// swimming is not optional — but only when |dz| is large enough to matter,
+	// so ordinary surface swimming still looks at enemies.
+	if ( me->GetWaterLevel() >= WL_Waist )
+	{
+		Vector swimGoal;
+		if ( me->GetPathGoal( &swimGoal ) )
+		{
+			const Vector eye = me->EyePosition();
+			Vector toGoal = swimGoal - eye;
+
+			if ( fabsf( toGoal.z ) > 32.0f && toGoal.Length() > 1.0f )
+			{
+				// Clamp the pitch. PlayerLocomotion::Approach decomposes the
+				// goal against the *2D* projection of our forward vector, so a
+				// near-vertical view would collapse that projection and destroy
+				// horizontal steering. +/-60 degrees keeps a usable horizontal
+				// component while still giving a strong vertical wish.
+				Vector dir = toGoal;
+				dir.NormalizeInPlace();
+
+				const float horiz = sqrtf( dir.x * dir.x + dir.y * dir.y );
+				const float kMaxSwimPitchTan = 1.732f;	// tan(60 degrees)
+				if ( horiz > 0.01f && fabsf( dir.z ) / horiz > kMaxSwimPitchTan )
+				{
+					dir.z = ( dir.z > 0.0f ? 1.0f : -1.0f ) * kMaxSwimPitchTan * horiz;
+					dir.NormalizeInPlace();
+				}
+
+				body->AimHeadTowards( eye + dir * 200.0f, IBody::CRITICAL, 0.3f,
+					NULL, "Swimming along path" );
+				return;
+			}
+		}
+	}
+
 	const CKnownEntity *known = vision->GetPrimaryKnownThreat( false );
 
-	// Stuck-scan override: when the stuck recovery has flagged "look around"
-	// mode, sweep the head so the bot visibly searches for an exit instead
-	// of staring at the wall it's wedged on. Higher priority than threat
-	// look so this isn't fighting per-tick aim.
+	// FIX 3 — stuck "look around" is a CLAMPED sweep around the path
+	// direction, never a free spin.
+	//
+	// The old code computed `yawDeg = remaining * 90.0f * 4.0f` with remaining
+	// running 2.5 -> 0, i.e. a 900-degree sweep at 360 deg/s: two and a half
+	// full revolutions, in absolute world yaw. With CFFBotBody's 3000 deg/s
+	// head cap the body tracked it exactly — that was the "bot spins in
+	// place". It also actively hurt movement: PlayerLocomotion::Approach
+	// quantizes to 8 view-relative directions, so a rotating view wobbles the
+	// world-space move direction by +/-22.5 degrees at the rotation rate,
+	// which is enough to keep re-colliding with a doorframe.
+	//
+	// Now: sweep at most +/-60 degrees, centred on the direction we actually
+	// want to travel, at a human-plausible rate.
 	if ( me->m_lookAroundUntil > gpGlobals->curtime )
 	{
-		const float remaining = me->m_lookAroundUntil - gpGlobals->curtime;
-		// 90 deg/sec rotation around current pos, full 360 over ~2.5s.
-		const float yawDeg = remaining * 90.0f * 4.0f;
-		const float rad = DEG2RAD( yawDeg );
-		Vector lookDir( cosf( rad ), sinf( rad ), 0.0f );
+		Vector baseDir;
+		Vector pathGoal;
+		if ( me->GetPathGoal( &pathGoal ) )
+		{
+			baseDir = pathGoal - me->EyePosition();
+			baseDir.z = 0.0f;
+		}
+		if ( baseDir.IsZero() || baseDir.NormalizeInPlace() < 0.5f )
+		{
+			// No path to anchor on — sweep around our current facing.
+			AngleVectors( me->EyeAngles(), &baseDir );
+			baseDir.z = 0.0f;
+			baseDir.NormalizeInPlace();
+		}
+
+		// One full left-right-left cycle per 2 seconds, clamped to +/-60 deg.
+		const float kSweepHalfAngle = 60.0f;
+		const float offsetDeg = kSweepHalfAngle * sinf( gpGlobals->curtime * M_PI );
+		const float rad = DEG2RAD( offsetDeg );
+		const float c = cosf( rad );
+		const float s = sinf( rad );
+		Vector lookDir( baseDir.x * c - baseDir.y * s,
+		                baseDir.x * s + baseDir.y * c,
+		                0.0f );
 		Vector lookAt = me->EyePosition() + lookDir * 200.0f;
 		body->AimHeadTowards( lookAt, IBody::IMPORTANT, 0.3f, NULL, "Looking for an exit (stuck)" );
 		// Don't return — let normal threat aim still happen if a threat
@@ -282,6 +379,38 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 
 	if ( !known || !known->GetEntity() )
 	{
+		// FIX 4 — DEFAULT AIM IS ALONG THE PATH.
+		//
+		// Nothing in the engine does this for a player bot. PathFollower::
+		// Update calls mover->FaceTowards( goalPos ), but ILocomotion::
+		// FaceTowards is an empty stub and PlayerLocomotion never overrides it
+		// (only NextBotGroundLocomotion does). So the bot's view was driven
+		// entirely by "look at interesting things" heuristics that point away
+		// from where it is walking, which is why travelling bots looked lost
+		// and walked sideways into geometry.
+		//
+		// This runs FIRST among the no-threat cases and short-circuits the
+		// rest while the bot is genuinely travelling. The old "face movement
+		// direction" fallback was gated on already having speed > 120 u/s —
+		// chicken-and-egg: a blocked bot has zero speed, so it could never use
+		// its own facing recovery and fell through to staring at the enemy
+		// invasion area instead.
+		Vector pathGoal;
+		if ( me->GetPathGoal( &pathGoal ) )
+		{
+			Vector toGoal = pathGoal - me->GetAbsOrigin();
+			toGoal.z = 0.0f;
+			if ( toGoal.NormalizeInPlace() > 0.1f )
+			{
+				// Aim at eye height along the route, not down at the goal
+				// point on the floor.
+				Vector lookAt = me->EyePosition() + toGoal * 300.0f;
+				body->AimHeadTowards( lookAt, IBody::IMPORTANT, 0.3f, NULL,
+					"Looking along path" );
+				return;
+			}
+		}
+
 		// Prefer a fresh team alert (a teammate spotted an enemy aiming at
 		// them, or we heard a footstep). 8s window — beyond that the alert
 		// is stale and noise.
@@ -300,6 +429,35 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 		{
 			body->AimHeadTowards( me->m_lastThreatPos, IBody::IMPORTANT, 0.5f, NULL, "Watching last-known threat" );
 			return;
+		}
+
+		// Authored aim hint (FF_NAV2_AIM_HINT). An author standing on a spot,
+		// facing a corridor, and pressing the aim key is saying "when you are
+		// here and have nothing better to look at, look down there". That is
+		// knowledge no heuristic recovers: which of the four exits from this
+		// room the attack actually comes through is a fact about how the map is
+		// played, not about its shape.
+		//
+		// Above the pre-aim heuristics below because they are guesses at the
+		// same question; below the threat blocks above because a real enemy
+		// always wins. Applies to any class — a marker is about the position.
+		{
+			CFFNavArea *hintArea = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
+			if ( hintArea && hintArea->HasAttributeFF2( FF_NAV2_AIM_HINT ) )
+			{
+				Vector hintPos;
+				float  hintYaw = 0.0f;
+				if ( FFNavBuilder::FindNearestPointWithYaw( FFNAVPT_AIM, -1,
+				         me->GetAbsOrigin(), &hintPos, &hintYaw ) )
+				{
+					const QAngle hintAngles( 0.0f, hintYaw, 0.0f );
+					Vector hintDir;
+					AngleVectors( hintAngles, &hintDir );
+					body->AimHeadTowards( me->EyePosition() + hintDir * 600.0f,
+						IBody::BORING, 0.5f, NULL, "Authored aim hint" );
+					return;
+				}
+			}
 		}
 
 		// Defenders: pre-aim toward enemy approach. Only for classes whose
@@ -345,19 +503,20 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 			}
 		}
 
-		// Velocity-based view tracking: when we're moving but have no
-		// threat to aim at, face the direction we're actually moving.
-		// Without this, PlayerLocomotion::Approach can press IN_BACK
-		// (because view is opposite goal direction) and the bot moves
-		// correctly in world space but visibly walks BACKWARDS — the
-		// model faces one way while sliding the other way.
+		// Velocity-based view tracking: face the direction we're actually
+		// moving, so the model doesn't visibly slide sideways/backwards.
 		//
-		// Threshold: 120 ups (bots run at ~225 ups, so anything > 120
-		// is "definitely moving"). We use horizontal velocity so jumps
-		// don't fool us.
+		// FIX 4 (part 2) — the speed gate here used to be 120 u/s, which made
+		// this unreachable for a bot that had already stopped: no speed means
+		// no facing correction means it keeps facing the wall it stalled on.
+		// The threshold is now just above "standing still", so a bot that is
+		// barely creeping still corrects its facing. A genuinely stationary
+		// bot (defending, building, healing) has no movement direction to face
+		// and falls through to the invasion-area glance below, which is the
+		// correct behavior for it.
 		Vector myVel = me->GetAbsVelocity();
 		myVel.z = 0.0f;
-		if ( myVel.LengthSqr() > ( 120.0f * 120.0f ) )
+		if ( myVel.LengthSqr() > ( 20.0f * 20.0f ) )
 		{
 			Vector velDir = myVel;
 			velDir.NormalizeInPlace();
@@ -474,6 +633,17 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 			aimPos.x += RandomFloat( -20.0f, 20.0f );
 			aimPos.y += RandomFloat( -20.0f, 20.0f );
 		}
+		else
+		{
+			// Difficulty-based Gaussian aim error. Tighter the longer
+			// we've held this threat (HasReactedToThreat updates the
+			// "first seen" timestamp). Disabled when concussed / tranqed
+			// since those impose their own much-larger wobble.
+			const float holdTime = ( me->m_currentThreatId == known->GetEntity()->entindex() )
+				? ( gpGlobals->curtime - me->m_threatFirstSeenTime )
+				: 0.0f;
+			aimPos = me->ApplyAimError( aimPos, holdTime );
+		}
 
 		body->AimHeadTowards( aimPos, IBody::CRITICAL, 1.0f, NULL, "Aiming at a visible threat" );
 		return;
@@ -499,25 +669,38 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 // Returns true if we owned the firing decision (caller should not fall
 // through to default press).
 //-----------------------------------------------------------------------------
-static bool RunSniperFireStateMachine( CFFBot *me, bool threatVisibleAndAimed )
+static bool RunSniperFireStateMachine( CFFBot *me,
+                                        bool threatVisibleAndAimed,
+                                        bool threatRecentlyVisible )
 {
 	switch ( me->m_sniperFireState )
 	{
 	case CFFBot::SNIPER_FIRE_CHARGING:
 	{
 		const float held = gpGlobals->curtime - me->m_sniperFireStartTime;
-		if ( held < FFBOT_SNIPER_CHARGE_DURATION )
+
+		// Force release at max charge — the engine caps further damage
+		// gain past this point, and holding longer just wastes time.
+		if ( held >= FFBOT_SNIPER_CHARGE_MAX )
 		{
-			// Keep IN_ATTACK pressed by extending the press timer.
-			me->PressFireButton( 0.2f );
-		}
-		else
-		{
-			// Charge complete — STOP pressing so IN_ATTACK releases this
-			// tick and the rifle reads the release event. Move to cooldown.
 			me->m_sniperFireState = CFFBot::SNIPER_FIRE_COOLDOWN;
 			me->m_sniperFireStartTime = gpGlobals->curtime;
+			return true;
 		}
+
+		// Aimed-on-target release: as soon as the target is in our
+		// crosshair AND we've held a useful minimum, fire. Don't wait
+		// for full charge — a partial-charge hit on a moving target is
+		// far better than a full-charge miss.
+		if ( threatVisibleAndAimed && held >= FFBOT_SNIPER_CHARGE_MIN_USEFUL )
+		{
+			me->m_sniperFireState = CFFBot::SNIPER_FIRE_COOLDOWN;
+			me->m_sniperFireStartTime = gpGlobals->curtime;
+			return true;
+		}
+
+		// Keep IN_ATTACK pressed (charge continues to build).
+		me->PressFireButton( 0.2f );
 		return true;
 	}
 
@@ -527,7 +710,12 @@ static bool RunSniperFireStateMachine( CFFBot *me, bool threatVisibleAndAimed )
 		return true;
 
 	case CFFBot::SNIPER_FIRE_IDLE:
-		if ( threatVisibleAndAimed )
+		// Pre-charge as soon as ANY threat enters our vision — even
+		// before we've finished slewing the head onto them. This is the
+		// "I'm holding the trigger waiting for him to round the corner"
+		// behavior. By the time aim catches up, the rifle is already
+		// hot and the partial-charge release fires immediately.
+		if ( threatVisibleAndAimed || threatRecentlyVisible )
 		{
 			me->m_sniperFireState = CFFBot::SNIPER_FIRE_CHARGING;
 			me->m_sniperFireStartTime = gpGlobals->curtime;
@@ -582,6 +770,16 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	IVision *vision = me->GetVisionInterface();
 	const CKnownEntity *threat = vision ? vision->GetPrimaryKnownThreat( false ) : NULL;
 
+	// Reaction-time gate: a freshly acquired threat gets a difficulty-scaled
+	// delay before we open fire (see CFFBot::GetReactionTimeFloor). The
+	// gate doesn't block tracking/aim updates — those keep settling onto
+	// the target during the delay, so the first shot lands cleanly.
+	// Charged weapons (sniper) bypass the gate via their own pre-charge
+	// state machine; otherwise the rifle wouldn't be hot in time to fire.
+	const bool reacted = me->HasReactedToThreat( threat );
+	if ( !reacted && !isChargedWeapon )
+		return;
+
 	bool canFireNow = false;
 	if ( threat && threat->GetEntity() && threat->IsVisibleRecently() && threat->IsVisibleInFOVNow() )
 	{
@@ -617,7 +815,11 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 	{
 		// Charge weapons must always run their state machine (commit-to-fire
 		// is one-way — the rifle is in m_bInFire as soon as we start pressing).
-		RunSniperFireStateMachine( me, canFireNow );
+		// We also feed in "threat is in our vision but maybe not aimed yet"
+		// so the rifle pre-charges while we slew the head onto target.
+		const bool threatRecentlyVisible =
+			threat && threat->GetEntity() && threat->IsVisibleRecently();
+		RunSniperFireStateMachine( me, canFireNow, threatRecentlyVisible );
 		return;
 	}
 
@@ -698,86 +900,404 @@ static void HandleCombatStrafe( CFFBot *me )
 // continuous +use / +forward to cycle the door open or push past the trigger
 // volume. Mash every tick while the locomotor reports stuck.
 //-----------------------------------------------------------------------------
+// True if the bot is "water-stuck": standing in a tagged water/underwater
+// area, moving very slowly for the last several frames. The locomotor's
+// IsStuck() check uses a velocity threshold that water bots barely beat
+// (water slows you to ~120u/s, IsStuck waits for total path stall) — so
+// without this, a bot oscillating between two waypoints in a well bottom
+// is technically "moving" and never tripped as stuck. We trip it.
+static bool IsWaterStuck( CFFBot *me )
+{
+	CNavArea *here = me->GetLastKnownArea();
+	if ( !here )
+		return false;
+	const unsigned int attrs = static_cast< CFFNavArea * >( here )->GetAttributesFF();
+	if ( !( attrs & ( FF_NAV_WATER | FF_NAV_UNDERWATER ) ) )
+		return false;
+
+	// Speed check — average speed below 50 u/s for at least 2.5s of
+	// continuous time. We use m_lastUnstuckTime as the proxy: it's
+	// refreshed by other movement systems whenever the bot makes
+	// real progress.
+	if ( gpGlobals->curtime - me->m_lastUnstuckTime < 2.5f )
+		return false;
+
+	const Vector vel = me->GetAbsVelocity();
+	if ( vel.LengthSqr() > ( 50.0f * 50.0f ) )
+		return false;
+
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// FIX 6 — DOORS ARE A BEHAVIOR, NOT AN OBSTACLE.
+//
+// FF respawn gates and func_door doorways open when a player walks into their
+// trigger volume or presses +use. The old stuck recovery pressed IN_BACK at
+// exactly this moment, which walks the bot back OUT of the trigger volume, so
+// the door never opened and the bot looped forever. This is the "bots can't
+// find the door of the spawn area" symptom.
+//
+// Returns true while a door interaction owns the bot, in which case stuck
+// recovery must stand down entirely.
+//-----------------------------------------------------------------------------
+bool CFFBotMainAction::HandleDoors( CFFBot *me )
+{
+	// Where do we want to go? Prefer the path goal; fall back to our facing.
+	Vector towards;
+	if ( !me->GetPathGoal( &towards ) )
+	{
+		Vector forward;
+		AngleVectors( me->EyeAngles(), &forward );
+		forward.z = 0.0f;
+		if ( forward.NormalizeInPlace() < 0.5f )
+			return false;
+		towards = me->GetAbsOrigin() + forward * 64.0f;
+	}
+
+	CBaseEntity *door = FFBotHelpers::FindBlockingDoor( me, towards );
+
+	if ( door == NULL )
+	{
+		// Interaction over (door opened, or we routed away from it).
+		if ( me->m_blockingDoor.Get() != NULL )
+		{
+			me->m_blockingDoor = NULL;
+			me->m_doorPushTimer.Invalidate();
+		}
+		return false;
+	}
+
+	// New door — start a bounded interaction window. Bounded so a genuinely
+	// locked / team-restricted door eventually falls through to the normal
+	// escalation ladder instead of pinning the bot forever.
+	if ( me->m_blockingDoor.Get() != door )
+	{
+		me->m_blockingDoor = door;
+		me->m_doorPushTimer.Start( 4.0f );
+	}
+
+	if ( me->m_doorPushTimer.IsElapsed() )
+	{
+		// Gave it a fair try; let the ladder route around instead. Keep the
+		// handle so we don't immediately restart the window on the same door.
+		return false;
+	}
+
+	// Push INTO the door and hold +use. Both matter: trigger-touch respawn
+	// gates need the hull inside the volume, func_button style doors need the
+	// use press.
+	Vector doorPos = door->WorldSpaceCenter();
+	Vector toDoor = doorPos - me->GetAbsOrigin();
+	toDoor.z = 0.0f;
+	if ( toDoor.NormalizeInPlace() < 0.1f )
+		toDoor = ( towards - me->GetAbsOrigin() );
+
+	me->PressUseButton( 0.2f );
+
+	// Drive through the arbiter, not through PressForwardButton: a raw
+	// IN_FORWARD is view-relative and would send us wherever the head happens
+	// to be pointing. A world-space override point cannot be misaimed.
+	me->SetMoveOverride( me->GetAbsOrigin() + toDoor * 96.0f, 0.2f, "Opening door" );
+
+	// The door counts as progress, not as being stuck.
+	me->m_lastUnstuckTime = gpGlobals->curtime;
+	me->m_stuckStage = 0;
+	me->m_stuckStageTime = gpGlobals->curtime;
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// BUTTONS.
+//
+// A door you walk into is handled by HandleDoors. A door opened by a button
+// somewhere else is not: the button never shows up as a blocker, so nothing
+// looks at it, and the +use the stuck ladder presses is aimed at whatever the
+// bot happens to be facing — which is the door, which does nothing.
+//
+// Source buttons are used, not touched. CBasePlayer::PlayerUse traces out from
+// the eye and requires the player to be close and looking at the thing, so
+// pressing one is a small piece of deliberate behaviour: walk to it, aim at it,
+// press. That is what FFBotLift::WorkButton does.
+//
+// Gated on actually being stuck, and on the button being visible from where we
+// are. Both matter: a bot that detours to every button it passes would never
+// arrive anywhere, and a button through a wall is one that belongs to a
+// different room.
+//-----------------------------------------------------------------------------
+#define FFBOT_BUTTON_HUNT_RADIUS	320.0f
+
+bool CFFBotMainAction::HandleButtons( CFFBot *me )
+{
+	if ( ff_bot_use_lifts.GetInt() <= 0 )
+		return false;
+
+	// Only when the planner has already given the ordinary route a fair go. A
+	// button is a last resort before abandoning the goal, not a first thought.
+	if ( me->m_stuckStage < 1 )
+		return false;
+
+	CBaseEntity *button = FFBotLift::FindButtonNear( me, me->GetAbsOrigin(),
+	                                                 FFBOT_BUTTON_HUNT_RADIUS );
+	if ( !button )
+		return false;
+
+	return FFBotLift::WorkButton( me, button );
+}
+
+
+//-----------------------------------------------------------------------------
+// FIX 5 — STUCK ESCALATION AT THE PLANNER LEVEL.
+//
+// The old ladder was: press buttons -> press more buttons -> teleport at 15s.
+// It could not work, for two reasons:
+//
+//   1. Every press was view-relative and NextBotPlayer collapses
+//      IN_FORWARD+IN_BACK to IN_FORWARD, so the path follower's Approach()
+//      cancelled the recovery outright in 15 of the 16 actions (only
+//      CFFBotCtfObjective checked the inhibit flag).
+//   2. When the inhibit DID apply it skipped path.Update() wholesale, which
+//      also disabled PathFollower::Avoid() (the whisker-trace obstacle
+//      steering that actually works) and PathFollower::Climbing() — exactly
+//      when the bot needed them.
+//
+// The new ladder escalates the *plan*, and every physical motion goes through
+// the world-space movement arbiter so nothing can cancel it:
+//
+//   stage 0  (<0.75s)  do nothing — let PathFollower::Avoid do its job
+//   stage 1  (0.75s)   penalize the area ahead, force an immediate repath
+//   stage 2  (2.0s)    back-track in WORLD space to the last spot we had speed
+//   stage 3  (4.0s)    abandon the goal; the owning action picks a new one
+//   stage 4  (15s)     teleport (handled in HandleMobility, unchanged floor)
+//-----------------------------------------------------------------------------
 void CFFBotMainAction::HandleStuckState( CFFBot *me )
 {
 	ILocomotion *loco = me->GetLocomotionInterface();
-	if ( !loco || !loco->IsStuck() )
+	if ( !loco )
 		return;
+
+	// LADDER/WATER FIX — vertical travel is progress.
+	//
+	// Climbing a ladder or swimming up a shaft produces almost no HORIZONTAL
+	// velocity, so the old horizontal-only checks read it as "not moving": the
+	// stuck ladder escalated through its stages mid-climb and the 15s recovery
+	// teleport in HandleMobility eventually fired on a bot that was simply on
+	// a ladder. Count total speed when we're on a ladder or in water.
+	const bool onLadder = loco->IsUsingLadder() || loco->IsAscendingOrDescendingLadder();
+	const bool inWater = ( me->GetWaterLevel() >= WL_Waist );
+
+	Vector vel = me->GetAbsVelocity();
+	Vector horizVel = vel;
+	horizVel.z = 0.0f;
+
+	const float progressSpeedSq = ( onLadder || inWater ) ? vel.LengthSqr()
+	                                                      : horizVel.LengthSqr();
+	if ( progressSpeedSq > ( 100.0f * 100.0f ) )
+	{
+		me->m_lastGoodPos = me->GetAbsOrigin();
+		me->m_lastGoodPosTime = gpGlobals->curtime;
+		me->m_lastUnstuckTime = gpGlobals->curtime;
+	}
+
+	// A bot on a ladder is committed: the locomotor owns it through
+	// PlayerLocomotion::TraverseLadder, which only runs from inside
+	// PathFollower::Update. Publishing a move override here would suppress the
+	// path follower and strand the bot halfway up.
+	if ( onLadder )
+	{
+		me->ClearMoveOverride();
+		me->m_stuckStage = 0;
+		me->m_stuckStageTime = gpGlobals->curtime;
+		return;
+	}
+
+	// Doors get first refusal. If one is being worked, recovery stands down.
+	if ( HandleDoors( me ) )
+		return;
+
+	// Then buttons. Second rather than first because a door we can walk into is
+	// cheaper to open than a button we have to walk to, and because most of the
+	// blockers on most maps are the former.
+	if ( HandleButtons( me ) )
+		return;
+
+	// WATER FIX — water-stuck must NOT blacklist the water route.
+	//
+	// This used to stamp m_recentStuckPos with a 30s expiry, which makes
+	// CFFBotPathCost charge dist*4 + 200 for every area within 256u. On a map
+	// where the sewer IS the route to the enemy flag, one failed swim poisoned
+	// the entire underwater path — and since the bot could not descend at all,
+	// every swim failed, so the water route stayed permanently poisoned. The
+	// bots' apparent "refusal to use the water" was largely this feedback loop.
+	//
+	// Now that swimming actually works, a slow patch of water is a reason to
+	// re-aim, not a reason to abandon the route.
+	if ( IsWaterStuck( me ) )
+	{
+		// Re-drive straight at the path goal in world space. The pitched swim
+		// aim in UpdateLookingAroundForEnemies supplies the vertical component.
+		Vector out;
+		if ( me->GetPathGoal( &out ) )
+		{
+			me->SetMoveOverride( out, 0.3f, "Water: pushing along route" );
+		}
+		else
+		{
+			// No route to follow — surface so we don't drown while the owning
+			// action re-plans.
+			me->PressJumpButton( 0.3f );
+		}
+
+		me->m_lastUnstuckTime = gpGlobals->curtime;
+		return;
+	}
+
+	if ( !loco->IsStuck() )
+	{
+		// Recovered. Reset the ladder so the next episode starts at stage 0,
+		// and drop any un-consumed abandon request — actions that don't handle
+		// it (sniper lurk, medic follow, ...) would otherwise leave it set and
+		// have an unrelated action act on it minutes later.
+		if ( me->m_stuckStage != 0 )
+		{
+			me->m_stuckStage = 0;
+			me->m_stuckStageTime = gpGlobals->curtime;
+			me->m_abandonGoalRequest = false;
+			me->ClearMoveOverride();
+		}
+		return;
+	}
 
 	const float stuckDur = loco->GetStuckDuration();
 
-	// Phase 1 (under 1.5s): mash USE + FORWARD via direct button presses
-	// (bypasses locomotor.Approach overrides) — this is enough for trigger-
-	// touch doors and func_button doors.
+	// +use costs nothing and handles button-doors / plates we are touching.
 	me->PressUseButton( 0.2f );
 
-	if ( stuckDur < 1.5f )
+	// ---- stage 0: let PathFollower::Avoid work --------------------------
+	// Critically we do NOT suppress the path here. Avoid() is the one piece of
+	// obstacle steering in this codebase that is known-good, and it only runs
+	// from inside PathFollower::Update.
+	if ( stuckDur < FFBOT_STUCK_JUMP_THRESHOLD )
 	{
-		me->PressForwardButton( 0.2f );
-		if ( stuckDur > FFBOT_STUCK_JUMP_THRESHOLD && loco->IsOnGround() )
-			me->PressJumpButton( 0.3f );
+		me->m_stuckStage = 0;
 		return;
 	}
 
-	// Phase 2+ (≥1.5s): more aggressive. Inhibit the path follower for a
-	// short window so its locomotor.Approach calls don't keep re-pressing
-	// IN_FORWARD against our backward / lateral pushes (which would just
-	// cancel out into "stop"). 0.8s is long enough for our reverse to
-	// produce horizontal motion, short enough that we re-engage the path
-	// quickly when freed.
-	me->m_pathInhibitTimer.Start( 0.8f );
+	// A single hop clears the majority of ledge/prop catches, and is safe:
+	// IN_JUMP is not view-relative.
+	if ( loco->IsOnGround() )
+		me->PressJumpButton( 0.2f );
 
-	// Trigger a head scan so the bot visibly looks around — gives them a
-	// chance to spot the exit (and cues the human watching that the bot
-	// is searching, not bugged).
-	if ( me->m_lookAroundUntil < gpGlobals->curtime )
-		me->m_lookAroundUntil = gpGlobals->curtime + 2.5f;
+	// ---- stage 1: penalize what's AHEAD, force a repath ------------------
+	if ( stuckDur < 2.0f )
+	{
+		if ( me->m_stuckStage < 1 )
+		{
+			me->m_stuckStage = 1;
+			me->m_stuckStageTime = gpGlobals->curtime;
 
+			// Penalize the area we are trying to ENTER, not the one we are
+			// standing in. The old code stamped our own position, which
+			// penalized the (perfectly fine) area under our feet and left the
+			// actual blockage untouched, so the repath produced the same route.
+			Vector ahead;
+			if ( me->GetPathGoal( &ahead ) )
+				me->m_recentStuckPos = ahead;
+			else
+				me->m_recentStuckPos = me->GetAbsOrigin();
+			me->m_recentStuckExpireTime = gpGlobals->curtime + 30.0f;
+
+			// Force an immediate repath in whichever action owns the path.
+			me->m_pathInhibitTimer.Invalidate();
+		}
+		return;
+	}
+
+	// ---- stage 2: world-space back-track ---------------------------------
 	if ( stuckDur < 4.0f )
 	{
-		// Lateral escape — alternate left/right by ~1s so both sides get
-		// tried. With path inhibited, the bot strafes free of the wedge.
-		const int side = ( ( (int)stuckDur ) & 1 );
-		if ( side == 0 )
-			me->PressLeftButton( 0.4f );
-		else
-			me->PressRightButton( 0.4f );
-		// Add a backward press so we bias out of the corner rather than
-		// strafing parallel against it.
-		me->PressBackwardButton( 0.3f );
-		if ( loco->IsOnGround() )
-			me->PressJumpButton( 0.2f );
-	}
-	else
-	{
-		// Severely stuck (≥4s) — back away hard, crouch (clear low
-		// ledges), and tag the position so path cost penalizes routes
-		// through here for the next 30s.
-		me->PressBackwardButton( 0.6f );
-		me->PressCrouchButton( 0.4f );
-		if ( loco->IsOnGround() )
-			me->PressJumpButton( 0.2f );
+		if ( me->m_stuckStage < 2 )
+		{
+			me->m_stuckStage = 2;
+			me->m_stuckStageTime = gpGlobals->curtime;
 
-		// Record stuck position for the per-bot path-cost penalty.
+			// Clamped head sweep so the bot visibly searches (and so a human
+			// watching can tell it is recovering, not bugged). FIX 3 keeps
+			// this to +/-60 degrees around the path direction.
+			me->m_lookAroundUntil = gpGlobals->curtime + 2.0f;
+		}
+
+		// Reverse toward the last place we had real velocity. If we never had
+		// any (spawned into a wedge), reverse away from the blockage instead.
+		Vector target;
+		if ( me->m_lastGoodPosTime > 0.0f &&
+		     ( me->m_lastGoodPos - me->GetAbsOrigin() ).IsLengthGreaterThan( 32.0f ) )
+		{
+			target = me->m_lastGoodPos;
+		}
+		else
+		{
+			Vector away = me->GetAbsOrigin();
+			Vector goal;
+			if ( me->GetPathGoal( &goal ) )
+			{
+				Vector back = me->GetAbsOrigin() - goal;
+				back.z = 0.0f;
+				if ( back.NormalizeInPlace() > 0.1f )
+					away = me->GetAbsOrigin() + back * 128.0f;
+			}
+			target = away;
+		}
+
+		me->SetMoveOverride( target, 0.3f, "Stuck: backtracking" );
+		me->PressCrouchButton( 0.3f );	// clears low ledges; not view-relative
+		return;
+	}
+
+	// ---- stage 3: abandon the goal ---------------------------------------
+	if ( me->m_stuckStage < 3 )
+	{
+		me->m_stuckStage = 3;
+		me->m_stuckStageTime = gpGlobals->curtime;
+
 		me->m_recentStuckPos = me->GetAbsOrigin();
 		me->m_recentStuckExpireTime = gpGlobals->curtime + 30.0f;
+
+		// Consumed by the owning action on its next Update.
+		me->m_abandonGoalRequest = true;
 	}
+
+	// Keep reversing while the action re-plans, so we're not still wedged when
+	// the new path arrives.
+	if ( me->m_lastGoodPosTime > 0.0f )
+		me->SetMoveOverride( me->m_lastGoodPos, 0.3f, "Stuck: abandoning goal" );
 }
 
 //-----------------------------------------------------------------------------
-// HandleWallAvoidance — proactive obstacle detection independent of the path
-// planner. Casts a fan of trace lines from the bot's chest in their current
-// facing direction; if the forward direction is blocked but a side direction
-// is open, snap eye angles to the open direction so PlayerLocomotion::Approach
-// reads the corrected view and presses IN_FORWARD into the open path.
+// FIX 2 — WALL AVOIDANCE STEERS THE GOAL POINT, NOT THE VIEW.
 //
-// Lets the bot literally "see" walls — including other players standing in
-// their way — and steer around them instead of blindly running into a wedge
-// based on stale view direction.
+// The old implementation snapped eye angles toward the most open whisker and
+// commented that "PlayerLocomotion::Approach reads EyeVectors next tick and
+// will press IN_FORWARD aligned with the actually-walkable direction".
 //
-// Runs every tick. No-op when the bot is making forward progress (horizontal
-// speed > threshold). When idle/blocked, scans 7 angular offsets and picks
-// the longest unobstructed direction.
+// That premise is false. Approach (NextBotPlayerLocomotion.cpp) uses the eye
+// vectors ONLY as a basis to decompose (goalPos - feet) into forward/side
+// button presses. Rotating the view changes which buttons fire; it does not
+// change where the bot goes, which is always the goal within the 22.5-degree
+// button quantization. So the snap did zero steering.
+//
+// What it DID do was fight PlayerBody::Upkeep, which slews the view back
+// toward m_lookAtPos every frame at CFFBotBody's 3000 deg/s. Snap, slew back,
+// snap, slew back — every tick the bot was blocked. That is the visible
+// "spins in place", and the resulting view rotation also wobbles the
+// quantized move direction enough to keep re-colliding with a doorframe.
+//
+// Real steering means moving the POINT we approach. That is exactly what
+// PathFollower::Avoid() already does with its own whiskers, so this function
+// now only handles the case Avoid cannot: no usable path at all. It publishes
+// a world-space waypoint offset toward open space and never touches the view.
 //-----------------------------------------------------------------------------
 static void HandleWallAvoidance( CFFBot *me )
 {
@@ -799,29 +1319,38 @@ static void HandleWallAvoidance( CFFBot *me )
 	if ( horizSpeedSq > ( 80.0f * 80.0f ) )
 		return;
 
-	// Trace from chest height (so we don't catch our own feet on stairs).
+	// Don't fight an override that some other system already published.
+	if ( me->IsMoveOverrideActive() )
+		return;
+
+	// Steer relative to where we WANT to go, not where the head points. If
+	// there's no live path goal we have nothing to steer around, and the stuck
+	// ladder will take it from here.
+	Vector pathGoal;
+	if ( !me->GetPathGoal( &pathGoal ) )
+		return;
+
 	const Vector start = me->GetAbsOrigin() + Vector( 0, 0, 36 );
 
-	Vector forward;
-	AngleVectors( me->EyeAngles(), &forward );
+	Vector forward = pathGoal - me->GetAbsOrigin();
 	forward.z = 0.0f;
 	if ( forward.NormalizeInPlace() < 0.5f )
 		return;
 
 	const float traceDist = 80.0f;	// "is there a wall right in front of me?"
+	const Vector hullMin( -16, -16, -36 );
+	const Vector hullMax( 16, 16, 0 );
 
 	// Forward whisker first — if it's clear, no avoidance needed.
 	{
 		trace_t tr;
-		UTIL_TraceHull( start, start + forward * traceDist,
-			Vector( -16, -16, -36 ), Vector( 16, 16, 0 ),
+		UTIL_TraceHull( start, start + forward * traceDist, hullMin, hullMax,
 			MASK_PLAYERSOLID, me, COLLISION_GROUP_PLAYER_MOVEMENT, &tr );
 		if ( tr.fraction >= 0.9f )
-			return;	// open ahead, no wall
+			return;	// open toward the goal, no avoidance needed
 	}
 
-	// Forward is blocked. Sweep angular offsets to find the most open
-	// direction.
+	// Blocked. Sweep angular offsets to find the most open direction.
 	static const float kOffsetDegrees[] = { -22.5f, 22.5f, -45.0f, 45.0f, -67.5f, 67.5f, -90.0f, 90.0f };
 	const int kOffsetCount = sizeof( kOffsetDegrees ) / sizeof( kOffsetDegrees[ 0 ] );
 
@@ -841,8 +1370,7 @@ static void HandleWallAvoidance( CFFBot *me )
 		probe.NormalizeInPlace();
 
 		trace_t tr;
-		UTIL_TraceHull( start, start + probe * traceDist,
-			Vector( -16, -16, -36 ), Vector( 16, 16, 0 ),
+		UTIL_TraceHull( start, start + probe * traceDist, hullMin, hullMax,
 			MASK_PLAYERSOLID, me, COLLISION_GROUP_PLAYER_MOVEMENT, &tr );
 
 		// Prefer the smallest absolute angle change among directions that
@@ -862,18 +1390,15 @@ static void HandleWallAvoidance( CFFBot *me )
 		}
 	}
 
-	if ( !foundOpen )
+	if ( !foundOpen && bestFraction < 0.45f )
 	{
-		// Nothing is clear within 80u — every whisker hits geometry. Bot
-		// is wedged in a tight corner. Fall back to backing up; the
-		// stuck-recovery system will lateral-escape from there.
-		me->PressBackwardButton( 0.3f );
+		// Nothing clear within 80u — genuinely wedged. Leave it to the stuck
+		// ladder rather than issuing a move we know is blocked.
 		return;
 	}
 
-	// Snap eye angles toward the open direction. PlayerLocomotion::Approach
-	// reads EyeVectors next tick and will press IN_FORWARD aligned with
-	// the actually-walkable direction instead of pressing INTO a wall.
+	// Publish a world-space waypoint in the open direction. Short duration:
+	// this is a nudge past the obstacle, after which the path resumes.
 	const float rad = DEG2RAD( bestAngleOffset );
 	const float c = cosf( rad );
 	const float s = sinf( rad );
@@ -883,15 +1408,121 @@ static void HandleWallAvoidance( CFFBot *me )
 		0.0f );
 	openDir.NormalizeInPlace();
 
-	QAngle desired;
-	VectorAngles( openDir, desired );
-	// Preserve our pitch — don't snap the head down/up while wall-avoiding.
-	desired.x = me->EyeAngles().x;
-	me->SnapEyeAngles( desired );
+	me->SetMoveOverride( me->GetAbsOrigin() + openDir * 128.0f, 0.25f,
+		"Steering around obstacle" );
+}
 
-	// Force a forward press so we definitely move along the new direction
-	// (the body's slewing will catch up over the next few ticks).
-	me->PressForwardButton( 0.2f );
+
+//-----------------------------------------------------------------------------
+// FIX 1 — THE SINGLE MOVEMENT AUTHORITY.
+//
+// Runs last, after every other per-tick concern has had its chance to publish
+// a move override. Issues at most one locomotor->Approach() per tick.
+//
+// The behavior tree updates children before parents (Action::InvokeUpdate),
+// so by the time we get here the contained action's PathFollower may already
+// have driven movement this tick. In that case we do nothing and the override
+// takes effect next tick, when FFBotHelpers::CanDrivePath will refuse the
+// path. Either way: exactly one Approach per tick, so no two systems can issue
+// contradictory button presses that collapse to "walk into the wall" (recall
+// NextBotPlayer resolves IN_FORWARD+IN_BACK as IN_FORWARD).
+//-----------------------------------------------------------------------------
+void CFFBotMainAction::DriveMovementArbiter( CFFBot *me )
+{
+	if ( !me->IsMoveOverrideActive() )
+		return;
+
+	// The path already moved us this tick. Let the override land next tick.
+	if ( me->m_pathDrivenTick == gpGlobals->tickcount )
+		return;
+
+	ILocomotion *loco = me->GetLocomotionInterface();
+	if ( !loco )
+		return;
+
+	// LADDER FIX — never steal control from a ladder traversal. The ladder
+	// state machine lives in PlayerLocomotion::TraverseLadder and is only
+	// pumped from PathFollower::Update; an active override suppresses the path
+	// follower (FFBotHelpers::CanDrivePath), which would freeze the bot
+	// halfway up. Drop the override and let the path run.
+	if ( loco->IsUsingLadder() || loco->IsAscendingOrDescendingLadder() )
+	{
+		me->ClearMoveOverride();
+		return;
+	}
+
+	loco->Approach( me->GetMoveOverridePos() );
+	loco->Run();
+}
+
+
+//-----------------------------------------------------------------------------
+// bot_show_path / bot_show_threat overlays. Per-bot toggles set by the
+// console commands in ff_bot_commands.cpp.
+//
+// These exist because every navigation failure in this subsystem was
+// invisible: "bot has no path at all" and "bot has a path it can't follow"
+// look identical from the outside.
+//-----------------------------------------------------------------------------
+void CFFBotMainAction::DrawDebugOverlays( CFFBot *me )
+{
+	const float kDuration = 0.15f;
+
+	if ( me->m_debugShowPath )
+	{
+		const Vector eye = me->EyePosition();
+
+		Vector goal;
+		if ( me->GetPathGoal( &goal ) )
+		{
+			// Yellow: current path goal segment.
+			NDebugOverlay::Line( eye, goal, 255, 255, 0, true, kDuration );
+			NDebugOverlay::Cross3D( goal, 8.0f, 255, 255, 0, true, kDuration );
+		}
+		else
+		{
+			// Red box over the head: NO PATH. This is the state that used to
+			// be indistinguishable from "stuck".
+			NDebugOverlay::Box( eye + Vector( 0, 0, 16 ), Vector( -6, -6, -6 ), Vector( 6, 6, 6 ),
+				255, 0, 0, 100, kDuration );
+		}
+
+		if ( me->IsMoveOverrideActive() )
+		{
+			// Cyan: the arbiter is driving. Label says which system published.
+			const Vector ov = me->GetMoveOverridePos();
+			NDebugOverlay::Line( eye, ov, 0, 255, 255, true, kDuration );
+			NDebugOverlay::Cross3D( ov, 10.0f, 0, 255, 255, true, kDuration );
+			const char *why = me->GetMoveOverrideReason();
+			if ( why )
+				NDebugOverlay::Text( ov + Vector( 0, 0, 12 ), why, false, kDuration );
+		}
+
+		if ( me->m_stuckStage > 0 )
+		{
+			char buf[ 64 ];
+			Q_snprintf( buf, sizeof( buf ), "STUCK stage %d", me->m_stuckStage );
+			NDebugOverlay::Text( eye + Vector( 0, 0, 24 ), buf, false, kDuration );
+		}
+	}
+
+	if ( me->m_debugShowThreat )
+	{
+		IVision *vision = me->GetVisionInterface();
+		const CKnownEntity *known = vision ? vision->GetPrimaryKnownThreat( false ) : NULL;
+		if ( known && known->GetEntity() )
+		{
+			// Magenta: current primary threat.
+			NDebugOverlay::Line( me->EyePosition(), known->GetEntity()->WorldSpaceCenter(),
+				255, 0, 255, true, kDuration );
+		}
+		if ( me->m_lastThreatTime > 0.0f &&
+		     ( gpGlobals->curtime - me->m_lastThreatTime ) < 8.0f )
+		{
+			// Orange: last-known-position memory.
+			NDebugOverlay::Cross3D( me->m_lastThreatPos, 12.0f, 255, 128, 0, true, kDuration );
+		}
+	}
 }
 
 
@@ -914,12 +1545,88 @@ ActionResult< CFFBot > CFFBotMainAction::Update( CFFBot *me, float interval )
 	FireWeaponAtEnemy( me );
 	HandleCombatStrafe( me );
 	HandleMobility( me );
+
+	// Order matters here. Both of these may publish a move override; the stuck
+	// ladder is authoritative, so it runs last and overwrites the wall-avoid
+	// nudge if we're genuinely wedged rather than just brushing something.
 	HandleWallAvoidance( me );
 	HandleStuckState( me );
+
+	// FIX 1 — arbiter runs after every override producer. At most one
+	// Approach() per tick from this point on.
+	DriveMovementArbiter( me );
+
+	DrawDebugOverlays( me );
+
+	// WATER FIX — DON'T PIN THE BOT TO THE SURFACE.
+	//
+	// This used to press JUMP on every single tick the bot was waist-deep or
+	// worse. In FF that is not a gentle upward nudge: CGameMovement::WaterMove
+	// treats IN_JUMP as "sharking" and HARD-ASSIGNS
+	//     mv->m_vecVelocity[2] = 100.0f;
+	// so holding it clamps vertical velocity to +100 every tick. A bot in
+	// water physically could not descend, no matter what its path said. Between
+	// that and the flattened aim, underwater tunnels were unreachable by
+	// construction.
+	//
+	// Now we only surface when there's an actual reason to:
+	//   - air is genuinely running out, or
+	//   - the route wants us higher than we are.
+	// Otherwise we leave vertical control to the pitched swim aim above.
+	if ( me->GetWaterLevel() >= WL_Waist )
+	{
+		bool wantSurface = false;
+
+		// Real drown clock, not a guess. PlayerDrownTime() is the time at
+		// which we start taking damage; head for air with a margin.
+		if ( me->GetWaterLevel() >= WL_Eyes &&
+		     ( me->PlayerDrownTime() - gpGlobals->curtime ) < 4.0f )
+		{
+			wantSurface = true;
+		}
+
+		// Route wants us higher — rise toward it.
+		Vector goal;
+		if ( !wantSurface && me->GetPathGoal( &goal ) )
+		{
+			if ( goal.z > me->GetAbsOrigin().z + 32.0f )
+				wantSurface = true;
+		}
+
+		// No path at all and submerged: don't just sit on the bottom.
+		if ( !wantSurface && !me->GetPathGoal( &goal ) && me->GetWaterLevel() >= WL_Eyes )
+			wantSurface = true;
+
+		if ( wantSurface )
+			me->PressJumpButton( 0.2f );
+	}
 
 	// Class-specific per-tick driver: spy cloak/disguise, engineer build,
 	// sniper zoom, etc. Layered on top of the main objective.
 	FFBotClass::Update( me );
+
+	// ---- Environmental hazard --------------------------------------------
+	//
+	// Outranks combat, and that is not a mistake. A bot trading shots while the
+	// room fills with gas loses the trade and then dies anyway; the enemy is in
+	// the same room and has the same problem. This is the highest-priority
+	// suspend in the tree for the same reason a human's first move when the gas
+	// alarm goes is to leave.
+	if ( CFFBotEscapeHazard::IsPossible( me ) )
+	{
+		return SuspendFor( new CFFBotEscapeHazard,
+			"Taking environmental damage — fetching gear or getting out" );
+	}
+
+	// ---- Lifts ------------------------------------------------------------
+	//
+	// Checked before the combat gate below, because a bot that stops to fight
+	// halfway onto a platform gets left behind by it, and because riding is a
+	// state every other movement system in this file would otherwise try to
+	// correct. CFFBotRideLift's own timeouts bound how long it can hold the
+	// bot if the lift turns out to be unusable.
+	if ( CFFBotRideLift::IsPossible( me ) )
+		return SuspendFor( new CFFBotRideLift, "Using a lift" );
 
 	// Sub-action dispatch: when a threat is in close range and visible,
 	// suspend movement (Attack stops the chase path so we hold position).
@@ -930,12 +1637,44 @@ ActionResult< CFFBot > CFFBotMainAction::Update( CFFBot *me, float interval )
 
 	if ( hasVisibleThreat )
 	{
+		const int classSlot = me->GetClassSlot();
 		const float distSq = ( threat->GetEntity()->GetAbsOrigin() - me->GetAbsOrigin() ).LengthSqr();
-		if ( distSq > FFBOT_ATTACK_HOLD_RANGE * FFBOT_ATTACK_HOLD_RANGE )
+
+		// SNIPER FIX 1 — THE CHASE GATE IS CLASS-AWARE.
+		//
+		// This used to be a flat 600u for every class, so any threat farther
+		// than that suspended the bot into CFFBotAttack. For a sniper — whose
+		// whole job is 2000u+ engagement — that meant abandoning the perch the
+		// moment a target appeared anywhere in the yard.
+		//
+		// CFFBotAttack itself already checks GetDesiredAttackRange() and bails
+		// out with "In attack range", so at first glance the sniper should just
+		// bounce straight back. It doesn't, because that early-out ALSO
+		// requires IsLineOfFireClear( threat eye ). A sniper shooting down at
+		// someone behind a crate, a wall lip, or briefly screened by a
+		// teammate fails that test — and then Attack falls through to
+		// m_chasePath.Update() and physically walks the bot off the high
+		// ground toward the enemy. That is the "snipers run off the
+		// battlements" behaviour.
+		//
+		// GetDesiredAttackRange() already encodes the right number per class
+		// (sniper 2000, soldier 750, scout 250, ...). Use it. Keep the old
+		// 600u as a floor so short-range classes don't become passive.
+		float holdRange = me->GetDesiredAttackRange();
+		if ( holdRange < FFBOT_ATTACK_HOLD_RANGE )
+			holdRange = FFBOT_ATTACK_HOLD_RANGE;
+
+		// Snipers never chase at all. Holding the angle IS the class. Close
+		// quarters is handled by CFFBotSniperLurk, which switches to melee
+		// inside ff_bot_sniper_melee_range.
+		const bool willChase = ( classSlot != CLASS_SNIPER ) &&
+		                       ( distSq > holdRange * holdRange );
+
+		if ( willChase )
 		{
 			// Spies use a knife-aware attack that prefers backstabs from the
 			// rear arc; everyone else uses the generic chase.
-			if ( me->GetClassSlot() == CLASS_SPY )
+			if ( classSlot == CLASS_SPY )
 			{
 				CFFPlayer *victim = ToFFPlayer( threat->GetEntity() );
 				return SuspendFor( new CFFBotSpyAttack( victim ), "Spy engaging — backstab approach" );
@@ -981,6 +1720,44 @@ ActionResult< CFFBot > CFFBotMainAction::Update( CFFBot *me, float interval )
 					}
 				}
 			}
+
+			// Demoman offensive detpack — push past midfield and place a
+			// detpack at an enemy chokepoint to clear sentries / breach
+			// doors. Throttled (~30s) by m_classBuildTimer; the per-action
+			// 30s timeout in CFFBotDemomanDetpack also bounds runtime.
+			//
+			// Eligibility: in enemy half (incursion past midfield) so the
+			// candidate target is a real forward push, not a walk-back.
+			if ( me->GetClassSlot() == CLASS_DEMOMAN &&
+			     ( !me->m_classBuildTimer.HasStarted() || me->m_classBuildTimer.IsElapsed() ) &&
+			     CFFBotDemomanDetpack::IsPossible( me ) )
+			{
+				CFFNavArea *here = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
+				if ( here )
+				{
+					const int myTeam = me->GetTeamNumber();
+					// "Past midfield" = our area's incursion-from-some-enemy
+					// is below the average enemy spawn-room incursion. Cheap
+					// proxy: not in our spawn or our flag/cap room.
+					const unsigned int attrs = here->GetAttributesFF();
+					const unsigned int ownSpawn = CFFNavArea::SpawnRoomAttributeForTeam( myTeam );
+					const unsigned int ownFlagAttr = CFFNavArea::FlagAttributeForTeam( myTeam );
+					const unsigned int ownCapAttr  = CFFNavArea::CapAttributeForTeam( myTeam );
+					const bool inDefensiveHalf =
+						( attrs & ownSpawn ) || ( attrs & ownFlagAttr ) || ( attrs & ownCapAttr );
+
+					if ( !inDefensiveHalf )
+					{
+						const Vector target = CFFBotDemomanDetpack::PickTargetChoke( me );
+						if ( target != vec3_origin )
+						{
+							me->m_classBuildTimer.Start( 30.0f );
+							return SuspendFor( new CFFBotDemomanDetpack( target ),
+								"Demoman detpacking enemy chokepoint" );
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -1022,6 +1799,25 @@ EventDesiredResult< CFFBot > CFFBotMainAction::OnStuck( CFFBot *me )
 EventDesiredResult< CFFBot > CFFBotMainAction::OnKilled( CFFBot *me, const CTakeDamageInfo &info )
 {
 	return TryChangeTo( new CFFBotDead, RESULT_CRITICAL, "I died!" );
+}
+
+
+//-----------------------------------------------------------------------------
+// Environmental damage detection.
+//
+// This is the "when" that rock2's gas response was missing. FF has no
+// engine-level signal for a hazard being live and no way to read the Lua
+// schedule that switches one on — but the damage it deals arrives here with its
+// type bits and its attacker, and that is enough to tell a trigger_hurt from a
+// rocket without knowing anything about the map.
+//
+// Deliberately does not consume the event: everything else that responds to
+// being hurt still needs to see it.
+//-----------------------------------------------------------------------------
+EventDesiredResult< CFFBot > CFFBotMainAction::OnInjured( CFFBot *me, const CTakeDamageInfo &info )
+{
+	FFBotHazard::OnInjured( me, info );
+	return TryContinue();
 }
 
 
@@ -1071,7 +1867,44 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 		( classSlot != CLASS_HWGUY ) &&
 		( classSlot != CLASS_CIVILIAN );
 
-	if ( bunnyAllowed && loco->IsOnGround() && horizSpeedSq > ( 180.0f * 180.0f ) )
+	// FIX 8 — don't bunny-hop into a turn.
+	//
+	// Airborne movement is still view-relative (game movement air control uses
+	// cmd->viewangles), so hopping through a corner or a doorway curves the bot
+	// into the wall — one of the ways they "run into walls" while apparently
+	// following a valid path. Suppress hopping when:
+	//   - the next path segment turns more than ~45 degrees, or is a climb /
+	//     gap jump (m_pathTurnAhead, published by FFBotHelpers::CanDrivePath)
+	//   - we're in a tight space (no room to land clear of geometry)
+	//   - a move override is live (recovery / door work needs precise ground
+	//     movement, not ballistics)
+	//
+	// Also never in water or on a ladder: FF's WaterMove reads IN_JUMP as
+	// "sharking" and hard-assigns vertical velocity to +100, which would fight
+	// every attempt to swim down a tunnel; and jumping off a ladder is exactly
+	// what we don't want mid-climb.
+	bool bunnyGeometryOk = !me->m_pathTurnAhead && !me->IsMoveOverrideActive() &&
+	                       me->GetWaterLevel() < WL_Waist &&
+	                       !loco->IsUsingLadder();
+
+	if ( bunnyGeometryOk )
+	{
+		// Clearance check ahead along our actual travel direction. 96u is
+		// roughly one hop of horizontal travel at FF run speed.
+		Vector travel = horizVel;
+		if ( travel.NormalizeInPlace() > 0.1f )
+		{
+			trace_t tr;
+			const Vector from = me->GetAbsOrigin() + Vector( 0, 0, 36 );
+			UTIL_TraceHull( from, from + travel * 96.0f,
+				Vector( -16, -16, -36 ), Vector( 16, 16, 0 ),
+				MASK_PLAYERSOLID, me, COLLISION_GROUP_PLAYER_MOVEMENT, &tr );
+			if ( tr.fraction < 0.9f )
+				bunnyGeometryOk = false;
+		}
+	}
+
+	if ( bunnyAllowed && bunnyGeometryOk && loco->IsOnGround() && horizSpeedSq > ( 180.0f * 180.0f ) )
 	{
 		if ( !me->m_bunnyHopTimer.HasStarted() || me->m_bunnyHopTimer.IsElapsed() )
 		{
@@ -1089,6 +1922,33 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 	if ( loco->IsClimbingOrJumping() )
 	{
 		me->PressCrouchButton( 0.4f );
+	}
+
+	// ---- Authored jump spots (FF_NAV2_JUMP_SPOT) ---------------------
+	//
+	// An author placing ff_nav_place jump is saying "the way on from here is
+	// upwards and you have to leave the ground for it". The locomotor will not
+	// work that out on its own: PathFollower jumps when the nav graph says the
+	// connection needs one, and the reason a jump spot got marked by hand is
+	// usually that the graph does not say so.
+	//
+	// What this does NOT do is conc-jump or rocket-jump. Those are separate
+	// movement verbs the bot does not have, and pretending otherwise would send
+	// soldiers walking off ledges. This is the honest subset: on a marked spot,
+	// heading for something above us, commit to a running duck-jump. It clears
+	// the gaps a running jump can clear and no more.
+	if ( loco->IsOnGround() && horizSpeedSq > ( 150.0f * 150.0f ) )
+	{
+		CFFNavArea *here = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
+		if ( here && here->HasAttributeFF2( FF_NAV2_JUMP_SPOT ) )
+		{
+			Vector goal;
+			if ( me->GetPathGoal( &goal ) && goal.z > ( me->GetAbsOrigin().z + 32.0f ) )
+			{
+				me->PressJumpButton( 0.2f );
+				me->PressCrouchButton( 0.4f );
+			}
+		}
 	}
 
 	// ---- Path-recovery teleport -------------------------------------

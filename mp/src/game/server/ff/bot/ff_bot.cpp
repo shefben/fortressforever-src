@@ -12,6 +12,11 @@
 #include "ff_bot_helpers.h"
 #include "ff_bot_intel.h"
 #include "ff_bot_weapon.h"
+#include "ff_bot_learned_links.h"
+#include "ff_nav_builder.h"
+#include "ff_bot_lua_objectives.h"
+#include "ff_bot_gamemode.h"
+#include "ff_bot_hazard.h"
 #include "ff_nav_area.h"
 #include "ff_nav_mesh.h"
 #include "ff_player.h"
@@ -25,6 +30,7 @@
 #include "NextBotKnownEntity.h"
 
 #include <algorithm>
+#include <math.h>
 
 #include "NextBotManager.h"
 #include "NextBotBehavior.h"
@@ -33,6 +39,13 @@
 #include "tier0/memdbgon.h"
 
 LINK_ENTITY_TO_CLASS( ff_bot, CFFBot );
+
+
+// Server-wide difficulty for all bots. Re-read on each respawn so admins
+// can dial difficulty live without restarting.
+ConVar ff_bot_difficulty( "ff_bot_difficulty", "1", FCVAR_NONE,
+	"Bot difficulty: 0=easy, 1=normal, 2=hard, 3=expert. "
+	"Affects reaction time, aim accuracy, and tactical aggression." );
 
 
 //-----------------------------------------------------------------------------
@@ -84,14 +97,79 @@ CFFBot::CFFBot()
 	m_intention = new CFFBotIntention( this );
 
 	m_bClassDidSpawnInit = false;
+	m_botRole = FFROLE_OFFENSE;
+	m_roleAssignTime = 0.0f;
 	m_sniperFireState = SNIPER_FIRE_IDLE;
 	m_sniperFireStartTime = 0.0f;
 	m_routeSeed = (unsigned int)RandomInt( 1, 65535 );
 	m_routeFlavor = (unsigned char)RandomInt( 0, ROUTE_FLAVOR_COUNT - 1 );
 	m_lastRouteChokeID = 0;
+	m_currentThreatId = -1;
+	m_threatFirstSeenTime = 0.0f;
+	m_lastThreatlessTime = 0.0f;
+	m_difficulty = 1;
+	m_reactionJitter = RandomFloat( 0.0f, 1.0f );
 	m_spawnExitDir.Init();
 	m_spawnExitStartPos.Init();
 	m_spawnExitForceTimer.Invalidate();
+
+	m_moveOverridePos.Init();
+	m_moveOverrideTimer.Invalidate();
+	m_moveOverrideReason = NULL;
+	m_pathDrivenTick = -1;
+	m_pathGoalPos.Init();
+	m_pathGoalTime = 0.0f;
+	m_pathTurnAhead = false;
+	m_blockingDoor = NULL;
+	m_doorPushTimer.Invalidate();
+	m_stuckStage = 0;
+	m_stuckStageTime = 0.0f;
+	m_lastGoodPos.Init();
+	m_lastGoodPosTime = 0.0f;
+	m_abandonGoalRequest = false;
+	m_debugShowPath = false;
+	m_debugShowThreat = false;
+}
+
+//-----------------------------------------------------------------------------
+// Movement arbiter. See the long comment in ff_bot.h — the whole point is
+// that exactly one Approach() runs per tick, so a recovery push cannot be
+// cancelled by a PathFollower re-pressing IN_FORWARD.
+//-----------------------------------------------------------------------------
+void CFFBot::SetMoveOverride( const Vector &worldPos, float duration, const char *reason )
+{
+	m_moveOverridePos = worldPos;
+	m_moveOverrideTimer.Start( duration );
+	m_moveOverrideReason = reason;
+}
+
+void CFFBot::ClearMoveOverride( void )
+{
+	m_moveOverrideTimer.Invalidate();
+	m_moveOverrideReason = NULL;
+}
+
+bool CFFBot::IsMoveOverrideActive( void ) const
+{
+	return m_moveOverrideTimer.HasStarted() && !m_moveOverrideTimer.IsElapsed();
+}
+
+//-----------------------------------------------------------------------------
+void CFFBot::NotePathGoal( const Vector &pos )
+{
+	m_pathGoalPos = pos;
+	m_pathGoalTime = gpGlobals->curtime;
+}
+
+bool CFFBot::GetPathGoal( Vector *out ) const
+{
+	// Half a second of tolerance: long enough to survive a throttled behavior
+	// update, short enough that we never aim at a goal from a dead path.
+	if ( m_pathGoalTime <= 0.0f || ( gpGlobals->curtime - m_pathGoalTime ) > 0.5f )
+		return false;
+	if ( out )
+		*out = m_pathGoalPos;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -150,6 +228,34 @@ void CFFBot::Spawn( void )
 	m_recentStuckPos.Init();
 	m_recentStuckExpireTime = 0.0f;
 	m_lookAroundUntil = 0.0f;
+	ClearMoveOverride();
+	m_moveOverridePos.Init();
+	m_pathDrivenTick = -1;
+	m_pathGoalPos.Init();
+	m_pathGoalTime = 0.0f;
+	m_pathTurnAhead = false;
+	m_blockingDoor = NULL;
+	m_doorPushTimer.Invalidate();
+	m_stuckStage = 0;
+	m_stuckStageTime = gpGlobals->curtime;
+	m_lastGoodPos = GetAbsOrigin();
+	m_lastGoodPosTime = gpGlobals->curtime;
+	m_abandonGoalRequest = false;
+	m_currentThreatId = -1;
+	m_threatFirstSeenTime = 0.0f;
+	m_lastThreatlessTime = 0.0f;
+
+	// A new life gets a clean read of the map. An objective we gave up on last
+	// life is very likely reachable now — the door the keycard opens, the phase
+	// gate that has since fallen, the lift that was at the other floor. Keeping
+	// the blacklist across a death is how a bot ends up permanently refusing to
+	// go somewhere for a reason that stopped being true minutes ago.
+	FFBotGameMode::ClearObjectiveBlacklist( this );
+	FFBotHazard::Reset( this );
+
+	// Difficulty re-reads each spawn so live cvar tweaks pick up. Per-bot
+	// jitter stays the same across lives — that's a "personality" trait.
+	m_difficulty = clamp( ff_bot_difficulty.GetInt(), 0, 3 );
 
 	// Spawn-aim override.
 	//
@@ -495,6 +601,137 @@ bool CFFBot::IsAmmoFull( void ) const
 
 
 //-----------------------------------------------------------------------------
+// Reaction-time floor — how long after first sighting until we'll fire.
+//
+// Difficulty schedule (matches the ff_bot_difficulty cvar tiers):
+//   0 easy   — 0.40s base + up to 0.20s jitter (≤ 0.60s total)
+//   1 normal — 0.25s base + up to 0.15s jitter (≤ 0.40s)
+//   2 hard   — 0.15s base + up to 0.10s jitter (≤ 0.25s)
+//   3 expert — 0.08s base + up to 0.07s jitter (≤ 0.15s)
+//
+// Jitter is per-bot deterministic so the same bot reacts consistently within
+// a life — gives each bot a slightly different feel without thrashing.
+//-----------------------------------------------------------------------------
+float CFFBot::GetReactionTimeFloor( void ) const
+{
+	static const float kBase[ 4 ]   = { 0.40f, 0.25f, 0.15f, 0.08f };
+	static const float kJitter[ 4 ] = { 0.20f, 0.15f, 0.10f, 0.07f };
+	const int d = clamp( m_difficulty, 0, 3 );
+	return kBase[ d ] + m_reactionJitter * kJitter[ d ];
+}
+
+
+//-----------------------------------------------------------------------------
+// Reaction-time gate: returns true once we've held *some* threat long enough
+// to react. The clock is per-engagement, NOT per-threat — a multi-enemy
+// scene where vision oscillates between visible primaries (e.g., two
+// equidistant enemies) doesn't keep resetting the timer. Only a sustained
+// threatless period (>1.5s) ends the engagement and resets.
+//-----------------------------------------------------------------------------
+bool CFFBot::HasReactedToThreat( const CKnownEntity *threat )
+{
+	const float now = gpGlobals->curtime;
+
+	if ( !threat || !threat->GetEntity() )
+	{
+		// No threat right now. Mark the threatless start; only fully
+		// reset the engagement clock once we've been threatless long
+		// enough that this is a real disengage, not a vision blip.
+		if ( m_threatFirstSeenTime > 0.0f && m_lastThreatlessTime == 0.0f )
+			m_lastThreatlessTime = now;
+		if ( m_lastThreatlessTime > 0.0f && ( now - m_lastThreatlessTime ) > 1.5f )
+		{
+			m_currentThreatId = -1;
+			m_threatFirstSeenTime = 0.0f;
+			m_lastThreatlessTime = 0.0f;
+		}
+		return true;	// no threat = nothing to gate
+	}
+
+	// Have a threat. Reset the threatless clock — we're back in the fight.
+	m_lastThreatlessTime = 0.0f;
+
+	if ( m_threatFirstSeenTime <= 0.0f )
+	{
+		// Fresh engagement — start the reaction clock.
+		m_threatFirstSeenTime = now;
+	}
+	// Update which entity we're tracking, but do NOT reset the clock if
+	// vision swaps primaries within the same engagement. That swap-reset
+	// behavior was preventing fire entirely when 2+ enemies were visible.
+	m_currentThreatId = threat->GetEntity()->entindex();
+
+	return ( now - m_threatFirstSeenTime ) >= GetReactionTimeFloor();
+}
+
+
+//-----------------------------------------------------------------------------
+// Apply Gaussian-ish aim error to a target world-space point.
+//
+// Three multipliers compose:
+//   - Difficulty: easy is much wider than expert.
+//   - Range:      a 4° error at 200u is a hit, at 2000u it's a clean miss.
+//                 We scale error proportional to range so absolute miss-
+//                 distance stays roughly comparable.
+//   - Hold-time:  early shots at a fresh threat are wider; the aim
+//                 narrows over the first ~1s of tracking. Mirrors human
+//                 settling onto a target.
+//
+// Gaussian-ish is summed-uniforms (cheap, no log/sqrt). Scale-factor 1.5
+// makes it close to a true gaussian for our purposes.
+//-----------------------------------------------------------------------------
+Vector CFFBot::ApplyAimError( const Vector &targetPos, float holdTimeSec ) const
+{
+	static const float kBaseSpread[ 4 ] = { 0.075f, 0.040f, 0.022f, 0.012f };	// radians
+	const int d = clamp( m_difficulty, 0, 3 );
+
+	// Hold-time tightening: 1.0 at hold=0, decays to ~0.25 by hold=1s.
+	float holdFactor = 1.0f / ( 1.0f + 3.0f * holdTimeSec );
+	if ( holdFactor < 0.25f )
+		holdFactor = 0.25f;
+
+	const float spreadRad = kBaseSpread[ d ] * holdFactor;
+	if ( spreadRad <= 0.0f )
+		return targetPos;
+
+	// Build a noise vector orthogonal to the line of fire so the noise
+	// shows up as left/right + up/down at the target plane, not in/out.
+	// EyePosition() isn't const so cast — pure read; we don't mutate state.
+	Vector toTarget = targetPos - const_cast< CFFBot * >( this )->EyePosition();
+	const float range = toTarget.NormalizeInPlace();
+	if ( range < 1.0f )
+		return targetPos;
+
+	// Pick any vector not parallel to toTarget; cross to get a basis.
+	Vector up( 0, 0, 1 );
+	if ( fabsf( toTarget.Dot( up ) ) > 0.95f )
+		up = Vector( 0, 1, 0 );
+
+	Vector right = CrossProduct( toTarget, up );
+	right.NormalizeInPlace();
+	Vector trueUp = CrossProduct( right, toTarget );
+	trueUp.NormalizeInPlace();
+
+	// Time-bucketed deterministic offsets (4× per second). Per-tick
+	// re-rolling thrashed the body's slew so the bot's view never
+	// settled onto the actual target — body lag + new offset every
+	// frame meant the canFireNow alignment test always failed.
+	// Holding the offset stable for ~250ms gives the slew time to
+	// reach the (offset) point so fires land. The two seed values
+	// (X / Y) decorrelate the horizontal and vertical axes.
+	const float jx = ( TransientlyConsistentRandomValue( 0.25f, 31 ) - 0.5f ) * 2.0f;	// [-1, 1]
+	const float jy = ( TransientlyConsistentRandomValue( 0.25f, 73 ) - 0.5f ) * 2.0f;
+
+	// Convert angular spread to lateral offset at the target's range.
+	const float lateral = tanf( spreadRad ) * range;
+	const float dx = jx * lateral;
+	const float dy = jy * lateral;
+
+	return targetPos + right * dx + trueUp * dy;
+}
+
+
+//-----------------------------------------------------------------------------
 // Static factory used by ClientPutInServerOverride during fake-client creation.
 // CFFBot inherits from CBasePlayer (via NextBotPlayer<CFFPlayer>) and so has
 // access to the protected static s_PlayerEdict.
@@ -629,19 +866,27 @@ static int FFBot_CountClassOnTeam( int team, int classSlot )
 }
 
 //-----------------------------------------------------------------------------
-// Pick a class that's allowed on the given team and not at its cap. Biases
-// toward role coverage:
-//   - if the team has no engineer, strongly prefer engineer
-//   - if the team has no medic, strongly prefer medic
-//   - otherwise pick uniformly from remaining offensive classes
+// Pick a class that's allowed on the given team and not at its cap.
 //
-// This prevents 8-bot teams from ending up with 8 soldiers.
+// First ask FFBotGameMode, which knows what kind of map this is and whether the
+// team still owes the defense quota a body. That is the answer that matters:
+// the old logic below biased towards having one engineer and one medic and was
+// otherwise uniform, which on an attack/defend map produced a defending team of
+// mostly scouts and soldiers with nothing holding the point.
+//
+// The old logic stays as the fallback for the cases the mode layer declines —
+// no CFFTeam, no detected mode, every class capped. It prevents 8-bot teams
+// from ending up with 8 soldiers, which is still worth having.
 //-----------------------------------------------------------------------------
 static int FFBot_PickAutoClass( int team )
 {
 	CFFTeam *pTeam = GetGlobalFFTeam( team );
 	if ( !pTeam )
 		return CLASS_SCOUT;
+
+	const int modePick = FFBotGameMode::PickClassForTeamNeed( team );
+	if ( modePick >= CLASS_SCOUT && modePick <= CLASS_CIVILIAN )
+		return modePick;
 
 	int validClasses[ 10 ];
 	int numValid = 0;
@@ -778,6 +1023,25 @@ void FFBotManager_Tick( void )
 {
 	// Intel layer runs every frame: alert decay, flag-stolen detection.
 	FFBotIntel::Tick();
+
+	// FIX 11 — watch every player (human and bot) and learn nav connections
+	// the mesh is missing. Cheap: one nav lookup per moving player per ~64
+	// units travelled.
+	FFBotLearnedLinks::Update();
+
+	// Manual nav authoring overlay. Returns immediately unless
+	// ff_manual_nav_builder is on.
+	FFNavBuilder::Tick();
+
+	// Reconcile Lua-declared objectives with their live state and re-tag the
+	// nav mesh when the set of real objectives moves — an AvD phase change, a
+	// key becoming available, a cap going active.
+	FFBotLuaObjectives::Tick();
+
+	// Re-read what kind of game this is from the live objective set, and re-run
+	// the per-team offense/defense quota. Both internally throttled. Must run
+	// AFTER FFBotLuaObjectives::Tick, which is what marks the mode stale.
+	FFBotGameMode::Tick();
 
 	static CountdownTimer s_balanceTimer;
 	if ( !s_balanceTimer.HasStarted() )

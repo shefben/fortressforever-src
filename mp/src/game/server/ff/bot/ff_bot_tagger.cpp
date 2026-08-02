@@ -6,8 +6,11 @@
 
 #include "cbase.h"
 #include "ff_bot_tagger.h"
+#include "ff_bot_autotag.h"
 #include "ff_nav_mesh.h"
 #include "ff_nav_area.h"
+#include "ff_nav_builder.h"
+#include "ff_bot_lua_objectives.h"
 #include "ff_info_script.h"
 #include "shareddefs.h"
 #include "entitylist.h"
@@ -20,10 +23,22 @@
 
 
 //-----------------------------------------------------------------------------
-// FF spawn-room flood-fill radius. ForAllAreasInRadius walks every nav area
-// whose center is within this 2D radius of the spawn entity. 600u covers a
-// typical FF spawn room without bleeding too far into corridors.
-#define FFBOT_SPAWN_ROOM_RADIUS		600.0f
+// FF spawn-room flood-fill parameters.
+//
+// FFBOT_SPAWN_ROOM_RADIUS — 2D Euclidean radius from each spawn entity. Was
+// 600u; lowered to 400u because well2 (and other large maps) have spawn
+// entities scattered across the back of the room, and 600u from each one
+// flooded out the front wall into the courtyard, tagging outdoor battlements
+// as spawn-room. The user-visible symptom: snipers couldn't pick the front-
+// wall perches because the autotagger excluded them as "in spawn".
+//
+// FFBOT_SPAWN_ROOM_Z_DELTA — vertical band around the spawn entity's Z. The
+// flood is 2D-only by Source's API, so without this filter a battlement
+// directly ABOVE the spawn floor (different floor entirely) gets tagged
+// spawn-room. 96u ≈ player crouch height — anything more than that is a
+// different floor and shouldn't be lumped with the spawn room.
+#define FFBOT_SPAWN_ROOM_RADIUS		400.0f
+#define FFBOT_SPAWN_ROOM_Z_DELTA	96.0f
 
 
 //-----------------------------------------------------------------------------
@@ -43,16 +58,19 @@ static int BotTeamFlagsToTeams( int botTeamFlags, int outTeams[ 4 ] )
 
 
 //-----------------------------------------------------------------------------
-// Find the nearest nav area to the given entity. Returns NULL if no mesh /
-// no walkable area within ~512u (which most likely means the entity is
-// floating or the .nav doesn't cover it).
+// Find the nearest nav area to the given world position. Returns NULL if no
+// mesh / no walkable area within FFBOT_ENTITY_NAV_RANGE (which most likely
+// means the entity is floating or the .nav doesn't cover it).
 //-----------------------------------------------------------------------------
-static CFFNavArea *AreaForEntity( CBaseEntity *pEnt )
+#define FFBOT_ENTITY_NAV_RANGE		512.0f
+
+static CFFNavArea *AreaForPosition( const Vector &pos )
 {
-	if ( !pEnt || !TheNavMesh || !TheNavMesh->IsLoaded() )
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
 		return NULL;
 
-	CNavArea *area = TheNavMesh->GetNearestNavArea( pEnt->GetAbsOrigin(), false, 512.0f, false, true, TEAM_ANY );
+	CNavArea *area = TheNavMesh->GetNearestNavArea( pos, false,
+		FFBOT_ENTITY_NAV_RANGE, false, true, TEAM_ANY );
 	return static_cast< CFFNavArea * >( area );
 }
 
@@ -70,10 +88,17 @@ namespace
 		int team;
 		CFFNavMesh *mesh;
 		int *count;
+		float spawnZ;	// spawn entity's Z; reject areas too far above/below
 
 		bool operator()( CNavArea *a )
 		{
 			CFFNavArea *area = static_cast< CFFNavArea * >( a );
+			// Z filter: 2D radius alone tags balconies above the spawn
+			// floor as "spawn", and basements below same. Reject areas
+			// whose center is more than FFBOT_SPAWN_ROOM_Z_DELTA from
+			// the spawn entity's elevation — those are different floors.
+			if ( fabsf( area->GetCenter().z - spawnZ ) > FFBOT_SPAWN_ROOM_Z_DELTA )
+				return true;	// continue iteration but don't tag
 			if ( !area->HasAttributeFF( spawnAttr ) )
 			{
 				area->SetAttributeFF( spawnAttr );
@@ -116,29 +141,34 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 			// validspawn predicate, so some maps leave the spawn entity's
 			// team field at TEAM_UNASSIGNED at level-init time. Parse the
 			// targetname so those still get tagged.
+			//
+			// Matches both with-underscore ("blue_spawn") and without-
+			// underscore ("bluespawn") naming. well2 and several other
+			// maps use the no-underscore form.
 			if ( attr == 0 )
 			{
 				const char *name = STRING( pSpot->GetEntityName() );
 				int nameTeam = TEAM_UNASSIGNED;
 				if ( name && name[ 0 ] )
 				{
-					if ( !V_strnicmp( name, "blue_", 5 ) || !V_strnicmp( name, "blu_", 4 ) )
-						nameTeam = TEAM_BLUE;
-					else if ( !V_strnicmp( name, "red_", 4 ) )
-						nameTeam = TEAM_RED;
-					else if ( !V_strnicmp( name, "yellow_", 7 ) || !V_strnicmp( name, "yel_", 4 ) )
+					// Order matters here — check longer prefixes first so
+					// we don't match "yellow*" as "y*" or "green*" as "g*".
+					if ( !V_strnicmp( name, "yellow", 6 ) ||
+					     !V_strnicmp( name, "yel", 3 ) )
 						nameTeam = TEAM_YELLOW;
-					else if ( !V_strnicmp( name, "green_", 6 ) || !V_strnicmp( name, "grn_", 4 ) )
+					else if ( !V_strnicmp( name, "green", 5 ) ||
+					          !V_strnicmp( name, "grn", 3 ) )
 						nameTeam = TEAM_GREEN;
+					else if ( !V_strnicmp( name, "blue", 4 ) ||
+					          !V_strnicmp( name, "blu", 3 ) )
+						nameTeam = TEAM_BLUE;
+					else if ( !V_strnicmp( name, "red", 3 ) )
+						nameTeam = TEAM_RED;
 				}
 				if ( nameTeam != TEAM_UNASSIGNED )
 				{
 					team = nameTeam;
 					attr = CFFNavArea::SpawnRoomAttributeForTeam( team );
-					Msg( "[CFFBotTagger] Spawn '%s' at (%.0f,%.0f,%.0f) GetTeamNumber()=0; "
-						"name-based fallback assigned team=%d.\n",
-						name, pSpot->GetAbsOrigin().x, pSpot->GetAbsOrigin().y,
-						pSpot->GetAbsOrigin().z, team );
 				}
 			}
 
@@ -153,7 +183,8 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 
 			++perTeamSpawnEnts[ team - TEAM_BLUE ];
 
-			SpawnRoomTagger tagger = { attr, team, mesh, &spawnTagged };
+			SpawnRoomTagger tagger = { attr, team, mesh, &spawnTagged,
+				pSpot->GetAbsOrigin().z };
 			TheNavMesh->ForAllAreasInRadius( tagger, pSpot->GetAbsOrigin(), FFBOT_SPAWN_ROOM_RADIUS );
 		}
 	}
@@ -164,24 +195,64 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 		perTeamSpawnEnts[ 0 ], perTeamSpawnEnts[ 1 ],
 		perTeamSpawnEnts[ 2 ], perTeamSpawnEnts[ 3 ] );
 
-	// ---- CFFInfoScript goal entities (flag, cap, backpack, hunted-escape)
+	// ---- Lua-declared goal entities ------------------------------------
+	//
+	// Source of truth is FFBotLuaObjectives, which tracks every entity Lua
+	// declared through SetBotGoalInfo and keeps its live state current. Two
+	// things that changes versus walking gEntList here:
+	//
+	//   * trigger_ff_script goals are included. CFuncFFScript has the same
+	//     GetBotGoalType / GetBotTeamFlags / IsActive interface as
+	//     CFFInfoScript and includes/base.lua calls SetBotGoalInfo on it, but
+	//     this pass only ever looked at CLASS_INFOSCRIPT, so trigger-based
+	//     goals were invisible to the entire bot layer.
+	//
+	//   * Dead goals are skipped. base_ad.lua and friends call Restore() and
+	//     Remove() on flags and caps as the round changes phase; tagging all
+	//     of them from level init had bots walking to objectives that, to a
+	//     player, do not exist yet.
+	//
+	// A goal that has been removed also has its position invalidated, so
+	// tagging uses the home position — where Lua first put it — rather than
+	// wherever a carrier has since dragged it.
 	{
-		CBaseEntity *pEnt = NULL;
-		while ( ( pEnt = gEntList.FindEntityByClassT( pEnt, CLASS_INFOSCRIPT ) ) != NULL )
+		int goalsSkippedDead = 0;
+		int goalsSkippedNoNav = 0;
+		int triggerGoals = 0;
+
+		for ( int g = 0; g < FFBotLuaObjectives::Count(); ++g )
 		{
-			CFFInfoScript *pScript = static_cast< CFFInfoScript * >( pEnt );
-			int goalType = pScript->GetBotGoalType();
-			if ( goalType == Omnibot::kNone )
+			const FFBotLuaGoal *goal = FFBotLuaObjectives::Get( g );
+			if ( !goal )
+				continue;
+
+			if ( !goal->isLive )
+			{
+				++goalsSkippedDead;
+				continue;
+			}
+
+			CBaseEntity *pEnt = goal->entity.Get();
+			if ( !pEnt )
 				continue;
 
 			int teams[ 4 ];
-			int teamCount = BotTeamFlagsToTeams( pScript->GetBotTeamFlags(), teams );
+			int teamCount = BotTeamFlagsToTeams( goal->teamFlags, teams );
 
-			CFFNavArea *area = AreaForEntity( pScript );
+			// Tag where the objective LIVES, not where it currently is. A flag
+			// being carried across the map shouldn't repaint the nav mesh
+			// along the carrier's route.
+			CFFNavArea *area = AreaForPosition( goal->homePos );
 			if ( !area )
+			{
+				++goalsSkippedNoNav;
 				continue;
+			}
 
-			switch ( goalType )
+			if ( goal->isTrigger )
+				++triggerGoals;
+
+			switch ( goal->goalType )
 			{
 			case Omnibot::kFlag:
 				if ( teamCount == 0 )
@@ -252,7 +323,28 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 				break;
 			}
 		}
+
+		Msg( "[CFFBotTagger] Lua goals: %d tracked, %d live-tagged "
+			"(%d from trigger_ff_script), %d skipped inactive/removed, "
+			"%d with no nav coverage.\n",
+			FFBotLuaObjectives::Count(),
+			flagTagged + capTagged + resupplyTagged,
+			triggerGoals, goalsSkippedDead, goalsSkippedNoNav );
+
+		if ( FFBotLuaObjectives::Count() == 0 )
+		{
+			Msg( "[CFFBotTagger] This map's Lua declares no bot goals at all "
+				"(no 'botgoaltype' on any entity). Roughly half the shipped map "
+				"scripts don't. Use ff_manual_nav_builder to author objectives "
+				"by hand.\n" );
+		}
 	}
+
+	// ---- Hand-authored markers -----------------------------------------
+	// After the entity pass so a manual marker can supplement or override what
+	// the entities say, and before spawn-exit collection / incursion distances
+	// so a hand-drawn spawn room participates in them exactly like a real one.
+	FFNavBuilder::ApplyToMesh( mesh );
 
 	// ---- Mark threshold areas + per-team spawn-exit lists ---------------
 	mesh->CollectAndMarkSpawnRoomExits();
@@ -262,6 +354,11 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 
 	// ---- Per-area invasion vectors (depend on incursion distances) ------
 	mesh->ComputeInvasionAreas();
+
+	// ---- Heuristic auto-tagging (water, sniper, sentry, choke, etc.) ----
+	// Runs AFTER all entity-derived tags + incursion calculations are done
+	// so the heuristics can use spawn-room / flag / cap tags as inputs.
+	CFFBotAutoTagger::TagAllAreas( mesh );
 
 	// ---- Diagnostics ----------------------------------------------------
 	int perTeamSpawnRooms[ FF_NAV_TEAM_COUNT ] = { 0, 0, 0, 0 };

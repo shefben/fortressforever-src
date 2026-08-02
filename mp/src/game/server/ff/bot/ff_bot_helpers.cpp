@@ -9,14 +9,172 @@
 #include "ff_bot.h"
 #include "ff_player.h"
 #include "ff_info_script.h"
+#include "ff_bot_lua_objectives.h"
 #include "shareddefs.h"
 #include "entitylist.h"
 #include "engine/IEngineTrace.h"
+
+#include "Path/NextBotPathFollow.h"
+#include "NextBotLocomotionInterface.h"
+#include "NextBotBodyInterface.h"
 
 #include "omnibot_interface.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+
+//-----------------------------------------------------------------------------
+// FIX 1 — single movement authority.
+//-----------------------------------------------------------------------------
+bool FFBotHelpers::CanDrivePath( CFFBot *me, PathFollower &path )
+{
+	if ( !me )
+		return false;
+
+	// Publish the path goal + whether a sharp turn / discontinuity is coming
+	// up. Nothing else in the engine does this for player bots: PathFollower
+	// ::Update calls ILocomotion::FaceTowards, which is an empty stub unless
+	// the locomotor is a NextBotGroundLocomotion (ours is a PlayerLocomotion).
+	const Path::Segment *goal = path.GetCurrentGoal();
+	if ( goal )
+	{
+		me->NotePathGoal( goal->pos );
+
+		// Turn-ahead detection for the bunny-hop gate (FIX 8). Either the next
+		// segment is a climb / gap jump, or the route bends more than ~45deg.
+		bool turnAhead = ( goal->type == Path::CLIMB_UP || goal->type == Path::JUMP_OVER_GAP );
+		if ( !turnAhead )
+		{
+			const Path::Segment *next = path.NextSegment( goal );
+			if ( next )
+			{
+				Vector a = goal->forward;
+				Vector b = next->forward;
+				a.z = 0.0f;
+				b.z = 0.0f;
+				if ( a.NormalizeInPlace() > 0.0f && b.NormalizeInPlace() > 0.0f )
+					turnAhead = ( DotProduct( a, b ) < 0.707f );	// > 45 deg
+			}
+		}
+		me->m_pathTurnAhead = turnAhead;
+	}
+	else
+	{
+		me->m_pathTurnAhead = false;
+	}
+
+	// While the arbiter owns movement, the path follower must stay quiet.
+	if ( me->IsMoveOverrideActive() )
+		return false;
+
+	// Legacy inhibit flag — kept so existing callers that set it still work.
+	if ( me->m_pathInhibitTimer.HasStarted() && !me->m_pathInhibitTimer.IsElapsed() )
+		return false;
+
+	// Claim this tick's single Approach() so the arbiter stands down.
+	me->m_pathDrivenTick = gpGlobals->tickcount;
+	return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// FIX 7 — repath hysteresis.
+//-----------------------------------------------------------------------------
+bool FFBotHelpers::ShouldRecomputePath( CFFBot *me, const PathFollower &path, const Vector &goalPos )
+{
+	if ( !me )
+		return false;
+
+	// No usable path — always recompute.
+	if ( !path.IsValid() )
+		return true;
+
+	// Goal moved (chasing a carrier, a pickup respawned elsewhere, ...).
+	// 100u is under one nav-area width, so a genuinely new destination always
+	// trips it while sub-area jitter does not.
+	if ( ( path.GetEndPosition() - goalPos ).IsLengthGreaterThan( 100.0f ) )
+		return true;
+
+	// Not making progress — the current route is not working, so re-plan even
+	// though the goal is unchanged.
+	Vector vel = me->GetAbsVelocity();
+	vel.z = 0.0f;
+	if ( vel.LengthSqr() < ( 100.0f * 100.0f ) )
+		return true;
+
+	// Path still valid, goal unchanged, bot travelling. Leave it alone — this
+	// is the case that used to flip lanes once a second.
+	return false;
+}
+
+
+//-----------------------------------------------------------------------------
+// FIX 6 — doors.
+//-----------------------------------------------------------------------------
+bool FFBotHelpers::IsOpenableBlocker( CBaseEntity *ent )
+{
+	if ( !ent || ent->IsWorld() )
+		return false;
+
+	// Never treat a player / NPC as a door.
+	if ( ent->IsPlayer() || ent->MyCombatCharacterPointer() )
+		return false;
+
+	static const char * const kOpenable[] = {
+		"func_door",
+		"func_door_rotating",
+		"prop_door_rotating",
+		"func_movelinear",
+		"func_areaportalwindow",	// FF respawn "doors" are sometimes these
+		"func_brush",				// lua-toggled respawn gates
+		"func_wall_toggle",
+	};
+
+	for ( int i = 0; i < ARRAYSIZE( kOpenable ); ++i )
+	{
+		if ( FClassnameIs( ent, kOpenable[ i ] ) )
+			return true;
+	}
+	return false;
+}
+
+
+CBaseEntity *FFBotHelpers::FindBlockingDoor( CFFBot *me, const Vector &towards )
+{
+	if ( !me )
+		return NULL;
+
+	ILocomotion *loco = me->GetLocomotionInterface();
+	IBody *body = me->GetBodyInterface();
+	if ( !loco || !body )
+		return NULL;
+
+	Vector dir = towards - me->GetAbsOrigin();
+	dir.z = 0.0f;
+	if ( dir.NormalizeInPlace() < 0.5f )
+		return NULL;
+
+	// Probe only as far as we could walk in a fraction of a second — we want
+	// "the thing I am pressed against", not "the next door down the corridor".
+	const float kProbeRange = 48.0f;
+	const Vector start = me->GetAbsOrigin() + Vector( 0, 0, loco->GetStepHeight() + 1.0f );
+
+	trace_t tr;
+	const float halfWidth = 0.5f * body->GetHullWidth();
+	UTIL_TraceHull( start, start + dir * kProbeRange,
+		Vector( -halfWidth, -halfWidth, 0.0f ),
+		Vector( halfWidth, halfWidth, body->GetCrouchHullHeight() ),
+		MASK_PLAYERSOLID, me, COLLISION_GROUP_PLAYER_MOVEMENT, &tr );
+
+	if ( tr.fraction >= 1.0f && !tr.startsolid )
+		return NULL;
+
+	if ( !tr.DidHitNonWorldEntity() || tr.m_pEnt == NULL )
+		return NULL;
+
+	return IsOpenableBlocker( tr.m_pEnt ) ? tr.m_pEnt : NULL;
+}
 
 
 bool FFBotHelpers::IsBotCarryingFlag( CFFBot *me, CFFInfoScript **outFlag )
@@ -287,7 +445,7 @@ bool FFBotHelpers::IsFriendlySentryNear( int myTeam, const Vector &pos, float ra
 }
 
 
-CFFInfoScript *FFBotHelpers::FindOwnCapPoint( int myTeam, const Vector &myPos )
+CBaseEntity *FFBotHelpers::FindOwnCapPoint( int myTeam, const Vector &myPos )
 {
 	// Caps inherit FF's "Lua-table-team-but-not-C++-team" issue, so
 	// GetTeamNumber() on a cap is unreliable. In CTF, own cap is always
@@ -297,47 +455,16 @@ CFFInfoScript *FFBotHelpers::FindOwnCapPoint( int myTeam, const Vector &myPos )
 	CFFInfoScript *ownFlag = FindOwnFlag( myTeam );
 	const Vector anchor = ownFlag ? ownFlag->GetAbsOrigin() : myPos;
 
-	CFFInfoScript *best = NULL;
-	float bestDistSq = FLT_MAX;
-	CBaseEntity *e = NULL;
-	while ( ( e = gEntList.FindEntityByClassT( e, CLASS_INFOSCRIPT ) ) != NULL )
-	{
-		CFFInfoScript *s = static_cast< CFFInfoScript * >( e );
-		if ( s->GetBotGoalType() != Omnibot::kFlagCap )
-			continue;
-		if ( s->IsRemoved() )
-			continue;
-		const float dSq = ( s->GetAbsOrigin() - anchor ).LengthSqr();
-		if ( dSq < bestDistSq )
-		{
-			bestDistSq = dSq;
-			best = s;
-		}
-	}
-	return best;
+	// team -1: cap ownership is not reliably expressed in the goal's team
+	// flags, which is exactly why this function anchors on proximity to our
+	// own flag instead. Take every live cap and pick the nearest to home.
+	return FFBotLuaObjectives::FindNearestGoal( Omnibot::kFlagCap, -1, anchor, NULL );
 }
 
 
-CFFInfoScript *FFBotHelpers::FindAnyCapPoint( const Vector &myPos )
+CBaseEntity *FFBotHelpers::FindAnyCapPoint( const Vector &myPos )
 {
-	CFFInfoScript *best = NULL;
-	float bestDistSq = FLT_MAX;
-	CBaseEntity *e = NULL;
-	while ( ( e = gEntList.FindEntityByClassT( e, CLASS_INFOSCRIPT ) ) != NULL )
-	{
-		CFFInfoScript *s = static_cast< CFFInfoScript * >( e );
-		if ( s->GetBotGoalType() != Omnibot::kFlagCap )
-			continue;
-		if ( s->IsRemoved() )
-			continue;
-		const float dSq = ( s->GetAbsOrigin() - myPos ).LengthSqr();
-		if ( dSq < bestDistSq )
-		{
-			bestDistSq = dSq;
-			best = s;
-		}
-	}
-	return best;
+	return FFBotLuaObjectives::FindNearestGoal( Omnibot::kFlagCap, -1, myPos, NULL );
 }
 
 

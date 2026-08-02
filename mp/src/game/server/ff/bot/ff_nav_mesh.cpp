@@ -8,6 +8,10 @@
 #include "ff_nav_mesh.h"
 #include "ff_nav_area.h"
 #include "ff_bot_tagger.h"
+#include "ff_bot_learned_links.h"
+#include "ff_bot_gamemode.h"
+#include "ff_nav_builder.h"
+#include "ff_bot_lua_objectives.h"
 #include "shareddefs.h"
 #include "entitylist.h"
 
@@ -351,13 +355,35 @@ void CFFNavMesh::OnServerActivate( void )
 		{
 			CFFNavArea *area = static_cast< CFFNavArea * >( a );
 			area->ClearAttributeFF( ~FF_NAV_PERSISTENT_ATTRIBUTES );
+			// Word 2 is entirely FFNavBuilder's; the sidecar re-stamps it.
+			area->ClearAllAttributesFF2();
 			return true;
 		}
 	} clearer;
 	ForAllAreas( clearer );
 
+	// Read the hand-authored marker sidecar BEFORE tagging: the tagger's
+	// derivation pass applies it, and a manual spawn room has to exist before
+	// spawn-exit collection and the incursion flood-fill run off it.
+	FFNavBuilder::OnMapLoad();
+
+	// Reconcile the Lua goal registry. Most of it arrived already, during
+	// entity spawn, via Omnibot::Notify_GoalInfo; this sweeps up anything that
+	// acquired a goal type without going through SetBotGoalInfo.
+	FFBotLuaObjectives::OnMapLoad();
+
 	ClearTaggedAreaCaches();
 	CFFBotTagger::TagAreasFromEntities( this );
+	MarkDoorwayAreas();
+
+	// FIX 11 — apply connections learned from watching players move on this
+	// map in previous sessions. Must run after the mesh is loaded and before
+	// bots start pathing.
+	FFBotLearnedLinks::OnMapLoad();
+
+	// What kind of game is this? Derived from the goal registry, so it has to
+	// run after FFBotLuaObjectives::OnMapLoad has swept the map.
+	FFBotGameMode::OnMapLoad();
 }
 
 void CFFNavMesh::OnRoundRestart( void )
@@ -371,6 +397,8 @@ void CFFNavMesh::OnRoundRestart( void )
 		{
 			CFFNavArea *area = static_cast< CFFNavArea * >( a );
 			area->ClearAttributeFF( ~FF_NAV_PERSISTENT_ATTRIBUTES );
+			// Word 2 is entirely FFNavBuilder's; the sidecar re-stamps it.
+			area->ClearAllAttributesFF2();
 			return true;
 		}
 	} clearer;
@@ -378,6 +406,167 @@ void CFFNavMesh::OnRoundRestart( void )
 
 	ClearTaggedAreaCaches();
 	CFFBotTagger::TagAreasFromEntities( this );
+	MarkDoorwayAreas();
+}
+
+//-----------------------------------------------------------------------------
+// FIX 10 — stamp FF_NAV_DOORWAY on areas overlapping an openable blocker.
+//
+// CNavArea::IsBlocked flips to true whenever a door brush occupies the area,
+// and CFFBotPathCost treated any blocked area as impassable (-1). On a map
+// whose spawn gate is shut, that removed the ONLY route out of the spawn room
+// from the graph — no path existed at all, which is why bots milled around
+// inside spawn instead of pathing anywhere.
+//
+// With this bit set, path cost charges a heavy penalty instead of refusing, so
+// a route still exists and CFFBotMainAction::HandleDoors can walk into the
+// door and open it.
+//-----------------------------------------------------------------------------
+void CFFNavMesh::MarkDoorwayAreas( void )
+{
+	static const char * const kOpenable[] = {
+		"func_door",
+		"func_door_rotating",
+		"prop_door_rotating",
+		"func_movelinear",
+		"func_brush",
+		"func_wall_toggle",
+	};
+
+	int doorsFound = 0;
+	int areasMarked = 0;
+
+	for ( int c = 0; c < ARRAYSIZE( kOpenable ); ++c )
+	{
+		CBaseEntity *door = NULL;
+		while ( ( door = gEntList.FindEntityByClassname( door, kOpenable[ c ] ) ) != NULL )
+		{
+			++doorsFound;
+
+			// Collect the door's world bounds with a margin, so the areas on
+			// BOTH sides of the threshold get marked, not just the sliver the
+			// brush itself sits in.
+			Extent extent;
+			extent.Init( door );
+
+			const float kMargin = 32.0f;
+			extent.lo -= Vector( kMargin, kMargin, kMargin );
+			extent.hi += Vector( kMargin, kMargin, kMargin );
+
+			CUtlVector< CNavArea * > overlapping;
+			CollectAreasOverlappingExtent( extent, &overlapping );
+
+			for ( int i = 0; i < overlapping.Count(); ++i )
+			{
+				CFFNavArea *area = static_cast< CFFNavArea * >( overlapping[ i ] );
+				if ( !area || area->HasAttributeFF( FF_NAV_DOORWAY ) )
+					continue;
+				area->SetAttributeFF( FF_NAV_DOORWAY );
+				++areasMarked;
+			}
+		}
+	}
+
+	Msg( "[CFFNavMesh] MarkDoorwayAreas: %d openable entities, %d areas tagged FF_NAV_DOORWAY.\n",
+		doorsFound, areasMarked );
+}
+
+//-----------------------------------------------------------------------------
+// Diagnostic dump for ff_bot_nav_report.
+//
+// The failure this exists to surface: if nav generation ran with the spawn
+// doors shut, the spawn room is a DISCONNECTED nav island. Then
+// CollectAndMarkSpawnRoomExits finds no non-spawn neighbour, so there are zero
+// exit areas and zero threshold areas, so CFFBot::Spawn can't compute an exit
+// direction and no path to any objective can be built. Every one of those is
+// silent at runtime; a bot with no path looks exactly like a stuck bot.
+//
+// If a team reports "exits=0" here, the nav mesh is the problem, not the AI.
+//-----------------------------------------------------------------------------
+void CFFNavMesh::PrintNavReport( void ) const
+{
+	Msg( "==== FF bot nav report ====\n" );
+
+	if ( !IsLoaded() )
+	{
+		Msg( "  NO NAV MESH LOADED. Run nav_generate.\n" );
+		return;
+	}
+
+	int doorwayAreas = 0;
+	int blockedAreas = 0;
+	int waterAreas = 0;
+	int underwaterAreas = 0;
+	for ( int i = 0; i < TheNavAreas.Count(); ++i )
+	{
+		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+		if ( !area )
+			continue;
+		if ( area->HasAttributeFF( FF_NAV_DOORWAY ) )
+			++doorwayAreas;
+		if ( area->IsBlocked( TEAM_ANY ) )
+			++blockedAreas;
+		if ( area->HasAttributeFF( FF_NAV_WATER ) )
+			++waterAreas;
+		if ( area->HasAttributeFF( FF_NAV_UNDERWATER ) )
+			++underwaterAreas;
+	}
+
+	Msg( "  areas=%d  doorway=%d  currently-blocked=%d\n",
+		TheNavAreas.Count(), doorwayAreas, blockedAreas );
+
+	// Vertical routing. A map with visible ladders but ladders=0 means nav
+	// generation never found them — regenerate with nav_generate. Bots
+	// physically cannot path up or down a ladder that isn't in this list.
+	const int ladderCount = const_cast< CFFNavMesh * >( this )->GetLadders().Count();
+	Msg( "  ladders=%d  water areas=%d  underwater areas=%d%s\n",
+		ladderCount, waterAreas, underwaterAreas,
+		( ladderCount == 0 ) ? "   <-- NO LADDERS IN MESH (regenerate if this map has any)" : "" );
+
+	static const char * const kTeamNames[] = { "BLUE", "RED", "YELLOW", "GREEN" };
+
+	for ( int team = TEAM_BLUE; team <= TEAM_GREEN; ++team )
+	{
+		const CUtlVector< CFFNavArea * > *spawns = GetSpawnRoomAreas( team );
+		const CUtlVector< CFFNavArea * > *exits  = GetSpawnRoomExitAreas( team );
+		if ( !spawns || spawns->Count() == 0 )
+			continue;
+
+		CUtlVector< CFFNavArea * > thresholds;
+		CollectSpawnRoomThresholdAreas( team, &thresholds );
+
+		// How much of the map is reachable from this team's spawn? A tiny
+		// number here with a large area count is the disconnected-island
+		// signature.
+		int reachable = 0;
+		for ( int i = 0; i < TheNavAreas.Count(); ++i )
+		{
+			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+			if ( area && area->IsReachableByTeam( team ) )
+				++reachable;
+		}
+
+		Msg( "  %-6s spawn=%d exits=%d thresholds=%d reachable=%d/%d%s\n",
+			kTeamNames[ team - TEAM_BLUE ],
+			spawns->Count(),
+			exits ? exits->Count() : 0,
+			thresholds.Count(),
+			reachable, TheNavAreas.Count(),
+			( exits && exits->Count() == 0 ) ? "   <-- SPAWN ROOM IS A DISCONNECTED NAV ISLAND" : "" );
+	}
+
+	Msg( "  flags/caps:" );
+	for ( int team = TEAM_BLUE; team <= TEAM_GREEN; ++team )
+	{
+		const CUtlVector< CFFNavArea * > *flags = GetFlagAreas( team );
+		const CUtlVector< CFFNavArea * > *caps  = GetCapAreas( team );
+		if ( ( !flags || flags->Count() == 0 ) && ( !caps || caps->Count() == 0 ) )
+			continue;
+		Msg( " %s(flag=%d cap=%d)", kTeamNames[ team - TEAM_BLUE ],
+			flags ? flags->Count() : 0, caps ? caps->Count() : 0 );
+	}
+	Msg( "\n  resupply areas=%d\n", m_resupplyAreas.Count() );
+	Msg( "===========================\n" );
 }
 
 //-----------------------------------------------------------------------------
@@ -398,22 +587,19 @@ static float FFSnapToGrid( float v )
 void CFFNavMesh::AddWalkableSeeds( void )
 {
 	int spawnsFound = 0;
+	int objectiveEntsSeeded = 0;
+	int itemEntsSeeded = 0;
 	int seedsAdded = 0;
 	int seedsViaGroundTrace = 0;
 	int seedsViaRawPos = 0;
 
-	CBaseEntity *pSpawn = NULL;
-	while ( ( pSpawn = gEntList.FindEntityByClassname( pSpawn, "info_ff_teamspawn" ) ) != NULL )
+	auto trySeed = [&]( const Vector &raw ) -> void
 	{
-		++spawnsFound;
-
-		Vector pos = pSpawn->GetAbsOrigin();
+		Vector pos = raw;
 		pos.x = FFSnapToGrid( pos.x );
 		pos.y = FFSnapToGrid( pos.y );
-
 		Vector groundPos = pos;
 		Vector normal( 0.0f, 0.0f, 1.0f );
-
 		if ( FindGroundForNode( &groundPos, &normal ) )
 		{
 			AddWalkableSeed( groundPos, normal );
@@ -422,32 +608,69 @@ void CFFNavMesh::AddWalkableSeeds( void )
 		}
 		else
 		{
-			// Ground trace started in solid (spawn buried in geometry, or
-			// hull too tall). Fall back to the raw spawn position — the
-			// sampler will project down on its first step.
 			AddWalkableSeed( pos, Vector( 0.0f, 0.0f, 1.0f ) );
 			++seedsViaRawPos;
 			++seedsAdded;
 		}
+	};
+
+	// 1. Team spawns — the primary seed (one for each spawn doorway).
+	{
+		CBaseEntity *pSpawn = NULL;
+		while ( ( pSpawn = gEntList.FindEntityByClassname( pSpawn, "info_ff_teamspawn" ) ) != NULL )
+		{
+			++spawnsFound;
+			trySeed( pSpawn->GetAbsOrigin() );
+		}
 	}
 
-	// Fallback: if no FF spawns at all, seed from the listen-server host.
+	// 2. Objective entities — flag, cap, backpack, hunted-escape, etc.
+	// Most FF maps put these in disjoint regions of the map (own base vs
+	// enemy base). Seeding from each one ensures nav_generate's sampler
+	// doesn't miss whole basements / sewers / battlements that aren't
+	// reachable from a spawn-room flood-fill alone.
+	{
+		CBaseEntity *pEnt = NULL;
+		while ( ( pEnt = gEntList.FindEntityByClassT( pEnt, CLASS_INFOSCRIPT ) ) != NULL )
+		{
+			++objectiveEntsSeeded;
+			trySeed( pEnt->GetAbsOrigin() );
+		}
+	}
+
+	// 3. Item entities — packs / health drops. Same rationale: any
+	// gameplay-relevant point is a place we want bot nav coverage for.
+	static const char * const kItemClasses[] = {
+		"ff_item_backpack",
+		"ff_item_healthdrop",
+		"item_healthkit",
+		"item_battery",
+	};
+	for ( int c = 0; c < ARRAYSIZE( kItemClasses ); ++c )
+	{
+		CBaseEntity *pEnt = NULL;
+		while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, kItemClasses[ c ] ) ) != NULL )
+		{
+			++itemEntsSeeded;
+			trySeed( pEnt->GetAbsOrigin() );
+		}
+	}
+
+	// 4. Fallback: listen-server host position.
 	if ( seedsAdded == 0 )
 	{
 		CBasePlayer *host = UTIL_GetListenServerHost();
 		if ( host )
 		{
-			Vector pos = host->GetAbsOrigin();
-			pos.x = FFSnapToGrid( pos.x );
-			pos.y = FFSnapToGrid( pos.y );
-			AddWalkableSeed( pos, Vector( 0.0f, 0.0f, 1.0f ) );
-			++seedsAdded;
-			Msg( "[CFFNavMesh] No info_ff_teamspawn found; seeded from listen-server host position.\n" );
+			trySeed( host->GetAbsOrigin() );
+			Msg( "[CFFNavMesh] No FF entities found; seeded from listen-server host position.\n" );
 		}
 	}
 
-	Msg( "[CFFNavMesh] AddWalkableSeeds: %d info_ff_teamspawn entities, %d seeds added (%d via ground-trace, %d via raw position).\n",
-		spawnsFound, seedsAdded, seedsViaGroundTrace, seedsViaRawPos );
+	Msg( "[CFFNavMesh] AddWalkableSeeds: %d teamspawns, %d objectives, %d items; "
+		"%d seeds added (%d ground-trace, %d raw).\n",
+		spawnsFound, objectiveEntsSeeded, itemEntsSeeded,
+		seedsAdded, seedsViaGroundTrace, seedsViaRawPos );
 
 	if ( seedsAdded == 0 )
 	{

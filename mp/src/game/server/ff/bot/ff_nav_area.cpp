@@ -27,6 +27,7 @@ static ConVar ff_nav_combat_decay_rate( "ff_nav_combat_decay_rate", "0.022",
 CFFNavArea::CFFNavArea( void )
 {
 	m_attributeFlags = 0;
+	m_attributeFlags2 = 0;
 	m_combatIntensity = 0.0f;
 	m_classMask = 0;
 	for ( int i = 0; i < FF_NAV_TEAM_COUNT; ++i )
@@ -106,6 +107,18 @@ int CFFNavArea::FlagAttributeForTeam( int team )
 	case TEAM_RED:		return FF_NAV_FLAG_RED;
 	case TEAM_YELLOW:	return FF_NAV_FLAG_YELLOW;
 	case TEAM_GREEN:	return FF_NAV_FLAG_GREEN;
+	}
+	return 0;
+}
+
+int CFFNavArea::DefendAttributeForTeam( int team )
+{
+	switch ( team )
+	{
+	case TEAM_BLUE:		return FF_NAV2_DEFEND_BLUE;
+	case TEAM_RED:		return FF_NAV2_DEFEND_RED;
+	case TEAM_YELLOW:	return FF_NAV2_DEFEND_YELLOW;
+	case TEAM_GREEN:	return FF_NAV2_DEFEND_GREEN;
 	}
 	return 0;
 }

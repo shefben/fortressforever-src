@@ -20,6 +20,12 @@
 
 #include "ff_team.h"
 
+// The Notify_* functions below are the only place FF tells anybody about
+// Lua-driven gameplay state changes, and every one of them early-outs when
+// Omnibot is absent. FFBotLuaObjectives taps the stream ahead of that gate so
+// the built-in bots see what a player sees. See ff/bot/ff_bot_lua_objectives.h.
+#include "ff/bot/ff_bot_lua_objectives.h"
+
 #include "tier0/vprof.h"
 
 #include "func_ladder.h"
@@ -3825,6 +3831,11 @@ namespace Omnibot
 
 	void Notify_GoalInfo(CBaseEntity *_entity, int _type, int _teamflags)
 	{
+		// Fires from CFFInfoScript::SetBotGoalInfo / CFuncFFScript::SetBotGoalInfo,
+		// which Lua calls as it spawns each entity. This is the moment the map
+		// declares what everything is.
+		FFBotLuaObjectives::OnGoalInfo(_entity, _type, _teamflags);
+
 		BotGoalInfo gi;
 
 		//////////////////////////////////////////////////////////////////////////
@@ -3904,6 +3915,8 @@ namespace Omnibot
 
 	void Notify_ItemRemove(CBaseEntity *_entity)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 
@@ -3911,6 +3924,8 @@ namespace Omnibot
 	}
 	void Notify_ItemRestore(CBaseEntity *_entity)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 
@@ -3918,6 +3933,8 @@ namespace Omnibot
 	}
 	void Notify_ItemDropped(CBaseEntity *_entity)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 
@@ -3925,6 +3942,8 @@ namespace Omnibot
 	}
 	void Notify_ItemPickedUp(CBaseEntity *_entity, CBaseEntity *_whodoneit)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 
@@ -3932,6 +3951,8 @@ namespace Omnibot
 	}
 	void Notify_ItemRespawned(CBaseEntity *_entity)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 
@@ -3939,6 +3960,8 @@ namespace Omnibot
 	}
 	void Notify_ItemReturned(CBaseEntity *_entity)
 	{
+		FFBotLuaObjectives::OnGoalStateChanged(_entity);
+
 		if(!IsOmnibotLoaded())
 			return;
 

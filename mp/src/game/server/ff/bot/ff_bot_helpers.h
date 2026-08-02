@@ -15,10 +15,53 @@
 class CFFBot;
 class CFFPlayer;
 class CFFInfoScript;
+class CBaseEntity;
+class PathFollower;
 class Vector;
 
 namespace FFBotHelpers
 {
+	//-------------------------------------------------------------------------
+	// Navigation plumbing. Every action that owns a PathFollower must go
+	// through these instead of touching path.Update / path.Compute directly.
+	//-------------------------------------------------------------------------
+
+	// FIX 1 — single movement authority.
+	//
+	// Call as:
+	//     if ( FFBotHelpers::CanDrivePath( me, m_path ) )
+	//         m_path.Update( me );
+	//
+	// Publishes the current path goal to the bot (so the aim driver can look
+	// along the route) and returns false while a move override is live, so the
+	// path follower cannot issue a second, contradictory Approach() in the same
+	// tick. Previously only CFFBotCtfObjective honoured the inhibit flag, which
+	// meant stuck recovery was a no-op in the other 15 actions.
+	bool CanDrivePath( CFFBot *me, PathFollower &path );
+
+	// FIX 7 — repath hysteresis.
+	//
+	// True when it is actually worth recomputing the path to `goalPos`. Cost
+	// terms that change every tick (combat intensity, grenade danger zones,
+	// low-ammo/low-health discounts, recent-stuck penalties) make A* flip
+	// between two near-equal lanes on consecutive repaths, and the bot visibly
+	// reverses at junctions. So: always recompute when there is no path, when
+	// the goal has moved, or when we are not making progress — but leave a
+	// working path alone while the bot is actually travelling along it.
+	bool ShouldRecomputePath( CFFBot *me, const PathFollower &path, const Vector &goalPos );
+
+	// FIX 6 — doors.
+	//
+	// Returns the openable entity blocking movement from the bot toward
+	// `towards`, or NULL if the blocker is world geometry / nothing. "Openable"
+	// means a door, movelinear or a brush entity that a player walking into it
+	// (or pressing +use) can get past.
+	CBaseEntity *FindBlockingDoor( CFFBot *me, const Vector &towards );
+
+	// True if `ent` is the kind of entity we should try to open rather than
+	// path around.
+	bool IsOpenableBlocker( CBaseEntity *ent );
+
 	// True iff `me` is currently carrying any flag entity. If `outFlag` is
 	// non-NULL, the carried flag is written to it on success.
 	bool IsBotCarryingFlag( CFFBot *me, CFFInfoScript **outFlag = NULL );
@@ -42,11 +85,23 @@ namespace FFBotHelpers
 	// Find this team's cap point — proximity-based: closest cap to our own
 	// flag, since GetTeamNumber() on caps is unreliable for the same reason
 	// flags are. Returns NULL if no caps exist.
-	CFFInfoScript *FindOwnCapPoint( int myTeam, const Vector &myPos );
+	//
+	// Returns CBaseEntity, not CFFInfoScript, and that is not cosmetic.
+	// includes/base_teamplay.lua defines
+	//
+	//     basecap = trigger_ff_script:new({ ... botgoaltype = Bot.kFlagCap })
+	//
+	// so a capture point is a CFuncFFScript (CLASS_TRIGGERSCRIPT), not a
+	// CFFInfoScript (CLASS_INFOSCRIPT). Both of these used to scan gEntList for
+	// CLASS_INFOSCRIPT, which meant they returned NULL on every stock FF map
+	// ever made: no bot has previously been able to find a capture point.
+	// They now go through FFBotLuaObjectives, which tracks both classes and
+	// knows which goals Lua currently has active.
+	CBaseEntity *FindOwnCapPoint( int myTeam, const Vector &myPos );
 
 	// Find any cap point on the map. For AvD-style maps where the cap is
 	// the only objective both teams care about.
-	CFFInfoScript *FindAnyCapPoint( const Vector &myPos );
+	CBaseEntity *FindAnyCapPoint( const Vector &myPos );
 
 	// True iff any enemy player is within `radius` of our own flag. Used
 	// for reactive defense — bots only switch to "defend home" when this

@@ -6,6 +6,7 @@
 
 #include "cbase.h"
 #include "ff_bot_medic.h"
+#include "ff_bot_helpers.h"
 #include "ff_bot_path_cost.h"
 #include "ff_player.h"
 #include "ff_weapon_base.h"
@@ -103,9 +104,21 @@ ActionResult< CFFBot > CFFBotHealTeammate::Update( CFFBot *me, float interval )
 	if ( m_repathTimer.IsElapsed() )
 	{
 		m_repathTimer.Start( RandomFloat( 0.5f, 1.0f ) );
-		CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
-		m_path.Compute( me, targetPos, cost );
+		// FIX 7 — repath hysteresis: leave a working path alone while the bot
+		// is actually travelling it. Volatile cost terms (combat intensity,
+		// grenade danger, ammo/health discounts, recent-stuck penalties) used
+		// to flip A* between near-equal lanes on consecutive repaths.
+		if ( FFBotHelpers::ShouldRecomputePath( me, m_path, targetPos ) )
+		{
+			CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
+			m_path.Compute( me, targetPos, cost );
+		}
 	}
-	m_path.Update( me );
+	// FIX 1 — single movement authority. CanDrivePath publishes the
+	// path goal for the aim driver and refuses while the movement
+	// arbiter owns locomotion, so this can never issue a second,
+	// contradictory Approach() in the same tick.
+	if ( FFBotHelpers::CanDrivePath( me, m_path ) )
+		m_path.Update( me );
 	return Continue();
 }

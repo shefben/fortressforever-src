@@ -350,6 +350,30 @@ public:
 	void BeginGeneration( bool incremental = false );					// initiate the generation process
 	void BeginAnalysis( bool quitWhenFinished = false );						// re-analyze an existing Mesh.  Determine Hiding Spots, Encounter Spots, etc.
 
+	// Force every openable brush entity (func_door, prop_door_rotating,
+	// func_movelinear, func_brush, ...) open for the duration of generation,
+	// and put them back afterwards. Without this the sampler treats a shut
+	// door as solid world and the room behind it never joins the mesh — which
+	// leaves spawn rooms as disconnected nav islands on most FF maps.
+	void OpenDoorsForGeneration( void );
+	void RestoreDoorsAfterGeneration( void );
+
+	// Discover ladders from CONTENTS_LADDER brush volumes and add them to
+	// m_ladders so the generated mesh actually contains ladder connections.
+	//
+	// BuildLadders() only ever created ladders from func_simpleladder, inside
+	// #ifdef TERROR — so for every non-L4D mod using brush ladders (which is
+	// what CGameMovement::LadderMove drives off) the generated mesh contained
+	// ZERO CNavLadder objects and bots could never path up or down a ladder.
+	void BuildLaddersFromBrushContents( void );
+
+	// Connect vertically-stacked areas that are separated by water. Swimming
+	// has no jump-height limit, so a submerged area directly above another is
+	// mutually reachable even though the normal generator — which only ever
+	// climbs ClimbUpHeight — leaves them unconnected. Without this an
+	// underwater tunnel generates as an isolated island in the mesh.
+	void ConnectSwimmableAreas( void );
+
 	bool IsGenerating( void ) const		{ return m_generationMode != GENERATE_NONE; }	// return true while a Navigation Mesh is being generated
 	const char *GetPlayerSpawnName( void ) const;						// return name of player spawn entity
 	void SetPlayerSpawnName( const char *name );						// define the name of player spawn entities

@@ -7,6 +7,8 @@
 #include "cbase.h"
 #include "ff_bot_ctf.h"
 #include "ff_bot_helpers.h"
+#include "ff_bot_lua_objectives.h"
+#include "ff_bot_gamemode.h"
 #include "ff_bot_intel.h"
 #include "ff_bot_path_cost.h"
 #include "ff_nav_area.h"
@@ -224,11 +226,14 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	const int myClass = me->GetClassSlot();
 	const Vector myPos = me->GetAbsOrigin();
 
-	// Class role split. Defensive classes anchor near a defensive position
-	// instead of running offense:
-	//   - Engineer: must be near sentry/dispenser to maintain them.
-	//   - Sniper:   posts up at our cap area for sight lines on attackers.
-	//   - HWGuy:    too slow to run flags; holds chokes near our flag.
+	// Class shapes HOW a bot defends. Whether it defends at all is a team-level
+	// decision made by FFBotGameMode's quota, because left to themselves every
+	// bot picks offense and a team of eight attackers loses every attack/defend
+	// map no matter how good its navigation is.
+	//
+	// The class branches below still exist and still matter — an engineer
+	// defends by building, a sniper by holding an angle, an HWGuy by sitting on
+	// a choke — they are just gated on the role now instead of being the role.
 	const bool isEngineerRole = ( myClass == CLASS_ENGINEER );
 	const bool isSniperRole   = ( myClass == CLASS_SNIPER );
 	const bool isHWGuyRole    = ( myClass == CLASS_HWGUY );
@@ -254,13 +259,15 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		}
 	}
 
-	// Engineer is "defensive" only while still building / upgrading / their
-	// home is under attack. Once topped up, they roam like an offensive
-	// class.
+	// The quota's answer.
+	const bool isDefensiveRole = ( me->m_botRole == FFROLE_DEFENSE );
+
+	// ...plus one class exception that is not a role question. An engineer with
+	// no buildings has to go and build them wherever it was sent; that is the
+	// class, not the assignment. Once topped up they roam like anyone else.
 	const bool isDefensiveClass =
-		( isEngineerRole && !engineerToppedUp ) ||
-		isSniperRole ||
-		isHWGuyRole;
+		isDefensiveRole ||
+		( isEngineerRole && !engineerToppedUp );
 
 	// 0a) Hunted: if I'm the civilian (VIP), my only goal is to run to the
 	// nearest hunted-escape area.
@@ -331,7 +338,7 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 	// 1) Carrying a flag → run it to our cap point.
 	if ( carryingFlag )
 	{
-		CFFInfoScript *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
+		CBaseEntity *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
 		if ( cap )
 		{
 			outTargetEnt->Set( cap );
@@ -411,7 +418,7 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 			for ( int i = 0; i < TheNavAreas.Count(); ++i )
 			{
 				CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
-				if ( !area->HasAttributeFF( FF_NAV_SENTRY_SPOT ) )
+				if ( !area->HasAttributeFF( FF_NAV_SENTRY_SPOT | FF_NAV_AUTO_SENTRY_SPOT ) )
 					continue;
 				const Vector spotPos = area->GetCenter();
 
@@ -476,14 +483,14 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 			// camping.
 		}
 	}
-	else if ( isSniperRole )
+	else if ( isSniperRole && isDefensiveRole )
 	{
 		// Snipers normally route through CFFBotSniperLurk (set as the root
 		// action for sniper class in CFFBotMainAction::InitialContainedAction).
 		// CtfObjective only runs for sniper if Lurk is suspended for some
 		// reason — keep a sane fallback to cap area so the bot doesn't
 		// stand still.
-		CFFInfoScript *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
+		CBaseEntity *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
 		if ( cap )
 		{
 			outTargetEnt->Set( cap );
@@ -497,53 +504,110 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 			return STATE_DEFEND_OWN_FLAG;
 		}
 	}
-	else if ( isHWGuyRole )
+	else if ( isHWGuyRole && isDefensiveRole )
 	{
-		// HWGuy holds a choke between our flag and the nearest enemy spawn
-		// exit, NOT the flag itself. Picks the spawn-room threshold area
-		// for any enemy team that's closest to our flag — that's the
-		// doorway the enemy comes through to reach our flag, which is
-		// where the AC's spinup matters most.
-		CFFNavMesh *mesh = TheFFNavMesh();
-		Vector chokePos;
-		bool gotChoke = false;
-		if ( mesh && ownFlag )
+		// HWGuy holds a choke between our flag and the nearest enemy
+		// approach, NOT the flag itself. Priority order:
+		//   1. A real FF_NAV_CHOKE area within 1500u of our flag, on the
+		//      line toward an enemy spawn-room threshold. Choke detection
+		//      from CFFBotAutoTagger picks narrow corridors and doorways
+		//      precisely where the AC spinup matters most.
+		//   2. Mid-point between flag and nearest enemy threshold (old
+		//      behavior — works when the auto-tagger didn't find a choke).
+		//   3. The flag itself (last resort).
+		if ( ownFlag )
 		{
 			const Vector flagPos = ownFlag->GetAbsOrigin();
-			float bestDistSq = FLT_MAX;
-			for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
+
+			// Step 1: find the nearest enemy spawn-room threshold to know
+			// which "side" of the map the attackers come from.
+			CFFNavMesh *mesh = TheFFNavMesh();
+			Vector enemyThresholdPos;
+			bool gotThreshold = false;
+			if ( mesh )
 			{
-				if ( t == myTeam )
-					continue;
-				CUtlVector< CFFNavArea * > thresholds;
-				mesh->CollectSpawnRoomThresholdAreas( t, &thresholds );
-				for ( int i = 0; i < thresholds.Count(); ++i )
+				float bestDistSq = FLT_MAX;
+				for ( int t = TEAM_BLUE; t <= TEAM_GREEN; ++t )
 				{
-					const Vector p = thresholds[ i ]->GetCenter();
-					const float dSq = ( p - flagPos ).LengthSqr();
-					if ( dSq < bestDistSq )
+					if ( t == myTeam )
+						continue;
+					CUtlVector< CFFNavArea * > thresholds;
+					mesh->CollectSpawnRoomThresholdAreas( t, &thresholds );
+					for ( int i = 0; i < thresholds.Count(); ++i )
 					{
-						bestDistSq = dSq;
-						chokePos = p;
-						gotChoke = true;
+						const Vector p = thresholds[ i ]->GetCenter();
+						const float dSq = ( p - flagPos ).LengthSqr();
+						if ( dSq < bestDistSq )
+						{
+							bestDistSq = dSq;
+							enemyThresholdPos = p;
+							gotThreshold = true;
+						}
 					}
 				}
 			}
-		}
-		if ( gotChoke )
-		{
-			// Stand 2/3 of the way from flag to choke — close enough to
-			// flag that we can rotate, still spun up at the doorway.
-			const Vector flagPos = ownFlag->GetAbsOrigin();
-			outTargetEnt->Term();
-			*outGoalPos = flagPos + ( chokePos - flagPos ) * 0.66f;
-			return STATE_DEFEND_OWN_FLAG;
-		}
-		// No choke computable — fall back to flag.
-		if ( ownFlag )
-		{
+
+			// Step 2: pick the FF_NAV_CHOKE area closest to the line
+			// between flag and enemy threshold. Score by distance from
+			// flag (closer wins, so HWGuy doesn't push too far forward)
+			// plus penalty for going past the threshold (we want to
+			// hold OUR side of the choke, not theirs).
+			CFFNavArea *bestChoke = NULL;
+			if ( gotThreshold )
+			{
+				float bestScore = FLT_MAX;
+				for ( int i = 0; i < TheNavAreas.Count(); ++i )
+				{
+					CFFNavArea *cand = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+					const unsigned int attrs = cand->GetAttributesFF();
+					if ( !( attrs & FF_NAV_CHOKE ) )
+						continue;
+					if ( attrs & ( FF_NAV_SPAWN_ROOM_ANY | FF_NAV_UNDERWATER ) )
+						continue;
+					const Vector p = cand->GetCenter();
+					const float distFromFlag = ( p - flagPos ).Length();
+					if ( distFromFlag > 1500.0f )
+						continue;
+					// Distance from flag is the primary score (smaller is
+					// better — HWGuy holds close). Push slightly toward
+					// the enemy threshold by adding a small reward for
+					// alignment.
+					Vector toThreshold = enemyThresholdPos - flagPos;
+					Vector toCand = p - flagPos;
+					if ( toThreshold.LengthSqr() > 1.0f )
+					{
+						toThreshold.NormalizeInPlace();
+						const float forwardness = toCand.Dot( toThreshold );
+						// forwardness 0..distFromFlag — reward more
+						// forward chokes by ~30% of forwardness.
+						const float score = distFromFlag - forwardness * 0.3f;
+						if ( score < bestScore )
+						{
+							bestScore = score;
+							bestChoke = cand;
+						}
+					}
+				}
+			}
+
+			if ( bestChoke )
+			{
+				outTargetEnt->Term();
+				*outGoalPos = bestChoke->GetCenter();
+				return STATE_DEFEND_OWN_FLAG;
+			}
+
+			// Step 3: fall back to the old midpoint heuristic.
+			if ( gotThreshold )
+			{
+				outTargetEnt->Term();
+				*outGoalPos = flagPos + ( enemyThresholdPos - flagPos ) * 0.66f;
+				return STATE_DEFEND_OWN_FLAG;
+			}
+
+			// Step 4: last resort — the flag itself.
 			outTargetEnt->Set( ownFlag );
-			*outGoalPos = ownFlag->GetAbsOrigin();
+			*outGoalPos = flagPos;
 			return STATE_DEFEND_OWN_FLAG;
 		}
 	}
@@ -581,11 +645,16 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		}
 	}
 
-	// 6) Offensive classes try to grab the closest enemy flag (default).
-	if ( !isDefensiveClass )
+	// 6) Fast path for the mode this state machine was built around.
+	//
+	// On CTF, grabbing the nearest grabbable enemy flag is the answer and the
+	// resolver would arrive at the same one by a longer road. Everywhere else
+	// this is skipped, because "the nearest thing I can pick up" is exactly the
+	// wrong instinct on a map where a keycard has to come first.
+	if ( !isDefensiveClass && FFBotGameMode::Get() == FFGAMEMODE_CTF )
 	{
 		CFFInfoScript *enemyFlag = FindClosestEnemyFlag( myTeam, myPos );
-		if ( enemyFlag )
+		if ( enemyFlag && !FFBotGameMode::IsObjectiveBlacklisted( me, enemyFlag ) )
 		{
 			outTargetEnt->Set( enemyFlag );
 			*outGoalPos = enemyFlag->GetAbsOrigin();
@@ -593,22 +662,34 @@ CFFBotCtfObjective::State CFFBotCtfObjective::EvaluateState(
 		}
 	}
 
-	// 5) AvD-style maps and similar: no flag goal exists, but a cap point
-	// does. Both teams converge on the cap. Defenders hold it; attackers
-	// push to it. Either way, going to the cap puts us where the action is.
+	// 7) Everything else is the mode layer's problem.
+	//
+	// This one call replaces what used to be three separate fallbacks — grab a
+	// flag, walk to a cap, follow the HUD arrow — none of which knew about each
+	// other, none of which knew what kind of map they were on, and none of which
+	// noticed when the thing they picked was unreachable.
+	//
+	// It answers for every mode, it applies the sequencing rules (a keycard
+	// outranks a flag, because a keycard exists to gate something), it honours
+	// touch permissions, and it skips anything this bot has already failed to
+	// reach. Defenders get a post out of it rather than an objective.
 	{
-		CFFInfoScript *cap = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
-		if ( !cap )
-			cap = FFBotHelpers::FindAnyCapPoint( myPos );
-		if ( cap )
+		FFBotObjective obj;
+		if ( FFBotGameMode::ResolveObjective( me, &obj ) )
 		{
-			outTargetEnt->Set( cap );
-			*outGoalPos = cap->GetAbsOrigin();
-			return STATE_PUSH_OBJECTIVE;
+			if ( obj.entity )
+				outTargetEnt->Set( obj.entity );
+			else
+				outTargetEnt->Term();
+
+			*outGoalPos = obj.pos;
+
+			return ( obj.kind == FFOBJ_DEFEND_POINT ) ? STATE_HOLD_GROUND
+			                                          : STATE_PUSH_OBJECTIVE;
 		}
 	}
 
-	// 6) Nothing objective-relevant — wander (DM maps, conc-jump, etc.).
+	// 8) Nothing objective-relevant — wander (DM maps, conc-jump, etc.).
 	if ( PickWanderGoal( myPos, outGoalPos ) )
 	{
 		outTargetEnt->Term();
@@ -697,6 +778,30 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 			m_wanderPickTimer.Start( RandomFloat( 8.0f, 15.0f ) );
 
 		m_evaluateTimer.Start( RandomFloat( 0.75f, 1.25f ) );
+
+		// Progress watchdog. This is the general prerequisite detector: we
+		// don't know what is in the way — a locked door, a phase gate, a lift
+		// parked at the wrong floor, a route the mesh doesn't have — but a bot
+		// that has stopped getting closer to something for twenty-five seconds
+		// has told us there is something. FFBotGameMode blacklists it and the
+		// ladder moves on to whatever is next.
+		//
+		// Only for real objectives. Wandering and holding ground have no target
+		// entity and nothing to give up on.
+		if ( m_state == STATE_PUSH_OBJECTIVE || m_state == STATE_GRAB_FLAG ||
+		     m_state == STATE_CARRY_FLAG )
+		{
+			CBaseEntity *target = m_targetEntity.Get();
+			if ( target )
+			{
+				FFBotGameMode::NoteObjectiveProgress( me, target,
+					( target->GetAbsOrigin() - me->GetAbsOrigin() ).Length() );
+			}
+		}
+		else
+		{
+			FFBotGameMode::NoteObjectiveProgress( me, NULL, 0.0f );
+		}
 	}
 
 	// In wander state, also re-pick after the picker timer has elapsed even
@@ -716,14 +821,34 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 	if ( m_state == STATE_NONE )
 		return Continue();
 
-	// Path inhibit: when MainAction's stuck-recovery is actively pushing
-	// the bot backward / lateral, we must NOT also drive the path
-	// follower. The locomotor's per-tick Approach() would re-press
-	// IN_FORWARD and cancel out our backward press. Skip path.Update
-	// while inhibited; bot uses only direct button presses for that
-	// window.
-	if ( me->m_pathInhibitTimer.HasStarted() && !me->m_pathInhibitTimer.IsElapsed() )
+	// FIX 5 — stuck stage 3 asks us to give up on this goal. Honour it here
+	// rather than letting the bot keep re-planning a route it cannot walk.
+	if ( me->m_abandonGoalRequest )
+	{
+		me->m_abandonGoalRequest = false;
+
+		// Stuck stage 3 is the movement layer reaching the same conclusion the
+		// no-progress watchdog would reach eventually. Record it so the next
+		// evaluation picks something else rather than the same thing again.
+		if ( m_targetEntity.Get() )
+			FFBotGameMode::NoteObjectiveFailure( me, m_targetEntity.Get(), "stuck trying to reach it" );
+
+		m_lastStuckPos = me->GetAbsOrigin();
+		m_avoidStuckRadius = 512.0f;
+		m_path.Invalidate();
+		m_repathTimer.Invalidate();
+
+		// Force a fresh objective evaluation next tick; in wander state, pick
+		// a different destination outright.
+		m_evaluateTimer.Invalidate();
+		if ( m_state == STATE_WANDER )
+			m_wanderPickTimer.Invalidate();
 		return Continue();
+	}
+
+	// The old per-action path-inhibit check lived here, and ONLY here — which
+	// is why stuck recovery was a no-op in the other fifteen actions. It now
+	// lives in FFBotHelpers::CanDrivePath, which every action calls.
 
 	// Standing in a fresh fire / gas / slow / sticky zone? Force an
 	// immediate repath. The current path was computed before this danger
@@ -742,6 +867,14 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 
 	// Recompute path occasionally and when the goal-target moves (e.g., the
 	// flag carrier we're chasing is moving).
+	//
+	// FIX 7 — repath hysteresis. Cost terms that change every tick (combat
+	// intensity, grenade danger zones, low-ammo/health discounts, recent-stuck
+	// penalties) used to flip A* between two near-equal lanes on consecutive
+	// repaths, so the bot visibly reversed at junctions roughly once a second.
+	// ShouldRecomputePath leaves a working path alone while the bot is
+	// actually travelling it, and still repaths immediately when there is no
+	// path, when the goal has moved, or when we've stopped making progress.
 	if ( m_repathTimer.IsElapsed() )
 	{
 		// Re-fetch the current goal position from the target entity in case
@@ -751,8 +884,20 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 			m_goalPos = target->GetAbsOrigin();
 
 		m_repathTimer.Start( RandomFloat( 0.75f, 1.5f ) );
-		CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
-		m_path.Compute( me, m_goalPos, cost );
+
+		if ( FFBotHelpers::ShouldRecomputePath( me, m_path, m_goalPos ) )
+		{
+			CFFBotPathCost cost( me, FFBOT_DEFAULT_ROUTE );
+			if ( !m_path.Compute( me, m_goalPos, cost ) && target != NULL )
+			{
+				// A* found nothing. That is the strongest possible statement
+				// that this objective is gated right now — stronger than the
+				// no-progress watchdog, and available immediately rather than
+				// twenty-five seconds in. Drop it and re-evaluate next tick.
+				FFBotGameMode::NoteObjectiveFailure( me, target, "no path to it" );
+				m_evaluateTimer.Invalidate();
+			}
+		}
 
 		// Post-respawn angle snap: align eyes with first path segment so
 		// PlayerLocomotion::Approach (which reads EyeVectors and dots
@@ -808,7 +953,12 @@ ActionResult< CFFBot > CFFBotCtfObjective::Update( CFFBot *me, float interval )
 		}
 	}
 
-	m_path.Update( me );
+	// FIX 1 — single movement authority. CanDrivePath publishes the path goal
+	// for the aim driver and refuses while the movement arbiter owns
+	// locomotion, so this can never issue a second, contradictory Approach()
+	// in the same tick.
+	if ( FFBotHelpers::CanDrivePath( me, m_path ) )
+		m_path.Update( me );
 
 	return Continue();
 }

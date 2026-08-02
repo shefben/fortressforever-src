@@ -1,14 +1,26 @@
 //========= Fortress Forever Bot =============================================//
 //
-// CFFBotCtfObjective — top-level objective Action for CTF-style maps.
+// CFFBotCtfObjective — top-level objective Action.
 //
-// State machine that picks the bot's current goal each evaluation tick:
-//   - STATE_CARRY_FLAG     : I'm carrying an enemy flag → run to my cap point.
-//   - STATE_RETURN_OWN_FLAG: my team's flag is dropped → run to it (touching
-//                            it auto-returns to base).
-//   - STATE_GRAB_FLAG      : an enemy flag is at home / dropped → run to it.
-//   - STATE_WANDER         : no CTF goal applicable → pick a random nav area
-//                            (also the path on non-CTF maps).
+// The name is historical. It began as a CTF state machine and for a long time
+// that was all it was, which is why every non-CTF map's bots ended up wandering:
+// base_ctf is 254 of the 599 shipped map scripts, so the ladder was right for
+// the plurality and silent about everything else.
+//
+// It is now two layers:
+//
+//   * The states below, which encode the things that are true regardless of
+//     mode and that a generic resolver could not know — I am carrying
+//     something, our flag is being run out of the base, I am on 20 health, I am
+//     the civilian. These run first.
+//   * FFBotGameMode::ResolveObjective, which answers "what should I be doing
+//     about this map" for every mode including CTF, and which owns the
+//     sequencing rules (keycards before flags) and the per-bot gating that
+//     notices when an objective cannot actually be reached.
+//
+// The split is deliberate. Anything that depends on this bot's immediate
+// situation belongs above; anything that depends on the map belongs below, in
+// one place, where adding a mode does not mean touching a state machine.
 //
 // Per-tick threat handling, aim, fire, and stuck-mashing all happen in
 // CFFBotMainAction; this Action only drives the path goal.
@@ -50,7 +62,8 @@ private:
 		STATE_INTERCEPT_CARRIER,// our flag is stolen — chase the enemy carrier
 		STATE_ESCORT_CARRIER,	// teammate is carrying enemy flag — escort them
 		STATE_RETREAT,			// low HP — fall back to our spawn area
-		STATE_PUSH_OBJECTIVE,	// AvD/no-flag maps: head to nearest cap point
+		STATE_PUSH_OBJECTIVE,	// whatever FFBotGameMode resolved for this map
+		STATE_HOLD_GROUND,		// assigned to defense: hold the resolved post
 		STATE_VIP_RUN,			// Hunted: I'm the civilian, run to escape area
 		STATE_ESCORT_VIP,		// Hunted: stay near my team's civilian
 		STATE_SEEK_CURE,		// I'm infected — find a friendly medic

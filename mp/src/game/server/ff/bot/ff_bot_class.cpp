@@ -14,6 +14,7 @@
 #include "ff_info_script.h"
 #include "ff_buildableobject.h"
 #include "ff_buildable_sentrygun.h"
+#include "ff_nav_area.h"
 #include "ammodef.h"
 #include "shareddefs.h"
 #include "in_buttons.h"
@@ -184,7 +185,7 @@ static void UpdateEngineer( CFFBot *me )
 	// attacker). On maps with neither, build wherever the bot wandered to.
 	const int myTeam = me->GetTeamNumber();
 	const Vector myPos = me->GetAbsOrigin();
-	CFFInfoScript *anchor = FFBotHelpers::FindOwnFlag( myTeam );
+	CBaseEntity *anchor = FFBotHelpers::FindOwnFlag( myTeam );
 	if ( !anchor )
 		anchor = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
 	if ( !anchor )
@@ -279,6 +280,42 @@ static void UpdateEngineer( CFFBot *me )
 	// defensive area, and the bot's path will favor resupply areas en
 	// route since m_isLowAmmo is true (see CFFBotPathCost).
 
+	// FF-only: drop a mancannon (jump pad) near a useful spot for the
+	// team. We do this AFTER SG+dispenser are running and topped up so we
+	// don't spend cells on a jump pad while the home base is fragile.
+	// The mancannon costs cells and only one can be deployed per engineer
+	// at a time, so we throttle and only build when no current pad
+	// exists.
+	if ( !me->GetManCannon() && cellsHeld >= 100 )
+	{
+		// Useful spot heuristic — in priority order:
+		//   1. Standing on a CHOKE area (perfect: pad launches teammates
+		//      *over* the choke).
+		//   2. Standing at our spawn-room exit (pad slingshots teammates
+		//      out of base).
+		//   3. Standing at our own flag (pad helps flag-defenders rotate
+		//      back if the flag is taken).
+		// Engineer must physically walk to the placement spot (no remote
+		// build), so we only build when our nav area matches one of these.
+		// Reject water — mancannons placed underwater don't function.
+		CFFNavArea *here = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
+		if ( here && !here->HasAttributeFF( FF_NAV_WATER | FF_NAV_UNDERWATER ) )
+		{
+			const unsigned int attrs = here->GetAttributesFF();
+			const int myTeam = me->GetTeamNumber();
+			const unsigned int ownFlagAttr = CFFNavArea::FlagAttributeForTeam( myTeam );
+			const bool atChoke     = ( attrs & FF_NAV_CHOKE ) != 0;
+			const bool atSpawnExit = ( attrs & FF_NAV_SPAWN_ROOM_EXIT ) != 0;
+			const bool atOwnFlag   = ( attrs & ownFlagAttr ) != 0;
+			if ( atChoke || atSpawnExit || atOwnFlag )
+			{
+				me->Command_BuildManCannon();
+				me->m_classBuildTimer.Start( 5.0f );
+				return;
+			}
+		}
+	}
+
 	// Both built and topped up. Tick again later to recheck (someone may
 	// damage the SG; CtfObjective handles whether we should return).
 	me->m_classBuildTimer.Start( 1.5f );
@@ -335,7 +372,7 @@ static void UpdateDemoman( CFFBot *me )
 	// cap on AvD-style maps) — the choke we want to deny.
 	const int myTeam = me->GetTeamNumber();
 	const Vector myPos = me->GetAbsOrigin();
-	CFFInfoScript *anchor = FFBotHelpers::FindOwnFlag( myTeam );
+	CBaseEntity *anchor = FFBotHelpers::FindOwnFlag( myTeam );
 	if ( !anchor )
 		anchor = FFBotHelpers::FindOwnCapPoint( myTeam, myPos );
 	if ( !anchor )
@@ -365,6 +402,109 @@ static void UpdateDemoman( CFFBot *me )
 // first shot fires the instant we're aimed and dot-locked. IN_ATTACK2 on the
 // AC is the spinup input; IN_ATTACK starts firing.
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// SCOUT: opportunistic jumpgun usage. The jumpgun fires a horizontal+vertical
+// shove (450h / 500v) at the bot — used to skip distance and reach high
+// places. Bots fire at their feet aimed slightly forward to hop+lunge.
+//
+// Trigger conditions (any of):
+//   1. Stuck for 1+ seconds — jumpgun out of the wedge.
+//   2. A close-range threat (< 300u) and we're not the aggressor — bail.
+//   3. We're carrying the enemy flag and on a long open stretch (>800u
+//      to next path waypoint) — burn distance toward our cap.
+//
+// Throttled by m_classBuildTimer (also used for builds — repurposed here
+// since a scout never builds and the timer would otherwise sit unused).
+//-----------------------------------------------------------------------------
+static void UpdateScout( CFFBot *me )
+{
+	if ( !me->m_bClassDidSpawnInit )
+		me->m_bClassDidSpawnInit = true;
+
+	if ( me->m_classBuildTimer.HasStarted() && !me->m_classBuildTimer.IsElapsed() )
+		return;
+
+	// Must own the jumpgun and have ammo.
+	CBaseCombatWeapon *jg = me->Weapon_OwnsThisType( "ff_weapon_jumpgun" );
+	if ( !jg )
+		return;
+	const int ammoType = jg->GetPrimaryAmmoType();
+	if ( ammoType < 0 || me->GetAmmoCount( ammoType ) <= 0 )
+		return;
+
+	// Must be on the ground — firing in air does nothing useful.
+	ILocomotion *loco = me->GetLocomotionInterface();
+	if ( !loco || !loco->IsOnGround() )
+		return;
+
+	bool wantsBoost = false;
+
+	// Stuck-recovery boost: if HandleStuckState has been pressing buttons
+	// for a while and we're still here, jumpgun straight up.
+	if ( gpGlobals->curtime - me->m_lastUnstuckTime > 1.5f )
+		wantsBoost = true;
+
+	// Escape boost: close-range threat, melee-class enemy in our face.
+	if ( !wantsBoost )
+	{
+		IVision *vision = me->GetVisionInterface();
+		const CKnownEntity *threat = vision ? vision->GetPrimaryKnownThreat() : NULL;
+		if ( threat && threat->GetEntity() && threat->IsVisibleRecently() )
+		{
+			const float dist = ( threat->GetLastKnownPosition() - me->GetAbsOrigin() ).Length();
+			if ( dist < 300.0f )
+				wantsBoost = true;
+		}
+	}
+
+	// Flag-carry sprint: if we're carrying enemy flag, jumpgun toward cap
+	// to outrun pursuit.
+	if ( !wantsBoost )
+	{
+		CFFInfoScript *carriedFlag = NULL;
+		if ( FFBotHelpers::IsBotCarryingFlag( me, &carriedFlag ) && carriedFlag )
+		{
+			// Only worth using on long stretches — short hops would just
+			// stutter our movement.
+			Vector vel = me->GetAbsVelocity();
+			if ( vel.LengthSqr() > ( 50.0f * 50.0f ) )
+				wantsBoost = true;
+		}
+	}
+
+	if ( !wantsBoost )
+	{
+		me->m_classBuildTimer.Start( 1.0f );
+		return;
+	}
+
+	// Switch to jumpgun, aim forward-and-down so the shove lifts+launches.
+	CFFWeaponBase *active = me->GetActiveFFWeapon();
+	if ( !active || !FStrEq( active->GetClassname(), "ff_weapon_jumpgun" ) )
+	{
+		me->Weapon_Switch( jg );
+		me->m_classBuildTimer.Start( 0.3f );	// give weapon-switch a tick
+		return;
+	}
+
+	IBody *body = me->GetBodyInterface();
+	if ( body )
+	{
+		Vector forward;
+		me->EyeVectors( &forward );
+		forward.NormalizeInPlace();
+		// Aim point: 80u forward, 100u below — gets us forward+up boost.
+		Vector aimAt = me->EyePosition() + forward * 80.0f - Vector( 0, 0, 100.0f );
+		body->AimHeadTowards( aimAt, IBody::IMPORTANT, 0.2f, NULL, "Jumpgun aim" );
+	}
+
+	me->PressJumpButton( 0.1f );
+	me->PressFireButton( 0.1f );
+	// Long cooldown so we don't spam — jumpgun ammo is limited.
+	me->m_classBuildTimer.Start( 6.0f );
+}
+
+
 static void UpdateHWGuy( CFFBot *me )
 {
 	if ( !me->m_bClassDidSpawnInit )
@@ -696,6 +836,10 @@ void FFBotClass::Update( CFFBot *me )
 
 	case CLASS_HWGUY:
 		UpdateHWGuy( me );
+		break;
+
+	case CLASS_SCOUT:
+		UpdateScout( me );
 		break;
 
 	default:

@@ -103,3 +103,14 @@ compile_commands.json
 
 # causes issues
 ttsapp.RES
+foxbot-master
+/.clinerules-architect
+/mp/.clinerules-architect
+/.clinerules-ask
+/mp/.clinerules-ask
+/.clinerules-code
+/mp/.clinerules-code
+/.clinerules-debug
+/mp/.clinerules-debug
+/.clinerules-test
+/mp/.clinerules-test

@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for FF Game
 //
@@ -432,6 +432,12 @@ public:
 	bool CanRespawn( void ) const { return IsRespawnable(); }
 	void SetObjectiveEntity( const CBaseEntity *pEntity );
 	void SetObjectiveOrigin( const Vector &vecObjOrigin ){ m_vecObjectiveOrigin = vecObjOrigin; }
+
+	// What the map's Lua is currently pointing this player at, via
+	// UpdateObjectiveIcon / UpdateTeamObjectiveIcon. This is the entity the HUD
+	// draws its objective arrow on, so reading it lets a bot follow the same
+	// instruction a human is being given rather than deriving its own.
+	CBaseEntity *GetObjectiveEntity( void ) const { return m_hObjectiveEntity.Get(); }
 private:
 	bool m_bRespawnable;
 	bool m_bACDamageHint; // For triggering the "Pyro takes damage from HWGuy" hint only once

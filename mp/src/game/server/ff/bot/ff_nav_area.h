@@ -93,14 +93,130 @@ enum FFNavAttributeType
 	// Area cannot be blocked (mapper-set).
 	FF_NAV_UNBLOCKABLE					= 0x00400000,
 
+	// Heuristic / runtime tags — stamped by CFFBotAutoTagger at level init,
+	// never serialized. These let the bot reason about FF-specific gameplay
+	// terrain without requiring per-map nav_edit work.
+	FF_NAV_WATER						= 0x00800000,	// feet-level water (wading)
+	FF_NAV_UNDERWATER					= 0x01000000,	// midbody+ water (must swim)
+	FF_NAV_CHOKE						= 0x02000000,	// narrow corridor / chokepoint
+	FF_NAV_HIGH_GROUND					= 0x04000000,	// elevated relative to neighbors
+	FF_NAV_AUTO_SNIPER_SPOT				= 0x08000000,	// heuristic sniper perch
+	FF_NAV_AUTO_SENTRY_SPOT				= 0x10000000,	// heuristic SG choke
+	FF_NAV_NEAR_LADDER					= 0x20000000,	// adjacent to a ladder
+
+	// FIX 10 — this area overlaps an OPENABLE blocker (func_door, respawn
+	// gate, movelinear, ...). Stamped at level init by
+	// CFFNavMesh::MarkDoorwayAreas.
+	//
+	// Matters because CNavArea::IsBlocked goes true while such a door is shut,
+	// and CFFBotPathCost used to return -1 (impassable) for any blocked area.
+	// That deleted the only route out of a spawn room every time its gate
+	// closed: no path existed at all, so the bot just milled about. A doorway
+	// area is now merely expensive, so a path still exists and
+	// CFFBotMainAction::HandleDoors gets a chance to open the thing.
+	FF_NAV_DOORWAY						= 0x40000000,
+
 	// Persistent attributes saved to the .nav file. Mapper-set bits only.
-	// Entity-derived bits (spawn rooms, flags, caps, pickups) are re-stamped
-	// every level load and never written.
+	// Entity-derived AND heuristic bits are re-stamped every level load.
 	FF_NAV_PERSISTENT_ATTRIBUTES		= FF_NAV_SNIPER_SPOT |
 	                                      FF_NAV_SENTRY_SPOT |
 	                                      FF_NAV_HUNTED_ESCAPE |
 	                                      FF_NAV_NO_SPAWNING |
 	                                      FF_NAV_UNBLOCKABLE,
+};
+
+
+//-----------------------------------------------------------------------------
+// Second attribute word.
+//
+// FFNavAttributeType above has one free bit (0x80000000) and several concepts
+// that want one. Rather than renumber an enum that already exists in saved
+// .nav files, new attributes go here.
+//
+// Everything in this word is stamped by FFNavBuilder from the map's
+// maps/<map>.ffnavpoints sidecar — hand-authored map knowledge that neither
+// the entity tagger nor the shape heuristics can derive. None of it is written
+// to the .nav file; the sidecar owns it and re-applies it every map load, so
+// there is deliberately no FF_NAV2_PERSISTENT_ATTRIBUTES mask.
+//-----------------------------------------------------------------------------
+enum FFNavAttributeType2
+{
+	FF_NAV2_INVALID						= 0x00000000,
+
+	// Engineer build hints. A suggestion, not a requirement — the build
+	// behaviours score these highly and still fall back to their own search.
+	FF_NAV2_DISPENSER_SPOT				= 0x00000001,
+
+	// Breakable / shortcut wall: worth a demoman's det charge.
+	FF_NAV2_DETPACK_SPOT				= 0x00000002,
+
+	// Capture point with no owning team (dustbowl-style linear push maps,
+	// where the same point is contested by whoever holds the round).
+	FF_NAV2_CAP_NEUTRAL					= 0x00000004,
+
+	// Hazard equipment pickup — rock2's gas suit and anything like it. Bots
+	// that are asphyxiating need somewhere to run to.
+	FF_NAV2_HAZARD_GEAR					= 0x00000008,
+
+	// Author says stay out: pit, crusher, known grinder.
+	FF_NAV2_DANGER						= 0x00000010,
+
+	// Conc / rocket-jump launch position.
+	FF_NAV2_JUMP_SPOT					= 0x00000020,
+
+	// Where to leave the water. Underwater tunnels connect fine now, but
+	// "which end of this pool has the ladder" is map knowledge.
+	FF_NAV2_WATER_EXIT					= 0x00000040,
+
+	// Set on every area any manual marker touches. Lets diagnostics tell
+	// authored data apart from derived data at a glance.
+	FF_NAV2_MANUAL						= 0x00000080,
+
+	// Per-team defensive hold ground.
+	FF_NAV2_DEFEND_BLUE					= 0x00000100,
+	FF_NAV2_DEFEND_RED					= 0x00000200,
+	FF_NAV2_DEFEND_YELLOW				= 0x00000400,
+	FF_NAV2_DEFEND_GREEN				= 0x00000800,
+	FF_NAV2_DEFEND_ANY					= 0x00000F00,
+
+	// This area rides a moving platform (func_train, func_plat, tracktrain,
+	// vertically-travelling door). Both auto-detected and hand-placeable.
+	//
+	// Worth knowing because a lift invalidates two assumptions the path
+	// follower makes: the area's position is not constant, and arriving at it
+	// may require waiting rather than moving. FoxBot needed a per-waypoint
+	// tolerance for the same reason — see the note about rock2's small lifts
+	// in its bot_navigate.cpp.
+	FF_NAV2_LIFT						= 0x00001000,
+
+	// This area overlaps a trigger_hurt. Auto-detected from the entity, which
+	// is what makes it different from FF_NAV2_DANGER — DANGER is an author
+	// saying "stay out", HAZARD_ZONE is the map saying it.
+	//
+	// The reason this matters is rock2. Its gas is a Lua-driven trigger_hurt
+	// whose damage is switched on partway through the round; there is no
+	// engine-level "the map is filling with gas" signal to read. But the
+	// trigger volume itself is a real entity sitting in the world from level
+	// load, so the geometry of the danger is knowable even when its schedule
+	// isn't.
+	FF_NAV2_HAZARD_ZONE					= 0x00002000,
+
+	// Demoman: blow this SHUT to deny a route, as opposed to
+	// FF_NAV2_DETPACK_SPOT which means blow it OPEN to make one.
+	//
+	// FoxBot has carried this distinction since TFC (W_FL_TFC_DETPACK_CLEAR
+	// vs W_FL_TFC_DETPACK_SEAL) and it is not cosmetic: the two produce
+	// opposite behaviour from the same position, and conflating them means a
+	// demoman opening the route the defence just paid to close.
+	FF_NAV2_DETPACK_SEAL				= 0x00004000,
+
+	// Demoman pipe-trap position — where to lay a pipe carpet, which is a
+	// different question from where to stand while doing it.
+	FF_NAV2_PIPETRAP					= 0x00008000,
+
+	// "Look this way from here." An aim hint is about facing, not position:
+	// the marker's yaw is the payload, the area is just where it applies.
+	FF_NAV2_AIM_HINT					= 0x00010000,
 };
 
 
@@ -124,10 +240,21 @@ public:
 	unsigned int	GetAttributesFF( void ) const		{ return m_attributeFlags; }
 	void			ClearAllAttributesFF( void )		{ m_attributeFlags = 0; }
 
-	// Convenience: per-team spawn-room / flag / cap bit lookup.
+	// Second attribute word — FF_NAV2_* bits, authored via FFNavBuilder.
+	// Deliberately a separate API rather than a 64-bit widening of the first:
+	// every existing call site means "the FF_NAV_* word" and silently
+	// accepting an FF_NAV2_* constant there would be a no-op that compiles.
+	void			SetAttributeFF2( int flags )		{ m_attributeFlags2 |= flags; }
+	void			ClearAttributeFF2( int flags )		{ m_attributeFlags2 &= ~flags; }
+	bool			HasAttributeFF2( int flags ) const	{ return ( m_attributeFlags2 & flags ) != 0; }
+	unsigned int	GetAttributesFF2( void ) const		{ return m_attributeFlags2; }
+	void			ClearAllAttributesFF2( void )		{ m_attributeFlags2 = 0; }
+
+	// Convenience: per-team spawn-room / flag / cap / defend bit lookup.
 	static int		SpawnRoomAttributeForTeam( int team );
 	static int		FlagAttributeForTeam( int team );
 	static int		CapAttributeForTeam( int team );
+	static int		DefendAttributeForTeam( int team );
 
 	// Per-team incursion distance — travel distance from the team's spawn
 	// room(s) to this area along the nav graph. -1 means unreachable from
@@ -185,6 +312,7 @@ private:
 	friend class CFFNavMesh;
 
 	unsigned int m_attributeFlags;
+	unsigned int m_attributeFlags2;
 
 	// Per-team [TEAM_BLUE..TEAM_GREEN] indexed compact (team - TEAM_BLUE).
 	float m_distanceFromSpawnRoom[ FF_NAV_TEAM_COUNT ];

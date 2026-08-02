@@ -691,7 +691,21 @@ void PathFollower::Update( INextBot *bot )
 	// limit too high distance to reasonable value for bots that can climb very high
 	float tooHighDistance = mover->GetMaxJumpHeight();
 
-	if ( !m_goal->ladder && !mover->IsClimbingOrJumping() && !isOnStairs && m_goal->pos.z > mover->GetFeet().z + tooHighDistance )
+	// A swimming bot can rise arbitrarily far with no jump involved, so a goal
+	// high above its feet is normal inside a water shaft — not evidence that it
+	// fell off the path. Without this exemption, pathing up through water
+	// immediately hit OnMoveToFailure( FAIL_FELL_OFF ) and threw the path away,
+	// so underwater routes could never be followed upward.
+	bool isSwimming = false;
+	{
+		CBaseEntity *botEntity = bot->GetEntity();
+		if ( botEntity && botEntity->GetWaterLevel() >= WL_Waist )
+		{
+			isSwimming = true;
+		}
+	}
+
+	if ( !m_goal->ladder && !mover->IsClimbingOrJumping() && !isOnStairs && !isSwimming && m_goal->pos.z > mover->GetFeet().z + tooHighDistance )
 	{
 		const float closeRange = 25.0f; // 75.0f;
 		Vector2D to( mover->GetFeet().x - m_goal->pos.x, mover->GetFeet().y - m_goal->pos.y );

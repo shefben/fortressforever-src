@@ -45,7 +45,7 @@ public:
 class CFFNavMesh : public CNavMesh
 {
 public:
-	DECLARE_CLASS( CFFNavMesh, CNavMesh );
+	DECLARE_CLASS_GAMEROOT( CFFNavMesh, CNavMesh );
 
 	CFFNavMesh( void );
 
@@ -114,6 +114,19 @@ public:
 	// here on respawn so it walks toward the actual playable region rather
 	// than into a wall. Mirrors CTFNavMesh::CollectSpawnRoomThresholdAreas.
 	void CollectSpawnRoomThresholdAreas( int team, CUtlVector< CFFNavArea * > *outVector ) const;
+
+	// FIX 10 — stamp FF_NAV_DOORWAY on every area overlapping an openable
+	// blocker (func_door, respawn gate, movelinear, ...). Path cost then
+	// treats those areas as expensive-but-passable rather than impassable
+	// while the door happens to be shut, so a route out of a spawn room
+	// continues to exist and the door-opening behavior can run.
+	void MarkDoorwayAreas( void );
+
+	// Diagnostic dump used by the ff_bot_nav_report console command. Prints
+	// per-team spawn / exit / threshold / doorway counts. Without this, "the
+	// nav mesh has no connection through the spawn door" is indistinguishable
+	// from "the bot is stuck", which is precisely how that bug survived.
+	void PrintNavReport( void ) const;
 
 private:
 	// Single-team flood-fill helper. Pulls the BFS out of the per-team loop

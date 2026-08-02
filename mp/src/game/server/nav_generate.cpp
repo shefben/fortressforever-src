@@ -3369,12 +3369,363 @@ void CNavMesh::CreateNavAreasFromNodes( void )
 	/// @TODO: incremental generation doesn't create ladders yet
 	if ( m_generationMode != GENERATE_INCREMENTAL )
 	{
+		// Brush ladders can only be found once areas exist — we probe upward
+		// from area surfaces. Must run before the connect loop below.
+		BuildLaddersFromBrushContents();
+
 		for ( int i=0; i<m_ladders.Count(); ++i )
 		{
 			CNavLadder *ladder = m_ladders[i];
 			ladder->ConnectGeneratedLadder( 0.0f );
 		}
+
+		// Water shafts / underwater tunnels. Also needs finished areas.
+		ConnectSwimmableAreas();
 	}
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+// Ladder discovery from CONTENTS_LADDER brush volumes.
+//
+// BuildLadders() creates ladders from func_simpleladder entities and its whole
+// body sits inside #ifdef TERROR. Mods that use brush ladders — the contents
+// flag that CGameMovement::LadderMove and GetLadderMove actually test — get an
+// empty m_ladders list, so no path segment is ever GO_LADDER_UP/GO_LADDER_DOWN
+// and the locomotor's entire ladder state machine is unreachable. Bots simply
+// cannot use ladders on such a map.
+//
+// Ladder brushes are not solid to traces, so we detect them by point contents.
+// To keep the scan bounded we only probe columns that sit above an existing
+// nav area, which is where a climbable ladder must start.
+//--------------------------------------------------------------------------------------------------------------
+
+// One vertical run of ladder contents found in a single column.
+struct LadderColumn
+{
+	float x, y;			// column centre, snapped to the probe grid
+	float zBottom;
+	float zTop;
+	bool  consumed;
+};
+
+// Probe resolution. 16u matches the nav generation step closely enough to
+// catch any ladder a player can actually mount, without exploding the scan.
+static const float kLadderProbeXY = 16.0f;
+static const float kLadderProbeZ  = 16.0f;
+
+// How far above an area's surface we look for ladder contents.
+static const float kLadderProbeMaxHeight = 512.0f;
+
+// A ladder shorter than this is a decorative rung set, not a route.
+static const float kLadderMinHeight = 48.0f;
+
+
+void CNavMesh::BuildLaddersFromBrushContents( void )
+{
+	CUtlVector< LadderColumn > columns;
+
+	// Deduplicate columns: many nav areas overlap the same ladder, and a large
+	// merged area can contribute thousands of probe columns on its own.
+	//
+	// This MUST be a tree, not a linear CUtlVector::Find. A big map yields
+	// hundreds of thousands of candidate columns, and a linear membership test
+	// makes the scan quadratic — enough to make nav_generate look hung.
+	CUtlRBTree< int, int > columnKeys( 0, 0, DefLessFunc( int ) );
+
+	for ( int i = 0; i < TheNavAreas.Count(); ++i )
+	{
+		CNavArea *area = TheNavAreas[ i ];
+		if ( !area )
+			continue;
+
+		Extent extent;
+		area->GetExtent( &extent );
+
+		for ( float x = extent.lo.x; x <= extent.hi.x + kLadderProbeXY; x += kLadderProbeXY )
+		{
+			for ( float y = extent.lo.y; y <= extent.hi.y + kLadderProbeXY; y += kLadderProbeXY )
+			{
+				const float px = floorf( x / kLadderProbeXY + 0.5f ) * kLadderProbeXY;
+				const float py = floorf( y / kLadderProbeXY + 0.5f ) * kLadderProbeXY;
+
+				// Cheap dedup key. Column spacing is 16u so this is unique
+				// enough across a Source-sized map.
+				const int key = ( (int)( px / kLadderProbeXY ) * 73856093 ) ^
+				                ( (int)( py / kLadderProbeXY ) * 19349663 );
+				if ( columnKeys.Find( key ) != columnKeys.InvalidIndex() )
+					continue;
+
+				// Claim the column whether or not it holds a ladder, so a
+				// barren column is never re-probed by an overlapping area.
+				columnKeys.Insert( key );
+
+				const float groundZ = area->GetZ( px, py );
+
+				// Walk up looking for the first ladder contents.
+				float foundBottom = 0.0f;
+				bool  found = false;
+				for ( float dz = 0.0f; dz <= kLadderProbeMaxHeight; dz += kLadderProbeZ )
+				{
+					Vector p( px, py, groundZ + dz );
+					if ( UTIL_PointContents( p ) & CONTENTS_LADDER )
+					{
+						foundBottom = groundZ + dz;
+						found = true;
+						break;
+					}
+				}
+
+				if ( !found )
+					continue;
+
+				// Extend down to the true bottom of the ladder volume...
+				float zBottom = foundBottom;
+				while ( zBottom > groundZ - kLadderProbeMaxHeight )
+				{
+					Vector p( px, py, zBottom - kLadderProbeZ );
+					if ( !( UTIL_PointContents( p ) & CONTENTS_LADDER ) )
+						break;
+					zBottom -= kLadderProbeZ;
+				}
+
+				// ...and up to the top.
+				float zTop = foundBottom;
+				while ( zTop < foundBottom + kLadderProbeMaxHeight )
+				{
+					Vector p( px, py, zTop + kLadderProbeZ );
+					if ( !( UTIL_PointContents( p ) & CONTENTS_LADDER ) )
+						break;
+					zTop += kLadderProbeZ;
+				}
+
+				if ( ( zTop - zBottom ) < kLadderMinHeight )
+					continue;
+
+				LadderColumn col;
+				col.x = px;
+				col.y = py;
+				col.zBottom = zBottom;
+				col.zTop = zTop;
+				col.consumed = false;
+				columns.AddToTail( col );
+			}
+		}
+	}
+
+	// Merge adjacent columns that share a vertical span into single ladders.
+	int laddersBuilt = 0;
+	for ( int i = 0; i < columns.Count(); ++i )
+	{
+		if ( columns[ i ].consumed )
+			continue;
+
+		columns[ i ].consumed = true;
+
+		float minX = columns[ i ].x, maxX = columns[ i ].x;
+		float minY = columns[ i ].y, maxY = columns[ i ].y;
+		float zBottom = columns[ i ].zBottom;
+		float zTop = columns[ i ].zTop;
+
+		// Flood outward over neighbouring columns with an overlapping span.
+		bool grew = true;
+		while ( grew )
+		{
+			grew = false;
+			for ( int j = 0; j < columns.Count(); ++j )
+			{
+				if ( columns[ j ].consumed )
+					continue;
+
+				const bool touchesX = ( columns[ j ].x >= minX - kLadderProbeXY * 1.5f ) &&
+				                      ( columns[ j ].x <= maxX + kLadderProbeXY * 1.5f );
+				const bool touchesY = ( columns[ j ].y >= minY - kLadderProbeXY * 1.5f ) &&
+				                      ( columns[ j ].y <= maxY + kLadderProbeXY * 1.5f );
+				const bool spanOverlaps = ( columns[ j ].zBottom <= zTop ) &&
+				                          ( columns[ j ].zTop >= zBottom );
+
+				if ( !touchesX || !touchesY || !spanOverlaps )
+					continue;
+
+				columns[ j ].consumed = true;
+				minX = MIN( minX, columns[ j ].x );
+				maxX = MAX( maxX, columns[ j ].x );
+				minY = MIN( minY, columns[ j ].y );
+				maxY = MAX( maxY, columns[ j ].y );
+				zBottom = MIN( zBottom, columns[ j ].zBottom );
+				zTop = MAX( zTop, columns[ j ].zTop );
+				grew = true;
+			}
+		}
+
+		const float centreX = ( minX + maxX ) * 0.5f;
+		const float centreY = ( minY + maxY ) * 0.5f;
+
+		// Facing: a ladder is mounted from the open side. Probe the four
+		// compass directions from the middle of the shaft and take the one
+		// with the most free space.
+		Vector2D bestDir( 1.0f, 0.0f );
+		float bestClearance = -1.0f;
+		static const Vector2D kDirs[ 4 ] = {
+			Vector2D(  0.0f, -1.0f ),	// NORTH
+			Vector2D(  1.0f,  0.0f ),	// EAST
+			Vector2D(  0.0f,  1.0f ),	// SOUTH
+			Vector2D( -1.0f,  0.0f ),	// WEST
+		};
+
+		const Vector probeFrom( centreX, centreY, ( zBottom + zTop ) * 0.5f );
+		for ( int d = 0; d < 4; ++d )
+		{
+			trace_t tr;
+			const Vector probeTo( probeFrom.x + kDirs[ d ].x * 64.0f,
+			                      probeFrom.y + kDirs[ d ].y * 64.0f,
+			                      probeFrom.z );
+			UTIL_TraceLine( probeFrom, probeTo, GetGenerationTraceMask(), NULL, COLLISION_GROUP_NONE, &tr );
+			if ( tr.fraction > bestClearance )
+			{
+				bestClearance = tr.fraction;
+				bestDir = kDirs[ d ];
+			}
+		}
+
+		const float width = MAX( maxX - minX, maxY - minY ) + kLadderProbeXY;
+
+		CreateLadder( Vector( centreX, centreY, zTop ),
+		              Vector( centreX, centreY, zBottom ),
+		              width, bestDir, 0.0f );
+		++laddersBuilt;
+	}
+
+	Msg( "Nav generation: found %d brush ladder(s) from CONTENTS_LADDER volumes "
+	     "(%d probe columns).\n", laddersBuilt, columns.Count() );
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+// Water-aware vertical connections.
+//
+// The generator only ever steps horizontally and climbs at most ClimbUpHeight,
+// so a submerged tunnel whose exit is a vertical shaft comes out of generation
+// as an isolated island: the areas exist, but nothing links them to the surface
+// or to the room above. Pathfinding then reports no route and bots never take
+// the underwater way round.
+//
+// Swimming has no jump-height limit. Two areas that overlap in plan view and
+// have water filling the space between them are mutually reachable, so we
+// connect them both ways.
+//--------------------------------------------------------------------------------------------------------------
+
+// How far a bot is willing to swim straight up or down in one connection.
+static const float kMaxSwimConnectHeight = 400.0f;
+
+
+void CNavMesh::ConnectSwimmableAreas( void )
+{
+	int connections = 0;
+
+	for ( int i = 0; i < TheNavAreas.Count(); ++i )
+	{
+		CNavArea *lower = TheNavAreas[ i ];
+		if ( !lower )
+			continue;
+
+		Extent lowerExtent;
+		lower->GetExtent( &lowerExtent );
+
+		// Only consider areas that are actually under water. A dry area needs
+		// the normal jump/climb rules.
+		const Vector lowerCentre = lower->GetCenter();
+		const int lowerContents = UTIL_PointContents( lowerCentre + Vector( 0, 0, 8 ) );
+		const bool lowerSubmerged = ( lowerContents & ( CONTENTS_WATER | CONTENTS_SLIME ) ) != 0;
+		if ( !lowerSubmerged )
+			continue;
+
+		// Everything stacked above this area within swim range.
+		Extent search;
+		search.lo = Vector( lowerExtent.lo.x, lowerExtent.lo.y, lowerExtent.lo.z );
+		search.hi = Vector( lowerExtent.hi.x, lowerExtent.hi.y, lowerExtent.hi.z + kMaxSwimConnectHeight );
+
+		CUtlVector< CNavArea * > overlapping;
+		CollectAreasOverlappingExtent( search, &overlapping );
+
+		for ( int j = 0; j < overlapping.Count(); ++j )
+		{
+			CNavArea *upper = overlapping[ j ];
+			if ( !upper || upper == lower )
+				continue;
+
+			const Vector upperCentre = upper->GetCenter();
+			const float deltaZ = upperCentre.z - lowerCentre.z;
+
+			// Must genuinely be above us, and beyond ordinary step height —
+			// anything within step height is already handled by the normal
+			// adjacency pass.
+			if ( deltaZ <= StepHeight || deltaZ > kMaxSwimConnectHeight )
+				continue;
+
+			// The column between the two areas has to be swimmable for most
+			// of its length. Sample it; allow the top of the column to be air
+			// so a bot can surface into a room above the waterline.
+			const int kSamples = 8;
+			int waterSamples = 0;
+			bool blocked = false;
+			for ( int s = 1; s <= kSamples; ++s )
+			{
+				const float t = (float)s / (float)( kSamples + 1 );
+				const Vector p = lowerCentre + ( upperCentre - lowerCentre ) * t;
+				const int contents = UTIL_PointContents( p );
+				if ( contents & CONTENTS_SOLID )
+				{
+					blocked = true;
+					break;
+				}
+				if ( contents & ( CONTENTS_WATER | CONTENTS_SLIME ) )
+					++waterSamples;
+			}
+
+			if ( blocked )
+				continue;
+
+			// At least half the shaft must be water; otherwise this is just
+			// two areas that happen to be stacked with open air between them,
+			// which is a fall, not a swim.
+			if ( waterSamples * 2 < kSamples )
+				continue;
+
+			// Confirm the straight-line swim isn't cut by geometry.
+			trace_t tr;
+			UTIL_TraceHull( lowerCentre + Vector( 0, 0, StepHeight ), upperCentre,
+				NavTraceMins, NavTraceMaxs, GetGenerationTraceMask(), NULL,
+				COLLISION_GROUP_NONE, &tr );
+			if ( tr.fraction < 1.0f || tr.startsolid )
+				continue;
+
+			// Direction is nominal for a vertical link; pick the compass
+			// bucket from whatever horizontal offset exists so the adjacency
+			// lists stay well-formed.
+			Vector delta = upperCentre - lowerCentre;
+			NavDirType dirUp;
+			if ( fabsf( delta.x ) > fabsf( delta.y ) )
+				dirUp = ( delta.x > 0.0f ) ? EAST : WEST;
+			else
+				dirUp = ( delta.y > 0.0f ) ? SOUTH : NORTH;
+
+			if ( !lower->IsConnected( upper, dirUp ) )
+			{
+				lower->ConnectTo( upper, dirUp );
+				++connections;
+			}
+			const NavDirType dirDown = OppositeDirection( dirUp );
+			if ( !upper->IsConnected( lower, dirDown ) )
+			{
+				upper->ConnectTo( lower, dirDown );
+				++connections;
+			}
+		}
+	}
+
+	Msg( "Nav generation: added %d swim connection(s) linking submerged areas "
+	     "to what's above them.\n", connections );
 }
 
 
@@ -3397,6 +3748,82 @@ void CNavMesh::AddWalkableSeeds( void )
 			AddWalkableSeed( pos, normal );
 		}
 	}
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+// FIX 9 — open doors before flood-filling.
+//
+// This branch of the SDK had NO door handling anywhere in nav generation. The
+// walkable-space sampler traces against world collision, so a door that is
+// shut at map start is a solid wall as far as generation is concerned: no nav
+// areas and no connections are produced through that doorway.
+//
+// On an FF map that means the spawn room comes out as a DISCONNECTED NAV
+// ISLAND. Everything downstream then fails silently —
+// CTFNavMesh-style CollectAndMarkSpawnRoomExits finds no non-spawn neighbour,
+// so there are zero spawn-room exits, zero threshold areas, no spawn-exit
+// direction for bots to face, and no computable path to any objective. Bots
+// "can't find the door of the spawn area" because as far as the mesh is
+// concerned there is no door and no area beyond it.
+//
+// So: force every openable brush entity open for the duration of generation,
+// then put it back exactly as it was.
+//--------------------------------------------------------------------------------------------------------------
+static const char * const s_navGenOpenableClasses[] = {
+	"func_door",
+	"func_door_rotating",
+	"prop_door_rotating",
+	"func_movelinear",
+	"func_wall_toggle",
+	"func_brush",
+};
+
+// Doors we forced open, so EndGeneration can restore them.
+static CUtlVector< EHANDLE > s_navGenForcedDoors;
+
+void CNavMesh::OpenDoorsForGeneration( void )
+{
+	s_navGenForcedDoors.RemoveAll();
+
+	int opened = 0;
+	for ( int c = 0; c < ARRAYSIZE( s_navGenOpenableClasses ); ++c )
+	{
+		CBaseEntity *door = NULL;
+		while ( ( door = gEntList.FindEntityByClassname( door, s_navGenOpenableClasses[ c ] ) ) != NULL )
+		{
+			variant_t emptyVariant;
+			door->AcceptInput( "Open", NULL, NULL, emptyVariant, 0 );
+			// func_brush / func_wall_toggle don't have an Open input; disabling
+			// them removes their collision, which is what we actually want.
+			door->AcceptInput( "Disable", NULL, NULL, emptyVariant, 0 );
+
+			EHANDLE h;
+			h = door;
+			s_navGenForcedDoors.AddToTail( h );
+			++opened;
+		}
+	}
+
+	if ( opened > 0 )
+	{
+		Msg( "Nav generation: forced %d door/brush entities open so the mesh "
+		     "connects through doorways.\n", opened );
+	}
+}
+
+void CNavMesh::RestoreDoorsAfterGeneration( void )
+{
+	for ( int i = 0; i < s_navGenForcedDoors.Count(); ++i )
+	{
+		CBaseEntity *door = s_navGenForcedDoors[ i ].Get();
+		if ( !door )
+			continue;
+		variant_t emptyVariant;
+		door->AcceptInput( "Enable", NULL, NULL, emptyVariant, 0 );
+		door->AcceptInput( "Close", NULL, NULL, emptyVariant, 0 );
+	}
+	s_navGenForcedDoors.RemoveAll();
 }
 
 
@@ -3441,6 +3868,10 @@ void CNavMesh::BeginGeneration( bool incremental )
 	// clear any previous mesh
 	DestroyNavigationMesh( incremental );
 
+	// FIX 9 — must happen before any walkable-space sampling, otherwise shut
+	// doors are sampled as solid wall and the rooms behind them never connect.
+	OpenDoorsForGeneration();
+
 	SetNavPlace( UNDEFINED_PLACE );
 
 	// build internal representations of ladders, which are used to find new walkable areas
@@ -3462,6 +3893,7 @@ void CNavMesh::BeginGeneration( bool incremental )
 	if (m_walkableSeeds.Count() == 0)
 	{
 		m_generationMode = GENERATE_NONE;
+		RestoreDoorsAfterGeneration();
 		Msg( "No valid walkable seed positions.  Cannot generate Navigation Mesh.\n" );
 		return;
 	}
@@ -3992,6 +4424,9 @@ bool CNavMesh::UpdateGeneration( float maxTime )
 			Msg( "Generation complete!  %0.1f seconds elapsed.\n", generationTime );
 			bool restart = m_generationMode != GENERATE_INCREMENTAL;
 			m_generationMode = GENERATE_NONE;
+
+			// FIX 9 — put the doors we forced open back the way we found them.
+			RestoreDoorsAfterGeneration();
 			m_isLoaded = true;
 			ClearWalkableSeeds();
 

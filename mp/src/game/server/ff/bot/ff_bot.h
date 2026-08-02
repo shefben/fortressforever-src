@@ -51,6 +51,22 @@ public:
 	Vector			m_spawnExitStartPos;
 	CountdownTimer	m_spawnExitForceTimer;
 
+	// ---- Squad role ------------------------------------------------------
+	//
+	// FFBotRoleType (offense / defense / support), assigned by the per-team
+	// quota in FFBotGameMode::AssignRoles rather than chosen by the bot.
+	//
+	// It has to be a quota. Left to individual preference every bot picks the
+	// same answer — go and take the thing — and a team of eight attackers loses
+	// every attack/defend map regardless of how good its navigation is. The
+	// quota comes from the detected game mode; who fills it comes from class
+	// affinity and proximity to whatever is being defended.
+	//
+	// m_roleAssignTime gates reassignment (FFBOT_ROLE_MIN_HOLD) so a death on
+	// the far side of the map doesn't reshuffle the whole team.
+	unsigned char	m_botRole;
+	float			m_roleAssignTime;
+
 	// Class-specialty per-life state (consumed by ff_bot_class.cpp).
 	bool			m_bClassDidSpawnInit;
 	CountdownTimer	m_classBuildTimer;		// engineer / demoman: throttle build attempts
@@ -89,6 +105,81 @@ public:
 	Vector			m_recentStuckPos;
 	float			m_recentStuckExpireTime;
 	float			m_lookAroundUntil;
+
+	// ---- Movement arbiter — SINGLE MOVEMENT AUTHORITY --------------------
+	//
+	// PlayerLocomotion::Approach decomposes (goal - feet) into *view-relative*
+	// button presses, and NextBotPlayer::Upkeep collapses IN_FORWARD+IN_BACK
+	// to IN_FORWARD (see NextBotPlayer.h — it's an `else if`). Consequence:
+	// any recovery that presses IN_BACK while an action's PathFollower is
+	// still calling Approach() in the same tick is silently cancelled, and
+	// the bot pushes *harder* into whatever it is wedged on.
+	//
+	// So recovery no longer presses movement buttons at all. It publishes a
+	// WORLD-SPACE point here. While an override is live:
+	//   - every action's PathFollower is suppressed (FFBotHelpers::CanDrivePath)
+	//   - CFFBotMainAction::DriveMovementArbiter issues exactly ONE
+	//     locomotor->Approach() at the override point
+	// One Approach per tick means nothing can cancel anything.
+	Vector			m_moveOverridePos;
+	CountdownTimer	m_moveOverrideTimer;
+	const char *	m_moveOverrideReason;	// static string literal; for bot_show_path
+
+	// Tick on which an action's PathFollower already issued its Approach().
+	// The behavior tree updates children BEFORE parents, so by the time
+	// CFFBotMainAction publishes an override the child may already have moved
+	// this tick. The arbiter therefore skips its own Approach when this equals
+	// the current tick, and the override takes effect on the next one. That
+	// preserves the invariant that matters: exactly one Approach() per tick.
+	int				m_pathDrivenTick;
+
+	void			SetMoveOverride( const Vector &worldPos, float duration, const char *reason );
+	void			ClearMoveOverride( void );
+	bool			IsMoveOverrideActive( void ) const;
+	const Vector &	GetMoveOverridePos( void ) const { return m_moveOverridePos; }
+	const char *	GetMoveOverrideReason( void ) const { return m_moveOverrideReason; }
+
+	// Last path goal published by whichever action owned the path this tick.
+	// This is the ONLY source of "which way is my path going" available to the
+	// aim driver: PathFollower::Update calls ILocomotion::FaceTowards, which is
+	// an empty stub for player bots (only NextBotGroundLocomotion overrides it),
+	// so nothing ever aimed these bots along their own route.
+	Vector			m_pathGoalPos;
+	float			m_pathGoalTime;
+	void			NotePathGoal( const Vector &pos );
+	bool			GetPathGoal( Vector *out ) const;	// false if stale (>0.5s)
+
+	// Set by the path driver when the next path segment turns sharply or is a
+	// climb/jump discontinuity. Gates bunny-hopping — hopping into a corner
+	// with view-relative air control is how bots curve into walls.
+	bool			m_pathTurnAhead;
+
+	// Door interaction. When the path is blocked by an *openable* entity we
+	// walk into it and hold +use, and suppress stuck recovery for that window.
+	// The old recovery did the opposite: it pressed IN_BACK, which backs the
+	// bot out of the door's own trigger volume, so the door never opened.
+	EHANDLE			m_blockingDoor;
+	CountdownTimer	m_doorPushTimer;
+
+	// Stuck escalation ladder. Stages escalate at the *planner* level rather
+	// than mashing more buttons. See CFFBotMainAction::HandleStuckState.
+	//   0 = not stuck (let PathFollower::Avoid work)
+	//   1 = penalize the area we're entering, force repath
+	//   2 = back-track in world space to the last spot we had velocity
+	//   3 = abandon the goal
+	//   4 = teleport (floor)
+	int				m_stuckStage;
+	float			m_stuckStageTime;
+	Vector			m_lastGoodPos;		// last position where we had real velocity
+	float			m_lastGoodPosTime;
+
+	// Set by stuck recovery, read by actions: "drop your goal and pick a new
+	// one". Cleared by the action that consumes it.
+	bool			m_abandonGoalRequest;
+
+	// Per-bot debug overlays (bot_show_path / bot_show_threat).
+	bool			m_debugShowPath;
+	bool			m_debugShowThreat;
 
 	// Route entropy seed — random per-bot value mixed into path cost to
 	// give different bots different shortest paths even when going to the
@@ -129,6 +220,32 @@ public:
 	SniperFireState	m_sniperFireState;
 	float			m_sniperFireStartTime;
 
+	// Reaction-time + aim-error tracking.
+	//   m_currentThreatId       — entindex of latest primary threat (-1 = none)
+	//   m_threatFirstSeenTime   — when we first acquired *any* threat in
+	//                              the current engagement. Persists across
+	//                              threat swaps within the engagement so a
+	//                              multi-enemy scene doesn't reset the gate
+	//                              every time vision picks a different
+	//                              primary; only resets after a sustained
+	//                              threatless window (m_lastThreatlessTime).
+	//   m_lastThreatlessTime    — first frame we had no threat. Resets the
+	//                              engagement clock once it exceeds 1.5s
+	//                              (real disengage, not vision blip).
+	int				m_currentThreatId;
+	float			m_threatFirstSeenTime;
+	float			m_lastThreatlessTime;
+
+	// Difficulty (0..3) — read once per Spawn() from ff_bot_difficulty
+	// cvar so a bot's difficulty stays stable across a life. Drives
+	// reaction-time floor and aim-error magnitude.
+	int				m_difficulty;
+
+	// Per-bot deterministic jitter, applied on top of the difficulty
+	// baseline so two bots at the same difficulty don't react identically.
+	// Set once at construction; range [0, 1).
+	float			m_reactionJitter;
+
 	// INextBot interface — return our owned components.
 	virtual PlayerLocomotion *GetLocomotionInterface( void ) const OVERRIDE { return m_locomotor; }
 	virtual PlayerBody       *GetBodyInterface( void )       const OVERRIDE { return m_body; }
@@ -160,6 +277,28 @@ public:
 	// want to occasionally pick a different action without thrashing —
 	// e.g., circle-strafe direction. Mirrors CTFBot::TransientlyConsistentRandomValue.
 	float			TransientlyConsistentRandomValue( float period = 10.0f, int seedValue = 0 ) const;
+
+	// Reaction-time floor in seconds — how long after first sighting
+	// the bot is allowed to open fire on a fresh threat. Difficulty-
+	// scaled; per-bot deterministic jitter on top.
+	//   easy   ~400ms
+	//   normal ~250ms
+	//   hard   ~150ms
+	//   expert ~80ms
+	float			GetReactionTimeFloor( void ) const;
+
+	// True if our reaction-time gate has elapsed for the given threat —
+	// i.e., we're past GetReactionTimeFloor() seconds since we first
+	// saw this enemy. Returns true if no threat or threat is stale
+	// (always allow non-aim-blocking work to continue).
+	bool			HasReactedToThreat( const class CKnownEntity *threat );
+
+	// Apply Gaussian-ish aim error to a target world-space point. Noise
+	// magnitude scales with difficulty (lower diff = wider error), range
+	// (farther target = wider error), and hold-time (the longer we've
+	// been on this threat, the tighter our aim). Pass 0 holdTime when
+	// calling fresh.
+	Vector			ApplyAimError( const Vector &targetPos, float holdTimeSec ) const;
 
 	// Ammo state — used by GetAmmo behavior and by path-cost heuristics.
 	// IsAmmoLow: active weapon has empty clip with <20 reserve, OR engineer

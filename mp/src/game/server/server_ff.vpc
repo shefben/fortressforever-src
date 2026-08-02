@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+﻿//-----------------------------------------------------------------------------
 //	SERVER_FF.VPC
 //
 //	Project Script
@@ -127,8 +127,24 @@ $Project "Server (FF)"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_sniper_lurk.h"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_demoman_sticky_trap.cpp"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_demoman_sticky_trap.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_demoman_detpack.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_demoman_detpack.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_autotag.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_autotag.h"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_helpers.cpp"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_helpers.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_learned_links.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_learned_links.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_nav_builder.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_nav_builder.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_lua_objectives.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_lua_objectives.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_gamemode.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_gamemode.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_hazard.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_hazard.h"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_ride_lift.cpp"
+		$File "$SRCDIR\game\server\ff\bot\ff_bot_ride_lift.h"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_intel.cpp"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_intel.h"
 		$File "$SRCDIR\game\server\ff\bot\ff_bot_commands.cpp"
