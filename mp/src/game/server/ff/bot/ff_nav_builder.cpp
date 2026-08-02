@@ -899,12 +899,42 @@ void FFNavBuilder::ApplyToMesh( CFFNavMesh *mesh )
 // other authored decision, and re-applied after the derivation passes rather
 // than before them.
 //
-// It clears both attribute words entirely, with one exception. FF_NAV_BLOCKED
-// is not a tag anybody authored; it is set and cleared at runtime by
-// CNavArea::UpdateBlocked from func_brush and door state, and clearing it here
-// would tell the pathfinder a shut door is open until the next time the door
-// moves.
+// WHAT IT CLEARS, AND WHY IT IS NOT EVERYTHING.
+//
+// The first version of this wiped both attribute words wholesale. That is
+// wrong, and wrong in a way that quietly breaks navigation: FF_NAV_WATER,
+// FF_NAV_UNDERWATER, FF_NAV_NEAR_LADDER, FF_NAV_DOORWAY and the spawn-room
+// bits are not "nodes an author placed". They are physical facts about the
+// map, the path cost prices routes with them, and CFFBot's water and ladder
+// handling reads them directly. Erasing the water tag off a sewer or the
+// ladder tag off a ladder foot does not remove a waypoint; it tells the bots
+// that a swim is a walk and that a ladder is a wall.
+//
+// So an erase clears the things that behave like nodes — the hand-placed and
+// derived tactical hints — and leaves the terrain alone. That matches what
+// "delete this nav point" means to the person pressing the key.
+//
+// FF_NAV_BLOCKED is excluded for a related reason: it is not authored either.
+// CNavArea::UpdateBlocked sets and clears it at runtime from door state, and
+// clearing it here would tell the pathfinder a shut door is open until the
+// next time the door moves.
 //-----------------------------------------------------------------------------
+
+// Node-like tags in word 1: things somebody (or something) decided, as opposed
+// to things the map is.
+#define FFNAVPT_ERASABLE_WORD1 ( \
+	FF_NAV_SNIPER_SPOT | FF_NAV_SENTRY_SPOT | \
+	FF_NAV_AUTO_SNIPER_SPOT | FF_NAV_AUTO_SENTRY_SPOT | \
+	FF_NAV_HUNTED_ESCAPE | FF_NAV_NO_SPAWNING | \
+	FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH | FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES | \
+	FF_NAV_FLAG_ANY | FF_NAV_CAP_ANY )
+
+// Everything in word 2 is a decision EXCEPT the traversal facts, which are the
+// same kind of thing as water and ladders in word 1.
+#define FFNAVPT_ERASE_KEEP_WORD2 ( \
+	FF_NAV2_LIFT | FF_NAV2_HAZARD_ZONE | FF_NAV2_TELEPORT | FF_NAV2_PUSH | \
+	FF_NAV2_LADDER | FF_NAV2_DOOR_ONEWAY | FF_NAV2_DOOR_TEAM_ANY )
+
 int FFNavBuilder::ApplyErasures( CFFNavMesh *mesh )
 {
 	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
@@ -936,16 +966,21 @@ int FFNavBuilder::ApplyErasures( CFFNavMesh *mesh )
 		{
 			CFFNavArea *area = areas[ a ];
 
-			const int keep = (int)( area->GetAttributesFF() & (unsigned int)FF_NAV_BLOCKED );
+			area->ClearAttributeFF( FFNAVPT_ERASABLE_WORD1 );
 
-			area->ClearAllAttributesFF();
+			const int keep2 = (int)( area->GetAttributesFF2() &
+			                         (unsigned int)FFNAVPT_ERASE_KEEP_WORD2 );
 			area->ClearAllAttributesFF2();
-			area->SetAttributeFF( keep );
+			area->SetAttributeFF2( keep2 );
 
 			// The mesh keeps its own lists of flag / cap / spawn / resupply
 			// areas, built as the tags were stamped. Clearing the bits without
 			// clearing those leaves every consumer that iterates the lists —
 			// which is most of them — still seeing the area.
+			//
+			// Spawn rooms are deliberately NOT removed here: the spawn-room
+			// bit is left set above, so removing it from the mesh's list would
+			// put the two out of step.
 			if ( mesh )
 				mesh->RemoveAreaFromTaggedCaches( area );
 
@@ -2148,10 +2183,93 @@ static Vector AuthoringGroundPos( CBasePlayer *player )
 }
 
 
+//-----------------------------------------------------------------------------
+// Delete the nav MESH AREA nearest the player — the walkable rectangle itself,
+// not the FF tags on it.
+//
+// This is a different operation from everything else in this file. A marker is
+// FF's own data and deleting one costs nothing; an area is part of the .nav and
+// removing it changes where bots can walk. Two consequences follow, and both
+// are handled here rather than left as surprises:
+//
+//   * Cached CFFNavArea pointers. CFFNavMesh keeps per-team spawn, flag, cap
+//     and resupply lists, and a freed area left in one of those is a dangling
+//     pointer that bites on the next objective query, not at delete time.
+//
+//   * Live bots. Every action owns a PathFollower, and a PathFollower's
+//     segments hold CNavArea pointers. Stock nav_delete has exactly the same
+//     hazard and Valve ships it anyway, but there is no reason to inherit a
+//     crash we can simply decline: with bots on the server this refuses and
+//     says why. Authoring happens with an empty server.
+//
+// Not persistent by itself — the mesh lives in the .nav, so nav_save is what
+// makes it stick. Said out loud on every deletion because forgetting is silent.
+//-----------------------------------------------------------------------------
+static bool DeleteNearestNavArea( CBasePlayer *player, const Vector &at, bool force )
+{
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
+	{
+		Msg( "[ff_nav_delete] no nav mesh loaded.\n" );
+		return false;
+	}
+
+	if ( !force )
+	{
+		int liveBots = 0;
+		for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+		{
+			CBasePlayer *p = UTIL_PlayerByIndex( i );
+			if ( p && p->IsBot() )
+				++liveBots;
+		}
+
+		if ( liveBots > 0 )
+		{
+			Msg( "[ff_nav_delete] %d bot(s) on the server. Their paths hold "
+				"pointers into the area you are about to free, so this refuses "
+				"rather than crash.\n", liveBots );
+			Msg( "  Remove the bots first, or pass 'force' if you know they "
+				"are not pathing.\n" );
+			ClientPrint( player, HUD_PRINTCENTER, "remove bots first" );
+			return false;
+		}
+	}
+
+	CNavArea *base = TheNavMesh->GetNearestNavArea( at, false,
+		FFNAVPT_AREA_SEARCH_RANGE, false, true, TEAM_ANY );
+	if ( !base )
+	{
+		Msg( "[ff_nav_delete] no nav area within %.0fu of (%.0f %.0f %.0f).\n",
+			FFNAVPT_AREA_SEARCH_RANGE, at.x, at.y, at.z );
+		ClientPrint( player, HUD_PRINTCENTER, "no nav area here" );
+		return false;
+	}
+
+	CFFNavArea *area = static_cast< CFFNavArea * >( base );
+	const unsigned int id = area->GetID();
+
+	CFFNavMesh *mesh = TheFFNavMesh();
+	if ( mesh )
+		mesh->RemoveAreaFromAllCaches( area );
+
+	// Same order nav_edit.cpp uses: out of the global list, then tell every
+	// surviving area to drop its references, then free it.
+	TheNavAreas.FindAndRemove( area );
+	TheNavMesh->OnEditDestroyNotify( area );
+	TheNavMesh->DestroyArea( area );
+
+	Msg( "[ff_nav_delete] deleted nav area %u. %d area(s) left. "
+		"Run nav_save to make it stick.\n", id, TheNavAreas.Count() );
+	ClientPrint( player, HUD_PRINTCENTER, "- deleted nav area (nav_save to keep)" );
+	return true;
+}
+
+
 CON_COMMAND_F( ff_nav_delete,
 	"Delete the nav point nearest to you. Deletes a hand-placed marker if "
 	"there is one in range; otherwise erases the auto-generated tags on the "
 	"nav area you are standing on, and keeps them erased. "
+	"Pass 'area' to delete the nav MESH AREA itself instead (needs nav_save). "
 	"Optional arg: radius (default ff_nav_builder_delete_radius).",
 	FCVAR_CHEAT )
 {
@@ -2162,6 +2280,16 @@ CON_COMMAND_F( ff_nav_delete,
 	if ( !player )
 	{
 		Msg( "[ff_nav_delete] must be issued by a player.\n" );
+		return;
+	}
+
+	// 'area' switches which of the three things stacked at your feet gets
+	// deleted. Checked before the radius parse because Q_atof("area") is 0,
+	// which would otherwise read as "radius zero" and silently delete nothing.
+	if ( args.ArgC() >= 2 && FStrEq( args.Arg( 1 ), "area" ) )
+	{
+		const bool force = ( args.ArgC() >= 3 && FStrEq( args.Arg( 2 ), "force" ) );
+		DeleteNearestNavArea( player, AuthoringGroundPos( player ), force );
 		return;
 	}
 

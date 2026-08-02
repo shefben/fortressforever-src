@@ -14,10 +14,51 @@
 #include "ff_player.h"
 #include "Player/NextBotPlayer.h"
 #include "Player/NextBotPlayerLocomotion.h"
+#include "nav_area.h"
 #include "Player/NextBotPlayerBody.h"
 #include "NextBotVisionInterface.h"
 #include "NextBotIntentionInterface.h"
 #include "tier1/utlvector.h"
+
+//-----------------------------------------------------------------------------
+// CFFBotLocomotion — the locomotion interface, and deliberately almost empty.
+//
+// It exists because movement WAS being done in the behaviour layer, and that
+// is the wrong place for it. Compare CTFBotLocomotion, which is 130 lines and
+// whose entire contribution to movement is "crouch while airborne": everything
+// else — obstacle avoidance, ledge climbing, gap jumping, ladders — belongs to
+// PathFollower and PlayerLocomotion, which already do all of it, correctly,
+// with knowledge of the path the bot is actually on.
+//
+// Every time a per-tick behaviour reached in and pressed a movement button of
+// its own, it was competing with those systems rather than helping them: two
+// independent opinions about when to jump produce a bot that jumps twice, and
+// a goal position written straight into Approach() skips the obstacle steering
+// that would have taken it round the corner it is now walking into.
+//-----------------------------------------------------------------------------
+class CFFBotLocomotion : public PlayerLocomotion
+{
+public:
+	DECLARE_CLASS( CFFBotLocomotion, PlayerLocomotion );
+
+	CFFBotLocomotion( INextBot *bot ) : PlayerLocomotion( bot ) {}
+	virtual ~CFFBotLocomotion() {}
+
+	// Crouch-jump, always. Mirrors CTFBotLocomotion::Update.
+	//
+	// The extra 18 units of a duck-jump is not a bonus, it is the height
+	// PathFollower's climb and gap logic ASSUMES the bot has. Without it a bot
+	// that decides a ledge is reachable jumps, falls short, lands, decides it
+	// is reachable, and jumps again — which is what "hopping around randomly"
+	// in front of a ledge looks like from outside.
+	virtual void Update( void ) OVERRIDE;
+
+	// Blocked areas and enemy spawn rooms, and nothing else. Same test as
+	// CTFBotLocomotion::IsAreaTraversable. Kept in step with CFFBotPathCost,
+	// which calls this before applying any cost of its own.
+	virtual bool IsAreaTraversable( const CNavArea *baseArea ) const OVERRIDE;
+};
+
 
 class CFFBot : public NextBotPlayer< CFFPlayer >
 {
@@ -90,6 +131,10 @@ public:
 
 	// Mobility: bunny-hop cadence + path-recovery escalation.
 	CountdownTimer	m_bunnyHopTimer;	// next jump-on-the-run pulse
+
+	// How long to stand still and let a teammate through. Randomised on start
+	// so two bots facing each other in a doorway don't resume in lockstep.
+	CountdownTimer	m_yieldTimer;
 	float			m_lastUnstuckTime;	// last time we were verified moving — used for "stuck for too long" teleport
 
 	// Stuck-recovery state. When severely stuck:

@@ -28,9 +28,28 @@
 
 enum FFBotRouteType
 {
+	// Distance, jumps, drops, water, and a per-bot preference. The route a
+	// person would take. Mirrors TF's DEFAULT_ROUTE.
 	FFBOT_DEFAULT_ROUTE,
+
+	// As above without the preference term: when something wants the actually
+	// shortest route rather than this bot's habitual one.
 	FFBOT_FASTEST_ROUTE,
+
+	// ...plus danger: combat intensity, sentry spots, per-class nerve. For
+	// retreating, escorting, and anything else with a reason to be careful.
+	// Mirrors TF's SAFEST_ROUTE, which is the only route type TF charges its
+	// combat and sentry terms on.
+	FFBOT_SAFEST_ROUTE,
 };
+
+// Strength of the per-bot route preference term. Defined in ff_bot.cpp; see
+// the long note next to its use for what it does and why it matters more than
+// it looks. 0 disables it, which is a useful A/B test and a bad default.
+extern ConVar ff_bot_route_variety;
+
+// Cost of swimming a nav area, as a multiple of walking the same distance.
+extern ConVar ff_bot_water_cost;
 
 
 class CFFBotPathCost : public IPathCost
@@ -246,49 +265,94 @@ public:
 		}
 
 		// ---- Attribute-based modifiers -----------------------------------
+		//
+		// SPLIT BY ROUTE TYPE, and that split is the point.
+		//
+		// This function used to apply every modifier below on every path,
+		// unconditionally: danger, hazard, combat intensity, caltrops, sticky
+		// traps, sentry avoidance, per-class signatures, water flavour,
+		// resupply discounts. A dozen multiplicative terms, all live, all the
+		// time.
+		//
+		// Compare CTFBotPathCost, which is about ninety lines: hard refusals,
+		// distance, double for a jump, refuse a fatal drop, a per-bot
+		// preference term — and then combat and sentry danger ONLY under
+		// SAFEST_ROUTE, plus one spy-specific rule. That is the whole cost
+		// model behind bots people describe as smart.
+		//
+		// Every extra term bends A* away from the route a person would take,
+		// and they compound: an underwater tunnel at 2.0x, times a dry-route
+		// flavour at 1.4x, is a shortcut priced at nearly three times its
+		// length and therefore never taken. Stack a dozen of those and the
+		// chosen route stops resembling the obvious one, which reads from
+		// outside as the bot being stupid rather than as the cost function
+		// being opinionated.
+		//
+		// So: terms that model TRAVEL TIME are always on, because they are
+		// facts about getting there. Terms that model DANGER or PREFERENCE are
+		// gated behind an explicit request for a careful route. A caller that
+		// wants the safe way round now has to say so.
 		const unsigned int attrs = area->GetAttributesFF();
 		float costMul = 1.0f;
 		float costFlat = 0.0f;
 
+		const bool wantsSafety = ( m_routeType == FFBOT_SAFEST_ROUTE );
+
 		// FIX 10 — currently-shut door. Passable, but only if there is no
 		// better option. Flat rather than multiplicative so the penalty
 		// doesn't scale away on short segments.
+		//
+		// Always on: a shut door is a real delay, not a matter of taste.
 		if ( blockedDoorway )
 			costFlat += 1500.0f;
 
-		// Resupply discount when low on ammo or health.
+		// Resupply discount when low on ammo or health. Always on, because it
+		// is already conditional on the bot actually needing something — it
+		// costs nothing on the paths where it does not apply.
 		const unsigned int kAnyResupply = FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH |
 		                                  FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES;
 		if ( ( attrs & kAnyResupply ) && ( m_isLowAmmo || m_isLowHealth ) )
 			costMul *= 0.6f;
 
-		// Combat-intensity penalty: areas with active combat get a flat
-		// cost so paths drift around hot zones unless directly on the way.
-		// Replaces our previous custom danger-score system.
-		const float combat = area->GetCombatIntensity();
-		if ( combat > 0.1f )
-			costFlat += combat * 200.0f;
-
-		// Per-class signature: scouts ignore danger (fast), soldiers reduce
-		// it (rockets clear chokes), medics avoid sentry-spotted lanes.
-		switch ( m_classSlot )
+		// Combat-intensity penalty. TF applies this under SAFEST_ROUTE only,
+		// and for good reason: on a busy map most of the route between two
+		// objectives has been fought over recently, so charging for it on
+		// every path just makes bots take the long way round to everywhere.
+		if ( wantsSafety )
 		{
-		case CLASS_SCOUT:
-			if ( costFlat > 0.0f ) costFlat *= 0.5f;
-			break;
-		case CLASS_SOLDIER:
-			if ( costFlat > 0.0f ) costFlat *= 0.7f;
-			break;
-		default:
-			break;
+			const float combat = area->GetCombatIntensity();
+			if ( combat > 0.1f )
+				costFlat += combat * 200.0f * area->GetCombatIntensity();
+		}
+
+		// Per-class signature: scouts shrug off danger, soldiers less so.
+		// Scales the danger terms, so it only means anything where there are
+		// danger terms — i.e. on a safety-conscious route.
+		if ( wantsSafety )
+		{
+			switch ( m_classSlot )
+			{
+			case CLASS_SCOUT:
+				if ( costFlat > 0.0f ) costFlat *= 0.5f;
+				break;
+			case CLASS_SOLDIER:
+				if ( costFlat > 0.0f ) costFlat *= 0.7f;
+				break;
+			default:
+				break;
+			}
 		}
 
 		// FF_NAV2_DANGER — hand-authored with ff_nav_place danger. Pits,
 		// crushers, the grinder everyone on the server knows to walk around.
-		// Expensive rather than impassable, deliberately: an author marking a
-		// hazard is describing a cost, not a wall, and turning it into a wall
-		// is how you end up with no path at all through a corridor whose only
-		// route happens to run past the thing.
+		//
+		// Always on, and it is the one authored danger tag that stays on: a
+		// human stood on that spot and said "this kills people". That is a
+		// fact about the map in the same way a wall is, not a preference.
+		// Expensive rather than impassable, deliberately — an author marking a
+		// hazard is describing a cost, and turning it into a wall is how you
+		// end up with no path at all through a corridor whose only route runs
+		// past the thing.
 		if ( area->HasAttributeFF2( FF_NAV2_DANGER ) )
 			costMul *= 4.0f;
 
@@ -314,11 +378,15 @@ public:
 		if ( m_inWater && area->HasAttributeFF2( FF_NAV2_WATER_EXIT ) )
 			costMul *= 0.4f;
 
-		// Sentry-spot avoidance for non-engineers / non-spies. The mapper
-		// hand-tagged areas with FF_NAV_SENTRY_SPOT — those are likely SG
-		// positions. Engineers want to BUILD there; spies want to SAP.
-		// Everyone else should route around.
-		if ( m_classSlot != CLASS_ENGINEER && m_classSlot != CLASS_SPY &&
+		// Sentry-spot avoidance for non-engineers / non-spies.
+		//
+		// Safety route only, matching TF, which charges its sentry-danger term
+		// under SAFEST_ROUTE and nowhere else. A sentry spot is where a sentry
+		// MIGHT be, and routing every bot around every hypothetical sentry for
+		// the whole round costs more than the occasional one that is really
+		// there. When a bot has a reason to be careful it can ask.
+		if ( wantsSafety &&
+		     m_classSlot != CLASS_ENGINEER && m_classSlot != CLASS_SPY &&
 			 ( attrs & FF_NAV_SENTRY_SPOT ) )
 		{
 			costMul *= 1.5f;
@@ -343,31 +411,36 @@ public:
 		//   ROUTE_FLAVOR_DRY    — water 1.4× extra (avoids water entirely)
 		//   ROUTE_FLAVOR_WATER  — water ×0.6 (prefers water)
 		//   ROUTE_FLAVOR_NEUTRAL — no change
+		// This is why they never take 2fort's water route.
+		//
+		// The old numbers were 2.0x underwater, times up to 1.2x for a heavy
+		// class, times 1.4x for a dry route flavour: a swim priced at up to
+		// 3.4x its length. No shortcut survives that, so the sewer was never
+		// chosen no matter how much distance it saved, and the water tunnels
+		// might as well not have been in the mesh.
+		//
+		// TF charges nothing at all for water. That is too far the other way
+		// for FF, which has considerably more of it and where swimming really
+		// is slower — but the honest figure is the SPEED RATIO, and swimming
+		// is roughly two thirds of run speed, not a third. So: 1.5x
+		// underwater, 1.15x wading, and the compounding multipliers are gone.
+		// The flavours remain because they are an explicit request, but they
+		// now nudge rather than dominate.
 		const bool isWater = ( attrs & FF_NAV_WATER ) != 0;
 		const bool isUnderwater = ( attrs & FF_NAV_UNDERWATER ) != 0;
 		if ( isWater || isUnderwater )
 		{
-			float waterMul = isUnderwater ? 2.0f : 1.4f;
-			switch ( m_classSlot )
-			{
-			case CLASS_HWGUY:
-			case CLASS_SOLDIER:
-				waterMul *= 1.2f;
-				break;
-			case CLASS_SCOUT:
-			case CLASS_SPY:
-				waterMul *= 0.75f;
-				break;
-			default:
-				break;
-			}
+			float waterMul = isUnderwater
+				? ff_bot_water_cost.GetFloat()
+				: ( 1.0f + ( ff_bot_water_cost.GetFloat() - 1.0f ) * 0.3f );
+
 			switch ( m_routeFlavor )
 			{
 			case CFFBot::ROUTE_FLAVOR_DRY:
-				waterMul *= 1.4f;
+				waterMul *= 1.15f;
 				break;
 			case CFFBot::ROUTE_FLAVOR_WATER:
-				waterMul *= 0.6f;
+				waterMul *= 0.7f;
 				break;
 			default:
 				break;
@@ -375,16 +448,14 @@ public:
 			costMul *= waterMul;
 		}
 
-		// Choke avoidance for non-defensive classes. Engineers / spies /
-		// snipers want to be near chokes (build / sap / hold sightlines);
-		// running classes route around so they don't bunch up there.
-		if ( ( attrs & FF_NAV_CHOKE ) &&
-			 m_classSlot != CLASS_ENGINEER &&
-			 m_classSlot != CLASS_SPY &&
-			 m_classSlot != CLASS_SNIPER )
-		{
-			costMul *= 1.15f;
-		}
+		// Choke avoidance used to live here at 1.15x for most classes.
+		//
+		// Removed. CFFBotAnalyzer now sets FF_NAV_CHOKE on every articulation
+		// point of the nav graph — which is the correct definition of a choke,
+		// and which means the tag is now on precisely the areas that are the
+		// ONLY way from one part of the map to another. Charging extra to walk
+		// through the only route there is does not spread bots out; it makes
+		// them hesitate in front of the doorway they have to use.
 
 		// Ladder-adjacent discount. Vertical traversal via ladder is more
 		// reliable than free jumps (which need momentum, can be blocked by
@@ -441,6 +512,42 @@ public:
 		//
 		// The vertical extent of a ladder or elevator is the entire point of
 		// it — it is not a "can I jump this?" question.
+		// ---- Per-bot route preference ---------------------------------------
+		//
+		// Straight out of CTFBotPathCost, and the single most important term in
+		// this function. Two jobs, and the second one is the one that was
+		// missing here:
+		//
+		//   1. Different bots pick different routes to the same place, instead
+		//      of every bot on the team conga-lining down the shortest one.
+		//
+		//   2. THE SAME BOT KEEPS ITS ROUTE. The term is a deterministic
+		//      function of (this bot, this area, which ten-second bucket we are
+		//      in), so a repath inside that window produces the identical cost
+		//      landscape and therefore the identical route.
+		//
+		// Without (2), a cost function with many near-equal alternatives — and
+		// this one has a dozen modifiers, so it has many — flips its answer
+		// every time the path is recomputed. NextBot repaths constantly. The
+		// bot walks three steps down route A, repaths onto route B, turns
+		// around, repaths onto A. From outside that looks exactly like a bot
+		// dancing on the spot in its own base, which is what it is.
+		//
+		// Valve's comment on the same lines: "this term causes the same bot to
+		// choose different routes over time, but keep the same route for a
+		// period in case of repaths".
+		//
+		// Not applied to deliberate route flavours: when something has asked
+		// for the safest or the driest route it wants that route, not a
+		// randomised one.
+		if ( m_routeType == FFBOT_DEFAULT_ROUTE )
+		{
+			const int timeMod = (int)( gpGlobals->curtime / 10.0f ) + 1;
+			const float preference = 1.0f + ff_bot_route_variety.GetFloat() *
+				( 1.0f + FastCos( (float)( m_me->entindex() * area->GetID() * timeMod ) ) );
+			dist *= preference;
+		}
+
 		if ( ladder != NULL || elevator != NULL )
 			return dist * costMul + costFlat;
 

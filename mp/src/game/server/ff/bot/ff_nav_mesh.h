@@ -102,6 +102,16 @@ public:
 	// keep being handed out by GetFlagAreas long after the bit was gone.
 	void RemoveAreaFromTaggedCaches( CFFNavArea *area );
 
+	// Drop one area from EVERY cached list, spawn rooms and spawn exits
+	// included.
+	//
+	// Distinct from RemoveAreaFromTaggedCaches on purpose. That one is for an
+	// erasure, where the area still exists and its spawn-room bits are still
+	// true, so pulling it out of the spawn lists would make the list and the
+	// bit disagree. This one is for a DELETION, where the CFFNavArea is about
+	// to be freed and every surviving pointer to it is a dangling one.
+	void RemoveAreaFromAllCaches( CFFNavArea *area );
+
 	// Per-team incursion-distance flood-fill from spawn rooms outward.
 	// Mirrors CTFNavMesh::ComputeIncursionDistances. Recomputes for all
 	// FF teams. Run AFTER spawn-room tagging.

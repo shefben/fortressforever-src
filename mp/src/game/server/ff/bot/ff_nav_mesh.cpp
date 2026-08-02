@@ -132,14 +132,37 @@ void CFFNavMesh::RemoveAreaFromTaggedCaches( CFFNavArea *area )
 	if ( !area )
 		return;
 
+	// Objective and pickup lists only.
+	//
+	// Spawn rooms and spawn exits are deliberately left alone. An erasure does
+	// not clear the spawn-room bits — those are facts about the map that the
+	// incursion-distance flood fill, the invasion vectors and the enemy-spawn
+	// path refusal all depend on — so removing the area from these lists would
+	// leave the list and the bit disagreeing, which is worse than either.
 	for ( int i = 0; i < FF_NAV_TEAM_COUNT; ++i )
 	{
-		m_spawnRoomAreas[ i ].FindAndRemove( area );
-		m_spawnRoomExitAreas[ i ].FindAndRemove( area );
 		m_flagAreas[ i ].FindAndRemove( area );
 		m_capAreas[ i ].FindAndRemove( area );
 	}
 	m_resupplyAreas.FindAndRemove( area );
+}
+
+
+//-----------------------------------------------------------------------------
+// Everything the previous function skips, plus everything it does.
+//-----------------------------------------------------------------------------
+void CFFNavMesh::RemoveAreaFromAllCaches( CFFNavArea *area )
+{
+	if ( !area )
+		return;
+
+	RemoveAreaFromTaggedCaches( area );
+
+	for ( int i = 0; i < FF_NAV_TEAM_COUNT; ++i )
+	{
+		m_spawnRoomAreas[ i ].FindAndRemove( area );
+		m_spawnRoomExitAreas[ i ].FindAndRemove( area );
+	}
 }
 
 //-----------------------------------------------------------------------------

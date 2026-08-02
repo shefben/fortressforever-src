@@ -551,22 +551,6 @@ static int TagLadderAdjacent( int *outConnectedLadders )
 //-----------------------------------------------------------------------------
 #define FFBOT_AUTOTAG_DOOR_MARGIN	32.0f
 
-static int TeamFromEntityName( const char *name )
-{
-	if ( !name || !name[ 0 ] )
-		return TEAM_UNASSIGNED;
-
-	// Longest prefixes first, so "yellow" is not matched as "y" and "green"
-	// not as "g". Same ordering rule as the spawn-entity fallback in
-	// CFFBotTagger, and for the same reason.
-	if ( Q_stristr( name, "yellow" ) || Q_stristr( name, "yel" ) ) return TEAM_YELLOW;
-	if ( Q_stristr( name, "green" )  || Q_stristr( name, "grn" ) ) return TEAM_GREEN;
-	if ( Q_stristr( name, "blue" )   || Q_stristr( name, "blu" ) ) return TEAM_BLUE;
-	if ( Q_stristr( name, "red" ) )                                return TEAM_RED;
-	return TEAM_UNASSIGNED;
-}
-
-
 static int TagTeamDoors( int *outGates )
 {
 	int tagged = 0;
@@ -646,42 +630,53 @@ static int TagTeamDoors( int *outGates )
 			// either side of one door is not a gate, it is a shared corridor
 			// that happens to be tagged twice, and guessing an owner there
 			// would be worse than declining to.
-			int team = TEAM_UNASSIGNED;
-			bool isGate = false;
-
-			if ( spawnTeamsSeen == 1 && sawNonSpawn )
-			{
-				team = spawnTeam;
-				isGate = true;
-			}
-			else
-			{
-				// No spawn room involved. Fall back to the targetname, which
-				// is a convention rather than data - hence only as a fallback,
-				// and never to override the geometric answer above.
-				team = TeamFromEntityName( STRING( door->GetEntityName() ) );
-			}
-
-			if ( team == TEAM_UNASSIGNED )
+			// Only a respawn gate is auto-detected, and only from geometry.
+			//
+			// The targetname was a fallback here at first and has been removed.
+			// Q_stristr on arbitrary door names matches far too much - "red"
+			// is a substring of a great many things that are not red team's
+			// door - and the consequence of a false positive is not a cosmetic
+			// mistake, it is CFFBotPathCost refusing that area to three of the
+			// four teams. A mid-map team door is rare, and the doorteam marker
+			// exists to say so explicitly.
+			if ( spawnTeamsSeen != 1 || !sawNonSpawn )
 				continue;
 
+			const int team = spawnTeam;
 			const int doorBit = CFFNavArea::DoorAttributeForTeam( team );
+			const int spawnBit = CFFNavArea::SpawnRoomAttributeForTeam( team );
 
 			for ( int i = 0; i < touching.Count(); ++i )
 			{
 				CFFNavArea *area = touching[ i ];
+
+				// The doorway tag goes on both sides, as before: it is what
+				// stops a shut door deleting the route, and that has to apply
+				// to whoever is walking up to it.
+				area->SetAttributeFF( FF_NAV_DOORWAY );
+
+				// The TEAM bits go on the spawn side only.
+				//
+				// This is the whole correction. Tagging every area the door
+				// touches marks the corridor OUTSIDE the gate as belonging to
+				// that team, and the path cost then refuses it to everyone
+				// else - which on a map like 2fort severs the main route to
+				// the flag, because the ground outside blue's respawn gate is
+				// exactly the ground red has to cross. The areas inside the
+				// spawn room are already refused to enemies by the spawn-room
+				// rule; what this adds is the threshold areas, which are the
+				// ones that were falling through the gap.
+				if ( !area->HasAttributeFF( spawnBit ) )
+					continue;
+
 				if ( area->HasAttributeFF2( doorBit ) )
 					continue;
 
-				area->SetAttributeFF( FF_NAV_DOORWAY );
-				area->SetAttributeFF2( doorBit );
-				if ( isGate )
-					area->SetAttributeFF2( FF_NAV2_DOOR_ONEWAY );
+				area->SetAttributeFF2( doorBit | FF_NAV2_DOOR_ONEWAY );
 				++tagged;
 			}
 
-			if ( isGate )
-				++gates;
+			++gates;
 		}
 	}
 

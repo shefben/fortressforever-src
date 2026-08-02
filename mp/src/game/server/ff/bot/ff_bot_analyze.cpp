@@ -83,6 +83,7 @@ static struct
 	int   teleports;
 	int   teleportLinks;
 	int   pushes;
+	int   precise;
 	int   pathsTraced;
 	float analyzeSeconds;
 } s_stats;
@@ -212,6 +213,91 @@ static void CollectRouteOrigins( CFFNavMesh *mesh, CUtlVector< CFFNavArea * > &o
 // several thousand areas and a deep DFS on a corridor-shaped graph will blow
 // the stack. O(V+E) either way.
 //=============================================================================
+//-----------------------------------------------------------------------------
+// Narrow ground with a drop on both sides: catwalks, beams, pipe tops, the
+// 2fort battlement ramp.
+//
+// Sets Source's own NAV_MESH_PRECISE, which PathFollower::Avoid checks before
+// doing anything:
+//
+//     CNavArea *area = bot->GetEntity()->GetLastKnownArea();
+//     if ( area && ( area->GetAttributes() & NAV_MESH_PRECISE ) )
+//         return goalPos;                    // no avoid volumes here
+//
+// That test exists because the avoidance sidestep is the wrong reflex on a
+// catwalk. Everywhere else, nudging a hundred units perpendicular to get round
+// a crate costs nothing; on a beam it is a fall. Valve leaves the flag to
+// mappers because their nav meshes are hand-edited. Ours are generated, so
+// nobody has ever set it on an FF map, and every bot crossing a walkway has
+// been one stray teammate away from stepping off it.
+//
+// The test is deliberately conservative — narrow AND a real drop on both sides
+// AND not already water or a spawn room — because a false positive disables
+// obstacle avoidance somewhere it was needed, which is worse than missing a
+// catwalk.
+//-----------------------------------------------------------------------------
+#define FFANALYZE_PRECISE_MAX_WIDTH		96.0f
+#define FFANALYZE_PRECISE_MIN_DROP		96.0f
+#define FFANALYZE_PRECISE_PROBE			48.0f
+
+static int AnalyzePrecise( void )
+{
+	int tagged = 0;
+
+	for ( int i = 0; i < TheNavAreas.Count(); ++i )
+	{
+		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+		if ( !area )
+			continue;
+
+		if ( area->HasAttributeFF( FF_NAV_WATER | FF_NAV_UNDERWATER |
+		                           FF_NAV_SPAWN_ROOM_ANY ) )
+			continue;
+
+		Extent extent;
+		area->GetExtent( &extent );
+
+		const float sizeX = extent.hi.x - extent.lo.x;
+		const float sizeY = extent.hi.y - extent.lo.y;
+
+		// Narrow in one axis and longer in the other: a walkway, not a closet.
+		const float narrow = MIN( sizeX, sizeY );
+		const float along  = MAX( sizeX, sizeY );
+		if ( narrow > FFANALYZE_PRECISE_MAX_WIDTH || along < narrow * 2.0f )
+			continue;
+
+		// Probe off both long edges. A corridor has walls; a catwalk has air.
+		const Vector center = area->GetCenter();
+		const Vector side = ( sizeX < sizeY )
+			? Vector( narrow * 0.5f + FFANALYZE_PRECISE_PROBE, 0.0f, 0.0f )
+			: Vector( 0.0f, narrow * 0.5f + FFANALYZE_PRECISE_PROBE, 0.0f );
+
+		int drops = 0;
+		for ( int s = -1; s <= 1; s += 2 )
+		{
+			const Vector from = center + side * (float)s + Vector( 0.0f, 0.0f, 8.0f );
+
+			trace_t tr;
+			UTIL_TraceLine( from, from - Vector( 0.0f, 0.0f, FFANALYZE_PRECISE_MIN_DROP * 2.0f ),
+				MASK_PLAYERSOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &tr );
+
+			// Nothing within the drop distance, or the floor is a long way
+			// below us: that side is air.
+			if ( !tr.DidHit() || ( from.z - tr.endpos.z ) > FFANALYZE_PRECISE_MIN_DROP )
+				++drops;
+		}
+
+		if ( drops < 2 )
+			continue;
+
+		area->SetAttributes( area->GetAttributes() | NAV_MESH_PRECISE );
+		++tagged;
+	}
+
+	return tagged;
+}
+
+
 static int AnalyzeTopology( void )
 {
 	const int count = TheNavAreas.Count();
@@ -1024,17 +1110,19 @@ void CFFBotAnalyzer::AnalyzeAll( CFFNavMesh *mesh )
 	s_stats.breachables = AnalyzeBreakables();
 	s_stats.teleports   = AnalyzeTeleports( &s_stats.teleportLinks );
 	s_stats.pushes      = AnalyzePushes();
+	s_stats.precise     = AnalyzePrecise();
 
 	s_stats.analyzeSeconds = Plat_FloatTime() - startTime;
 
 	Msg( "[CFFBotAnalyzer] %d areas in %.2fs: %d cut points, %d high traffic "
 	     "(%d routes), %d overlooks, %d sniper, %d sentry, %d defend, %d aim, "
-	     "%d breach, %d teleport (%d links), %d push.\n",
+	     "%d breach, %d teleport (%d links), %d push, %d precise.\n",
 		s_stats.areas, s_stats.analyzeSeconds,
 		s_stats.cutPoints, s_stats.highTraffic, s_stats.pathsTraced,
 		s_stats.overlooks, s_stats.autoSnipers, s_stats.autoSentries,
 		s_stats.autoDefends, s_stats.autoAims, s_stats.breachables,
-		s_stats.teleports, s_stats.teleportLinks, s_stats.pushes );
+		s_stats.teleports, s_stats.teleportLinks, s_stats.pushes,
+		s_stats.precise );
 
 	if ( !s_stats.hadVisibility )
 	{

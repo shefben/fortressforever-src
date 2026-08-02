@@ -79,6 +79,11 @@ private:
 	// at most one locomotor->Approach() per tick.
 	void DriveMovementArbiter( CFFBot *me );
 
+	// True while a teammate is directly in front of us and we should stand
+	// still and let them clear. Mirrors PathFollower::FindBlocker, which does
+	// the same thing for path-driven movement.
+	bool ShouldYieldToBlocker( CFFBot *me );
+
 	// bot_show_path / bot_show_threat overlays.
 	void DrawDebugOverlays( CFFBot *me );
 };

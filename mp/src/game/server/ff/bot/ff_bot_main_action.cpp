@@ -45,6 +45,31 @@
 // operate the map's machinery" — so they share the switch.
 extern ConVar ff_bot_use_lifts;
 
+ConVar ff_bot_bunnyhop( "ff_bot_bunnyhop", "0", FCVAR_CHEAT,
+	"Continuous hopping while running. Off by default: it competes with "
+	"PathFollower's own climb and gap jumps, and airborne movement is "
+	"view-relative, so a bot that re-aims mid-hop curves into the wall it was "
+	"running past. TF's bots do not do this." );
+
+ConVar ff_bot_require_settled_aim( "ff_bot_require_settled_aim", "1", FCVAR_CHEAT,
+	"Require the head to have stopped turning before firing at range, rather "
+	"than firing the instant the crosshair sweeps across the target. Mirrors "
+	"the IsHeadSteady / nb_head_aim_settle_duration gate TF uses. Only "
+	"meaningful now that the head turns at Valve's rate; at the old 3000 deg/s "
+	"the head was never in between moving and stopped." );
+
+ConVar ff_bot_yield_to_teammates( "ff_bot_yield_to_teammates", "1", FCVAR_CHEAT,
+	"Stop for a moment when a teammate is directly in the way, instead of "
+	"shoving or re-planning around them. PathFollower::FindBlocker does this "
+	"for path movement; this covers move overrides. The wait is randomised so "
+	"two bots facing each other don't resume in lockstep and collide again." );
+
+ConVar ff_bot_override_avoidance( "ff_bot_override_avoidance", "1", FCVAR_CHEAT,
+	"Run PathFollower-style feeler traces on move overrides (door pushes, "
+	"water pushes, stuck backtracks). Those bypass the path follower by "
+	"construction, so without this they steer straight at a world position "
+	"with no obstacle sense at all." );
+
 // Buffer added to the spawn delay before pressing fire — gives the
 // LIFE_DEAD → LIFE_RESPAWNABLE transition (which requires "all buttons
 // released" for one death-think tick) a chance to fire first.
@@ -418,7 +443,20 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 		float  alertAge = 0.0f;
 		if ( FFBotIntel::GetFreshTeamAlert( me->GetTeamNumber(), 8.0f, &alertPos, &alertAge ) )
 		{
-			body->AimHeadTowards( alertPos, IBody::IMPORTANT, 0.5f, NULL, "Reacting to team alert" );
+			// INTERESTING, not IMPORTANT.
+			//
+			// The priority ladder here has to respect one thing that is
+			// specific to Source: aim IS movement, because
+			// PlayerLocomotion::Approach decomposes the goal into view-relative
+			// buttons. So "look along the path I am walking" outranks every
+			// piece of information that is merely interesting, and a teammate's
+			// alert is interesting. Only a threat we can actually see is worth
+			// turning the bot's movement basis for.
+			//
+			// The early return below used to be the only thing enforcing that
+			// ordering. Now the priorities say it too, so a call added in the
+			// wrong place cannot silently win.
+			body->AimHeadTowards( alertPos, IBody::INTERESTING, 0.5f, NULL, "Reacting to team alert" );
 			return;
 		}
 
@@ -427,7 +465,8 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 		if ( me->m_lastThreatTime > 0.0f &&
 			 ( gpGlobals->curtime - me->m_lastThreatTime ) < 8.0f )
 		{
-			body->AimHeadTowards( me->m_lastThreatPos, IBody::IMPORTANT, 0.5f, NULL, "Watching last-known threat" );
+			// Also INTERESTING — a remembered enemy is not a seen one.
+			body->AimHeadTowards( me->m_lastThreatPos, IBody::INTERESTING, 0.5f, NULL, "Watching last-known threat" );
 			return;
 		}
 
@@ -799,7 +838,42 @@ void CFFBotMainAction::FireWeaponAtEnemy( CFFBot *me )
 		else
 			minDot = 0.998f;	// ~3.5° at long range
 
-		if ( dot >= minDot )
+		// Has the aim SETTLED, or is it merely passing through?
+		//
+		// The cone test above is satisfied the instant the crosshair sweeps
+		// across the target, which during a turn is one tick on the way past.
+		// The bot fires mid-slew, the shot goes wherever the head had got to,
+		// and it reads as a bot that shoots at nothing.
+		//
+		// Valve gates firing on the head being STEADY, not merely on-target:
+		//
+		//     if ( !IsHeadSteady() || GetHeadSteadyDuration() < nb_head_aim_settle_duration )
+		//         ...don't shoot yet
+		//
+		// IsHeadSteady goes true when the head is turning slower than
+		// nb_head_aim_steady_max_rate (100 deg/s), and the settle duration is
+		// 0.3s. This was previously unusable here for a mechanical reason: the
+		// old 3000 deg/s head aim meant the head was either stationary or
+		// moving thirty times over that threshold, so "steady" carried no
+		// information. Now that the rate is Valve's, it does.
+		//
+		// Scaled by range rather than applied flat. At point blank a snap shot
+		// is a legitimate thing for a person to do and demanding a settled aim
+		// there would make bots hesitate with an enemy in their face; at range
+		// the settle is the whole difference between aiming and spraying.
+		bool aimSettled = true;
+		if ( ff_bot_require_settled_aim.GetBool() && threatRange > 256.0f )
+		{
+			IBody *aimBody = me->GetBodyInterface();
+			if ( aimBody )
+			{
+				const float needSettle = ( threatRange > 1024.0f ) ? 0.2f : 0.1f;
+				aimSettled = aimBody->IsHeadSteady() &&
+				             aimBody->GetHeadSteadyDuration() >= needSettle;
+			}
+		}
+
+		if ( dot >= minDot && aimSettled )
 		{
 			// LOS check: don't fire through teammates / world.
 			trace_t tr;
@@ -1425,6 +1499,192 @@ static void HandleWallAvoidance( CFFBot *me )
 // contradictory button presses that collapse to "walk into the wall" (recall
 // NextBotPlayer resolves IN_FORWARD+IN_BACK as IN_FORWARD).
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Reflex obstacle avoidance for move overrides.
+//
+// PathFollower::Avoid does exactly this — two hull traces offset left and
+// right of the direction of travel, and a goal nudged away from whichever side
+// is more blocked — but it only ever runs from inside PathFollower::Update.
+// Every move override in this file bypasses the path follower by construction,
+// so for the duration of a door push, a water push or a stuck backtrack the
+// bot was steering with no obstacle sense at all. It walked in a straight line
+// at a world position and hit whatever was in between.
+//
+// That is most of "runs directly into walls and corners". The override targets
+// are chosen sensibly; what was missing was the steering between here and
+// there.
+//
+// Deliberately a copy of Valve's algorithm rather than a call into it: Avoid()
+// is a PathFollower member driven by that object's own timers and cached trace
+// results, and there is no PathFollower involved in an override. The details
+// that matter are copied with it:
+//
+//   * the feeler hull starts at stepHeight and stops at crouch height, so
+//     stairs and low ledges do not read as walls
+//   * startsolid counts as fully blocked rather than as a clear trace
+//   * equally blocked on both sides means squarely facing a wall, and sliding
+//     sideways there is wrong, so the goal is left alone
+//-----------------------------------------------------------------------------
+static Vector AvoidObstaclesForOverride( CFFBot *me, const Vector &goalPos )
+{
+	ILocomotion *mover = me->GetLocomotionInterface();
+	IBody *body = me->GetBodyInterface();
+	if ( !mover || !body )
+		return goalPos;
+
+	// Airborne movement is view-relative; nudging a goal sideways mid-jump
+	// steers by aim rather than by intent. Same guard Avoid() uses.
+	if ( mover->IsClimbingOrJumping() || !mover->IsOnGround() )
+		return goalPos;
+
+	const Vector feet = mover->GetFeet();
+
+	Vector forward = goalPos - feet;
+	forward.z = 0.0f;
+	if ( forward.NormalizeInPlace() < 0.001f )
+		return goalPos;
+
+	const Vector left( -forward.y, forward.x, 0.0f );
+
+	const float size = body->GetHullWidth() / 4.0f;
+	const float offset = size + 2.0f;
+	const float range = mover->IsRunning() ? 50.0f : 30.0f;
+
+	const Vector hullMin( -size, -size, mover->GetStepHeight() + 0.1f );
+	const Vector hullMax( size, size, body->GetCrouchHullHeight() );
+
+	trace_t tr;
+	float leftAvoid = 0.0f;
+	float rightAvoid = 0.0f;
+	bool isLeftClear = true;
+	bool isRightClear = true;
+
+	const Vector leftFrom = feet + offset * left;
+	UTIL_TraceHull( leftFrom, leftFrom + range * forward, hullMin, hullMax,
+		body->GetSolidMask(), me, COLLISION_GROUP_NONE, &tr );
+	if ( tr.fraction < 1.0f || tr.startsolid )
+	{
+		leftAvoid = clamp( 1.0f - ( tr.startsolid ? 0.0f : tr.fraction ), 0.0f, 1.0f );
+		isLeftClear = false;
+	}
+
+	const Vector rightFrom = feet - offset * left;
+	UTIL_TraceHull( rightFrom, rightFrom + range * forward, hullMin, hullMax,
+		body->GetSolidMask(), me, COLLISION_GROUP_NONE, &tr );
+	if ( tr.fraction < 1.0f || tr.startsolid )
+	{
+		rightAvoid = clamp( 1.0f - ( tr.startsolid ? 0.0f : tr.fraction ), 0.0f, 1.0f );
+		isRightClear = false;
+	}
+
+	if ( isLeftClear && isRightClear )
+		return goalPos;
+
+	float avoidResult;
+	if ( isLeftClear )
+	{
+		avoidResult = -rightAvoid;
+	}
+	else if ( isRightClear )
+	{
+		avoidResult = leftAvoid;
+	}
+	else
+	{
+		// Both blocked. Equally blocked means head-on into a wall, and there is
+		// no good sideways answer — leave it to the stuck monitor.
+		if ( fabsf( rightAvoid - leftAvoid ) < 0.01f )
+			return goalPos;
+
+		avoidResult = ( rightAvoid > leftAvoid ) ? -rightAvoid : leftAvoid;
+	}
+
+	Vector avoidDir = 0.5f * forward - left * avoidResult;
+	if ( avoidDir.NormalizeInPlace() < 0.001f )
+		return goalPos;
+
+	return feet + 100.0f * avoidDir;
+}
+
+
+//-----------------------------------------------------------------------------
+// Yield to whoever is in the way.
+//
+// PathFollower::Avoid opens with this, before any steering:
+//
+//     m_hindrance = FindBlocker( bot );
+//     if ( m_hindrance != NULL ) {
+//         m_waitTimer.Start( avoidInterval * RandomFloat( 1.0f, 2.0f ) );
+//         return mover->GetFeet();          // stand still
+//     }
+//
+// When another actor is in the path, a TF bot STOPS for half a second to a
+// second and lets them clear. We had no equivalent, and the absence shows up
+// as the thing that looks least like intelligence: two bots meet in their own
+// doorway, both treat the other as an obstruction, both re-plan, both pick a
+// route through where the other is going, and they shuffle. Add three or four
+// more and the whole spawn corridor is a scrum.
+//
+// The randomised wait is the important detail and it is why this works at all.
+// Two bots that both wait exactly 0.5s resume simultaneously and collide
+// again; RandomFloat(1,2) breaks the symmetry, so one of them goes first.
+//
+// Teammates only. An enemy in the way is not an obstruction to be polite
+// about, it is a target, and stopping to let one past would be absurd.
+//-----------------------------------------------------------------------------
+bool CFFBotMainAction::ShouldYieldToBlocker( CFFBot *me )
+{
+	if ( !ff_bot_yield_to_teammates.GetBool() )
+		return false;
+
+	if ( me->m_yieldTimer.HasStarted() && !me->m_yieldTimer.IsElapsed() )
+		return true;
+
+	ILocomotion *mover = me->GetLocomotionInterface();
+	if ( !mover || !mover->IsOnGround() )
+		return false;
+
+	// Only when we are actually trying to move and failing to. A bot standing
+	// still on purpose has no reason to care that someone is near it.
+	Vector vel = me->GetAbsVelocity();
+	vel.z = 0.0f;
+	if ( vel.LengthSqr() > ( 60.0f * 60.0f ) )
+		return false;
+
+	Vector forward = me->GetMoveOverridePos() - me->GetAbsOrigin();
+	forward.z = 0.0f;
+	if ( forward.NormalizeInPlace() < 0.001f )
+		return false;
+
+	const float kReach = 48.0f;
+
+	for ( int i = 1; i <= gpGlobals->maxClients; ++i )
+	{
+		CFFPlayer *other = ToFFPlayer( UTIL_PlayerByIndex( i ) );
+		if ( !other || other == me || !other->IsAlive() )
+			continue;
+		if ( other->GetTeamNumber() != me->GetTeamNumber() )
+			continue;
+
+		Vector toOther = other->GetAbsOrigin() - me->GetAbsOrigin();
+		toOther.z = 0.0f;
+
+		const float range = toOther.NormalizeInPlace();
+		if ( range > kReach )
+			continue;
+
+		// In front of us, not beside or behind.
+		if ( DotProduct( toOther, forward ) < 0.7f )
+			continue;
+
+		me->m_yieldTimer.Start( 0.5f * RandomFloat( 1.0f, 2.0f ) );
+		return true;
+	}
+
+	return false;
+}
+
+
 void CFFBotMainAction::DriveMovementArbiter( CFFBot *me )
 {
 	if ( !me->IsMoveOverrideActive() )
@@ -1449,7 +1709,19 @@ void CFFBotMainAction::DriveMovementArbiter( CFFBot *me )
 		return;
 	}
 
-	loco->Approach( me->GetMoveOverridePos() );
+	// Someone is in the doorway. Wait rather than shove, and rather than
+	// re-planning around a teammate who is about to move anyway.
+	if ( ShouldYieldToBlocker( me ) )
+		return;
+
+	// Steer round whatever is between us and the override target. Without this
+	// an override is a straight line at a world position with no obstacle
+	// sense whatsoever — see the note above AvoidObstaclesForOverride.
+	Vector target = me->GetMoveOverridePos();
+	if ( ff_bot_override_avoidance.GetBool() )
+		target = AvoidObstaclesForOverride( me, target );
+
+	loco->Approach( target );
 	loco->Run();
 }
 
@@ -1857,9 +2129,31 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 	}
 
 	// ---- Bunny-hop ---------------------------------------------------
-	// Only when moving forward HORIZONTALLY at speed AND on ground.
+	//
+	// OFF BY DEFAULT, and that is a reversal.
+	//
+	// This is the "hopping around randomly" people see. It is not a bug in the
+	// sense of being unintended — it presses jump every 0.35-0.5s whenever the
+	// bot is running — but it is the wrong default, for two reasons.
+	//
+	// First, it competes with PathFollower. Climbing() and JumpOverGaps() also
+	// press jump, from the path's actual next segment, and a bot already
+	// airborne from a bunny hop when it reaches a ledge arrives at it with the
+	// wrong velocity and the wrong timing.
+	//
+	// Second, airborne movement in Source is view-relative, so every hop hands
+	// steering authority to wherever the bot happens to be LOOKING for the
+	// duration of the hop. The guards below exist because of that and they
+	// cannot cover it: a bot that snaps its aim to a threat mid-hop curves into
+	// the nearest wall, and no amount of pre-checking the geometry ahead
+	// predicts where the head will be pointing in 200ms.
+	//
+	// TF's bots do not do this at all. Turn it on if you want the movement
+	// style; leave it off if you want them to look like they know where they
+	// are going.
 	const int classSlot = me->GetClassSlot();
 	const bool bunnyAllowed =
+		ff_bot_bunnyhop.GetBool() &&
 		( classSlot != CLASS_SNIPER ) &&
 		( classSlot != CLASS_ENGINEER ) &&
 		( classSlot != CLASS_HWGUY ) &&
@@ -1911,16 +2205,11 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 		}
 	}
 
-	// ---- Crouch-jump auto -------------------------------------------
-	// When the locomotor is climbing or has reported "I want to step up
-	// past my jump height", press CROUCH so we get the +18u from a duck-
-	// jump. We use IsClimbingOrJumping as a proxy for "we're attempting a
-	// vertical that needed a jump", which catches both immediate jumps
-	// and ledge-climb situations.
-	if ( loco->IsClimbingOrJumping() )
-	{
-		me->PressCrouchButton( 0.4f );
-	}
+	// Crouch-jump used to be driven from here, keyed on IsClimbingOrJumping.
+	// It now lives in CFFBotLocomotion::Update, which is where TF puts it and
+	// where it belongs: crouch is a property of being airborne, not of the
+	// behaviour that happened to be running when the bot left the ground, and
+	// the locomotor is the only thing that sees every frame of the jump.
 
 	// ---- Authored jump spots (FF_NAV2_JUMP_SPOT) ---------------------
 	//
@@ -1943,8 +2232,9 @@ void CFFBotMainAction::HandleMobility( CFFBot *me )
 			Vector goal;
 			if ( me->GetPathGoal( &goal ) && goal.z > ( me->GetAbsOrigin().z + 32.0f ) )
 			{
+				// Jump only. The crouch comes from CFFBotLocomotion the
+				// instant the bot leaves the ground.
 				me->PressJumpButton( 0.2f );
-				me->PressCrouchButton( 0.4f );
 			}
 		}
 	}

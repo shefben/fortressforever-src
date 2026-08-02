@@ -47,6 +47,20 @@ ConVar ff_bot_difficulty( "ff_bot_difficulty", "1", FCVAR_NONE,
 	"Bot difficulty: 0=easy, 1=normal, 2=hard, 3=expert. "
 	"Affects reaction time, aim accuracy, and tactical aggression." );
 
+ConVar ff_bot_route_variety( "ff_bot_route_variety", "50", FCVAR_CHEAT,
+	"Strength of the per-bot route preference in CFFBotPathCost. Spreads bots "
+	"across alternative routes AND — the part that matters — makes a given "
+	"bot's route stable across repaths for ten seconds at a time. 0 turns it "
+	"off, which is the A/B test for 'are the bots dancing because they keep "
+	"changing their minds'. Same term and same default as TF's CTFBotPathCost." );
+
+ConVar ff_bot_water_cost( "ff_bot_water_cost", "1.5", FCVAR_CHEAT,
+	"Cost of swimming a nav area, as a multiple of walking the same distance. "
+	"Was effectively 2.0-3.4 once the class and route-flavour multipliers "
+	"compounded, which is why bots never took 2fort's water route: no shortcut "
+	"is worth three times its length. Swimming is roughly two thirds of run "
+	"speed, so 1.5 is the honest figure. Wading is charged 30% of this." );
+
 
 //-----------------------------------------------------------------------------
 // CFFBotIntention — owns the root Behavior. In Phase 3, the root action is
@@ -91,7 +105,7 @@ CFFBot::CFFBot()
 {
 	// Base NextBot components. We'll subclass these in later phases for class-aware
 	// locomotion (scout speed, hwguy spinup), spy-disguise filtering, etc.
-	m_locomotor = new PlayerLocomotion( this );
+	m_locomotor = new CFFBotLocomotion( this );
 	m_body      = new CFFBotBody( this );
 	m_vision    = new CFFBotVision( this );
 	m_intention = new CFFBotIntention( this );
@@ -173,6 +187,67 @@ bool CFFBot::GetPathGoal( Vector *out ) const
 }
 
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// CFFBotLocomotion
+//-----------------------------------------------------------------------------
+void CFFBotLocomotion::Update( void )
+{
+	BaseClass::Update();
+
+	CFFBot *me = static_cast< CFFBot * >( GetBot()->GetEntity() );
+	if ( !me )
+		return;
+
+	// Crouch in the air, stand on the ground. Straight out of
+	// CTFBotLocomotion::Update, including the engineer exception — an engineer
+	// wants to stay ducked behind its gun.
+	//
+	// The 0.3s hold is Valve's: long enough to survive a tick where the
+	// airborne test flickers, short enough that landing stands the bot back up
+	// immediately.
+	if ( IsOnGround() )
+	{
+		if ( me->GetClassSlot() != CLASS_ENGINEER )
+			me->ReleaseCrouchButton();
+	}
+	else
+	{
+		me->PressCrouchButton( 0.3f );
+	}
+}
+
+
+bool CFFBotLocomotion::IsAreaTraversable( const CNavArea *baseArea ) const
+{
+	if ( !baseArea )
+		return false;
+
+	CFFBot *me = static_cast< CFFBot * >( GetBot()->GetEntity() );
+	if ( !me )
+		return false;
+
+	const CFFNavArea *area = static_cast< const CFFNavArea * >( baseArea );
+
+	if ( area->IsBlocked( me->GetTeamNumber() ) )
+		return false;
+
+	// Enemy spawn rooms. CFFBotPathCost refuses these too; having it here as
+	// well matters because the path follower and the ledge/gap logic ask the
+	// locomotor directly, without going through the cost function.
+	const int myTeam = me->GetTeamNumber();
+	const unsigned int spawnBits = area->GetAttributesFF() & FF_NAV_SPAWN_ROOM_ANY;
+	if ( spawnBits != 0 )
+	{
+		const unsigned int mine =
+			(unsigned int)CFFNavArea::SpawnRoomAttributeForTeam( myTeam );
+		if ( ( spawnBits & ~mine ) != 0 )
+			return false;
+	}
+
+	return true;
+}
+
+
 CFFBot::~CFFBot()
 {
 	if ( m_intention ) { delete m_intention; m_intention = NULL; }
@@ -579,22 +654,23 @@ bool CFFBot::IsAmmoLow( void ) const
 			return true;
 	}
 
-	// Out of grenades counts as low on ammo.
+	// NOT grenades.
 	//
-	// The class behaviours already bail out of every grenade throw with
-	// "GetSecondaryGrenades() <= 0" and then do nothing about it, so a bot
-	// that spent its grenades stayed spent for the rest of the life — it never
-	// asked for resupply, because the only thing that triggered a resupply
-	// trip was the primary weapon running dry.
+	// An earlier version of this returned true when both grenade counts hit
+	// zero, on the reasoning that a bot which had spent its grenades never
+	// asked for resupply. That reasoning was right and the fix was wrong.
 	//
-	// Both counts, and only when BOTH are empty: a demoman with pipes and no
-	// concs is not out of ammo in any sense worth walking across the map for.
-	{
-		CFFBot *self = const_cast< CFFBot * >( this );
-		if ( self->GetPrimaryGrenades() <= 0 && self->GetSecondaryGrenades() <= 0 )
-			return true;
-	}
-
+	// IsAmmoLow is the trigger for CFFBotMainAction to SUSPEND whatever the
+	// bot is doing and walk to a resupply. Grenades run out constantly and are
+	// not restored by every pickup, so keying that on them makes bots abandon
+	// a flag run for an ammo trip that may not even refill what sent them, and
+	// then do it again — which reads from outside as bots milling about in
+	// their own base.
+	//
+	// The preference belongs in the path cost, not in the interrupt: areas
+	// tagged FF_NAV_HAS_GRENADES are already discounted there via
+	// kAnyResupply, so a bot that is going past a grenade crate anyway takes
+	// it. That is the behaviour worth having.
 	return false;
 }
 

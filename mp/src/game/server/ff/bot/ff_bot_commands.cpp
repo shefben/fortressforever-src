@@ -665,12 +665,46 @@ static bool NavVizMatches( const NavVizType &type, CFFNavArea *area )
 }
 
 
+//-----------------------------------------------------------------------------
+// Draw budget.
+//
+// This is a crash fix, not a tuning knob that happened to be useful.
+//
+// `all` and `mesh` walk every area in TheNavAreas and hand the engine one
+// overlay each, and the persistent view re-issues the whole batch every
+// FFVIZ_REDRAW_INTERVAL seconds with a lifetime three times that — so three
+// full copies are alive at once by design. On a map the size of 2fort that is
+// tens of thousands of live overlays, and the engine's debug overlay renderer
+// does not survive it. `all` only started doing this when it stopped skipping
+// untagged areas: before that it drew the few hundred tagged ones and the
+// problem was invisible.
+//
+// Valve hit the same wall drawing the mesh in nav edit mode and capped it at
+// nav_draw_limit = 500. Same number here for the same reason. The cap keeps the
+// areas NEAREST THE VIEWER rather than the first N in mesh order, because the
+// ones you are standing in front of are the ones you are trying to look at.
+//-----------------------------------------------------------------------------
+ConVar ff_nav_visualize_limit( "ff_nav_visualize_limit", "500", FCVAR_CHEAT,
+	"Maximum number of nav areas ff_nav_visualize draws at once, nearest to you "
+	"first. The cap exists because the engine's debug overlay renderer crashes "
+	"well before a whole map's worth of areas — raise it with that in mind." );
+
+
 static void PrintNavVizTypes( void )
 {
 	Msg( "Usage: ff_nav_visualize <type>\n" );
-	Msg( "  all     every tagged area, coloured by what it is (see legend)\n" );
+	Msg( "  mesh    the plain nav mesh: EVERY area outlined, tagged or not.\n" );
+	Msg( "          Start here when bots won't go somewhere — a missing area\n" );
+	Msg( "          has no attributes, so it is invisible in every other view.\n" );
+	Msg( "  all     every area, tagged ones coloured by category, untagged\n" );
+	Msg( "          ones flat and dim (see legend)\n" );
 	Msg( "  combat  recent combat intensity, red by weight\n" );
-	Msg( "  list    this list\n\n" );
+	Msg( "  list    this list\n" );
+	Msg( "\n" );
+	Msg( "  At most ff_nav_visualize_limit (%d) areas are drawn at once, the ones\n"
+	     "  nearest you. Walk to what you want to see; the cap is there because a\n"
+	     "  whole map's worth of overlays crashes the engine's overlay renderer.\n\n",
+		ff_nav_visualize_limit.GetInt() );
 
 	for ( int i = 0; i < (int)ARRAYSIZE( s_navVizTypes ); ++i )
 	{
@@ -697,6 +731,7 @@ ConVar ff_nav_visualize_persist( "ff_nav_visualize_persist", "1", FCVAR_CHEAT,
 #define FFVIZ_NONE		-1
 #define FFVIZ_ALL		-2
 #define FFVIZ_COMBAT	-3
+#define FFVIZ_MESH		-4
 
 static int   s_vizActive = FFVIZ_NONE;
 static float s_vizNextDraw = 0.0f;
@@ -708,6 +743,148 @@ static float s_vizNextDraw = 0.0f;
 
 
 //-----------------------------------------------------------------------------
+// Where "nearest" is measured from. The persistent refresh runs from the bot
+// manager tick rather than from a command, so there is no command client to ask
+// then; the listen-server host is the one actually looking at the overlays.
+//-----------------------------------------------------------------------------
+static bool NavVizViewPos( Vector *out )
+{
+	CBasePlayer *player = UTIL_GetListenServerHost();
+
+	if ( !player )
+		player = UTIL_GetCommandClient();
+
+	if ( !player )
+	{
+		for ( int i = 1; i <= gpGlobals->maxClients && !player; ++i )
+		{
+			CBasePlayer *p = UTIL_PlayerByIndex( i );
+			if ( p && !p->IsBot() )
+				player = p;
+		}
+	}
+
+	if ( !player )
+		return false;
+
+	*out = player->EyePosition();
+	return true;
+}
+
+
+// One queued overlay. Collected first and emitted second so the budget can be
+// applied to the whole batch — capping while walking the mesh would keep
+// whatever happened to come first in area order, which is nowhere in
+// particular.
+struct VizDraw
+{
+	CFFNavArea *area;
+	int         r, g, b, a;
+	int         height;		// box height; ignored when outline is true
+	bool        outline;	// mesh mode: four lines on the floor, not a box
+	float       distSq;
+};
+
+static int VizDrawCompare( const VizDraw *lhs, const VizDraw *rhs )
+{
+	if ( lhs->distSq < rhs->distSq ) return -1;
+	if ( lhs->distSq > rhs->distSq ) return 1;
+	return 0;
+}
+
+static void AddVizBox( CUtlVector< VizDraw > &list, CFFNavArea *area,
+                       int r, int g, int b, int a, int height )
+{
+	VizDraw d;
+	d.area = area;
+	d.r = r; d.g = g; d.b = b; d.a = a;
+	d.height = height;
+	d.outline = false;
+	d.distSq = 0.0f;
+	list.AddToTail( d );
+}
+
+static void AddVizOutline( CUtlVector< VizDraw > &list, CFFNavArea *area,
+                           int r, int g, int b )
+{
+	VizDraw d;
+	d.area = area;
+	d.r = r; d.g = g; d.b = b; d.a = 255;
+	d.height = 0;
+	d.outline = true;
+	d.distSq = 0.0f;
+	list.AddToTail( d );
+}
+
+
+//-----------------------------------------------------------------------------
+// Emit at most ff_nav_visualize_limit of the collected draws, nearest first.
+// Returns how many actually went to the engine.
+//-----------------------------------------------------------------------------
+static int EmitVizDraws( CUtlVector< VizDraw > &list, float lifetime )
+{
+	const int limit = MAX( 1, ff_nav_visualize_limit.GetInt() );
+
+	// Only pay for the sort when it changes the answer.
+	Vector view;
+	if ( list.Count() > limit && NavVizViewPos( &view ) )
+	{
+		for ( int i = 0; i < list.Count(); ++i )
+			list[ i ].distSq = ( list[ i ].area->GetCenter() - view ).LengthSqr();
+
+		list.Sort( VizDrawCompare );
+	}
+
+	const int drawCount = MIN( list.Count(), limit );
+
+	for ( int i = 0; i < drawCount; ++i )
+	{
+		const VizDraw &d = list[ i ];
+
+		if ( !d.outline )
+		{
+			NDebugOverlay::Box( d.area->GetCenter(),
+				Vector( -32, -32, 0 ), Vector( 32, 32, (float)d.height ),
+				d.r, d.g, d.b, d.a, lifetime );
+			continue;
+		}
+
+		Extent extent;
+		d.area->GetExtent( &extent );
+
+		// The outline sits a little above the floor so it is not z-fighting
+		// the surface the area was generated on.
+		const Vector lift( 0.0f, 0.0f, 2.0f );
+		const Vector nw( extent.lo.x, extent.lo.y, d.area->GetZ( extent.lo.x, extent.lo.y ) );
+		const Vector ne( extent.hi.x, extent.lo.y, d.area->GetZ( extent.hi.x, extent.lo.y ) );
+		const Vector se( extent.hi.x, extent.hi.y, d.area->GetZ( extent.hi.x, extent.hi.y ) );
+		const Vector sw( extent.lo.x, extent.hi.y, d.area->GetZ( extent.lo.x, extent.hi.y ) );
+
+		NDebugOverlay::Line( nw + lift, ne + lift, d.r, d.g, d.b, false, lifetime );
+		NDebugOverlay::Line( ne + lift, se + lift, d.r, d.g, d.b, false, lifetime );
+		NDebugOverlay::Line( se + lift, sw + lift, d.r, d.g, d.b, false, lifetime );
+		NDebugOverlay::Line( sw + lift, nw + lift, d.r, d.g, d.b, false, lifetime );
+	}
+
+	return drawCount;
+}
+
+
+static void ReportVizBudget( int collected, int drawn )
+{
+	if ( collected <= drawn )
+		return;
+
+	Msg( "  %d more area%s in range but not drawn: the view is capped at "
+	     "ff_nav_visualize_limit (%d), nearest to you first.\n",
+		collected - drawn, ( collected - drawn ) == 1 ? "" : "s",
+		ff_nav_visualize_limit.GetInt() );
+	Msg( "  Walk to what you want to inspect rather than raising the cap — a "
+	     "whole map's worth of overlays crashes the engine's overlay renderer.\n" );
+}
+
+
+//-----------------------------------------------------------------------------
 // Draw one batch. `verbose` prints counts and the legend — true for the console
 // command, false for the per-frame refresh, which must stay silent.
 //-----------------------------------------------------------------------------
@@ -716,10 +893,11 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 	if ( which == FFVIZ_NONE )
 		return;
 
+	CUtlVector< VizDraw > queue;
+
 	// ---- combat: a continuous quantity, not an attribute ------------------
 	if ( which == FFVIZ_COMBAT )
 	{
-		int drawn = 0;
 		for ( int i = 0; i < TheNavAreas.Count(); ++i )
 		{
 			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
@@ -730,12 +908,56 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 			if ( intensity <= 0.05f )
 				continue;
 
-			NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-				(int)( 255 * intensity ), 0, 0, 64, lifetime );
-			++drawn;
+			AddVizBox( queue, area, (int)( 255 * intensity ), 0, 0, 64, 32 );
 		}
+
+		const int drawn = EmitVizDraws( queue, lifetime );
 		if ( verbose )
+		{
 			Msg( "[ff_nav_visualize] Drew %d areas for 'combat'.\n", drawn );
+			ReportVizBudget( queue.Count(), drawn );
+		}
+		return;
+	}
+
+	// ---- mesh: the plain nav mesh, attributes ignored ----------------------
+	//
+	// Every area, outlined on the floor, whether or not anything has tagged
+	// it. This is the "what does the mesh actually look like" view, and it is
+	// the one to reach for when bots are failing to go somewhere: an area that
+	// is missing, an area that covers a wall, or a gap between two areas that
+	// look adjacent are all invisible in every attribute-coloured view,
+	// because an area that does not exist has no attributes to colour.
+	if ( which == FFVIZ_MESH )
+	{
+		for ( int i = 0; i < TheNavAreas.Count(); ++i )
+		{
+			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+			if ( !area )
+				continue;
+
+			// Outlined rather than filled: filled boxes at this density hide
+			// each other and the world.
+			//
+			// Areas nobody has tagged are the dim ones; anything carrying an
+			// attribute is brightened, so the mesh view still tells you where
+			// the tagged ground is without becoming a second colour scheme to
+			// learn.
+			const bool tagged = ( area->GetAttributesFF() != 0 ||
+			                      area->GetAttributesFF2() != 0 );
+			const int c = tagged ? 255 : 110;
+
+			AddVizOutline( queue, area, c, c, tagged ? 160 : 130 );
+		}
+
+		const int drawn = EmitVizDraws( queue, lifetime );
+
+		if ( verbose )
+		{
+			Msg( "[ff_nav_visualize] mesh: %d area(s) outlined. Bright = carries "
+				"at least one attribute, dim = untagged walkable ground.\n", drawn );
+			ReportVizBudget( queue.Count(), drawn );
+		}
 		return;
 	}
 
@@ -748,7 +970,7 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 	if ( which == FFVIZ_ALL )
 	{
 		int perType[ ARRAYSIZE( s_navVizTypes ) ] = { 0 };
-		int drawn = 0;
+		int tagged = 0;
 		int untagged = 0;
 		int unnamed = 0;
 
@@ -760,7 +982,18 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 
 			if ( area->GetAttributesFF() == 0 && area->GetAttributesFF2() == 0 )
 			{
+				// Draw it anyway, dim.
+				//
+				// This used to skip untagged areas entirely, which meant the
+				// ordinary nav mesh was invisible and the view answered "what
+				// is tagged" instead of "what does the mesh look like, and
+				// what is tagged on it". Those are different questions and the
+				// second one is the one you have while authoring: an area with
+				// no attributes is still an area bots walk through, and a HOLE
+				// where an area should be is the single most useful thing this
+				// command can show you.
 				++untagged;
+				AddVizBox( queue, area, 70, 75, 85, 24, 4 );
 				continue;
 			}
 
@@ -782,24 +1015,26 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 			// shows up as a gap rather than silently vanishing.
 			if ( !match )
 			{
-				NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-					110, 110, 110, 64, lifetime );
-				++drawn;
+				AddVizBox( queue, area, 110, 110, 110, 64, 32 );
+				++tagged;
 				++unnamed;
 				continue;
 			}
 
-			NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-				match->r, match->g, match->b, 64, lifetime );
+			AddVizBox( queue, area, match->r, match->g, match->b, 64, 32 );
 			++perType[ matchIndex ];
-			++drawn;
+			++tagged;
 		}
+
+		const int drawn = EmitVizDraws( queue, lifetime );
 
 		if ( !verbose )
 			return;
 
-		Msg( "[ff_nav_visualize] Drew %d of %d areas. %d carry no attribute at all.\n",
-			drawn, TheNavAreas.Count(), untagged );
+		Msg( "[ff_nav_visualize] %d of %d areas carry an attribute; the other %d "
+			"are drawn flat and dim. %d overlay(s) drawn.\n",
+			tagged, TheNavAreas.Count(), untagged, drawn );
+		ReportVizBudget( queue.Count(), drawn );
 		Msg( "  Each area is coloured by the FIRST category it matches, most\n"
 		     "  specific first — a flag room that is also a choke reads as a flag room.\n" );
 		Msg( "  legend (only categories actually present):\n" );
@@ -828,23 +1063,23 @@ static void DrawNavVisualization( int which, bool verbose, float lifetime )
 
 	const NavVizType &vizType = s_navVizTypes[ which ];
 
-	int drawn = 0;
 	for ( int i = 0; i < TheNavAreas.Count(); ++i )
 	{
 		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
 		if ( !area || !NavVizMatches( vizType, area ) )
 			continue;
 
-		NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-			vizType.r, vizType.g, vizType.b, 64, lifetime );
-		++drawn;
+		AddVizBox( queue, area, vizType.r, vizType.g, vizType.b, 64, 32 );
 	}
+
+	const int drawn = EmitVizDraws( queue, lifetime );
 
 	if ( !verbose )
 		return;
 
 	Msg( "[ff_nav_visualize] Drew %d areas for '%s' — rgb(%d,%d,%d), %s.\n",
 		drawn, vizType.name, vizType.r, vizType.g, vizType.b, vizType.description );
+	ReportVizBudget( queue.Count(), drawn );
 
 	if ( drawn == 0 )
 	{
@@ -926,6 +1161,10 @@ CON_COMMAND_F( ff_nav_visualize,
 	else if ( FStrEq( type, "combat" ) )
 	{
 		which = FFVIZ_COMBAT;
+	}
+	else if ( FStrEq( type, "mesh" ) || FStrEq( type, "nav" ) || FStrEq( type, "areas" ) )
+	{
+		which = FFVIZ_MESH;
 	}
 	else
 	{
