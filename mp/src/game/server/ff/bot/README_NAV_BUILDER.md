@@ -41,7 +41,7 @@ the nav mesh work in general.
 - which way to look when you're standing at that corner with nothing to shoot
 - where two areas are adjacent in the world but not in the graph
 
-Four layers already handle everything they can:
+Five layers already handle everything they can:
 
 | Layer | Derives | From |
 |---|---|---|
@@ -49,17 +49,20 @@ Four layers already handle everything they can:
 | `FFBotLuaObjectives` | goal type and class, incl. gas suits and keycards | Lua declarations, then model, then name |
 | `FFBotGameMode` | what kind of map this is, who attacks, who defends | the live goal registry |
 | `CFFBotAutoTagger` | high ground, chokes, water, ladders, hazard volumes, lifts | geometry and entities |
+| `CFFBotAnalyzer` | **structural chokepoints, main routes, overlooks, sniper perches, defensive posts, sentry ground, aim directions, breakable shortcuts, teleport links** | the nav graph, the visibility sets, and world entities |
 
-What's left over is the genuinely unautomatable part: judgement about a specific
-map. That's what this tool is for.
+What's left over is judgement about a specific map. That's what this tool is
+for — and the list has got a great deal shorter.
 
-> The list of unautomatable things has got shorter. The gas suit used to be on
-> it; it's now classified by model and auto-tagged, so you shouldn't need to
-> place `gassuit` by hand unless a map uses a custom one. So is which team
-> attacks and which defends — that comes from the registry now, so there's no
-> marker for it and doesn't need to be. Author what the detectors miss, not what
-> they already get right; `ff_nav_validate` and `ff_bot_gamemode_report` tell you
-> which is which.
+> **Start by finding out what you don't have to place.** Run
+> `ff_nav_analyze_report` and `ff_nav_visualize all` before authoring anything.
+>
+> The gas suit used to need placing by hand; it's classified by model now. Which
+> team attacks and which defends comes from the registry. And as of the analysis
+> pass, so do **sniper perches, defensive posts, sentry ground, aim directions
+> and breakable walls** — the five things that used to be most of the work.
+>
+> Author what the detectors miss or get wrong, not what they already get right.
 
 > **Every marker type now has something reading it.** Ten of the word-2
 > attributes used to be write-only — placed, drawn, saved, and consumed by
@@ -77,8 +80,19 @@ sv_cheats 1
 ff_manual_nav_builder 1
 ```
 
-That writes `cfg/ff_navbuilder.cfg`, execs it (on a listen server), prints the
-key map, and starts drawing every existing marker.
+That writes `cfg/ff_navbuilder.cfg`, execs it (on a listen server), puts the
+**key map on screen**, and starts drawing every existing marker.
+
+The on-screen panel sits down the left edge and shows the current page's nine
+slots — each in its own marker colour — plus which type is selected, which team
+you're authoring for, how many markers exist, and the modifier keys. It updates
+live, so paging or cycling the team is visible immediately.
+
+Authoring means looking at the world, and the console printout it replaces was
+exactly the wrong place for it: it scrolled past the moment you turned the mode
+on, and reprinting it with `ff_nav_builder_help` meant opening a console you
+then had to close before you could place anything. `ff_nav_builder_keymap 0`
+turns the panel off if you know the layout.
 
 Then: walk or noclip to a spot, **face the way you want them to face**, press a
 numpad digit. Done. The marker is written to disk immediately and applied to the
@@ -623,6 +637,7 @@ Round restarts re-run the tagger, so markers survive round transitions.
 | `ff_nav_builder_delete_radius` | `96` | How close a marker must be for `ff_nav_delete` |
 | `ff_nav_builder_spawn_height` | `256` | Height above the highest corner still inside a spawn room |
 | `ff_nav_builder_link_oneway` | `0` | `0` = `linkfrom`/`linkto` pairs connect both ways, `1` = one way only. Read when the pair is applied, so set it before placing or run `ff_nav_builder_reload` |
+| `ff_nav_builder_keymap` | `1` | Draw the numpad key map on screen. `0` = off; the console still has `ff_nav_builder_help` |
 
 ### Commands
 
@@ -778,7 +793,8 @@ worse than `nav_generate` would have got you for free.
 | Symptom | Cause |
 |---|---|
 | Numpad does nothing | `ff_manual_nav_builder` is `0`, or the cfg was never exec'd. Run `ff_nav_builder_writecfg` then `exec ff_navbuilder` |
-| Numpad places the *wrong* type | Wrong page. `KP_SLASH` cycles; `ff_nav_builder_page` shows where you are |
+| No key map on screen | `ff_nav_builder_keymap` is `0`, or `ff_manual_nav_builder` is. The panel only draws while build mode is on |
+| Numpad places the *wrong* type | Wrong page. The on-screen panel shows which page you're on; `KP_SLASH` cycles |
 | Numpad binds broken after an update | The cfg is generated, not versioned. Re-run `ff_nav_builder_writecfg` |
 | Marker has no facing arrow | That type doesn't use yaw — only `sniper`, `sentry`, `aim`, `pipetrap`, `defend`, `jump` do |
 | Facing is wrong | Yaw is captured once, at placement, from your eye angles. Delete and re-place looking the right way |

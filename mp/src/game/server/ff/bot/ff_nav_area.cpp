@@ -28,6 +28,8 @@ CFFNavArea::CFFNavArea( void )
 {
 	m_attributeFlags = 0;
 	m_attributeFlags2 = 0;
+	m_aimYaw = 0.0f;
+	m_trafficScore = 0.0f;
 	m_combatIntensity = 0.0f;
 	m_classMask = 0;
 	for ( int i = 0; i < FF_NAV_TEAM_COUNT; ++i )

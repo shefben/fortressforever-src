@@ -1033,6 +1033,10 @@ void FFBotManager_Tick( void )
 	// ff_manual_nav_builder is on.
 	FFNavBuilder::Tick();
 
+	// Keep the last ff_nav_visualize view on screen. Returns immediately when
+	// no view is active.
+	FFBotCommands_TickVisualization();
+
 	// Reconcile Lua-declared objectives with their live state and re-tag the
 	// nav mesh when the set of real objectives moves — an AvD phase change, a
 	// key becoming available, a cap going active.

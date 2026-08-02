@@ -216,7 +216,50 @@ enum FFNavAttributeType2
 
 	// "Look this way from here." An aim hint is about facing, not position:
 	// the marker's yaw is the payload, the area is just where it applies.
+	// The yaw itself lives in CFFNavArea::m_aimYaw.
 	FF_NAV2_AIM_HINT					= 0x00010000,
+
+	//-------------------------------------------------------------------------
+	// Derived by CFFBotAnalyzer at map load. Everything below is computed from
+	// the nav graph, the visibility sets nav_generate already builds, or world
+	// entities nobody was reading — no hand authoring, no map knowledge.
+	//-------------------------------------------------------------------------
+
+	// Articulation point: removing this area would disconnect the nav graph.
+	//
+	// This is what a chokepoint actually IS, and it is a different claim from
+	// FF_NAV_CHOKE, which only means "this area is between 32 and 96 units
+	// wide". That width test tags every corridor and doorway in the map whether
+	// or not it matters, and misses a wide choke completely.
+	FF_NAV2_CUTPOINT					= 0x00020000,
+
+	// This area lies on a large fraction of the routes between spawn rooms and
+	// objectives. Derived by running the pathfinder over every
+	// spawn-threshold-to-objective pair and counting.
+	//
+	// "Where does the traffic go" answers most of the questions an author
+	// answers by hand — where a sentry earns its keep, where a pipe carpet
+	// catches people, which corridor is worth watching.
+	FF_NAV2_HIGH_TRAFFIC				= 0x00040000,
+
+	// Sees an unusual amount of high-traffic ground. Scored from the per-area
+	// visibility sets that nav_generate already computes and writes into the
+	// .nav file, and which nothing was reading.
+	FF_NAV2_OVERLOOK					= 0x00080000,
+
+	// A breakable brush sits here AND destroying it measurably shortens the
+	// route between two parts of the map. The second half is the important one:
+	// most breakables are scenery, and the test for "this one opens a shortcut"
+	// is a graph query rather than a guess.
+	FF_NAV2_BREACHABLE					= 0x00100000,
+
+	// A trigger_teleport's entrance. Its exit is a real nav connection that no
+	// amount of walkable-space sampling could ever find.
+	FF_NAV2_TELEPORT					= 0x00200000,
+
+	// A trigger_push overlaps this area — movement the mesh cannot see, and a
+	// launcher that gets a player somewhere walking wouldn't.
+	FF_NAV2_PUSH						= 0x00400000,
 };
 
 
@@ -297,6 +340,21 @@ public:
 	float	GetCombatIntensity( void ) const;
 	bool	IsInCombat( void ) const;
 
+	// Facing, in degrees, for FF_NAV2_AIM_HINT. Either hand-authored (the yaw
+	// you were looking at when you placed the marker) or derived by
+	// CFFBotAnalyzer from where the traffic comes from.
+	//
+	// Lives on the area rather than being looked up from the marker sidecar
+	// because a derived hint has no marker to look up, and the consumer should
+	// not have to care which kind it got.
+	float			GetAimYaw( void ) const		{ return m_aimYaw; }
+	void			SetAimYaw( float yaw )		{ m_aimYaw = yaw; }
+
+	// 0..1. How much of the spawn-to-objective traffic passes through here, as
+	// a fraction of the busiest area on the map. Derived; never serialized.
+	float			GetTrafficScore( void ) const	{ return m_trafficScore; }
+	void			SetTrafficScore( float s )		{ m_trafficScore = s; }
+
 	// FF-specific: per-area class restriction mask. 0 = all classes welcome,
 	// non-zero = only listed classes can path through. No TF analogue.
 	unsigned short	GetClassMask( void ) const		{ return m_classMask; }
@@ -313,6 +371,9 @@ private:
 
 	unsigned int m_attributeFlags;
 	unsigned int m_attributeFlags2;
+
+	float m_aimYaw;			// FF_NAV2_AIM_HINT payload
+	float m_trafficScore;	// 0..1, derived betweenness
 
 	// Per-team [TEAM_BLUE..TEAM_GREEN] indexed compact (team - TEAM_BLUE).
 	float m_distanceFromSpawnRoom[ FF_NAV_TEAM_COUNT ];

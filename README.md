@@ -23,8 +23,15 @@ bot_add                  // one bot, auto team and class
 bot_add red sniper       // team and class if you want them
 ```
 
-If the map has never been navmeshed, `nav_generate` first. That is the only step
-that is genuinely slow, and it is once per map.
+If the map has never been navmeshed:
+
+```
+ff_nav_generate_full     // generate, then derive everything, then reload
+```
+
+That is the only slow step, and it happens once per map. It prints exactly what
+it's about to do, because a two-minute silence followed by a map reload
+otherwise looks like a crash.
 
 Two documents cover this in depth, both in `mp/src/game/server/ff/bot/`:
 
@@ -93,7 +100,7 @@ doors forced open while sampling, ladder generation (stock Source builds none
 outside Left 4 Dead), and underwater connections so a submerged tunnel whose exit
 is a vertical shaft isn't an isolated island.
 
-On top of the geometry sit three layers of *meaning*, all re-derived at every map
+On top of the geometry sit four layers of *meaning*, all re-derived at every map
 load so none of it can go stale:
 
 | Layer | Derives | From |
@@ -101,6 +108,30 @@ load so none of it can go stale:
 | Entity tagging | spawn rooms, flags, capture points, resupplies | live entities |
 | Lua objective bridge | what each goal entity *is*, and whether it's live right now | the map's own Lua, then model, then name |
 | Auto-tagger | high ground, chokes, water, ladders, hazard volumes, lifts | geometry and entities |
+| Analyzer | chokepoints, main routes, overlooks, sniper perches, defensive posts, sentry ground, aim directions, breakable shortcuts | the nav graph and the visibility sets |
+
+**Automatic waypointing.** That last layer is what makes a map playable without
+anyone authoring it. Three observations do most of the work:
+
+- A **chokepoint** is not "a narrow area" — it's a place the graph funnels
+  through with no way around. That's an articulation point, computable exactly
+  in O(V+E), where the old width heuristic tagged every doorway in the map and
+  missed wide chokes entirely.
+- **Where people walk** falls out of pathing every spawn to every objective and
+  counting. Most authoring decisions are downstream of that: where a sentry
+  earns its keep, which corridor to watch, which ledge overlooks anything.
+- **What each area can see** was already computed by `nav_generate` and written
+  into the `.nav`, and nothing was reading it. Combined with traffic, "is this a
+  good sniper perch" stops being a guess and becomes a measurement — and the
+  busiest thing an area can see is also which way to face.
+
+Plus entity mining the bots weren't doing: a `func_breakable` is a demoman
+target exactly when destroying it shortens a route, which is a graph query
+rather than map knowledge; a `trigger_teleport`'s destination is a nav
+connection no amount of walkable-space sampling could find.
+
+Hand-authored markers always win — the analyzer only writes where nothing
+already had.
 
 The Lua bridge is worth a note. Almost nothing about an FF map's objectives is in
 the BSP — Lua creates and drives all of it at runtime — and FF already contained
@@ -121,19 +152,22 @@ saves it. Humans playing a map teach the bots its geometry.
 
 ## Authoring map knowledge
 
-Some things no detector recovers: which battlement is the sniping position and
-which catwalk merely happens to be high, which way to face from it, which wall a
-demoman blows open versus shut, which corridor is worth a pipe carpet.
+The analyzer covers most of what used to need doing by hand. What's left is
+disagreement with it — a spot it rated poorly that you know plays well, a wall
+it called scenery, a pipe-carpet corridor no route metric would rank.
 
 ```
 ff_manual_nav_builder 1
 ```
 
-binds the numpad, draws every existing marker, and prints the key map. Walk or
-noclip to a spot, face the way you want them to face, press a key. The marker is
-written to disk and applied to the live mesh immediately — no reload, no save
-step. Twenty-three marker types across three pages, including two that author a
-missing nav *connection* rather than tagging an area.
+binds the numpad, puts a **key map on screen**, and draws every existing marker.
+Walk or noclip to a spot, face the way you want them to face, press a key. The
+marker is written to disk and applied to the live mesh immediately — no reload,
+no save step. Twenty-three marker types across three pages, including two that
+author a missing nav *connection* rather than tagging an area.
+
+Check `ff_nav_analyze_report` and `ff_nav_visualize all` first, though. Placing a
+marker where the analyzer already got it right is work for nothing.
 
 Markers live in a text sidecar keyed on **world positions**, so they survive
 `nav_generate`. That is the point: redoing map knowledge by hand after every mesh
@@ -149,6 +183,8 @@ watching a bot walk into a wall. So:
 |---|---|
 | `ff_bot_nav_report` | Per-team spawn / exit / ladder / water counts. **Start here** |
 | `bot_show_path` | Draws the path. A red box overhead means *no path* — a data problem, not an AI one |
+| `ff_nav_analyze_report` | What the automatic analysis derived, pass by pass, with timings |
+| `ff_nav_visualize all` | Every tagged area, coloured by category, with a legend. Stays on screen until `ff_nav_visualize off` |
 | `ff_bot_gamemode_report` | Detected mode, defense quota, every bot's role and what it's given up on |
 | `ff_bot_lua_report` | Every objective entity the bots can see, live or not |
 | `ff_bot_diagnose` | One bot's full state |

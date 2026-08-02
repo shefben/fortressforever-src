@@ -19,14 +19,15 @@ hand-authoring map knowledge.
 7. [Environmental hazards](#environmental-hazards)
 8. [The navigation data pipeline](#the-navigation-data-pipeline)
 9. [Automatic nav generation](#automatic-nav-generation)
-10. [Nav attributes reference](#nav-attributes-reference)
-11. [Lua objectives and the entity classifier](#lua-objectives-and-the-entity-classifier)
-12. [Incursion distances](#incursion-distances)
-13. [Path cost](#path-cost)
-14. [Learned links](#learned-links)
-15. [Diagnostics](#diagnostics)
-16. [Troubleshooting](#troubleshooting)
-17. [Known gaps](#known-gaps)
+10. [Automatic map analysis](#automatic-map-analysis)
+11. [Nav attributes reference](#nav-attributes-reference)
+12. [Lua objectives and the entity classifier](#lua-objectives-and-the-entity-classifier)
+13. [Incursion distances](#incursion-distances)
+14. [Path cost](#path-cost)
+15. [Learned links](#learned-links)
+16. [Diagnostics](#diagnostics)
+17. [Troubleshooting](#troubleshooting)
+18. [Known gaps](#known-gaps)
 
 ---
 
@@ -632,6 +633,13 @@ them.
 > [`CFFBotAutoTagger`](#auto-tagger-thresholds), including the three
 > [entity-derived passes](#entity-derived-auto-tagging-pass-5) that find hazard
 > gear, hazard volumes and lifts.
+>
+> The distinction matters when something looks missing. **`nav_generate` never
+> creates a spawn-room, flag, capture-point, sniper or resupply tag.** It writes
+> geometry and connections into the `.nav` and nothing else. Every attribute is
+> re-derived at map load from live entities and geometry, and none of it is
+> persisted — which is what lets a Lua phase change move the tags mid-round.
+> `ff_nav_visualize all` after a load is the quick way to see what landed.
 
 ### 1. Spawn seeding — `CFFNavMesh::AddWalkableSeeds`
 
@@ -686,6 +694,139 @@ to be stacked (which is a fall, not a swim).
 `ff_nav_generate_full` chains the whole thing and reminds you what fires on
 reload. Tagging and validation happen automatically at level init; the only
 manual step is checking the report.
+
+---
+
+## Automatic map analysis
+
+`ff_bot_analyze.cpp`. Runs last in the tagging pipeline, at every map load,
+because every pass consumes something the earlier stages produced. `ff_nav_analyze`
+re-runs it without a reload; `ff_nav_analyze_report` shows what it found;
+`ff_bot_analyze 0` turns it off entirely.
+
+### Why it exists
+
+The bots had three ways to learn what a map means: entity tags (exact, but only
+knows what an entity said), shape heuristics (cheap, local and crude), and hand
+authoring (accurate, and somebody has to do it for every map, forever).
+
+Everything the heuristics couldn't derive fell to hand authoring, and the list
+was long. Most of it turned out not to be map knowledge at all — it's a property
+of the nav graph, or of the visibility sets `nav_generate` already computes, or
+of world entities nothing was reading.
+
+### Pass 1 — Topology
+
+**Articulation points**, via Tarjan's algorithm, iterative so a corridor-shaped
+graph of several thousand areas doesn't blow the stack. O(V+E).
+
+A cut vertex is a node whose removal disconnects the graph. On a nav mesh that
+is *precisely* a chokepoint: somewhere the map funnels through with no way
+around.
+
+Compare what it replaces. `FF_NAV_CHOKE` meant "this area is between 32 and 96
+units wide" — true of every doorway, stairwell and corridor in the map, hundreds
+of areas, most of them irrelevant, and blind to a choke that happens to be wide.
+Cut points are structural and have no tuning constant at all.
+
+Results set `FF_NAV2_CUTPOINT` **and** `FF_NAV_CHOKE`, so the existing choke
+consumers — HWGuy hold positions, sticky traps, path cost — start seeing real
+chokepoints without any of them changing.
+
+Spawn-room interiors are skipped: a spawn room is trivially a cut point because
+it hangs off the map by its door, and saying so is useless.
+
+### Pass 2 — Traffic
+
+For every (spawn threshold, objective) pair, path between them and increment a
+counter on each area the route crosses. Normalise by the busiest area; store on
+`CFFNavArea::GetTrafficScore()` as 0..1. Areas above
+`ff_bot_analyze_traffic_threshold` (0.35) get `FF_NAV2_HIGH_TRAFFIC`.
+
+"Where does everyone actually walk" is upstream of most authoring decisions:
+where a sentry earns its keep, where a pipe carpet catches somebody, which
+corridor is worth watching, which of two ledges overlooks anything.
+
+The cost function here is deliberately **not** `CFFBotPathCost` — that model is
+per-bot and full of transient terms (combat intensity, one bot's recent stuck
+position, its route seed, its class). We want the map's shape, not one bot's
+opinion of it on one frame.
+
+### Pass 3 — Visibility
+
+`nav_generate`'s analyze phase already computes, for every area, the set of
+areas it can see, and writes it into the `.nav`
+(`nav_generate.cpp:4208`, `:4222`). Nothing was reading it.
+
+With traffic from pass 2, "is this a good sniper perch" stops being a shape
+heuristic and becomes a measurement: which areas see the most of the ground
+people walk on, from far enough away to matter (700–4000u), while being
+somewhere `IsAwayFromInvasionAreas` says the enemy isn't already standing.
+
+The same data gives an **aim hint** free. If you know which visible area carries
+the most traffic, you know which way to look. The yaw is stored on the area
+(`CFFNavArea::SetAimYaw`), which is also where a hand-authored `aim` marker puts
+it — so the consumer never has to know which kind it got.
+
+> **This pass needs an analyzed `.nav`.** If yours predates the visibility
+> phase, you get a loud warning and no overlooks, perches or aim hints. Re-run
+> `nav_generate`.
+
+### Pass 4 — Defense
+
+A defender wants to be somewhere attackers must pass, with sight of it, close
+enough to the thing being defended, and on our side of it. All four are now
+measurable:
+
+| Requirement | Source |
+|---|---|
+| must pass | `FF_NAV2_CUTPOINT` or `FF_NAV2_HIGH_TRAFFIC` (passes 1, 2) |
+| sight of it | visibility sets (pass 3) |
+| close enough | distance to the objective area, ≤2000u |
+| our side | incursion distance vs. the objective's |
+
+Output goes into the same `FF_NAV2_DEFEND_<team>` bits the hand-authored posts
+use, so `ResolveDefendPosition` picks them up unchanged — and an authored post
+still wins, because it's checked first.
+
+A cut point in our own half with a sightline is also where a sentry does its
+work, so those get `FF_NAV_AUTO_SENTRY_SPOT`.
+
+### Pass 5 — Entities
+
+Before this the bot layer read **six** world classnames. The BSP has far more
+that maps onto gameplay knowledge.
+
+**Breakable walls.** "Which wall does a demoman blow open" was the flagship
+example of knowledge only a human had. It isn't. A breakable is a shortcut
+exactly when destroying it shortens a path, and that's a graph query: take the
+nav areas either side, path between them as things stand, and compare. No route
+at all, or a detour over 1200u and more than 1.6× the straight line, means the
+wall opens something. Anything else is scenery or a window. Sets
+`FF_NAV2_BREACHABLE` and feeds `FF_NAV2_DETPACK_SPOT`.
+
+**Teleports.** A `trigger_teleport` moves a player somewhere no amount of
+walkable-space sampling will ever find — the two ends may be opposite corners of
+the map. The destination is a named entity, looked up exactly the way
+`CTriggerTeleport::Touch` looks it up, so this is a free, exact nav connection.
+Added **one-way**, because a teleport is.
+
+**Push volumes.** `trigger_push` is movement the mesh can't see. Tagged
+`FF_NAV2_PUSH`.
+
+### Hand authoring still wins
+
+Every pass checks whether a stronger source already spoke. A derived aim yaw
+never overwrites an authored one; a derived sentry hint never overwrites a
+placed one; `ClearDerived` only wipes bits this module owns outright and
+deliberately leaves anything the manual builder can also set. The analyzer fills
+the map in; it doesn't argue with you.
+
+### Cost
+
+One pass over the graph, a few hundred A* runs, and a sampled visibility scoring
+loop, all at map load. The report prints wall-clock time. If it's ever a
+problem, `ff_bot_analyze 0`.
 
 ---
 
@@ -747,8 +888,18 @@ Every bit now has a consumer.
 | `CAP_NEUTRAL` | manual | unowned capture point | mode detection, `ResolveObjective` |
 | `JUMP_SPOT` | manual | jump launch position | `HandleMobility` — running duck-jump |
 | `WATER_EXIT` | manual | where to leave the water | path cost (×0.4 **while in water**) |
-| `DEFEND_{BLUE,RED,YELLOW,GREEN}` | manual | hold this ground on defense | `ResolveDefendPosition` |
+| `DEFEND_{BLUE,RED,YELLOW,GREEN}` | manual + **derived** | hold this ground on defense | `ResolveDefendPosition` |
 | `MANUAL` | manual | set on any area a marker touches | diagnostics |
+| `CUTPOINT` | **derived** | removing this splits the nav graph | also sets `FF_NAV_CHOKE`; pass 4 |
+| `HIGH_TRAFFIC` | **derived** | on a large share of spawn→objective routes | passes 3 and 4 |
+| `OVERLOOK` | **derived** | sees a lot of the ground people walk on | feeds `FF_NAV_AUTO_SNIPER_SPOT` |
+| `BREACHABLE` | **derived** | a breakable here opens a real shortcut | feeds `FF_NAV2_DETPACK_SPOT` |
+| `TELEPORT` | **derived** | `trigger_teleport` mouth or exit | a one-way nav connection is added |
+| `PUSH` | **derived** | `trigger_push` volume | diagnostics |
+
+Rows marked **derived** come from [`CFFBotAnalyzer`](#automatic-map-analysis).
+`AIM_HINT` and `DETPACK_SPOT` are now dual-sourced too — an authored marker
+always wins, because the analyzer only writes where nothing already had.
 
 `DANGER` and `HAZARD_ZONE` look similar and are not the same thing. `DANGER` is
 an author saying "stay out"; `HAZARD_ZONE` is the map saying it, derived from
@@ -1043,7 +1194,7 @@ statistical. See
 |---|---|
 | `ff_bot_nav_report` | Per-team spawn / exit / threshold / doorway / ladder / water counts. **Start here.** `exits=0` for a team means its spawn room is a disconnected island — the mesh is the problem, not the AI |
 | `ff_nav_validate` | Entity coverage, spawn→flag connectivity, full attribute counts (both words) |
-| `ff_nav_visualize <type>` | Draw areas with an attribute. Types: `spawn exit flag cap resupply sniper sentry autosniper autosentry water underwater choke highground ladder doorway dispenser detpack detpackseal pipetrap aim lift hazardzone capneutral gassuit defend danger jump waterexit manual combat all`. Note `linkfrom` / `linkto` markers set **no attribute** — they make a graph edge, so use `ff_nav_builder_report` and `nav_edit 1` to see them |
+| `ff_nav_visualize <type>` | Draw areas carrying an attribute. `list` prints every type with its colour and meaning; `all` colours **every** tagged area by category and prints a legend with per-category counts; `combat` shows combat intensity. Note `linkfrom` / `linkto` markers set **no attribute** — they make a graph edge, so use `ff_nav_builder_list` and `nav_edit 1` to see those |
 | `ff_nav_autotag` | Re-run heuristics without a reload |
 | `ff_nav_generate_full` | `nav_generate` + reminder of what auto-fires on reload |
 | `ff_bot_sniper_report` | Sniper-spot candidates and their scoring signals |
@@ -1053,6 +1204,8 @@ statistical. See
 | `ff_bot_objective` | What the map is pointing YOU at (the HUD arrow target) |
 | `ff_bot_gamemode_report` | Detected mode and what it was derived from, per-team defense quota, every bot's role, and how many objectives each has blacklisted. **The first thing to check when bots go to the wrong place** |
 | `ff_bot_gamemode_rederive` | Re-derive the mode from the live registry now, ignoring the throttle |
+| `ff_nav_analyze` | Re-run all five analysis passes on the current mesh, no reload needed |
+| `ff_nav_analyze_report` | What the last analysis derived, pass by pass, with timings. Says plainly when a `.nav` has no visibility data or the map produced no traffic |
 
 ### Bots
 
@@ -1086,6 +1239,11 @@ follow" look identical when you're watching it walk into a wall.
 | `ff_bot_objective_gating` | `1` | Blacklist objectives a bot can't reach so it falls through to the next. `2` logs every drop with its reason |
 | `ff_bot_hazard_response` | `1` | React to environmental damage. `0` = stand in the gas until dead. `2` logs every classification |
 | `ff_bot_use_lifts` | `1` | Ride moving platforms and press the buttons that call them. Also gates `HandleButtons`. `2` logs transitions |
+| `ff_bot_analyze` | `1` | Derive gameplay knowledge from the graph, visibility and entities at map load. `0` = hand-authored markers only |
+| `ff_bot_analyze_traffic_threshold` | `0.35` | Share of the busiest area's traffic needed to count as a main route. Lower tags more |
+| `ff_bot_analyze_overlook_threshold` | `0.45` | Share of the best overlook score needed to count as one |
+| `ff_nav_visualize_persist` | `1` | Keep the last `ff_nav_visualize` view drawn until switched off. `0` = draw once and expire |
+| `ff_nav_builder_keymap` | `1` | Draw the numpad key map on screen while the builder is on |
 | `ff_bot_ammo_search_range` | `5000` | How far a bot will go for ammo |
 | `ff_bot_health_search_range` | `2000` | How far a bot will go for health |
 | `ff_bot_retreat_to_cover_range` | `1000` | Cover search radius |
@@ -1127,7 +1285,12 @@ Builder cvars (`ff_nav_builder_*`) are documented in
 | A bot refuses to go somewhere everyone else goes | `ff_bot_objective_gating 2` | It blacklisted that objective after failing to reach it. The log says which detector fired. Clears on respawn |
 | Bots stand at the bottom of a lift shaft | `ff_bot_use_lifts 2` | No call button they can see within 400u, or the platform isn't recognised. `ff_nav_visualize lift` shows what got tagged; `ff_nav_place lift` covers Lua-driven platforms |
 | Bots ignore a button that opens the way | — | `HandleButtons` only hunts once the bot is genuinely stuck, within 320u, with line of sight. A button behind a grate fails the LOS test |
-| Defenders all stack on one spot | `ff_nav_visualize defend` | One authored post, or none. Posts are spread per-bot, but only across the posts that exist |
+| Defenders all stack on one spot | `ff_nav_visualize defend` | One post, or none. Posts are spread per-bot, but only across the posts that exist. If analysis ran, `ff_nav_analyze_report` says how many it derived |
+| No sniper perches, overlooks or aim hints anywhere | `ff_nav_analyze_report` | "visibility data present: NO" — this `.nav` predates the analyze phase. Re-run `nav_generate` |
+| Analysis derived almost nothing | `ff_nav_analyze_report` | Zero traffic means no spawn thresholds or no objective areas. Passes 3 and 4 both hang off traffic, so they produce nothing too. Check `ff_bot_nav_report` and `ff_bot_lua_report` first |
+| Far too many areas tagged choke / traffic / overlook | `ff_nav_visualize cutpoint` | Thresholds are first guesses. `ff_bot_analyze_traffic_threshold` and `ff_bot_analyze_overlook_threshold` raise the bar; cut points have no threshold and are exact |
+| Demomen detpack a wall that opens nothing | `ff_nav_visualize breach` | The breach test wants a detour >1200u and >1.6× the straight line. A map with a big loop around a small breakable trips it legitimately |
+| Overlay vanishes after 30 seconds | — | Fixed: `ff_nav_visualize` now redraws until `ff_nav_visualize off`. If it still expires, `ff_nav_visualize_persist` is `0` |
 
 ---
 
@@ -1137,6 +1300,20 @@ Builder cvars (`ff_nav_builder_*`) are documented in
   duck-jump and nothing more. Self-propelled movement is a separate verb the bot
   doesn't have, and a large fraction of FF map routes assume at least conc. The
   bot takes the long way or, where there is no long way, can't reach at all.
+- **Analysis is untuned.** Every threshold in `CFFBotAnalyzer` — traffic 0.35,
+  overlook 0.45, breach 1.6× / 1200u, defend 2000u — is a first guess. They are
+  all cvars or named constants and all want a pass over real maps with
+  `ff_nav_visualize` running. The *algorithms* are exact; the cutoffs are not.
+- **Nothing reads the map's Lua script.** FF ships `maps/<map>.lua` beside the
+  `.bsp` and there is a Lua VM in-process. Parsing it would give the real
+  prerequisite graph — which trigger enables which goal, in what order — instead
+  of the keycard-rank rule and the no-progress watchdog, which are inference.
+  This is the largest remaining automation win and the one most likely to hit
+  surprises across 597 scripts.
+- **`func_button` target strings are still unread.** The analyzer reads
+  `trigger_teleport`'s destination but not which button drives which door or
+  lift, so `CFFBotRideLift` still presses the nearest visible button and waits
+  on a timer rather than knowing.
 - **Mode detection is a heuristic over the registry.** It reads the shape of
   what's live, which is the best available signal, but a map that declares its
   goals unconventionally can be misread. `ff_bot_gamemode` forces it. The

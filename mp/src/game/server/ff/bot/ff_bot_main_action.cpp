@@ -445,18 +445,16 @@ void CFFBotMainAction::UpdateLookingAroundForEnemies( CFFBot *me )
 			CFFNavArea *hintArea = static_cast< CFFNavArea * >( me->GetLastKnownArea() );
 			if ( hintArea && hintArea->HasAttributeFF2( FF_NAV2_AIM_HINT ) )
 			{
-				Vector hintPos;
-				float  hintYaw = 0.0f;
-				if ( FFNavBuilder::FindNearestPointWithYaw( FFNAVPT_AIM, -1,
-				         me->GetAbsOrigin(), &hintPos, &hintYaw ) )
-				{
-					const QAngle hintAngles( 0.0f, hintYaw, 0.0f );
-					Vector hintDir;
-					AngleVectors( hintAngles, &hintDir );
-					body->AimHeadTowards( me->EyePosition() + hintDir * 600.0f,
-						IBody::BORING, 0.5f, NULL, "Authored aim hint" );
-					return;
-				}
+				// The yaw lives on the area. It got there either from an
+				// authored marker or from CFFBotAnalyzer working out which
+				// visible area carries the most traffic — and the bot has no
+				// reason to care which.
+				const QAngle hintAngles( 0.0f, hintArea->GetAimYaw(), 0.0f );
+				Vector hintDir;
+				AngleVectors( hintAngles, &hintDir );
+				body->AimHeadTowards( me->EyePosition() + hintDir * 600.0f,
+					IBody::BORING, 0.5f, NULL, "Aim hint" );
+				return;
 			}
 		}
 

@@ -318,6 +318,11 @@ private:
 // Returns the new bot's CBasePlayer*, or NULL on failure.
 CBasePlayer *CreateFFBot( bool bFrozen, int iTeam, int iClass, const char *pszCustomName );
 
+// Keeps the last ff_nav_visualize view drawn. Lives in ff_bot_commands.cpp;
+// declared here because FFBotManager_Tick is the only per-frame hook the bot
+// subsystem has and everything periodic hangs off it.
+void FFBotCommands_TickVisualization( void );
+
 // Per-frame manager hook — called from Bot_RunAll. Drives periodic autobalance
 // (every 30s, moves a bot from the largest team to the smallest if the gap is
 // > 1) and any other future bot-side global concerns.

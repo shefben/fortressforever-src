@@ -1,0 +1,3 @@
+[submodule "ff_waypoint_builder"]
+	path = ff_waypoint_builder
+	url = https://github.com/shefben/ff_waypoint_builder.git

@@ -465,6 +465,12 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 		{ FF_NAV2_AIM_HINT,          "AIM_HINT" },
 		{ FF_NAV2_LIFT,              "LIFT (auto+manual)" },
 		{ FF_NAV2_HAZARD_ZONE,       "HAZARD_ZONE (auto)" },
+		{ FF_NAV2_CUTPOINT,          "CUTPOINT (derived)" },
+		{ FF_NAV2_HIGH_TRAFFIC,      "HIGH_TRAFFIC (derived)" },
+		{ FF_NAV2_OVERLOOK,          "OVERLOOK (derived)" },
+		{ FF_NAV2_BREACHABLE,        "BREACHABLE (derived)" },
+		{ FF_NAV2_TELEPORT,          "TELEPORT (derived)" },
+		{ FF_NAV2_PUSH,              "PUSH (derived)" },
 	};
 
 	const int kKnown = (int)( sizeof( known ) / sizeof( known[ 0 ] ) );
@@ -522,92 +528,411 @@ CON_COMMAND_F( ff_nav_validate, "Validate FF nav coverage and connectivity.", FC
 // ff_nav_visualize <type> — draw debug overlays for an attribute class.
 // type: spawn, exit, flag, cap, resupply, sniper, sentry, combat, all
 //-----------------------------------------------------------------------------
-CON_COMMAND_F( ff_nav_visualize, "Visualize FF nav attributes. Args: spawn|exit|flag|cap|resupply|sniper|sentry|combat|water|underwater|choke|highground|autosniper|autosentry|ladder|doorway|dispenser|detpack|detpackseal|pipetrap|aim|lift|hazardzone|capneutral|gassuit|defend|danger|jump|waterexit|manual|all", FCVAR_CHEAT )
+//-----------------------------------------------------------------------------
+// Visualisation type table.
+//
+// One row per drawable attribute, replacing what used to be a thirty-branch
+// if/else chain. Two reasons it's a table now:
+//
+//   * `all` needs to pick a colour PER AREA rather than per command, which
+//     means walking the same set of types the individual modes use. Two copies
+//     of that list would drift, and a legend that disagrees with the view it
+//     describes is worse than no legend.
+//   * The colours in the chain had already drifted — `autosniper` and `sentry`
+//     were both (255,128,255), which is invisible in a combined view and
+//     confusing in a single one.
+//
+// ORDER IS SIGNIFICANT. `all` assigns each area the colour of the FIRST row it
+// matches, so the rows run most-specific-first: objectives, then authored
+// intent, then derived hints, then terrain. An area that is both a flag room
+// and a choke reads as "flag room", which is the more useful fact about it.
+//-----------------------------------------------------------------------------
+struct NavVizType
 {
-	if ( args.ArgC() < 2 )
+	const char  *name;
+	int          filter;	// FF_NAV_*  (word 1); 0 if this row uses word 2
+	int          filter2;	// FF_NAV2_* (word 2); 0 if this row uses word 1
+	int          r, g, b;
+	const char  *description;
+};
+
+// Word 1 and word 2 are separate bit spaces. A row sets exactly one of the two
+// filters — ORing an FF_NAV2_ constant into the word-1 filter would silently
+// match the wrong attribute, which is why they were never merged.
+static const NavVizType s_navVizTypes[] =
+{
+	// ---- Objectives: what the map is about --------------------------------
+	{ "flag",        FF_NAV_FLAG_ANY,        0,                       255, 255,  64, "flag rest position (per team)" },
+	{ "cap",         FF_NAV_CAP_ANY,         0,                       255, 128,  64, "capture point (per team)" },
+	{ "capneutral",  0,                      FF_NAV2_CAP_NEUTRAL,     176, 176, 176, "capture point nobody owns" },
+	{ "escape",      FF_NAV_HUNTED_ESCAPE,   0,                       255, 128, 192, "hunted VIP escape destination" },
+
+	// ---- Spawns -----------------------------------------------------------
+	{ "exit",        FF_NAV_SPAWN_ROOM_EXIT, 0,                       128, 255, 128, "spawn-room threshold (the door out)" },
+	{ "spawn",       FF_NAV_SPAWN_ROOM_ANY,  0,                       128, 128, 255, "inside a spawn room (per team)" },
+	{ "nospawn",     FF_NAV_NO_SPAWNING,     0,                        96,  96,  96, "never place a bot here" },
+
+	// ---- Authored intent --------------------------------------------------
+	{ "sniper",      FF_NAV_SNIPER_SPOT,     0,                       255,  64, 255, "hand-tagged sniper position" },
+	{ "sentry",      FF_NAV_SENTRY_SPOT,     0,                       255, 128,  64, "hand-tagged sentry position" },
+	{ "dispenser",   0,                      FF_NAV2_DISPENSER_SPOT,  255, 255,   0, "build a dispenser here" },
+	{ "detpack",     0,                      FF_NAV2_DETPACK_SPOT,    255,   0,   0, "breakable wall - blow it OPEN" },
+	{ "detpackseal", 0,                      FF_NAV2_DETPACK_SEAL,    200,  32,  96, "breakable wall - blow it SHUT" },
+	{ "pipetrap",    0,                      FF_NAV2_PIPETRAP,        255,  96,  32, "demoman pipe-carpet position" },
+	{ "defend",      0,                      FF_NAV2_DEFEND_ANY,        0, 160, 255, "hold this ground on defense" },
+	{ "aim",         0,                      FF_NAV2_AIM_HINT,        255, 255, 192, "look this way from here" },
+	{ "jump",        0,                      FF_NAV2_JUMP_SPOT,       192, 128, 255, "jump launch position" },
+	{ "waterexit",   0,                      FF_NAV2_WATER_EXIT,        0, 255, 255, "the marked way out of the water" },
+	{ "danger",      0,                      FF_NAV2_DANGER,          255,  48, 112, "author says stay out" },
+
+	// ---- Entity-derived ---------------------------------------------------
+	{ "gassuit",     0,                      FF_NAV2_HAZARD_GEAR,       0, 255,   0, "protective equipment is here" },
+	{ "hazardzone",  0,                      FF_NAV2_HAZARD_ZONE,     255,   0,  64, "overlaps a trigger_hurt" },
+	{ "lift",        0,                      FF_NAV2_LIFT,            128, 160, 192, "rides a moving platform" },
+	{ "breach",      0,                      FF_NAV2_BREACHABLE,      255,  64,   0, "breakable wall that opens a real shortcut" },
+	{ "teleport",    0,                      FF_NAV2_TELEPORT,        224,  64, 255, "trigger_teleport mouth or exit" },
+	{ "push",        0,                      FF_NAV2_PUSH,            160, 255,  64, "trigger_push volume" },
+
+	// ---- Derived structure (CFFBotAnalyzer) -------------------------------
+	// Above the shape heuristics below because these are measurements and
+	// those are guesses at the same questions.
+	{ "cutpoint",    0,                      FF_NAV2_CUTPOINT,        255,  32,  32, "removing this would split the nav graph" },
+	{ "overlook",    0,                      FF_NAV2_OVERLOOK,        255, 160, 255, "sees a lot of the ground people walk on" },
+	{ "traffic",     0,                      FF_NAV2_HIGH_TRAFFIC,    255, 224,  96, "on a large share of spawn-to-objective routes" },
+	{ "resupply",    FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH |
+	                 FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES, 0,        64, 255, 128, "ammo / health / armor available" },
+	{ "doorway",     FF_NAV_DOORWAY,         0,                       255, 255, 255, "an openable blocker overlaps this" },
+
+	// ---- Heuristics -------------------------------------------------------
+	{ "autosniper",  FF_NAV_AUTO_SNIPER_SPOT, 0,                      160,  32, 160, "heuristic sniper perch" },
+	{ "autosentry",  FF_NAV_AUTO_SENTRY_SPOT, 0,                      200, 200,  64, "heuristic sentry choke" },
+	{ "choke",       FF_NAV_CHOKE,           0,                       255, 200,  64, "narrow corridor / doorway" },
+	{ "highground",  FF_NAV_HIGH_GROUND,     0,                       128, 255, 255, "elevated relative to neighbours" },
+	{ "ladder",      FF_NAV_NEAR_LADDER,     0,                       255, 255, 128, "adjacent to a ladder" },
+
+	// ---- Terrain: last, because almost everything can also be one of these -
+	{ "underwater",  FF_NAV_UNDERWATER,      0,                        32,  64, 200, "must swim" },
+	{ "water",       FF_NAV_WATER,           0,                        64, 128, 255, "feet-level water (wading)" },
+
+	// ---- Meta -------------------------------------------------------------
+	// Dead last on purpose: MANUAL is set alongside whatever a marker actually
+	// meant, so matching it first would paint every authored area the same
+	// colour and hide the thing you placed.
+	{ "manual",      0,                      FF_NAV2_MANUAL,          255, 128,   0, "some manual marker touched this" },
+};
+
+
+static const NavVizType *FindNavVizType( const char *name )
+{
+	for ( int i = 0; i < (int)ARRAYSIZE( s_navVizTypes ); ++i )
 	{
-		Msg( "Usage: ff_nav_visualize <type>\n" );
+		if ( FStrEq( name, s_navVizTypes[ i ].name ) )
+			return &s_navVizTypes[ i ];
+	}
+	return NULL;
+}
+
+
+static bool NavVizMatches( const NavVizType &type, CFFNavArea *area )
+{
+	if ( type.filter2 != 0 )
+		return area->HasAttributeFF2( type.filter2 );
+	return area->HasAttributeFF( type.filter );
+}
+
+
+static void PrintNavVizTypes( void )
+{
+	Msg( "Usage: ff_nav_visualize <type>\n" );
+	Msg( "  all     every tagged area, coloured by what it is (see legend)\n" );
+	Msg( "  combat  recent combat intensity, red by weight\n" );
+	Msg( "  list    this list\n\n" );
+
+	for ( int i = 0; i < (int)ARRAYSIZE( s_navVizTypes ); ++i )
+	{
+		const NavVizType &t = s_navVizTypes[ i ];
+		Msg( "  %-12s rgb(%3d,%3d,%3d)  %s\n",
+			t.name, t.r, t.g, t.b, t.description );
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Persistent visualisation state.
+//
+// Overlays used to be issued once with a 30-second lifetime, which meant the
+// view you were working against silently evaporated partway through whatever
+// you were doing. It now redraws from FFBotManager_Tick until switched off,
+// which is what a debug view is for.
+//-----------------------------------------------------------------------------
+ConVar ff_nav_visualize_persist( "ff_nav_visualize_persist", "1", FCVAR_CHEAT,
+	"Keep the last ff_nav_visualize view drawn until it is switched off. "
+	"0 = draw once and let it expire (the old behaviour)." );
+
+// Index into s_navVizTypes, or one of the sentinels below.
+#define FFVIZ_NONE		-1
+#define FFVIZ_ALL		-2
+#define FFVIZ_COMBAT	-3
+
+static int   s_vizActive = FFVIZ_NONE;
+static float s_vizNextDraw = 0.0f;
+
+// How often the persistent view refreshes, and how long each batch lives.
+// Lifetime is comfortably longer than the interval so nothing blinks.
+#define FFVIZ_REDRAW_INTERVAL	0.25f
+#define FFVIZ_DRAW_LIFETIME		( FFVIZ_REDRAW_INTERVAL * 3.0f )
+
+
+//-----------------------------------------------------------------------------
+// Draw one batch. `verbose` prints counts and the legend — true for the console
+// command, false for the per-frame refresh, which must stay silent.
+//-----------------------------------------------------------------------------
+static void DrawNavVisualization( int which, bool verbose, float lifetime )
+{
+	if ( which == FFVIZ_NONE )
+		return;
+
+	// ---- combat: a continuous quantity, not an attribute ------------------
+	if ( which == FFVIZ_COMBAT )
+	{
+		int drawn = 0;
+		for ( int i = 0; i < TheNavAreas.Count(); ++i )
+		{
+			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+			if ( !area )
+				continue;
+
+			const float intensity = area->GetCombatIntensity();
+			if ( intensity <= 0.05f )
+				continue;
+
+			NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
+				(int)( 255 * intensity ), 0, 0, 64, lifetime );
+			++drawn;
+		}
+		if ( verbose )
+			Msg( "[ff_nav_visualize] Drew %d areas for 'combat'.\n", drawn );
 		return;
 	}
-	const char *type = args.Arg( 1 );
 
-	int filter = 0;
-	// Second attribute word (FF_NAV2_*, hand-authored via FFNavBuilder). A
-	// separate filter because the two words are separate bit spaces — ORing an
-	// FF_NAV2_ constant into 'filter' would silently match the wrong attribute.
-	int filter2 = 0;
-	int color[ 3 ] = { 255, 255, 255 };
-	bool combatMode = false;
+	// ---- all: colour each area by the first category it matches -----------
+	//
+	// This used to draw everything white, which answered "is anything tagged
+	// at all" and nothing else. Per-area colouring makes it the view you
+	// actually want after a nav_generate: one look tells you whether the
+	// spawns, flags and caps landed where they should have.
+	if ( which == FFVIZ_ALL )
+	{
+		int perType[ ARRAYSIZE( s_navVizTypes ) ] = { 0 };
+		int drawn = 0;
+		int untagged = 0;
+		int unnamed = 0;
 
-	if ( FStrEq( type, "spawn" ) )         { filter = FF_NAV_SPAWN_ROOM_ANY; color[0]=128; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "exit" ) )     { filter = FF_NAV_SPAWN_ROOM_EXIT; color[0]=128; color[1]=255; color[2]=128; }
-	else if ( FStrEq( type, "flag" ) )     { filter = FF_NAV_FLAG_ANY;       color[0]=255; color[1]=255; color[2]=64;  }
-	else if ( FStrEq( type, "cap" ) )      { filter = FF_NAV_CAP_ANY;        color[0]=255; color[1]=128; color[2]=64;  }
-	else if ( FStrEq( type, "resupply" ) ) { filter = FF_NAV_HAS_AMMO | FF_NAV_HAS_HEALTH | FF_NAV_HAS_ARMOR | FF_NAV_HAS_GRENADES; color[0]=64; color[1]=255; color[2]=128; }
-	else if ( FStrEq( type, "sniper" ) )      { filter = FF_NAV_SNIPER_SPOT | FF_NAV_AUTO_SNIPER_SPOT; color[0]=255; color[1]=64;  color[2]=255; }
-	else if ( FStrEq( type, "sentry" ) )      { filter = FF_NAV_SENTRY_SPOT | FF_NAV_AUTO_SENTRY_SPOT; color[0]=255; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "autosniper" ) )  { filter = FF_NAV_AUTO_SNIPER_SPOT;  color[0]=255; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "autosentry" ) )  { filter = FF_NAV_AUTO_SENTRY_SPOT;  color[0]=200; color[1]=200; color[2]=64;  }
-	else if ( FStrEq( type, "water" ) )       { filter = FF_NAV_WATER;             color[0]=64;  color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "underwater" ) )  { filter = FF_NAV_UNDERWATER;        color[0]=32;  color[1]=64;  color[2]=200; }
-	else if ( FStrEq( type, "choke" ) )       { filter = FF_NAV_CHOKE;             color[0]=255; color[1]=200; color[2]=64;  }
-	else if ( FStrEq( type, "highground" ) )  { filter = FF_NAV_HIGH_GROUND;       color[0]=128; color[1]=255; color[2]=255; }
-	else if ( FStrEq( type, "ladder" ) )      { filter = FF_NAV_NEAR_LADDER;       color[0]=255; color[1]=255; color[2]=128; }
-	else if ( FStrEq( type, "doorway" ) )     { filter = FF_NAV_DOORWAY;           color[0]=255; color[1]=255; color[2]=255; }
-	// Hand-authored (FFNavBuilder). Colours match the authoring overlay so the
-	// two views agree.
-	else if ( FStrEq( type, "dispenser" ) )   { filter2 = FF_NAV2_DISPENSER_SPOT;  color[0]=255; color[1]=255; color[2]=0;   }
-	else if ( FStrEq( type, "detpack" ) )     { filter2 = FF_NAV2_DETPACK_SPOT;    color[0]=255; color[1]=0;   color[2]=0;   }
-	else if ( FStrEq( type, "capneutral" ) )  { filter2 = FF_NAV2_CAP_NEUTRAL;     color[0]=176; color[1]=176; color[2]=176; }
-	else if ( FStrEq( type, "gassuit" ) )     { filter2 = FF_NAV2_HAZARD_GEAR;     color[0]=0;   color[1]=255; color[2]=0;   }
-	else if ( FStrEq( type, "defend" ) )      { filter2 = FF_NAV2_DEFEND_ANY;      color[0]=0;   color[1]=160; color[2]=255; }
-	else if ( FStrEq( type, "danger" ) )      { filter2 = FF_NAV2_DANGER;          color[0]=255; color[1]=48;  color[2]=112; }
-	else if ( FStrEq( type, "jump" ) )        { filter2 = FF_NAV2_JUMP_SPOT;       color[0]=192; color[1]=128; color[2]=255; }
-	else if ( FStrEq( type, "waterexit" ) )   { filter2 = FF_NAV2_WATER_EXIT;      color[0]=0;   color[1]=255; color[2]=255; }
-	else if ( FStrEq( type, "manual" ) )      { filter2 = FF_NAV2_MANUAL;          color[0]=255; color[1]=128; color[2]=0;   }
-	else if ( FStrEq( type, "detpackseal" ) ) { filter2 = FF_NAV2_DETPACK_SEAL;    color[0]=200; color[1]=32;  color[2]=96;  }
-	else if ( FStrEq( type, "pipetrap" ) )    { filter2 = FF_NAV2_PIPETRAP;        color[0]=255; color[1]=96;  color[2]=32;  }
-	else if ( FStrEq( type, "aim" ) )         { filter2 = FF_NAV2_AIM_HINT;        color[0]=255; color[1]=255; color[2]=192; }
-	else if ( FStrEq( type, "lift" ) )        { filter2 = FF_NAV2_LIFT;            color[0]=128; color[1]=160; color[2]=192; }
-	else if ( FStrEq( type, "hazardzone" ) )  { filter2 = FF_NAV2_HAZARD_ZONE;     color[0]=255; color[1]=0;   color[2]=64;  }
-	else if ( FStrEq( type, "combat" ) )   { combatMode = true; }
-	else if ( FStrEq( type, "all" ) )      { filter = -1; }
-	else { Msg( "Unknown type '%s'\n", type ); return; }
+		for ( int i = 0; i < TheNavAreas.Count(); ++i )
+		{
+			CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
+			if ( !area )
+				continue;
+
+			if ( area->GetAttributesFF() == 0 && area->GetAttributesFF2() == 0 )
+			{
+				++untagged;
+				continue;
+			}
+
+			// First match wins; the table is ordered most-specific-first.
+			const NavVizType *match = NULL;
+			int matchIndex = -1;
+			for ( int t = 0; t < (int)ARRAYSIZE( s_navVizTypes ); ++t )
+			{
+				if ( NavVizMatches( s_navVizTypes[ t ], area ) )
+				{
+					match = &s_navVizTypes[ t ];
+					matchIndex = t;
+					break;
+				}
+			}
+
+			// Tagged with something the table doesn't name — an attribute
+			// added to the enum and not to this list. Grey, and counted, so it
+			// shows up as a gap rather than silently vanishing.
+			if ( !match )
+			{
+				NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
+					110, 110, 110, 64, lifetime );
+				++drawn;
+				++unnamed;
+				continue;
+			}
+
+			NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
+				match->r, match->g, match->b, 64, lifetime );
+			++perType[ matchIndex ];
+			++drawn;
+		}
+
+		if ( !verbose )
+			return;
+
+		Msg( "[ff_nav_visualize] Drew %d of %d areas. %d carry no attribute at all.\n",
+			drawn, TheNavAreas.Count(), untagged );
+		Msg( "  Each area is coloured by the FIRST category it matches, most\n"
+		     "  specific first — a flag room that is also a choke reads as a flag room.\n" );
+		Msg( "  legend (only categories actually present):\n" );
+
+		for ( int t = 0; t < (int)ARRAYSIZE( s_navVizTypes ); ++t )
+		{
+			if ( perType[ t ] == 0 )
+				continue;
+			const NavVizType &vt = s_navVizTypes[ t ];
+			Msg( "    %-12s rgb(%3d,%3d,%3d)  %4d area%s  %s\n",
+				vt.name, vt.r, vt.g, vt.b, perType[ t ],
+				perType[ t ] == 1 ? " " : "s", vt.description );
+		}
+
+		if ( unnamed > 0 )
+		{
+			Msg( "    %-12s rgb(110,110,110)  %4d areas  tagged with an attribute this table doesn't name\n",
+				"(unnamed)", unnamed );
+		}
+		return;
+	}
+
+	// ---- a single named type ----------------------------------------------
+	if ( which < 0 || which >= (int)ARRAYSIZE( s_navVizTypes ) )
+		return;
+
+	const NavVizType &vizType = s_navVizTypes[ which ];
 
 	int drawn = 0;
 	for ( int i = 0; i < TheNavAreas.Count(); ++i )
 	{
 		CFFNavArea *area = static_cast< CFFNavArea * >( TheNavAreas[ i ] );
-		if ( !area )
+		if ( !area || !NavVizMatches( vizType, area ) )
 			continue;
 
-		if ( combatMode )
-		{
-			const float intensity = area->GetCombatIntensity();
-			if ( intensity <= 0.05f ) continue;
-			color[ 0 ] = (int)( 255 * intensity );
-			color[ 1 ] = 0;
-			color[ 2 ] = 0;
-		}
-		else if ( filter == -1 )
-		{
-			if ( area->GetAttributesFF() == 0 && area->GetAttributesFF2() == 0 ) continue;
-		}
-		else if ( filter2 != 0 )
-		{
-			if ( !area->HasAttributeFF2( filter2 ) ) continue;
-		}
-		else
-		{
-			if ( !area->HasAttributeFF( filter ) ) continue;
-		}
-
-		const Vector center = area->GetCenter();
-		NDebugOverlay::Box( center, Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
-			color[ 0 ], color[ 1 ], color[ 2 ], 64, 30.0f );
+		NDebugOverlay::Box( area->GetCenter(), Vector( -32, -32, 0 ), Vector( 32, 32, 32 ),
+			vizType.r, vizType.g, vizType.b, 64, lifetime );
 		++drawn;
 	}
-	Msg( "[ff_nav_visualize] Drew %d areas for '%s'.\n", drawn, type );
+
+	if ( !verbose )
+		return;
+
+	Msg( "[ff_nav_visualize] Drew %d areas for '%s' — rgb(%d,%d,%d), %s.\n",
+		drawn, vizType.name, vizType.r, vizType.g, vizType.b, vizType.description );
+
+	if ( drawn == 0 )
+	{
+		Msg( "  Nothing carries that attribute. Entity-derived tags (spawn, flag,\n"
+		     "  cap, resupply) come from live entities at map load, NOT from\n"
+		     "  nav_generate — check ff_bot_lua_report and ff_nav_validate.\n" );
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Per-frame refresh, called from FFBotManager_Tick.
+//-----------------------------------------------------------------------------
+void FFBotCommands_TickVisualization( void )
+{
+	if ( s_vizActive == FFVIZ_NONE )
+		return;
+
+	if ( !ff_nav_visualize_persist.GetBool() )
+	{
+		// Switched off mid-view. Stop redrawing; what's on screen expires.
+		s_vizActive = FFVIZ_NONE;
+		return;
+	}
+
+	if ( !TheNavMesh || !TheNavMesh->IsLoaded() )
+	{
+		s_vizActive = FFVIZ_NONE;
+		return;
+	}
+
+	if ( gpGlobals->curtime < s_vizNextDraw )
+		return;
+	s_vizNextDraw = gpGlobals->curtime + FFVIZ_REDRAW_INTERVAL;
+
+	DrawNavVisualization( s_vizActive, false, FFVIZ_DRAW_LIFETIME );
+}
+
+
+CON_COMMAND_F( ff_nav_visualize,
+	"Visualize FF nav attributes, and keep it drawn until switched off. "
+	"'all' colours every tagged area by category; 'list' prints the types and "
+	"their colours; 'combat' shows combat intensity; 'off' clears the view.",
+	FCVAR_CHEAT )
+{
+	if ( args.ArgC() < 2 )
+	{
+		PrintNavVizTypes();
+		return;
+	}
+
+	const char *type = args.Arg( 1 );
+
+	if ( FStrEq( type, "list" ) || FStrEq( type, "help" ) )
+	{
+		PrintNavVizTypes();
+		return;
+	}
+
+	if ( FStrEq( type, "off" ) || FStrEq( type, "none" ) || FStrEq( type, "0" ) )
+	{
+		s_vizActive = FFVIZ_NONE;
+		Msg( "[ff_nav_visualize] Off. What's already drawn expires within a second.\n" );
+		return;
+	}
+
+	CFFNavMesh *mesh = TheFFNavMesh();
+	if ( !mesh || !mesh->IsLoaded() )
+	{
+		Msg( "[ff_nav_visualize] Nav mesh not loaded. Run nav_generate.\n" );
+		return;
+	}
+
+	int which = FFVIZ_NONE;
+	if ( FStrEq( type, "all" ) )
+	{
+		which = FFVIZ_ALL;
+	}
+	else if ( FStrEq( type, "combat" ) )
+	{
+		which = FFVIZ_COMBAT;
+	}
+	else
+	{
+		const NavVizType *found = FindNavVizType( type );
+		if ( !found )
+		{
+			Msg( "Unknown type '%s'.\n", type );
+			PrintNavVizTypes();
+			return;
+		}
+		which = (int)( found - s_navVizTypes );
+	}
+
+	const bool persist = ff_nav_visualize_persist.GetBool();
+
+	// One immediate batch with a lifetime long enough to bridge to the first
+	// refresh, then the tick keeps it alive. With persistence off this is the
+	// only batch, so give it the old 30-second life.
+	DrawNavVisualization( which, true, persist ? FFVIZ_DRAW_LIFETIME : 30.0f );
+
+	if ( persist )
+	{
+		s_vizActive = which;
+		s_vizNextDraw = gpGlobals->curtime + FFVIZ_REDRAW_INTERVAL;
+		Msg( "  Staying on screen until 'ff_nav_visualize off' "
+		     "(or ff_nav_visualize_persist 0).\n" );
+	}
+	else
+	{
+		s_vizActive = FFVIZ_NONE;
+	}
 }
 
 
@@ -655,25 +980,48 @@ CON_COMMAND_F( ff_nav_autotag, "Re-run heuristic auto-tagging on the current nav
 
 
 //-----------------------------------------------------------------------------
-// ff_nav_generate_full — fire-and-forget nav generation pipeline. Equivalent
-// to running, in order:
+// ff_nav_generate_full — the whole waypointing pipeline, from an empty map to
+// bots that know what the map means.
 //
-//   sv_cheats 1
-//   nav_generate           (Source's built-in walker; reloads the map)
-//   ff_nav_autotag         (auto-fires from CFFBotTagger on level init)
-//   ff_nav_validate        (coverage / connectivity report)
-//
-// Since `nav_generate` triggers a map reload, the chained autotag + validate
-// happen automatically the next time we're in OnServerActivate — this is
-// just a convenience wrapper that issues nav_generate and prints a reminder
-// of what'll fire afterward.
+// `nav_generate` reloads the level when it finishes, which takes the command
+// buffer with it, so nothing can be chained onto it here. It doesn't need to
+// be: every stage after generation is wired into CFFNavMesh::OnServerActivate
+// and fires on the reload by itself. This command issues the generation and
+// tells you what is about to happen, because otherwise a two-minute silence
+// followed by a map reload looks like a crash.
 //-----------------------------------------------------------------------------
-CON_COMMAND_F( ff_nav_generate_full, "Run nav_generate and (on map reload) auto-tag + validate.", FCVAR_CHEAT )
+CON_COMMAND_F( ff_nav_generate_full,
+	"Generate the nav mesh and derive all gameplay knowledge from it. "
+	"Reloads the map when generation finishes.",
+	FCVAR_CHEAT )
 {
-	Msg( "[ff_nav_generate_full] Issuing nav_generate. After the map reloads:\n" );
-	Msg( "    - CFFBotTagger will stamp entity-derived tags (spawn/flag/cap/resupply)\n" );
-	Msg( "    - CFFBotAutoTagger will stamp heuristic tags (water/sniper/sentry/choke)\n" );
-	Msg( "    - run 'ff_nav_validate' to confirm coverage\n" );
+	Msg( "[ff_nav_generate_full] Generating. This takes a while on a large map,\n"
+	     "and the level reloads when it finishes. On the reload, automatically:\n" );
+	Msg( "\n" );
+	Msg( "  GENERATION (writes the .nav)\n" );
+	Msg( "    walkable-space sampling, seeded from every spawn point\n" );
+	Msg( "    doors forced open so shut ones don't wall off half the map\n" );
+	Msg( "    ladders built from brush contents (stock Source builds none)\n" );
+	Msg( "    underwater areas connected vertically\n" );
+	Msg( "    per-area visibility sets computed and saved\n" );
+	Msg( "\n" );
+	Msg( "  TAGGING (every map load, from live entities)\n" );
+	Msg( "    spawn rooms, flags, capture points, resupplies\n" );
+	Msg( "    hand-authored markers from maps/<map>.ffnavpoints\n" );
+	Msg( "    spawn exits, per-team incursion distances, invasion vectors\n" );
+	Msg( "    heuristics: water, high ground, chokes, ladders\n" );
+	Msg( "    entity passes: hazard gear, trigger_hurt volumes, lifts\n" );
+	Msg( "\n" );
+	Msg( "  ANALYSIS (every map load, derived)\n" );
+	Msg( "    structural chokepoints, from graph articulation points\n" );
+	Msg( "    main routes, from spawn-to-objective traffic\n" );
+	Msg( "    overlooks and sniper perches, from the visibility sets\n" );
+	Msg( "    defensive posts, sentry ground and aim directions\n" );
+	Msg( "    breakable walls that open shortcuts; teleport connections\n" );
+	Msg( "\n" );
+	Msg( "  Afterwards: ff_bot_nav_report, ff_nav_analyze_report,\n"
+	     "              ff_nav_validate, ff_nav_visualize all\n" );
+
 	engine->ServerCommand( "nav_generate\n" );
 }
 

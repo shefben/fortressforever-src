@@ -7,6 +7,7 @@
 #include "cbase.h"
 #include "ff_bot_tagger.h"
 #include "ff_bot_autotag.h"
+#include "ff_bot_analyze.h"
 #include "ff_nav_mesh.h"
 #include "ff_nav_area.h"
 #include "ff_nav_builder.h"
@@ -359,6 +360,18 @@ void CFFBotTagger::TagAreasFromEntities( CFFNavMesh *mesh )
 	// Runs AFTER all entity-derived tags + incursion calculations are done
 	// so the heuristics can use spawn-room / flag / cap tags as inputs.
 	CFFBotAutoTagger::TagAllAreas( mesh );
+
+	// ---- Automatic gameplay analysis ------------------------------------
+	//
+	// Last, because every one of its passes consumes something produced above:
+	// traffic needs spawn thresholds and objective areas, defensive posts need
+	// incursion distances, sniper scoring needs the high-ground tag.
+	//
+	// This is the pass that derives what used to require hand authoring —
+	// structural chokepoints, main routes, overlooks, defensive posts, sentry
+	// ground, aim directions, breakable walls that open shortcuts, and the
+	// teleport connections no amount of walkable-space sampling can find.
+	CFFBotAnalyzer::AnalyzeAll( mesh );
 
 	// ---- Diagnostics ----------------------------------------------------
 	int perTeamSpawnRooms[ FF_NAV_TEAM_COUNT ] = { 0, 0, 0, 0 };

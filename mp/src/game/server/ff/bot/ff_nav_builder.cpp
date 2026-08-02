@@ -66,6 +66,10 @@ ConVar ff_nav_builder_team( "ff_nav_builder_team", "0", FCVAR_CHEAT,
 ConVar ff_nav_builder_overlay( "ff_nav_builder_overlay", "1", FCVAR_CHEAT,
 	"Draw placed nav markers while ff_manual_nav_builder is on." );
 
+ConVar ff_nav_builder_keymap( "ff_nav_builder_keymap", "1", FCVAR_CHEAT,
+	"Draw the numpad key map on screen while ff_manual_nav_builder is on. "
+	"0 = off. The console still has ff_nav_builder_help." );
+
 static void OnBuilderModeChanged( IConVar *var, const char *pOldValue, float flOldValue );
 
 ConVar ff_manual_nav_builder( "ff_manual_nav_builder", "0", FCVAR_CHEAT,
@@ -472,7 +476,11 @@ static void ApplyPointToArea( const FFNavPoint &pt, CFFNavArea *area, CFFNavMesh
 		break;
 
 	case FFNAVPT_AIM:
+		// The yaw goes onto the area, not just into the sidecar. CFFBotAnalyzer
+		// derives aim hints too, and those have no marker to look up — the
+		// consumer should not have to know which kind of hint it got.
 		area->SetAttributeFF2( FF_NAV2_AIM_HINT );
+		area->SetAimYaw( pt.yaw );
 		break;
 
 	case FFNAVPT_LIFT:
@@ -1490,9 +1498,101 @@ int FFNavBuilder::CountPoints( int type )
 // keeps the view readable in a room full of them, and you can always noclip
 // through the wall to look.
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// On-screen key map.
+//
+// The console prints the layout once when the mode turns on, which is exactly
+// when you scroll past it, and `ff_nav_builder_help` reprints it into a console
+// you have to close again to place anything. Authoring means looking at the
+// world, so the layout belongs on the world.
+//
+// Screen coordinates are normalised 0..1 from the top-left. The block sits down
+// the left edge, clear of the crosshair and of FF's own HUD elements.
+//-----------------------------------------------------------------------------
+#define FFNAVPT_HUD_X			0.012f
+#define FFNAVPT_HUD_Y			0.30f
+#define FFNAVPT_HUD_LINE		0.021f
+
+static void DrawKeyMapHud( float duration )
+{
+	float y = FFNAVPT_HUD_Y;
+	char line[ 160 ];
+
+	// Header: which page you're on, which type is selected, which team you're
+	// authoring for. All three change what a keypress does, so all three have
+	// to be visible without opening the console.
+	Q_snprintf( line, sizeof( line ), "NAV BUILDER   page %d/%d  -  %s",
+		s_currentPage + 1, FFNAVPT_PAGE_COUNT,
+		FFNavBuilder::PageName( s_currentPage ) );
+	NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y, line, 255, 255, 255, 255, duration );
+	y += FFNAVPT_HUD_LINE;
+
+	Q_snprintf( line, sizeof( line ), "selected: %s      team: %s      markers: %d",
+		FFNavBuilder::NameForType( s_selectedType ),
+		ff_nav_builder_team.GetInt() == 0 ? "auto (yours)" : TeamName( ff_nav_builder_team.GetInt() ),
+		s_points.Count() );
+	NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y, line, 200, 200, 200, 255, duration );
+	y += FFNAVPT_HUD_LINE * 1.5f;
+
+	// The nine slots of the current page, each in its own type's colour so the
+	// list and the markers in the world agree at a glance.
+	for ( int slot = 1; slot <= FFNAVPT_SLOTS_PER_PAGE; ++slot )
+	{
+		const int type = FFNavBuilder::TypeForSlot( s_currentPage, slot );
+
+		if ( type == FFNAVPT_INVALID )
+		{
+			Q_snprintf( line, sizeof( line ), "  [%d]  -", slot );
+			NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y, line, 90, 90, 90, 255, duration );
+			y += FFNAVPT_HUD_LINE;
+			continue;
+		}
+
+		int r, g, b;
+		FFNavBuilder::ColorForType( type, &r, &g, &b );
+
+		Q_snprintf( line, sizeof( line ), "  [%d]  %-12s %s%s", slot,
+			FFNavBuilder::NameForType( type ),
+			FFNavBuilder::TypeNeedsTeam( type ) ? "(team) " : "",
+			FFNavBuilder::TypeUsesYaw( type ) ? "(faces where you look)" : "" );
+
+		// The selected type is brightened rather than marked, so the colour
+		// still reads.
+		const bool isSelected = ( type == s_selectedType );
+		NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y, line,
+			r, g, b, isSelected ? 255 : 170, duration );
+		y += FFNAVPT_HUD_LINE;
+	}
+
+	y += FFNAVPT_HUD_LINE * 0.5f;
+
+	static const char * const kControls[] = {
+		"  [/]  next page          [*]  next team",
+		"  [0]  place selected     [.]  delete here",
+		"  [+]/[-]  cycle type     [enter]  list all",
+	};
+
+	for ( int i = 0; i < (int)ARRAYSIZE( kControls ); ++i )
+	{
+		NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y, kControls[ i ],
+			170, 210, 255, 255, duration );
+		y += FFNAVPT_HUD_LINE;
+	}
+
+	// Only worth saying while it's true.
+	if ( !s_loadedThisMap )
+	{
+		y += FFNAVPT_HUD_LINE * 0.5f;
+		NDebugOverlay::ScreenText( FFNAVPT_HUD_X, y,
+			"  sidecar not loaded - is there a nav mesh on this map?",
+			255, 96, 96, 255, duration );
+	}
+}
+
+
 void FFNavBuilder::Tick( void )
 {
-	if ( !ff_manual_nav_builder.GetBool() || !ff_nav_builder_overlay.GetBool() )
+	if ( !ff_manual_nav_builder.GetBool() )
 		return;
 	if ( gpGlobals->curtime < s_nextOverlayTime )
 		return;
@@ -1504,6 +1604,12 @@ void FFNavBuilder::Tick( void )
 	// different clock to the one that schedules them, and a marker that blinks
 	// out for a frame every quarter second is unusable to work against.
 	const float duration = kRedrawInterval * 2.0f;
+
+	if ( ff_nav_builder_keymap.GetBool() )
+		DrawKeyMapHud( duration );
+
+	if ( !ff_nav_builder_overlay.GetBool() )
+		return;
 
 	for ( int i = 0; i < s_points.Count(); ++i )
 	{
